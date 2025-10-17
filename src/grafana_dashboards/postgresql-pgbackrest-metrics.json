@@ -1,0 +1,7120 @@
+{
+  "__inputs": [],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.5.1"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "description": "Dashboard for pgBackRest metrics collected by the pgbackrest_exporter.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 46,
+      "panels": [],
+      "title": "General info",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Count of selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 57,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(count by (stanza)(pgbackrest_stanza_status{stanza=~\"$stanza\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Stanzas CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Count of all backups for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 52,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(count by (stanza) (pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Backups CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of full backups for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 55,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(count by (stanza) (pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"full\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Full backups CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of diff backups for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 58,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(count by (stanza) (pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"diff\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Diff backups CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of incr backups for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 59,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(count by (stanza) (pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"incr\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Incr backups CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of backups with errors for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 60,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum(pgbackrest_backup_error_status{stanza=~\"$stanza\", repo_key=~\"$repo_key\"})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Backups with errors CNT",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Current stanza and active operations statuses for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "text": "ok"
+                      },
+                      "1": {
+                        "text": "missing stanza path"
+                      },
+                      "2": {
+                        "text": "no valid backups"
+                      },
+                      "3": {
+                        "text": "missing stanza data"
+                      },
+                      "4": {
+                        "text": "different across repos"
+                      },
+                      "5": {
+                        "text": "database mismatch across repos"
+                      },
+                      "6": {
+                        "text": "requested backup not found"
+                      },
+                      "99": {
+                        "text": "other"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Since last full"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Since last diff"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Since last diff"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Since last incr"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lock status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 155
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 0,
+                        "text": "no active operation"
+                      },
+                      "1": {
+                        "index": 1,
+                        "text": "backup/expire"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "purple",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "NaN": {
+                        "index": 0,
+                        "text": "no active operation"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "purple",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 30,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_stanza_status{stanza=~\"$stanza\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_since_last_completion_seconds{stanza=~\"$stanza\", backup_type=\"full\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_since_last_completion_seconds{stanza=~\"$stanza\", backup_type=\"diff\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_since_last_completion_seconds{stanza=~\"$stanza\", backup_type=\"incr\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_stanza_lock_status{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(pgbackrest_stanza_backup_compete_bytes{stanza=~\"$stanza\"}/pgbackrest_stanza_backup_total_bytes{stanza=~\"$stanza\"})*100",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "F"
+        }
+      ],
+      "title": "Stanza status and last backups",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "stanza",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D",
+                "Value #E",
+                "Value #F"
+              ],
+              "pattern": "stanza"
+            }
+          }
+        },
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "stanza"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A": 4,
+              "Value #B": 1,
+              "Value #C": 2,
+              "Value #D": 3,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value #A": "Status",
+              "Value #B": "Since last full",
+              "Value #C": "Since last diff",
+              "Value #D": "Since last incr",
+              "Value #E": "Lock status",
+              "Value #F": "Completed",
+              "stanza": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Current repository status for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "color-text"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 0,
+                        "text": "ok"
+                      },
+                      "1": {
+                        "index": 1,
+                        "text": "missing stanza path"
+                      },
+                      "2": {
+                        "index": 2,
+                        "text": "no valid backups"
+                      },
+                      "3": {
+                        "index": 3,
+                        "text": "missing stanza data"
+                      },
+                      "4": {
+                        "index": 4,
+                        "text": "different across repos"
+                      },
+                      "5": {
+                        "index": 5,
+                        "text": "database mismatch across repos"
+                      },
+                      "6": {
+                        "index": 6,
+                        "text": "requested backup not found"
+                      },
+                      "99": {
+                        "index": 7,
+                        "text": "other"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cipher"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 13
+      },
+      "id": 32,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_repo_status{stanza=~\"$stanza\", repo_key=~\"$repo_key\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Repository status",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "cipher",
+                "repo_key",
+                "stanza",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "stanza 2": false
+            },
+            "indexByName": {
+              "Value": 3,
+              "cipher": 2,
+              "repo_key": 1,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value": "Status",
+              "Value #A": "status",
+              "cipher": "Cipher",
+              "repo_key": "Repo key",
+              "stanza": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of backups for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 13
+      },
+      "id": 72,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "count by (stanza) (pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Backups CNT",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Current WAL archive status for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 1,
+                        "text": "error"
+                      },
+                      "1": {
+                        "index": 0,
+                        "text": "ok"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PG Version"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 21
+      },
+      "id": 33,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_wal_archive_status{stanza=~\"$stanza\", repo_key=~\"$repo_key\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "WAL archive status",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "database_id",
+                "pg_version",
+                "repo_key",
+                "stanza",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "stanza 2": false
+            },
+            "indexByName": {
+              "Value": 4,
+              "database_id": 3,
+              "pg_version": 2,
+              "repo_key": 1,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value": "Status",
+              "Value #A": "status",
+              "database_id": "Database ID",
+              "pg_version": "PG Version",
+              "repo_key": "Repo Key",
+              "stanza": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average full uncompressed size of the database for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 21
+      },
+      "id": 67,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_size_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\"})",
+          "legendFormat": "{{ stanza }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average full uncompressed size of the database ",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Last backup error status and duration for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 1,
+                        "text": "ok"
+                      },
+                      "1": {
+                        "index": 0,
+                        "text": "error"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 29
+      },
+      "id": 77,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_error_status{stanza=~\"$stanza\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_duration_seconds{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        }
+      ],
+      "title": "Last backup error status and duration",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backup_type 1",
+                "block_incr 1",
+                "Value #A",
+                "Value #B",
+                "stanza 1"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "stanza 2": false
+            },
+            "indexByName": {
+              "Value #A": 3,
+              "Value #B": 4,
+              "backup_type 1": 1,
+              "block_incr 1": 2,
+              "stanza 1": 0
+            },
+            "renameByName": {
+              "Value": "Status",
+              "Value #A": "Error status",
+              "Value #B": "Duration",
+              "backup_type 1": "Backup type",
+              "block_incr 1": "Block incremental",
+              "database_id": "Database ID",
+              "pg_version": "PG Version",
+              "repo_key": "Repo Key",
+              "stanza": "Stanza",
+              "stanza 1": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Total size occupied by backups in the repository for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 29
+      },
+      "id": 69,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (stanza) (pgbackrest_backup_repo_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\"})",
+          "legendFormat": "{{ stanza }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total size occupied by backups in the repository",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 76,
+      "panels": [],
+      "title": "Last backups info",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average last full backup duration for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 38
+      },
+      "id": 78,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_duration_seconds{stanza=~\"$stanza\", backup_type=\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average last full backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average last differential backup duration for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 38
+      },
+      "id": 79,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_duration_seconds{stanza=~\"$stanza\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average last diff backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average last incremental backup duration for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 38
+      },
+      "id": 73,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_duration_seconds{stanza=~\"$stanza\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average last incr backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by last full backup in the repository for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 46
+      },
+      "id": 81,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_repo_delta_bytes{stanza=~\"$stanza\", backup_type=~\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of last full backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by last differential backup in the repository for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 46
+      },
+      "id": 82,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_repo_delta_bytes{stanza=~\"$stanza\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of last diff backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by last  incremental backup in the repository for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 46
+      },
+      "id": 74,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_repo_delta_bytes{stanza=~\"$stanza\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of last incr backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "For selected stanzas.\n\nBackup sizes:\n* **databaze size** - full uncompressed size of the database;\n* **database backup size** - the amount of data in the database to actually back up.\n\nThese will be the same for full backups.\n\nRepo sizes:\n* **repo backup set size** - includes all the files from this backup and any referenced backups in the repository that are required to restore the database from this backup;\n* **repo backup size** - includes only the files in this backup.\n\nThese will also be the same for full backups. Repository sizes reflect compressed file sizes if compression is enabled.\n\nSee https://pgbackrest.org/command.html#command-info\n\nFor block incremental backups **repo backup set size** is zero.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "semi-dark-green",
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo Key"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database backup size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 176
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo backup set size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo backup size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo block incr map size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo block incr delta map size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 230
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "id": 85,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_size_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_delta_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_repo_size_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_repo_delta_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_repo_size_map_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_repo_delta_map_bytes{stanza=~\"$stanza\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "F"
+        }
+      ],
+      "title": "Last backup size",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {
+            "frameNameLabel": "frame",
+            "frameNameMode": "field"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backup_type 1",
+                "block_incr 1",
+                "stanza 1",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D",
+                "Value #F",
+                "Value #E"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A": 3,
+              "Value #B": 4,
+              "Value #C": 5,
+              "Value #D": 6,
+              "Value #E": 7,
+              "Value #F": 8,
+              "backup_type 1": 1,
+              "block_incr 1": 2,
+              "stanza 1": 0
+            },
+            "renameByName": {
+              "Value #A": "Database size",
+              "Value #B": "Database backup size",
+              "Value #C": "Repo backup set size",
+              "Value #D": "Repo backup size",
+              "Value #E": "Repo block incr map size",
+              "Value #F": "Repo block incr delta map size",
+              "backup_name 1": "Backup name",
+              "backup_type 1": "Backup type",
+              "block_incr 1": "Block incremental",
+              "database_id 1": "Database ID",
+              "repo_key 1": "Repo Key",
+              "stanza 1": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of annotations in the last backups for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last full"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last diff"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last incr"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 63
+      },
+      "id": 86,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_annotations{stanza=~\"$stanza\", backup_type=\"full\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_annotations{stanza=~\"$stanza\", backup_type=\"diff\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_annotations{stanza=~\"$stanza\", backup_type=\"incr\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        }
+      ],
+      "title": "Number of annotations in the last backups",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "stanza",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D"
+              ],
+              "pattern": "stanza"
+            }
+          }
+        },
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "stanza"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A": 4,
+              "Value #B": 1,
+              "Value #C": 2,
+              "Value #D": 3,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value #A": "Annotations in last incr",
+              "Value #B": "Annotations in last full",
+              "Value #C": "Annotations in last diff",
+              "Value #D": "Since last incr",
+              "stanza": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of annotations in the last backup for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 63
+      },
+      "id": 87,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_annotations{stanza=~\"$stanza\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of annotations in the last backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of databases in the last backups for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DBs in last full"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DBs in last diff"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DBs in last incr"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 71
+      },
+      "id": 50,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_databases{stanza=~\"$stanza\", backup_type=\"full\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_databases{stanza=~\"$stanza\", backup_type=\"diff\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_last_databases{stanza=~\"$stanza\", backup_type=\"incr\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        }
+      ],
+      "title": "Number of databases in the last backups",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "stanza",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D"
+              ],
+              "pattern": "stanza"
+            }
+          }
+        },
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "stanza"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A": 4,
+              "Value #B": 1,
+              "Value #C": 2,
+              "Value #D": 3,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value #A": "DBs in last incr",
+              "Value #B": "DBs in last full",
+              "Value #C": "DBs in last diff",
+              "Value #D": "Since last incr",
+              "stanza": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of databases in the last backup for selected stanzas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 71
+      },
+      "id": 61,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_last_databases{stanza=~\"$stanza\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of databases in the last backup",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 65,
+      "panels": [],
+      "title": "General backups info",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average full backup duration for selected stanzas and  repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 80
+      },
+      "id": 54,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_duration_seconds{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average full backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average differential backup duration for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 80
+      },
+      "id": 62,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_duration_seconds{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average diff backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average incremental backup duration for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 80
+      },
+      "id": 80,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_duration_seconds{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average incr backup duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by full backup in the repository for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 88
+      },
+      "id": 68,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_repo_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of full backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by differential backup in the repository for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 88
+      },
+      "id": 70,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_repo_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of diff backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average size occupied by incremental backup in the repository for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 88
+      },
+      "id": 83,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_repo_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average size of incr backup in the repository",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of annotations in the full backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 96
+      },
+      "id": 88,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_annotations{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of annotations in the full backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of annotations in the diff backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 96
+      },
+      "id": 90,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_annotations{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of annotations in the diff backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of annotations in the incr backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 96
+      },
+      "id": 91,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_annotations{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of annotations in the incr backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of databases in the full backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 104
+      },
+      "id": 89,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_databases{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"full\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of databases in the full backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of databases in the diff backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 104
+      },
+      "id": 92,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_databases{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"diff\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of databases in the diff backup",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Average number of databases in the incr backup for selected stanzas and repos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 104
+      },
+      "id": 93,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "avg by (stanza) (pgbackrest_backup_databases{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=\"incr\"})",
+          "legendFormat": "{{stanza}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average number of databases in the incr backup",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
+      "id": 48,
+      "panels": [],
+      "title": "Detailed backups info",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Backup error status for selected stanzas, repos, backup types, block incremental statuses and backup names.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "text": "ok"
+                      },
+                      "1": {
+                        "text": "error"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "noValue",
+                "value": "null"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block Incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 113
+      },
+      "id": 37,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "pgbackrest_backup_error_status{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Backup error status",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backup_name",
+                "backup_type",
+                "database_id",
+                "repo_key",
+                "stanza",
+                "Value",
+                "block_incr"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Value #A": false,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "backup_type 2": true,
+              "database_id 2": true,
+              "instance": true,
+              "instance 1": true,
+              "instance 2": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "prj 1": true,
+              "prj 2": true,
+              "prometheus 1": true,
+              "prometheus 2": true,
+              "repo_key 2": true,
+              "service 1": true,
+              "service 2": true,
+              "stanza 2": true
+            },
+            "indexByName": {
+              "Value": 6,
+              "backup_name": 4,
+              "backup_type": 2,
+              "block_incr": 3,
+              "database_id": 5,
+              "repo_key": 1,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value": "Error status",
+              "Value #A": "Error status",
+              "Value #B": "Databases CNT",
+              "backrest_ver": "pgBackRest version",
+              "backup_name": "Backup name",
+              "backup_type": "Backup type",
+              "backup_type 1": "Backup type",
+              "block_incr": "Block Incremental",
+              "database_id": "Database ID",
+              "database_id 1": "Database ID",
+              "lsn_start": "LSN start",
+              "lsn_stop": "LSN stop",
+              "pg_version": "PG version",
+              "prior": "Prior",
+              "repo_key": "Repo key",
+              "repo_key 1": "Repo key",
+              "stanza": "Stanza",
+              "stanza 1": "Stanza",
+              "wal_start": "WAL start",
+              "wal_stop": "WAL stop"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Backup duration for selected stanzas, repos, backup types, block incremental statuses and backup names.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "": {
+                  "text": ""
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Start time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stop time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 121
+      },
+      "id": 35,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "expr": "pgbackrest_backup_duration_seconds{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Backup duration",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backup_name",
+                "backup_type",
+                "database_id",
+                "repo_key",
+                "stanza",
+                "start_time",
+                "stop_time",
+                "Value",
+                "block_incr"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value": 6,
+              "backup_name": 4,
+              "backup_type": 2,
+              "block_incr": 3,
+              "database_id": 5,
+              "repo_key": 1,
+              "stanza": 0,
+              "start_time": 7,
+              "stop_time": 8
+            },
+            "renameByName": {
+              "Value": "Duration",
+              "backup_name": "Backup name",
+              "backup_type": "Backup type",
+              "block_incr": "Block incremental",
+              "database_id": "Database ID",
+              "repo_key": "Repo key",
+              "stanza": "Stanza",
+              "start_time": "Start time",
+              "stop_time": "Stop time"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "For selected stanzas, repos, backup types, block incremental statuses and backup names.\n\nBackup sizes:\n* **databaze size** - full uncompressed size of the database;\n* **database backup size** - the amount of data in the database to actually back up.\n\nThese will be the same for full backups.\n\nRepo sizes:\n* **repo backup set size** - includes all the files from this backup and any referenced backups in the repository that are required to restore the database from this backup;\n* **repo backup size** - includes only the files in this backup.\n\nThese will also be the same for full backups. Repository sizes reflect compressed file sizes if compression is enabled.\n\nSee https://pgbackrest.org/command.html#command-info\n\nFor block incremental backups **repo backup set size** is zero.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "semi-dark-green",
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo Key"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database backup size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 176
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo backup set size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo backup size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo block incr map size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo block incr delta map size"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 230
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 130
+      },
+      "id": 39,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_size_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_repo_size_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_repo_delta_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_repo_size_map_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_repo_delta_map_bytes{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "F"
+        }
+      ],
+      "title": "Backup size",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {
+            "frameNameLabel": "frame",
+            "frameNameMode": "field"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backup_name 1",
+                "backup_type 1",
+                "database_id 1",
+                "repo_key 1",
+                "stanza 1",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D",
+                "Value #E",
+                "Value #F",
+                "block_incr 1"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A": 6,
+              "Value #B": 7,
+              "Value #C": 8,
+              "Value #D": 9,
+              "Value #E": 10,
+              "Value #F": 11,
+              "backup_name 1": 4,
+              "backup_type 1": 2,
+              "block_incr 1": 3,
+              "database_id 1": 5,
+              "repo_key 1": 1,
+              "stanza 1": 0
+            },
+            "renameByName": {
+              "Value #A": "Database size",
+              "Value #B": "Database backup size",
+              "Value #C": "Repo backup set size",
+              "Value #D": "Repo backup size",
+              "Value #E": "Repo block incr map size",
+              "Value #F": "Repo block incr delta map size",
+              "backup_name 1": "Backup name",
+              "backup_type 1": "Backup type",
+              "block_incr 1": "Block incremental",
+              "database_id 1": "Database ID",
+              "repo_key 1": "Repo Key",
+              "stanza 1": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Backup detail info for selected stanzas, repos, backup types, block incremental statuses and backup names.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LSN start"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LSN stop"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WAL start"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 225
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WAL stop"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 225
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prior"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PG ver."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pgBackRest ver."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block Incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 139
+      },
+      "id": 49,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "expr": "pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Backup detail info",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "backrest_ver",
+                "backup_name",
+                "backup_type",
+                "database_id",
+                "lsn_start",
+                "lsn_stop",
+                "pg_version",
+                "repo_key",
+                "stanza",
+                "wal_start",
+                "wal_stop",
+                "prior",
+                "Value",
+                "block_incr"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Value": true,
+              "Value #A": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "backup_type 2": true,
+              "database_id 2": true,
+              "instance": true,
+              "instance 1": true,
+              "instance 2": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "prj 1": true,
+              "prj 2": true,
+              "prometheus 1": true,
+              "prometheus 2": true,
+              "repo_key 2": true,
+              "service 1": true,
+              "service 2": true,
+              "stanza 2": true
+            },
+            "indexByName": {
+              "Value": 13,
+              "backrest_ver": 12,
+              "backup_name": 4,
+              "backup_type": 2,
+              "block_incr": 3,
+              "database_id": 5,
+              "lsn_start": 6,
+              "lsn_stop": 7,
+              "pg_version": 11,
+              "prior": 10,
+              "repo_key": 1,
+              "stanza": 0,
+              "wal_start": 8,
+              "wal_stop": 9
+            },
+            "renameByName": {
+              "Value #B": "Error",
+              "backrest_ver": "pgBackRest ver.",
+              "backup_name": "Backup name",
+              "backup_type": "Backup type",
+              "backup_type 1": "Backup type",
+              "block_incr": "Block Incremental",
+              "database_id": "Database ID",
+              "database_id 1": "Database ID",
+              "lsn_start": "LSN start",
+              "lsn_stop": "LSN stop",
+              "pg_version": "PG ver.",
+              "prior": "Prior",
+              "repo_key": "Repo key",
+              "repo_key 1": "Repo key",
+              "stanza": "Stanza",
+              "stanza 1": "Stanza",
+              "wal_start": "WAL start",
+              "wal_stop": "WAL stop"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of annotations in the backup for selected stanzas, repos, backup types, block incremental statuses and backup names.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last full"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last diff"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last incr"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 147
+      },
+      "id": 94,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_annotations{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Number of annotations in the backup",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "stanza",
+                "repo_key",
+                "Value",
+                "backup_name",
+                "backup_type",
+                "block_incr",
+                "database_id"
+              ],
+              "pattern": "stanza"
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value": 6,
+              "backup_name": 4,
+              "backup_type": 2,
+              "block_incr": 3,
+              "database_id": 5,
+              "repo_key": 1,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value": "Annotations",
+              "Value #A": "Annotations",
+              "Value #B": "DBs ",
+              "Value #C": "Annotations in last diff",
+              "Value #D": "Since last incr",
+              "backup_name": "Backup name",
+              "backup_name 1": "Backup name",
+              "backup_type": "Backup type",
+              "backup_type 1": "Backup type",
+              "block_incr": "Block incremental",
+              "block_incr 1": "Block incremental",
+              "database_id": "Database ID",
+              "database_id 1": "Database ID",
+              "repo_key": "Repo key",
+              "repo_key 1": "Repo key",
+              "stanza": "Stanza",
+              "stanza 1": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Number of databases in the backup for selected stanzas, repos, backup types, block incremental statuses and backup names.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last full"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last diff"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Annotations in last incr"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block incremental"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Backup name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DBs"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 156
+      },
+      "id": 95,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Stanza"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_backup_databases{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\", block_incr=~\"$block_incr\", backup_name=~\"$backup_name\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Number of databases in the backup",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "stanza",
+                "Value",
+                "repo_key",
+                "backup_name",
+                "backup_type",
+                "block_incr",
+                "database_id"
+              ],
+              "pattern": "stanza"
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value": 6,
+              "backup_name": 4,
+              "backup_type": 2,
+              "block_incr": 3,
+              "database_id": 5,
+              "repo_key": 1,
+              "stanza": 0
+            },
+            "renameByName": {
+              "Value": "DBs",
+              "Value #A": "Annotations",
+              "Value #B": "DBs ",
+              "Value #C": "Annotations in last diff",
+              "Value #D": "Since last incr",
+              "backup_name": "Backup name",
+              "backup_name 1": "Backup name",
+              "backup_type": "Backup type",
+              "backup_type 1": "Backup type",
+              "block_incr": "Block incremental",
+              "block_incr 1": "Block incremental",
+              "database_id": "Database ID",
+              "database_id 1": "Database ID",
+              "repo_key": "Repo key",
+              "repo_key 1": "Repo key",
+              "stanza": "Stanza",
+              "stanza 1": "Stanza"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 165
+      },
+      "id": 97,
+      "panels": [],
+      "title": "pgBackRest Exporter info",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheusds}"
+      },
+      "description": "Information about exporter build parameters and status of getting data from  pgBackRest.\n\nWhen the information is collected for all available stanzas, the **stanza for metrics** is **all-stanzas**.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Instance"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 250
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Job"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Exporter version"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stanza for metrics"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Get data status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              },
+              {
+                "id": "noValue",
+                "value": "-"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 0,
+                        "text": "error"
+                      },
+                      "1": {
+                        "index": 1,
+                        "text": "ok"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build goarch"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build goos"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build gover"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build branch"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build rev"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Build tags"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 166
+      },
+      "id": 99,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_exporter_build_info",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheusds}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "pgbackrest_exporter_status",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Exporter status and build info",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "instance",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "instance",
+                "goarch",
+                "goos",
+                "goversion",
+                "job 1",
+                "revision",
+                "tags",
+                "version",
+                "stanza",
+                "Value #B",
+                "branch"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {
+              "Value #B": 3,
+              "branch": 8,
+              "goarch": 5,
+              "goos": 6,
+              "goversion": 7,
+              "instance": 0,
+              "job 1": 1,
+              "revision": 9,
+              "stanza": 2,
+              "tags": 10,
+              "version": 4
+            },
+            "renameByName": {
+              "Value #B": "Get data status",
+              "branch": "Build branch",
+              "goarch": "Build goarch",
+              "goos": "Build goos",
+              "goversion": "Build gover",
+              "instance": "Instance",
+              "job 1": "Job",
+              "revision": "Build rev",
+              "stanza": "Stanza for metrics",
+              "tags": "Build tags",
+              "version": "Exporter version"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 40,
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheusds}"
+        },
+        "definition": "label_values(pgbackrest_repo_status, stanza)",
+        "includeAll": true,
+        "label": "Stanza",
+        "multi": true,
+        "name": "stanza",
+        "options": [],
+        "query": {
+          "query": "label_values(pgbackrest_repo_status, stanza)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheusds}"
+        },
+        "definition": "label_values(pgbackrest_repo_status{stanza=~\"$stanza\"}, repo_key)",
+        "includeAll": true,
+        "label": "Repo key",
+        "multi": true,
+        "name": "repo_key",
+        "options": [],
+        "query": {
+          "query": "label_values(pgbackrest_repo_status{stanza=~\"$stanza\"}, repo_key)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheusds}"
+        },
+        "definition": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\"}, backup_type)",
+        "includeAll": true,
+        "label": "Backup type",
+        "multi": true,
+        "name": "backup_type",
+        "options": [],
+        "query": {
+          "query": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\"}, backup_type)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheusds}"
+        },
+        "definition": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\"}, block_incr)",
+        "includeAll": true,
+        "label": "Block incr",
+        "multi": true,
+        "name": "block_incr",
+        "options": [],
+        "query": {
+          "query": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\"}, block_incr)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheusds}"
+        },
+        "definition": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\",block_incr=~\"$block_incr\"}, backup_name)",
+        "includeAll": true,
+        "label": "Backup name",
+        "multi": true,
+        "name": "backup_name",
+        "options": [],
+        "query": {
+          "query": "label_values(pgbackrest_backup_info{stanza=~\"$stanza\", repo_key=~\"$repo_key\", backup_type=~\"$backup_type\",block_incr=~\"$block_incr\"}, backup_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-12h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "pgBackRest",
+  "tags": [
+    "postgres",
+    "pgbackrest",
+    "backups"
+  ],
+  "uid": "Wyf8STx7z",
+  "version": 2,
+  "weekStart": "",
+  "gnetId": 17709
+}

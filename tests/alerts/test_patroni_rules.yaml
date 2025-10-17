@@ -1,0 +1,80 @@
+rule_files:
+  - ../../src/prometheus_alert_rules/patroni_rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: PatroniPostgresqlDown fires immediately when running=0
+    interval: 1m
+    input_series:
+      - series: 'patroni_postgres_running{instance="pg1"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PatroniPostgresqlDown
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PatroniPostgresqlDown
+              severity: critical
+              instance: pg1
+            exp_annotations:
+              summary: Patroni PostgreSQL instance pg1 is down.
+              description: |
+                Check for errors in the Loki logs.
+                LABELS = map[__name__:patroni_postgres_running instance:pg1]
+
+  - name: PatroniPostgresqlDown does not fire when running=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_postgres_running{instance="pg2"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniPostgresqlDown
+        eval_time: 1m
+        exp_alerts: []
+
+  - name: PatroniHasNoLeader fires when both master and standby_leader=0
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '0'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PatroniHasNoLeader
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PatroniHasNoLeader
+              severity: critical
+              scope: cluster1
+            exp_annotations:
+              summary: Patroni instance  has no leader node. 
+              description: |
+                A leader node (neither primary nor standby) cannot be found inside the cluster cluster1.
+                Check for errors in the Loki logs.
+                LABELS = map[scope:cluster1]
+
+  - name: PatroniHasNoLeader does not fire if master=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PatroniHasNoLeader
+        eval_time: 1m
+        exp_alerts: []
+
+  - name: PatroniHasNoLeader does not fire if standby_leader=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '0'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniHasNoLeader
+        eval_time: 1m
+        exp_alerts: []
