@@ -1,0 +1,28 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.9    unsupported  01:35:01Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.19    error      1/3  postgresql           14/stable    936  no       hook failed: "database-peers-relation-changed"
+postgresql-test-app           waiting    0/1  postgresql-test-app  latest/edge  414  no       waiting for machine
+
+Unit                   Workload  Agent       Machine  Public address  Ports     Message
+postgresql-test-app/0  waiting   allocating  3        10.99.5.134               waiting for machine
+postgresql/0*          error     idle        0        10.99.5.126     5432/tcp  hook failed: "database-peers-relation-changed"
+postgresql/1           waiting   allocating  1        10.99.5.61                waiting for machine
+postgresql/2           waiting   allocating  2        10.99.5.127               waiting for machine
+
+Machine  State    Address      Inst id        Base          AZ             Message
+0        started  10.99.5.126  juju-a9d053-0  ubuntu@22.04  runnervmzdgdc  Running
+1        down     10.99.5.61   juju-a9d053-1  ubuntu@22.04  runnervmzdgdc  Running
+2        down     10.99.5.127  juju-a9d053-2  ubuntu@22.04  runnervmzdgdc  Running
+3        down     10.99.5.134  juju-a9d053-3  ubuntu@22.04  runnervmzdgdc  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:33:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
