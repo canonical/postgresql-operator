@@ -2529,17 +2529,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def relations_user_databases_map(self) -> dict:
         """Returns a user->databases map for all relations."""
-        user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
-        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
-        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
-            if user not in user_database_map and (
-                database := self.postgresql_client_relation.database_provides.fetch_relation_field(
-                    relation.id, "database"
-                )
-            ):
-                user_database_map[user] = database
+        user_database_map = self._collect_user_relations()
+
         if not self.is_cluster_initialised or not self._patroni.member_started:
             user_database_map.update({
                 USER: "all",
@@ -2560,8 +2552,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 ):
                     continue
                 if databases := ",".join(
-                    self.postgresql.list_accessible_databases_for_user(
-                        user, current_host=self.is_connectivity_enabled
+                    sorted(
+                        self.postgresql.list_accessible_databases_for_user(
+                            user, current_host=self.is_connectivity_enabled
+                        )
                     )
                 ):
                     user_database_map[user] = databases
@@ -2583,18 +2577,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @cached_property
-    def generate_user_hash(self) -> str:
-        """Generate expected user and database hash."""
+    def _collect_user_relations(self) -> dict[str, str]:
         user_db_pairs = {}
         custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
+        prefix_database_mapping = self.postgresql_client_relation.get_databases_prefix_mapping()
+
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
             if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                 relation.id, "database"
             ):
                 user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
+                database = ",".join(prefix_database_mapping.get(str(relation.id), [database]))
                 user_db_pairs[user] = database
-        return shake_128(str(user_db_pairs).encode()).hexdigest(16)
+        return user_db_pairs
+
+    @cached_property
+    def generate_user_hash(self) -> str:
+        """Generate expected user and database hash."""
+        return shake_128(str(self._collect_user_relations()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None

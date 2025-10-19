@@ -61,6 +61,7 @@ SECRET_DELETED_LABEL = "None"  # noqa: S105
 SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
 
 USERNAME_MAPPING_LABEL = "custom-usernames"
+DATABASE_MAPPING_LABEL = "prefix-databases"
 
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
