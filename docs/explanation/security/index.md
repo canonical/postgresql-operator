@@ -89,7 +89,7 @@ PostgreSQL logs are stored in `/var/snap/charmed-postgresql/common/var/log/postg
 
 ### Security event logging
 
-Charmed PostgreSQL K8s provides [PostgreSQL Audit Extension (or pgAudit)](https://www.pgaudit.org/) enabled by default. These logs are stored in the `/var/snap/charmed-postgresql/common/var/log/postgresql` directory of each unit along with the regular workload logs, and rotated minutely. If COS is enabled, audit logs are also persisted there.
+Charmed PostgreSQL VM provides [PostgreSQL Audit Extension (or pgAudit)](https://www.pgaudit.org/) enabled by default. These logs are stored in the `/var/snap/charmed-postgresql/common/var/log/postgresql` directory of each unit along with the regular workload logs, and rotated minutely. If COS is enabled, audit logs are also persisted there.
 
 The following information is configured to be logged:
 
