@@ -1437,12 +1437,7 @@ async def backup_operations(
 
 
 def execute_queries_on_unit(
-    unit_address: str,
-    username: str,
-    password: str,
-    queries: list[str],
-    database: str,
-    commit: bool = False,
+    unit_address: str, username: str, password: str, queries: list[str], database: str
 ) -> list:
     """Execute given PostgreSQL queries on a unit.
 
@@ -1452,7 +1447,6 @@ def execute_queries_on_unit(
         password: The PostgreSQL password
         queries: A list of queries to execute
         database: Database to execute in
-        commit: A keyword arg indicating whether there are any writes queries
 
     Returns:
         A list of rows that were potentially queried
