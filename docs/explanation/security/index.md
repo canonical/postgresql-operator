@@ -87,6 +87,21 @@ Charmed PostgreSQL provides native integration with the [Canonical Observability
 
 PostgreSQL logs are stored in `/var/snap/charmed-postgresql/common/var/log/postgresql` within the PostgreSQL container of each unit. It’s recommended to integrate the charm with [COS](/how-to/monitoring-cos/enable-monitoring), from where the logs can be easily persisted and queried using [Loki](https://charmhub.io/loki-k8s)/[Grafana](https://charmhub.io/grafana).
 
+### Security event logging
+
+Charmed PostgreSQL VM provides [PostgreSQL Audit Extension (or pgAudit)](https://www.pgaudit.org/) enabled by default. These logs are stored in the `/var/snap/charmed-postgresql/common/var/log/postgresql` directory of each unit along with the regular workload logs, and rotated minutely. If COS is enabled, audit logs are also persisted there.
+
+The following information is configured to be logged:
+
+* Statements related to roles and privileges, such as GRANT, REVOKE, CREATE, ALTER, and DROP ROLE.
+* Data Definition Language (DDL) statements.
+* Miscellaneous commands like DISCARD, FETCH, CHECKPOINT, VACUUM, SET.
+* Miscellaneous SET commands.
+
+Other events, like connections and disconnections, are logged depending on the value of the charm configuration options related to them. For more information, check the configuration options with the `logging` prefix in the [configuration reference](https://charmhub.io/postgresql/configurations#logging_log_connections).
+
+No secrets are logged.
+
 ## Additional resources
 
 For details on the cryptography used by Charmed PostgreSQL, see the [Cryptography](/explanation/security/cryptography) explanation page.
