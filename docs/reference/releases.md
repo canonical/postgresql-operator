@@ -44,8 +44,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 | Revision | amd64 | arm64 |  Snap revision |
 |:--------:|:-----:|:-----:|:-----:|
-| 935      |         |![check] | 230 |
-| 936      | ![check]|         | 229 |
+| [935]      |         |![check] | 230 |
+| [936]      | ![check]|         | 229 |
 
 
 <details>
