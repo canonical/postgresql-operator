@@ -80,7 +80,7 @@ def first_model_continuous_writes(first_model: str) -> Generator:
 
 
 def test_deploy(first_model: str, second_model: str, charm: str) -> None:
-    """Simple test to ensure that the MySQL application charms get deployed."""
+    """Simple test to ensure that the PostgreSQL application charms get deployed."""
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture.architecture}
 
@@ -129,7 +129,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
 
 
 def test_async_relate(first_model: str, second_model: str) -> None:
-    """Relate the two MySQL clusters."""
+    """Relate the two PostgreSQL clusters."""
     logging.info("Creating offers in first model")
     model_1 = Juju(model=first_model)
     model_1.offer(f"{first_model}.{DB_APP_1}", endpoint="replication-offer")
@@ -174,7 +174,7 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 def test_upgrade_from_edge(
     first_model: str, second_model: str, charm: str, first_model_continuous_writes
 ) -> None:
-    """Upgrade the two MySQL clusters."""
+    """Upgrade the two PostgreSQL clusters."""
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
 

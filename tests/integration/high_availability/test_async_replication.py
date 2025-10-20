@@ -143,7 +143,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
 
 
 def test_async_relate(first_model: str, second_model: str) -> None:
-    """Relate the two MySQL clusters."""
+    """Relate the two PostgreSQL clusters."""
     logging.info("Creating offers in first model")
     model_1 = Juju(model=first_model)
     model_1.offer(f"{first_model}.{DB_APP_1}", endpoint="replication-offer")

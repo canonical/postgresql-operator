@@ -191,7 +191,7 @@ def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
 def get_db_max_written_value(
     juju: Juju, app_name: str, unit_name: str, db_name: str = "postgresql_test_app_database"
 ) -> int:
-    """Retrieve the max written value in the MySQL database.
+    """Retrieve the max written value in the PostgreSQL database.
 
     Args:
         juju: The Juju model.

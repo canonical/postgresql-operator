@@ -1444,7 +1444,7 @@ def execute_queries_on_unit(
     database: str,
     commit: bool = False,
 ) -> list:
-    """Execute given MySQL queries on a unit.
+    """Execute given PostgreSQL queries on a unit.
 
     Args:
         unit_address: The public IP address of the unit to execute the queries on
