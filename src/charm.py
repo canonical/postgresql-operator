@@ -166,8 +166,10 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         pass
 
     def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
-        if not self._charm._patroni.are_all_members_ready():
-            raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
+        for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
+            with attempt:
+                if not self._charm._patroni.are_all_members_ready():
+                    raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
 
@@ -191,7 +193,12 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             )
         else:
             try:
-                self._charm._patroni.switchover(candidate=last_unit_to_refresh)
+                self._charm._patroni.switchover(
+                    candidate=last_unit_to_refresh,
+                    async_cluster=bool(
+                        self._charm.async_replication.get_primary_cluster_endpoint()
+                    ),
+                )
             except SwitchoverFailedError as e:
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
@@ -2367,6 +2374,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _api_update_config(self) -> None:
+        # Use config value if set, calculate otherwise
+        max_connections = (
+            self.config.experimental_max_connections
+            if self.config.experimental_max_connections
+            else max(4 * self.cpu_count, 100)
+        )
+        cfg_patch = {
+            "max_connections": max_connections,
+            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            "max_replication_slots": 25,
+            "max_wal_senders": 25,
+            "wal_keep_size": self.config.durability_wal_keep_size,
+        }
+        base_patch = {}
+        if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
+            base_patch["standby_cluster"] = {"host": primary_endpoint}
+        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+
     def update_config(
         self,
         is_creating_backup: bool = False,
@@ -2436,20 +2462,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        # Use config value if set, calculate otherwise
-        max_connections = (
-            self.config.experimental_max_connections
-            if self.config.experimental_max_connections
-            else max(4 * self.cpu_count, 100)
-        )
-
-        self._patroni.bulk_update_parameters_controller_by_patroni({
-            "max_connections": max_connections,
-            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            "max_replication_slots": 25,
-            "max_wal_senders": 25,
-            "wal_keep_size": self.config.durability_wal_keep_size,
-        })
+        self._api_update_config()
 
         self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
