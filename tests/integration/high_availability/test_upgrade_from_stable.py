@@ -89,10 +89,10 @@ def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
                 wait=5 * MINUTE_SECS,
             )
 
-            juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
-        juju.run(unit=unit_names[-1], action="resume-refresh", wait=5 * MINUTE_SECS)
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert juju.status().apps[DB_APP_NAME].is_active
