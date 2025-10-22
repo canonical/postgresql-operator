@@ -75,7 +75,7 @@ def test_refresh_without_pre_refresh_check(juju: Juju, charm: str, continuous_wr
                 wait=5 * MINUTE_SECS,
             )
 
-            juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
         juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
@@ -123,7 +123,7 @@ async def test_rollback_without_pre_refresh_check(
                 wait=5 * MINUTE_SECS,
             )
 
-            juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
         juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
