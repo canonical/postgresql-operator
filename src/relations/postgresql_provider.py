@@ -380,24 +380,24 @@ class PostgreSQLProvider(Object):
         if not ca:
             ca = ""
 
+        prefix_database_mapping = self.get_databases_prefix_mapping()
+
         for relation_id in rel_data:
-            database = rel_data[relation_id].get("database")
+            if prefix_def := prefix_database_mapping.get(str(relation_id)):
+                self.database_provides.set_prefix_databases(relation_id, prefix_def["databases"])
+                database = prefix_def["databases"][0] if len(prefix_def["databases"]) else None
+            else:
+                database = rel_data[relation_id].get("database")
             user = secret_data.get(relation_id, {}).get("username")
             password = secret_data.get(relation_id, {}).get("password")
             if not database or not password:
                 continue
 
             # Set the read/write endpoint.
-            self.database_provides.set_endpoints(
-                relation_id,
-                rw_endpoint,
-            )
+            self.database_provides.set_endpoints(relation_id, rw_endpoint)
 
             # Set the read-only endpoint.
-            self.database_provides.set_read_only_endpoints(
-                relation_id,
-                ro_endpoints,
-            )
+            self.database_provides.set_read_only_endpoints(relation_id, ro_endpoints)
 
             # Set connection string URI.
             self.database_provides.set_uris(
