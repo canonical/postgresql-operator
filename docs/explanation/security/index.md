@@ -100,6 +100,12 @@ The following information is configured to be logged:
 
 Other events, like connections and disconnections, are logged depending on the value of the charm configuration options related to them. For more information, check the configuration options with the `logging` prefix in the [configuration reference](https://charmhub.io/postgresql/configurations#logging_log_connections).
 
+Also, all operations performed by the charm as a result of user actions — such as enabling or disabling plugins, managing TLS, creating or restoring backups, and configuring replication between clusters (asynchronous or logical) — are executed through the underlying workload components (PostgreSQL, Patroni, or pgBackRest). Consequently, these operations are recorded in the respective workload log files, which are accessible in the directories below and also forwarded to COS:
+
+* /var/snap/charmed-postgresql/common/var/log/patroni
+* /var/snap/charmed-postgresql/common/var/log/pgbackrest
+* /var/snap/charmed-postgresql/common/var/log/postgresql
+
 No secrets are logged.
 
 ## Additional resources
