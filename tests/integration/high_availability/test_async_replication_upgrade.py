@@ -252,7 +252,7 @@ def run_upgrade_from_edge(juju: Juju, app_name: str, charm: str) -> None:
                 wait=5 * MINUTE_SECS,
             )
 
-            juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
         juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
