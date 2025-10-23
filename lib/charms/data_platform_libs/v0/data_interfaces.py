@@ -2071,6 +2071,7 @@ class RequirerData(Data):
         requested_entity_secret: Optional[str] = None,
         requested_entity_name: Optional[str] = None,
         requested_entity_password: Optional[str] = None,
+        prefix_matching: Optional[str] = None,
     ):
         """Manager of base client relations."""
         super().__init__(model, relation_name)
@@ -2081,6 +2082,7 @@ class RequirerData(Data):
         self.requested_entity_secret = requested_entity_secret
         self.requested_entity_name = requested_entity_name
         self.requested_entity_password = requested_entity_password
+        self.prefix_matching = prefix_matching
 
         if (
             self.requested_entity_secret or self.requested_entity_name
@@ -3258,6 +3260,14 @@ class DatabaseRequestedEvent(DatabaseProvidesEvent):
                     logger.warning("Invalid requested-entity-secret: no entity name")
         return names
 
+    @property
+    def prefix_matching(self) -> Optional[str]:
+        """Returns the prefix matching strategy that were requested."""
+        if not self.relation.app:
+            return None
+
+        return self.relation.data[self.relation.app].get("prefix-matching")
+
 
 class DatabaseEntityRequestedEvent(DatabaseProvidesEvent, EntityProvidesEvent):
     """Event emitted when a new entity is requested for use on this relation."""
@@ -3615,6 +3625,7 @@ class DatabaseRequirerData(RequirerData):
         requested_entity_secret: Optional[str] = None,
         requested_entity_name: Optional[str] = None,
         requested_entity_password: Optional[str] = None,
+        prefix_matching: Optional[str] = None,
     ):
         """Manager of database client relations."""
         super().__init__(
@@ -3628,6 +3639,7 @@ class DatabaseRequirerData(RequirerData):
             requested_entity_secret,
             requested_entity_name,
             requested_entity_password,
+            prefix_matching,
         )
         self.database = database_name
         self.relations_aliases = relations_aliases
@@ -3823,6 +3835,8 @@ class DatabaseRequirerEventHandlers(RequirerEventHandlers):
             event_data["entity-permissions"] = self.relation_data.entity_permissions
         if self.relation_data.requested_entity_secret:
             event_data["requested-entity-secret"] = self.relation_data.requested_entity_secret
+        if self.relation_data.prefix_matching:
+            event_data["prefix-matching"] = self.relation_data.prefix_matching
 
         # Create helper secret if needed
         if (
@@ -3951,6 +3965,7 @@ class DatabaseRequires(DatabaseRequirerData, DatabaseRequirerEventHandlers):
         requested_entity_secret: Optional[str] = None,
         requested_entity_name: Optional[str] = None,
         requested_entity_password: Optional[str] = None,
+        prefix_matching: Optional[str] = None,
     ):
         DatabaseRequirerData.__init__(
             self,
@@ -3967,6 +3982,7 @@ class DatabaseRequires(DatabaseRequirerData, DatabaseRequirerEventHandlers):
             requested_entity_secret,
             requested_entity_name,
             requested_entity_password,
+            prefix_matching,
         )
         DatabaseRequirerEventHandlers.__init__(self, charm, self)
 
