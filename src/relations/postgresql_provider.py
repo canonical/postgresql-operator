@@ -123,7 +123,8 @@ class PostgreSQLProvider(Object):
     ) -> None:
         """Set the initial mapping of prefix databases."""
         database_mapping = self.get_databases_prefix_mapping()
-        if prefix and username and databases:
+        # Empty databases is valid
+        if prefix and username and databases is not None:
             database_mapping[str(relation_id)] = {
                 "prefix": prefix,
                 "username": username,
@@ -164,7 +165,50 @@ class PostgreSQLProvider(Object):
             self.charm.set_secret(APP_SCOPE, DATABASE_MAPPING_LABEL, json.dumps(database_mapping))
         return usernames
 
-    def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:  # noqa: C901
+    def set_rel_to_db_mapping(self) -> None:
+        """Set mapping between relation and database."""
+        if self.charm.unit.is_leader():
+            self.charm.app_peer_data["rel_databases"] = json.dumps({
+                key: val["database"]
+                for key, val in self.database_provides.fetch_relation_data(
+                    None, ["database"]
+                ).items()
+                if val.get("database")
+            })
+
+    def get_rel_to_db_mapping(self) -> dict[str, str] | None:
+        """Set mapping between relation and database."""
+        if self.charm.unit.is_leader():
+            return json.loads(self.charm.app_peer_data.get("rel_databases", "{}"))
+
+    def _get_credentials(self, event: DatabaseRequestedEvent) -> tuple[str, str] | None:
+        try:
+            if requested_entities := event.requested_entity_secret_content:
+                for key, val in requested_entities.items():
+                    if not val:
+                        val = new_password()
+                    if key in SYSTEM_USERS or key in self.charm.postgresql.list_users():
+                        self.charm.unit.status = BlockedStatus(FORBIDDEN_USER_MSG)
+                        return
+                    return key, val
+        except ModelError:
+            self.charm.unit.status = BlockedStatus(NO_ACCESS_TO_SECRET_MSG)
+            return
+        return f"relation-{event.relation.id}", new_password()
+
+    def _are_units_in_sync(self) -> bool:
+        for key in self.charm.all_peer_data:
+            # We skip the leader so we don't have to wait on the defer
+            if (
+                key != self.charm.app
+                and key != self.charm.unit
+                and self.charm.all_peer_data[key].get("user_hash", "")
+                != self.charm.generate_user_hash
+            ):
+                return False
+        return True
+
+    def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
@@ -181,20 +225,9 @@ class PostgreSQLProvider(Object):
             )
             return
 
-        user = None
-        password = None
-
-        try:
-            if requested_entities := event.requested_entity_secret_content:
-                for key, val in requested_entities.items():
-                    user = key
-                    password = val
-                    break
-                if user in SYSTEM_USERS or user in self.charm.postgresql.list_users():
-                    self.charm.unit.status = BlockedStatus(FORBIDDEN_USER_MSG)
-                    return
-        except ModelError:
-            self.charm.unit.status = BlockedStatus(NO_ACCESS_TO_SECRET_MSG)
+        if creds := self._get_credentials(event):
+            user, password = creds
+        else:
             return
 
         # Retrieve the database name and extra user roles using the charm library.
@@ -209,17 +242,10 @@ class PostgreSQLProvider(Object):
 
         self.update_username_mapping(event.relation.id, user)
         self.charm.update_config()
-        for key in self.charm.all_peer_data:
-            # We skip the leader so we don't have to wait on the defer
-            if (
-                key != self.charm.app
-                and key != self.charm.unit
-                and self.charm.all_peer_data[key].get("user_hash", "")
-                != self.charm.generate_user_hash
-            ):
-                logger.debug("Not all units have synced configuration")
-                event.defer()
-                return
+        if not self._are_units_in_sync():
+            logger.debug("Not all units have synced configuration")
+            event.defer()
+            return
 
         # Make sure the relation access-group is added to the list
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
@@ -227,8 +253,6 @@ class PostgreSQLProvider(Object):
 
         try:
             # Creates the user and the database for this specific relation.
-            user = user or f"relation-{event.relation.id}"
-            password = password or new_password()
             plugins = self.charm.get_plugins()
 
             if database[-1] != "*":
@@ -285,6 +309,13 @@ class PostgreSQLProvider(Object):
         """Correctly update the status."""
         self.update_username_mapping(event.relation.id, None)
         self.set_databases_prefix_mapping(event.relation.id, None, None, None)
+        if (
+            (dbs := self.get_rel_to_db_mapping())
+            and (database := dbs.get(str(event.relation.id)))
+            and database[-1] != "*"
+        ):
+            self.remove_database_from_prefix_mapping(database)
+
         self._update_unit_status(event.relation)
 
     def oversee_users(self) -> None:
@@ -304,10 +335,9 @@ class PostgreSQLProvider(Object):
             return
 
         # Retrieve the users from the active relations.
-        relation_users = set()
-        for relation in self.model.relations[self.relation_name]:
-            username = f"relation-{relation.id}"
-            relation_users.add(username)
+        relation_users = {
+            f"relation-{relation.id}" for relation in self.model.relations[self.relation_name]
+        }
 
         # Delete that users that exist in the database but not in the active relations.
         for user in database_users - relation_users:
@@ -383,11 +413,13 @@ class PostgreSQLProvider(Object):
         prefix_database_mapping = self.get_databases_prefix_mapping()
 
         for relation_id in rel_data:
-            if prefix_def := prefix_database_mapping.get(str(relation_id)):
-                self.database_provides.set_prefix_databases(relation_id, prefix_def["databases"])
-                database = prefix_def["databases"][0] if len(prefix_def["databases"]) else None
-            else:
-                database = rel_data[relation_id].get("database")
+            database = rel_data[relation_id].get("database")
+            databases = None
+            prefix_def = prefix_database_mapping.get(str(relation_id))
+            if prefix_def is not None:
+                databases = prefix_def["databases"]
+                self.database_provides.set_prefix_databases(relation_id, databases)
+                database = databases[0] if len(databases) else database
             user = secret_data.get(relation_id, {}).get("username")
             password = secret_data.get(relation_id, {}).get("password")
             if not database or not password:
@@ -399,24 +431,25 @@ class PostgreSQLProvider(Object):
             # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(relation_id, ro_endpoints)
 
-            # Set connection string URI.
-            self.database_provides.set_uris(
-                relation_id,
-                f"postgresql://{user}:{password}@{rw_endpoint}/{database}",
-            )
-            # Make sure that the URI will be a secret
-            if (
-                secret_fields := self.database_provides.fetch_relation_field(
-                    relation_id, "requested-secrets"
-                )
-            ) and "read-only-uris" in secret_fields:
-                self.database_provides.set_read_only_uris(
-                    relation_id,
-                    f"postgresql://{user}:{password}@{ro_hosts}:{DATABASE_PORT}/{database}",
-                )
-
             self.database_provides.set_tls(relation_id, tls)
             self.database_provides.set_tls_ca(relation_id, ca)
+            if databases is None or len(databases):
+                # Set connection string URI.
+                self.database_provides.set_uris(
+                    relation_id,
+                    f"postgresql://{user}:{password}@{rw_endpoint}/{database}",
+                )
+                # Make sure that the URI will be a secret
+                if (
+                    secret_fields := self.database_provides.fetch_relation_field(
+                        relation_id, "requested-secrets"
+                    )
+                ) and "read-only-uris" in secret_fields:
+                    self.database_provides.set_read_only_uris(
+                        relation_id,
+                        f"postgresql://{user}:{password}@{ro_hosts}:{DATABASE_PORT}/{database}",
+                    )
+            self.set_rel_to_db_mapping()
 
     def _update_unit_status(self, relation: Relation) -> None:
         """# Clean up Blocked status if it's due to extensions request."""
