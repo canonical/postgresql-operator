@@ -3364,6 +3364,16 @@ class DatabaseRequiresEvent(RelationEventWithSecret):
 
         return self.relation.data[self.relation.app].get("version")
 
+    @property
+    def prefix_databases(self) -> Optional[List[str]]:
+        """Returns a list of databases matching a prefix."""
+        if not self.relation.app:
+            return None
+
+        if prefixed_databases := self.relation.data[self.relation.app].get("prefix-databases"):
+            return prefixed_databases.split(",")
+        return []
+
 
 class DatabaseCreatedEvent(AuthenticationEvent, DatabaseRequiresEvent):
     """Event emitted when a new database is created for use on this relation."""
@@ -3384,16 +3394,6 @@ class DatabaseReadOnlyEndpointsChangedEvent(AuthenticationEvent, DatabaseRequire
 class DatabasePrefixDatabasesChangedEvent(AuthenticationEvent, DatabaseRequiresEvent):
     """Event emitted when the prefix databases are changed."""
 
-    @property
-    def prefix_databases(self) -> Optional[List[str]]:
-        """Returns a list of databases matching a prefix."""
-        if not self.relation.app:
-            return None
-
-        if prefixed_databases := self.relation.data[self.relation.app].get("prefix-databases"):
-            return prefixed_databases.split(",")
-        return []
-
 
 class DatabaseRequiresEvents(RequirerCharmEvents):
     """Database events.
@@ -3405,7 +3405,7 @@ class DatabaseRequiresEvents(RequirerCharmEvents):
     database_entity_created = EventSource(DatabaseEntityCreatedEvent)
     endpoints_changed = EventSource(DatabaseEndpointsChangedEvent)
     read_only_endpoints_changed = EventSource(DatabaseReadOnlyEndpointsChangedEvent)
-    prefix_databases_changed = EventSource(DatabaseReadOnlyEndpointsChangedEvent)
+    prefix_databases_changed = EventSource(DatabasePrefixDatabasesChangedEvent)
 
 
 # Database Provider and Requires
@@ -3726,6 +3726,10 @@ class DatabaseRequirerEventHandlers(RequirerEventHandlers):
                 self.on.define_event(
                     f"{relation_alias}_read_only_endpoints_changed",
                     DatabaseReadOnlyEndpointsChangedEvent,
+                )
+                self.on.define_event(
+                    f"{relation_alias}_prefix_databases_changed",
+                    DatabasePrefixDatabasesChangedEvent,
                 )
 
     def _on_secret_changed_event(self, event: SecretChangedEvent):
