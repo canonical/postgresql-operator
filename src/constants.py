@@ -20,6 +20,7 @@ TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
 TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
+PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
@@ -47,7 +48,8 @@ UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
-METRICS_PORT = "9187"
+METRICS_PORT = 9187
+PGBACKREST_METRICS_PORT = 9854
 
 # Labels are not confidential
 REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105

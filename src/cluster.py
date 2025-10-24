@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 import psutil
 import requests
 import tomli
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
