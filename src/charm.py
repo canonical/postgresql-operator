@@ -26,10 +26,10 @@ import charm_refresh
 import ops.log
 import psycopg2
 import tomli
+from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
-from charms.operator_libs_linux.v2 import snap
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
@@ -106,6 +106,8 @@ from constants import (
     MONITORING_SNAP_SERVICE,
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
+    PGBACKREST_METRICS_PORT,
+    PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
@@ -373,7 +375,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
-            metrics_endpoints=[{"path": "/metrics", "port": int(METRICS_PORT)}],
+            metrics_endpoints=[
+                {"path": "/metrics", "port": METRICS_PORT},
+                {"path": "/metrics", "port": PGBACKREST_METRICS_PORT},
+            ],
             scrape_configs=self.patroni_scrape_config,
             refresh_events=[
                 self.on[PEER].relation_changed,
@@ -407,6 +412,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
+        self._setup_pgbackrest_exporter()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
@@ -1015,6 +1021,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
+        if "pgbackrest-exporter-started" not in self.unit_peer_data:
+            self._setup_pgbackrest_exporter()
 
     def _update_new_unit_status(self) -> None:
         """Update the status of a new unit that recently joined the cluster."""
@@ -1666,7 +1674,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
-            logger.warning("Early exit: skipping exporter setup (no configuration set)")
+            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
@@ -1709,6 +1717,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
 
         self.unit_peer_data.update({"exporter-started": "True"})
+
+    def _setup_pgbackrest_exporter(self, postgres_snap: snap.Snap | None = None) -> None:
+        """Set up pgbackrest_exporter."""
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[charm_refresh.snap_name()]
+
+        if postgres_snap.services[PGBACKREST_MONITORING_SNAP_SERVICE]["active"] is False:
+            postgres_snap.start(services=[PGBACKREST_MONITORING_SNAP_SERVICE], enable=True)
+        else:
+            postgres_snap.restart(services=[PGBACKREST_MONITORING_SNAP_SERVICE])
+
+        self.unit_peer_data.update({"pgbackrest-exporter-started": "True"})
 
     def _setup_ldap_sync(self, postgres_snap: snap.Snap | None = None) -> None:
         """Set up postgresql_ldap_sync options."""
