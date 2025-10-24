@@ -130,10 +130,6 @@ from constants import (
 )
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
-from relations.logical_replication import (
-    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
-    PostgreSQLLogicalReplication,
-)
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.tls_transfer import TLSTransfer
@@ -339,7 +335,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.logical_replication = PostgreSQLLogicalReplication(self)
+        # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -1516,8 +1512,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
-        if not self.logical_replication.apply_changed_config(event):
-            return
+        # if not self.logical_replication.apply_changed_config(event):
+        #     return
 
         if not self.unit.is_leader():
             return
@@ -2001,7 +1997,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.backup.coordinate_stanza_fields()
 
-        self.logical_replication.retry_validations()
+        # self.logical_replication.retry_validations()
 
         self._set_primary_status_message()
 
@@ -2093,9 +2089,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            self.is_blocked
-            and self.unit.status not in S3_BLOCK_MESSAGES
-            and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
+            self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES
+            # and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
@@ -2141,12 +2136,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     BlockedStatus(self.app_peer_data["s3-initialization-block-message"])
                 )
                 return
-            if self.unit.is_leader() and (
-                self.app_peer_data.get("logical-replication-validation") == "error"
-                or self.logical_replication.has_remote_publisher_errors()
-            ):
-                self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
-                return
+            # if self.unit.is_leader() and (
+            #     self.app_peer_data.get("logical-replication-validation") == "error"
+            #     or self.logical_replication.has_remote_publisher_errors()
+            # ):
+            #     self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
+            #     return
             if (
                 self._patroni.get_primary(unit_name_pattern=True) == self.unit.name
                 or self.is_standby_leader
@@ -2413,7 +2408,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.model.config, self.get_available_memory(), limit_memory
         )
 
-        replication_slots = self.logical_replication.replication_slots()
+        # replication_slots = self.logical_replication.replication_slots()
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
@@ -2430,7 +2425,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
-            slots=replication_slots,
+            # slots=replication_slots,
         )
         if no_peers:
             return True
@@ -2464,7 +2459,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._api_update_config()
 
-        self._patroni.ensure_slots_controller_by_patroni(replication_slots)
+        # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
         self._handle_postgresql_restart_need()
 
