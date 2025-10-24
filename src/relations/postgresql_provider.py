@@ -197,6 +197,25 @@ class PostgreSQLProvider(Object):
             return
         return f"relation-{event.relation.id}", new_password()
 
+    def _collect_databases(
+        self, user: str, event: DatabaseRequestedEvent
+    ) -> tuple[str, list[str]] | None:
+        # Retrieve the database name and extra user roles using the charm library.
+        database = event.database or ""
+        if database and database[-1] == "*":
+            if len(database) < 4:
+                self.charm.unit.status = BlockedStatus(PREFIX_TOO_SHORT_MSG)
+                return
+            if event.prefix_matching and event.prefix_matching != "all":
+                logger.warning("Only all prefix matching is supported")
+            databases = sorted(self.charm.postgresql.list_databases(database[:-1]))
+            self.set_databases_prefix_mapping(event.relation.id, user, database[:-1], databases)
+        else:
+            databases = [database]
+            # Add to cached field to be able to generate hba rules
+            self.add_database_to_prefix_mapping(database)
+        return database, databases
+
     def _are_units_in_sync(self) -> bool:
         for key in self.charm.all_peer_data:
             # We skip the leader so we don't have to wait on the defer
@@ -231,18 +250,10 @@ class PostgreSQLProvider(Object):
         else:
             return
 
-        # Retrieve the database name and extra user roles using the charm library.
-        database = event.database or ""
-        if database and database[-1] == "*":
-            if len(database) < 4:
-                self.charm.unit.status = BlockedStatus(PREFIX_TOO_SHORT_MSG)
-                return
-            databases = sorted(self.charm.postgresql.list_databases(database[:-1]))
-            self.set_databases_prefix_mapping(event.relation.id, user, database[:-1], databases)
+        if databases_setup := self._collect_databases(user, event):
+            database, databases = databases_setup
         else:
-            databases = [database]
-            # Add to cached field to be able to generate hba rules
-            self.add_database_to_prefix_mapping(database)
+            return
 
         self.update_username_mapping(event.relation.id, user)
         self.charm.update_config()
@@ -523,7 +534,7 @@ class PostgreSQLProvider(Object):
             NO_ACCESS_TO_SECRET_MSG,
             FORBIDDEN_USER_MSG,
         ]:
-            self._unblock_custom_user_errors(self, relation)
+            self._unblock_custom_user_errors(relation)
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
         """Checks if there are relations with invalid extra user roles.
