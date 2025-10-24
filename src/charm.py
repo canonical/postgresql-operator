@@ -79,6 +79,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLGetCurrentTimelineError,
     PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
+    PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
@@ -1566,7 +1567,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             self.set_unit_status(BlockedStatus(EXTENSION_OBJECT_MESSAGE))
             return
-        except PostgreSQLEnableDisableExtensionError as e:
+        except (PostgreSQLEnableDisableExtensionError, PostgreSQLUndefinedHostError) as e:
             logger.exception("failed to change plugins: %s", str(e))
         if original_status.message == EXTENSION_OBJECT_MESSAGE:
             self.set_unit_status(ActiveStatus())
