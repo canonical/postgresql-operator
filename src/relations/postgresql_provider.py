@@ -277,8 +277,7 @@ class PostgreSQLProvider(Object):
                     user, password, extra_user_roles=extra_user_roles, database=database
                 )
                 # Get the prefixed users again, to add db level grants
-                prefixed_users = self.add_database_to_prefix_mapping(database)
-                for prefixed_user in prefixed_users:
+                for prefixed_user in self.add_database_to_prefix_mapping(database):
                     self.charm.postgresql.add_user_to_databases(
                         prefixed_user, databases, extra_user_roles
                     )
@@ -329,7 +328,8 @@ class PostgreSQLProvider(Object):
             and (database := dbs.get(str(event.relation.id)))
             and database[-1] != "*"
         ):
-            self.remove_database_from_prefix_mapping(database)
+            for prefixed_user in self.remove_database_from_prefix_mapping(database):
+                self.charm.postgresql.remove_user_from_databases(prefixed_user, [database])
 
         self._update_unit_status(event.relation)
 

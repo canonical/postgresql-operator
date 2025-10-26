@@ -149,8 +149,8 @@ def test_readd_db_from_prefix(juju: jubilant.Juju) -> None:
 
     pg_data = result.results["postgresql"]
     assert "postgres" not in pg_data["prefix-databases"]
-    assert pg_data["prefix-databases"] == "postgre2"
-    assert pg_data["uris"] == f"postgresql://tester:password@{db_ip}:5432/postgre2"
+    assert pg_data["prefix-databases"] == "postgre1,postgre2"
+    assert pg_data["uris"] == f"postgresql://tester:password@{db_ip}:5432/postgre1"
 
     # Connect to database
     psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre1")
