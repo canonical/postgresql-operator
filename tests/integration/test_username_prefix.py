@@ -5,6 +5,7 @@ import logging
 
 import jubilant
 import psycopg2
+import pytest
 
 from .helpers import DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME
 from .high_availability.high_availability_helpers_new import (
@@ -132,8 +133,9 @@ def test_remove_db_from_prefix(juju: jubilant.Juju) -> None:
     assert pg_data["uris"] == f"postgresql://tester:password@{db_ip}:5432/postgre2"
 
     # Connect to database
-    # TODO this should fail
-    psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre1")
+    with pytest.raises(psycopg2.OperationalError):
+        psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre1")
+        assert False
     psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre2")
 
 
