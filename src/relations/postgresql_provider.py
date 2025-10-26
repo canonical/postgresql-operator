@@ -464,6 +464,11 @@ class PostgreSQLProvider(Object):
                         relation_id,
                         f"postgresql://{user}:{password}@{ro_hosts}:{DATABASE_PORT}/{database}",
                     )
+            else:
+                # No database matches prefix, no valid URI
+                self.database_provides.delete_relation_data(
+                    relation_id, ["uris", "read-only-uris"]
+                )
             self.set_rel_to_db_mapping()
 
     def _unblock_custom_user_errors(self, relation: Relation) -> None:

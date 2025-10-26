@@ -157,3 +157,27 @@ def test_readd_db_from_prefix(juju: jubilant.Juju) -> None:
     # Connect to database
     psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre1")
     psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre2")
+
+
+def test_no_prefix_dbs(juju: jubilant.Juju) -> None:
+    db_ip = get_unit_ip(juju, DATABASE_APP_NAME, get_app_leader(juju, DATABASE_APP_NAME))
+
+    juju.remove_relation(f"{DATABASE_APP_NAME}", "di1")
+    juju.remove_relation(f"{DATABASE_APP_NAME}", "di2")
+    juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+
+    integrator_leader = get_app_leader(juju, "di3")
+    result = juju.run(unit=integrator_leader, action="get-credentials")
+    result.raise_on_failure()
+
+    pg_data = result.results["postgresql"]
+    assert "prefix-databases" not in pg_data
+    assert "uris" not in pg_data
+
+    # Connect to database
+    with pytest.raises(psycopg2.OperationalError):
+        psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre1")
+        assert False
+    with pytest.raises(psycopg2.OperationalError):
+        psycopg2.connect(f"postgresql://tester:password@{db_ip}:5432/postgre2")
+        assert False
