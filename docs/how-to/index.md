@@ -1,10 +1,11 @@
 # How-to guides
 
-The following guides cover key processes and common tasks for managing and using Charmed PostgreSQL on machines.
+The following guides cover key processes and common tasks for setting up and managing Charmed PostgreSQL on machines.
 
 ## Deployment and setup
 
-Installation of different cloud services with Juju:
+Set up different cloud services for a Charmed PostgreSQL deployment:
+
 * [Sunbeam]
 * [MAAS]
 * [AWS EC2]
@@ -13,6 +14,7 @@ Installation of different cloud services with Juju:
 * [Multi-availability zones (AZ)][Multi-AZ]
 
 Other deployment scenarios and configurations:
+
 * [Terraform]
 * [TLS VIP access]
 * [Air-gapped]
@@ -20,6 +22,8 @@ Other deployment scenarios and configurations:
 * [Juju storage]
 
 ## Usage and maintenance
+
+Most common operations during the initial setup of a PostgreSQL cluster:
 
 * [Integrate with another application]
 * [External access]
@@ -29,6 +33,9 @@ Other deployment scenarios and configurations:
 * [Switchover/failover]
 
 ## Backup and restore
+
+Configuration of storage providers and backup management:
+
 * [Configure S3 AWS]
 * [Configure S3 RadosGW]
 * [Create a backup]
@@ -38,15 +45,22 @@ Other deployment scenarios and configurations:
 
 ## Monitoring (COS)
 
+Observability and monitoring with the Canonical Observability Stack:
+
 * [Enable monitoring] with Grafana
 * [Enable alert rules] with Prometheus
 * [Enable tracing] with Tempo
 * [Enable profiling] with Parca
 
 ## Refresh (upgrade)
+
+In-place upgrades to higher revisions of Charmed PostgreSQL 16:
+
 * [How to refresh]
 
 ## Cross-regional (cluster-cluster) async replication
+
+Walkthrough of a cluster-cluster deployment and its essential operations:
 
 * [Cross-regional async replication]
     * [Set up clusters]
@@ -55,13 +69,16 @@ Other deployment scenarios and configurations:
     * [Enable plugins/extensions]
 
 ## Logical replication
+
+How to replicate a subset of data to another PostgreSQL cluster:
+
 * [Logical replication]
     * [Set up two clusters]
     * [Re-enable logical replication]
 
 ## Development
 
-This section is for charm developers looking to support PostgreSQL integrations with their charm.
+For charm developers looking to support PostgreSQL integrations with their charm:
 
 * [Integrate with your charm]
 * [Migrate data via pg_dump]

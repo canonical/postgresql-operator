@@ -1,8 +1,10 @@
 # Explanation
 
-Additional context about key concepts behind the PostgreSQL charm, including design and legacy information.
+Additional context about the PostgreSQL charm, including design, legacy information, and security.
 
-## Core concepts and design
+## Core
+
+Core concepts about the history and design of the charm:
 
 ```{toctree}
 :titlesonly:
@@ -12,7 +14,9 @@ Interfaces and endpoints <interfaces-and-endpoints>
 Charm versions <charm-versions/index>
 ```
 
-## Operational concepts
+## Operation
+
+Clarification of standard operational concepts:
 
 ```{toctree}
 :titlesonly:
@@ -24,7 +28,9 @@ Logs <logs>
 Connection pooling <connection-pooling>
 ```
 
-## Security and hardening
+## Security
+
+Security hardening overview:
 
 ```{toctree}
 :titlesonly:
