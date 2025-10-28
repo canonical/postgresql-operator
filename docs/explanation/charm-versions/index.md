@@ -35,8 +35,6 @@ Modern charm
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
-:glob:
 :hidden:
 
 Legacy charm <legacy-charm>
