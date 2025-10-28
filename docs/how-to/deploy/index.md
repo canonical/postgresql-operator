@@ -22,6 +22,8 @@ Then, use the [`juju deploy`](https://canonical-juju.readthedocs-hosted.com/en/l
 juju deploy postgresql --channel 16/stable -n <number_of_replicas>
 ```
 
+If you are not sure where to start or would like a more guided walkthrough for setting up your environment, see the {ref}`tutorial`.
+
 (deploy-clouds)=
 ## Clouds
 
@@ -46,6 +48,8 @@ Multi-AZ <multi-az>
 ```
 
 ## Terraform
+
+Deploy PostgreSQL and automate your infrastructure with the Juju Terraform Provider:
 
 ```{toctree}
 :titlesonly:

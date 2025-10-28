@@ -5,7 +5,7 @@ The following guides cover key processes and common tasks for setting up and man
 
 ## Deployment and setup
 
-Available deployment methods and specialized setups:
+Available deployment methods and specialised setups:
 
 ```{toctree}
 :titlesonly:
