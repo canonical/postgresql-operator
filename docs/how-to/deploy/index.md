@@ -1,3 +1,4 @@
+(deploy)=
 # How to deploy
 
 The basic requirements for deploying a charm are the [**Juju client**](https://documentation.ubuntu.com/juju/3.6/) and a machine [**cloud**](https://juju.is/docs/juju/cloud).

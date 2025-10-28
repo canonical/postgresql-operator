@@ -1,3 +1,4 @@
+(how-to)=
 # How-to guides
 
 The following guides cover key processes and common tasks for setting up and managing Charmed PostgreSQL on machines.
