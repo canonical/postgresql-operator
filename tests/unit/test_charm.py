@@ -14,7 +14,7 @@ import charm_refresh
 import psycopg2
 import pytest
 import tomli
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from ops import JujuVersion, RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (
@@ -241,10 +241,10 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
-        patch(
-            "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
-            return_value=True,
-        ),
+        # patch(
+        #     "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
+        #     return_value=True,
+        # ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -368,9 +368,9 @@ def test_enable_disable_extensions(harness, caplog):
   synchronous_node_count:
     type: string
     default: "all"
-  logical_replication_subscription_request:
-    type: string
-    default: "{}"
+  # logical_replication_subscription_request:
+  #   type: string
+  #   default: "{}"
   plugin_citext_enable:
     default: false
     type: boolean
@@ -1177,7 +1177,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots={},
+            # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1208,7 +1208,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots={},
+            # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()

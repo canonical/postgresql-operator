@@ -21,8 +21,8 @@ from botocore.client import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
 from botocore.loaders import create_loader
 from botocore.regions import EndpointResolver
+from charmlibs import snap
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
-from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
@@ -44,10 +44,6 @@ from constants import (
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
-from relations.logical_replication import (
-    LOGICAL_REPLICATION_OFFER_RELATION,
-    LOGICAL_REPLICATION_RELATION,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -1240,15 +1236,15 @@ Stderr:
             return False
 
         logger.info("Checking that cluster does not have an active logical replication relation")
-        if self.model.get_relation(LOGICAL_REPLICATION_RELATION) or len(
-            self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
-        ):
-            error_message = (
-                "Unit cannot restore backup with an active logical replication connection"
-            )
-            logger.error(f"Restore failed: {error_message}")
-            event.fail(error_message)
-            return False
+        # if self.model.get_relation(LOGICAL_REPLICATION_RELATION) or len(
+        #     self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
+        # ):
+        #     error_message = (
+        #         "Unit cannot restore backup with an active logical replication connection"
+        #     )
+        #     logger.error(f"Restore failed: {error_message}")
+        #     event.fail(error_message)
+        #     return False
 
         logger.info("Checking that this unit was already elected the leader unit")
         if not self.charm.unit.is_leader():

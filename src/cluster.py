@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 import psutil
 import requests
 import tomli
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
@@ -857,12 +857,18 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def switchover(self, candidate: str | None = None) -> None:
+    def switchover(self, candidate: str | None = None, async_cluster: bool = False) -> None:
         """Trigger a switchover."""
         # Try to trigger the switchover.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                current_primary = self.get_primary()
+                current_primary = (
+                    self.get_primary() if not async_cluster else self.get_standby_leader()
+                )
+                if current_primary == candidate:
+                    logger.info("Candidate and leader are the same")
+                    return
+
                 body = {"leader": current_primary}
                 if candidate:
                     body["candidate"] = candidate
@@ -1101,11 +1107,15 @@ class Patroni:
         logger.debug("API reinitialize_postgresql: %s (%s)", r, r.elapsed.total_seconds())
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def bulk_update_parameters_controller_by_patroni(self, parameters: dict[str, Any]) -> None:
+    def bulk_update_parameters_controller_by_patroni(
+        self, parameters: dict[str, Any], base_parameters: dict[str, Any] | None
+    ) -> None:
         """Update the value of a parameter controller by Patroni.
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
         """
+        if not base_parameters:
+            base_parameters = {}
         r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
@@ -1114,7 +1124,8 @@ class Patroni:
                     "remove_data_directory_on_rewind_failure": False,
                     "remove_data_directory_on_diverged_timelines": False,
                     "parameters": parameters,
-                }
+                },
+                **base_parameters,
             },
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,

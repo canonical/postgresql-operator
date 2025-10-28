@@ -84,17 +84,8 @@ jobs:
     needs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
-    timeout-minutes: 226  # Sum of steps `timeout-minutes` + 5
+    timeout-minutes: 216  # Sum of steps `timeout-minutes` + 5
     steps:
-      - name: Free up disk space
-        timeout-minutes: 10
-        run: |
-          printf '\nDisk usage before cleanup\n'
-          df --human-readable
-          # Based on https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-          rm -r /opt/hostedtoolcache/
-          printf '\nDisk usage after cleanup\n'
-          df --human-readable
       - name: Checkout
         timeout-minutes: 3
         uses: actions/checkout@v5
@@ -141,6 +132,11 @@ jobs:
       - timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: snap list
+      - name: lxc image list
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        # sudo needed since spread runs scripts as root
+        run: sudo lxc image list
       - name: Select model
         timeout-minutes: 1
         # `!contains(matrix.job.spread_job, 'juju29')` workaround for juju 2 error:

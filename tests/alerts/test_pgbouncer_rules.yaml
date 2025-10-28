@@ -1,0 +1,96 @@
+rule_files:
+  - ../../src/prometheus_alert_rules/pgbouncer_rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: PgbouncerActiveConnections fires after 2m when >200
+    interval: 1m
+    input_series:
+      - series: 'pgbouncer_pools_server_active_connections{instance="pgb1"}'
+        values: '210 210 210'
+    alert_rule_test:
+      - alertname: PgbouncerActiveConnections
+        eval_time: 2m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgbouncerActiveConnections
+              severity: warning
+              instance: pgb1
+            exp_annotations:
+              summary: PgBouncer instance pgb1 has > 200 active connections
+              description: |
+                Consider checking the client application responsible for generating those additional connections.
+                LABELS = map[__name__:pgbouncer_pools_server_active_connections instance:pgb1]
+
+  - name: PgbouncerActiveConnections does not fire when <=200
+    interval: 1m
+    input_series:
+      - series: 'pgbouncer_pools_server_active_connections{instance="pgb2"}'
+        values: '150 180 200'
+    alert_rule_test:
+      - alertname: PgbouncerActiveConnections
+        eval_time: 2m
+        exp_alerts: []
+
+  - name: PgbouncerErrors fires immediately when increase>3
+    interval: 1m
+    input_series:
+      - series: 'pgbouncer_errors_count{instance="pgb1",errmsg="some error"}'
+        values: '0 4 9 16 20'
+    alert_rule_test:
+      - alertname: PgbouncerErrors
+        eval_time: 3m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgbouncerErrors
+              severity: warning
+              instance: pgb1
+              errmsg: some error
+            exp_annotations:
+              summary: PgBouncer instance pgb1 is logging errors. 
+              description: |
+                This may be due to a a server restart or an admin typing commands at the PgBouncer console.
+                VALUE = 7
+                LABELS = map[errmsg:some error instance:pgb1]
+
+  - name: PgbouncerErrors does not fire when errmsg="server conn crashed?"
+    interval: 1m
+    input_series:
+      - series: 'pgbouncer_errors_count{instance="pgb2",errmsg="server conn crashed?"}'
+        values: '0 5 10'
+    alert_rule_test:
+      - alertname: PgbouncerErrors
+        eval_time: 2m
+        exp_alerts: []
+
+  - name: PgbouncerMaxConnections fires when errmsg="no more connections allowed (max_client_conn)"
+    interval: 30s
+    input_series:
+      - series: 'pgbouncer_errors_count{instance="pgb1",errmsg="no more connections allowed (max_client_conn)"}'
+        values: '0 1 2 3 4 5 6'
+    alert_rule_test:
+      - alertname: PgbouncerMaxConnections
+        eval_time: 1m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgbouncerMaxConnections
+              severity: critical
+              instance: pgb1
+              errmsg: 'no more connections allowed (max_client_conn)'
+            exp_annotations:
+              summary: PgBouncer instance pgb1 has reached `max_client_conn`.
+              description: |
+                Consider checking how many connections the client application is opening.
+                VALUE = 1
+                LABELS = map[errmsg:no more connections allowed (max_client_conn) instance:pgb1]
+
+  - name: PgbouncerMaxConnections does not fire when no matching errmsg
+    interval: 30s
+    input_series:
+      - series: 'pgbouncer_errors_count{instance="pgb2",errmsg="other error"}'
+        values: '0 1'
+    alert_rule_test:
+      - alertname: PgbouncerMaxConnections
+        eval_time: 30s
+        exp_alerts: []

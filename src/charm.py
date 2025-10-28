@@ -26,10 +26,10 @@ import charm_refresh
 import ops.log
 import psycopg2
 import tomli
+from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
-from charms.operator_libs_linux.v2 import snap
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
@@ -80,6 +80,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLGetCurrentTimelineError,
     PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
+    PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
@@ -107,6 +108,8 @@ from constants import (
     MONITORING_SNAP_SERVICE,
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
+    PGBACKREST_METRICS_PORT,
+    PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
@@ -129,10 +132,6 @@ from constants import (
 )
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
-from relations.logical_replication import (
-    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
-    PostgreSQLLogicalReplication,
-)
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.tls_transfer import TLSTransfer
@@ -165,8 +164,10 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         pass
 
     def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
-        if not self._charm._patroni.are_all_members_ready():
-            raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
+        for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
+            with attempt:
+                if not self._charm._patroni.are_all_members_ready():
+                    raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
 
@@ -190,7 +191,12 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             )
         else:
             try:
-                self._charm._patroni.switchover(candidate=last_unit_to_refresh)
+                self._charm._patroni.switchover(
+                    candidate=last_unit_to_refresh,
+                    async_cluster=bool(
+                        self._charm.async_replication.get_primary_cluster_endpoint()
+                    ),
+                )
             except SwitchoverFailedError as e:
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
@@ -331,7 +337,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.logical_replication = PostgreSQLLogicalReplication(self)
+        # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -367,7 +373,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
-            metrics_endpoints=[{"path": "/metrics", "port": int(METRICS_PORT)}],
+            metrics_endpoints=[
+                {"path": "/metrics", "port": METRICS_PORT},
+                {"path": "/metrics", "port": PGBACKREST_METRICS_PORT},
+            ],
             scrape_configs=self.patroni_scrape_config,
             refresh_events=[
                 self.on[PEER].relation_changed,
@@ -401,6 +410,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
+        self._setup_pgbackrest_exporter()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
@@ -1015,6 +1025,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
+        if "pgbackrest-exporter-started" not in self.unit_peer_data:
+            self._setup_pgbackrest_exporter()
 
     def _update_new_unit_status(self) -> None:
         """Update the status of a new unit that recently joined the cluster."""
@@ -1047,7 +1059,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return False
             if ip_to_remove in self.members_ips:
                 self._remove_from_members_ips(ip_to_remove)
-        self._add_members(event)
+        try:
+            self._add_members(event)
+        except Exception:
+            logger.debug("Deferring on_peer_relation_changed: Unable to add members")
+            return False
         return True
 
     def _update_member_ip(self) -> bool:
@@ -1504,8 +1520,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
-        if not self.logical_replication.apply_changed_config(event):
-            return
+        # if not self.logical_replication.apply_changed_config(event):
+        #     return
 
         if not self.unit.is_leader():
             return
@@ -1558,7 +1574,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             self.set_unit_status(BlockedStatus(EXTENSION_OBJECT_MESSAGE))
             return
-        except PostgreSQLEnableDisableExtensionError as e:
+        except (PostgreSQLEnableDisableExtensionError, PostgreSQLUndefinedHostError) as e:
             logger.exception("failed to change plugins: %s", str(e))
         if original_status.message == EXTENSION_OBJECT_MESSAGE:
             self.set_unit_status(ActiveStatus())
@@ -1662,7 +1678,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
-            logger.warning("Early exit: skipping exporter setup (no configuration set)")
+            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
@@ -1705,6 +1721,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
 
         self.unit_peer_data.update({"exporter-started": "True"})
+
+    def _setup_pgbackrest_exporter(self, postgres_snap: snap.Snap | None = None) -> None:
+        """Set up pgbackrest_exporter."""
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[charm_refresh.snap_name()]
+
+        if postgres_snap.services[PGBACKREST_MONITORING_SNAP_SERVICE]["active"] is False:
+            postgres_snap.start(services=[PGBACKREST_MONITORING_SNAP_SERVICE], enable=True)
+        else:
+            postgres_snap.restart(services=[PGBACKREST_MONITORING_SNAP_SERVICE])
+
+        self.unit_peer_data.update({"pgbackrest-exporter-started": "True"})
 
     def _setup_ldap_sync(self, postgres_snap: snap.Snap | None = None) -> None:
         """Set up postgresql_ldap_sync options."""
@@ -1976,7 +2005,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.backup.coordinate_stanza_fields()
 
-        self.logical_replication.retry_validations()
+        # self.logical_replication.retry_validations()
 
         self._set_primary_status_message()
 
@@ -2068,9 +2097,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            self.is_blocked
-            and self.unit.status not in S3_BLOCK_MESSAGES
-            and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
+            self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES
+            # and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
@@ -2116,12 +2144,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     BlockedStatus(self.app_peer_data["s3-initialization-block-message"])
                 )
                 return
-            if self.unit.is_leader() and (
-                self.app_peer_data.get("logical-replication-validation") == "error"
-                or self.logical_replication.has_remote_publisher_errors()
-            ):
-                self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
-                return
+            # if self.unit.is_leader() and (
+            #     self.app_peer_data.get("logical-replication-validation") == "error"
+            #     or self.logical_replication.has_remote_publisher_errors()
+            # ):
+            #     self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
+            #     return
             if (
                 self._patroni.get_primary(unit_name_pattern=True) == self.unit.name
                 or self.is_standby_leader
@@ -2349,6 +2377,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _api_update_config(self) -> None:
+        # Use config value if set, calculate otherwise
+        max_connections = (
+            self.config.experimental_max_connections
+            if self.config.experimental_max_connections
+            else max(4 * self.cpu_count, 100)
+        )
+        cfg_patch = {
+            "max_connections": max_connections,
+            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            "max_replication_slots": 25,
+            "max_wal_senders": 25,
+            "wal_keep_size": self.config.durability_wal_keep_size,
+        }
+        base_patch = {}
+        if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
+            base_patch["standby_cluster"] = {"host": primary_endpoint}
+        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+
     def update_config(
         self,
         is_creating_backup: bool = False,
@@ -2369,7 +2416,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.model.config, self.get_available_memory(), limit_memory
         )
 
-        replication_slots = self.logical_replication.replication_slots()
+        # replication_slots = self.logical_replication.replication_slots()
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
@@ -2386,7 +2433,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
-            slots=replication_slots,
+            # slots=replication_slots,
         )
         if no_peers:
             return True
@@ -2418,22 +2465,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        # Use config value if set, calculate otherwise
-        max_connections = (
-            self.config.experimental_max_connections
-            if self.config.experimental_max_connections
-            else max(4 * self.cpu_count, 100)
-        )
+        self._api_update_config()
 
-        self._patroni.bulk_update_parameters_controller_by_patroni({
-            "max_connections": max_connections,
-            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            "max_replication_slots": 25,
-            "max_wal_senders": 25,
-            "wal_keep_size": self.config.durability_wal_keep_size,
-        })
-
-        self._patroni.ensure_slots_controller_by_patroni(replication_slots)
+        # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
         self._handle_postgresql_restart_need()
 
