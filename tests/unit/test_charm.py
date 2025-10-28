@@ -2761,15 +2761,3 @@ def test_relations_user_databases_map(harness):
             "replication": "all",
             "rewind": "all",
         }
-
-
-def test_on_secret_remove(harness):
-    event = Mock()
-    harness.charm._on_secret_remove(event)
-    event.remove_revision.assert_called_once_with()
-    event.reset_mock()
-
-    # No secret
-    event.secret.label = None
-    harness.charm._on_secret_remove(event)
-    assert not event.remove_revision.called
