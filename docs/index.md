@@ -18,7 +18,7 @@ This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL
 
 | | |
 |--|--|
-|  [**Get started**](/tutorial/index) - [Deploy on a cloud](/how-to/deploy/index) \| [Scale](/how-to/scale-replicas) \| [Manage passwords](/how-to/manage-passwords) \| [Enable encryption](/how-to/enable-tls) \| [Back up](/how-to/back-up-and-restore/index) \| [Monitoring](/how-to/monitoring-cos/index) </br> |  [**How-to guides**](/how-to/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
+|  [**Get started**](/tutorial) - [Deploy on a cloud](/how-to/deploy/index) \| [Scale](/how-to/scale-replicas) \| [Manage passwords](/how-to/manage-passwords) \| [Enable encryption](/how-to/enable-tls) \| [Back up](/how-to/back-up-and-restore/index) \| [Monitoring](/how-to/monitoring-cos/index) </br> |  [**How-to guides**](/how-to/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
 | [**Reference**](/reference/index) - Technical information for quick lookup, such as [requirements](/reference/system-requirements), [plugins](/reference/plugins-extensions), and [statuses](/reference/statuses). | [**Explanation**](/explanation/interfaces-and-endpoints) - Discussion and clarification of key topics such as [architecture](/explanation/architecture), [users](/explanation/users), and [legacy charms](/explanation/charm-versions/index)|
 
 
@@ -40,12 +40,11 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
-:glob:
 :hidden:
 
 Home <self>
-tutorial/index
+tutorial
 how-to/index
 reference/index
 explanation/index
+```
