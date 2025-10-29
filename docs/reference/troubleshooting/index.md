@@ -197,8 +197,8 @@ Always remove manually installed components at the end of troubleshooting. Keep 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 :hidden:
 
 SOS report <sos-report>
 CLI helpers <cli-helpers>
+```

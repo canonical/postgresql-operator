@@ -1,3 +1,4 @@
+(cross-regional-async-replication)=
 # Cross-regional async replication
 
 Cross-regional (or multi-server) asynchronous replication focuses on disaster recovery by distributing data across different servers.
@@ -32,10 +33,9 @@ The following table shows the source and target controller/model combinations th
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
-:glob:
 :hidden:
 
 Set up clusters <set-up-clusters>
 Integrate with a client app <integrate-with-a-client-app>
 Remove or recover a cluster <remove-or-recover-a-cluster>
+```
