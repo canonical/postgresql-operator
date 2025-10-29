@@ -12,8 +12,6 @@ Under the hood, it uses the publication and subscriptions mechanisms from the [P
 ## Guides
 
 ```{toctree}
-:titlesonly:
-
 Set up two clusters <set-up-clusters>
 Re-enable logical replication <re-enable>
 ```

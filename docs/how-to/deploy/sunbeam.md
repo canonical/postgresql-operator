@@ -78,10 +78,12 @@ The image below is an example of the OpenStack dashboard view (bastion + juju co
 
 ![Sunbeam OpenStack dashboard|690x225](sunbeam-dashboard.png)
 
-> To learn more about deploying and operating PostgreSQL, see the [Charmed PostgreSQL tutorial][Tutorial].
+```{seealso}
+To learn more about deploying and operating PostgreSQL, see the {ref}`tutorial`.
+```
 
-<!-- LABELS-->
-[Tutorial]: /tutorial/index
+<!-- Links-->
+
 [Single-node guided]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/install/install-canonical-openstack-using-the-manual-bare-metal-provider/
 [Accessing the OpenStack dashboard]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/misc/using-the-openstack-dashboard/
 [Images Sync]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/features/images-sync/

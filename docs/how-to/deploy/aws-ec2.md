@@ -180,7 +180,7 @@ Type "help" for help.
 test123=> 
 ```
 
-From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly deployed Charmed PostgreSQL.
+See our {ref}`how-to` for further information about setting up and operating newly deployed Charmed PostgreSQL.
 
 ## Expose database (optional)
 

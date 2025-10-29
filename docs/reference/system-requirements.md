@@ -1,3 +1,4 @@
+(system-requirements)=
 # System requirements
 
 The following are the minimum software and hardware requirements to run Charmed PostgreSQL on VM.
@@ -11,7 +12,7 @@ Charmed PostgreSQL 16 supports several Juju releases from 3.6 LTS onwards. The t
 
 | Juju major release | Supported minor versions | Compatible charm revisions |Comment |
 |:--------|:-----|:-----|:-----|
-| ![3.6 LTS] | `3.6.1+` |  | |
+| ![3.6 LTS] | `3.6.1+` | | All |
 
 
 ## Hardware
