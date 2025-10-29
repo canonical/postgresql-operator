@@ -13,7 +13,7 @@ Although Canonical does not prescribe how you should set up your environment, we
 The basic requirements to follow along with this example setup are the following:
 
 * A fully deployed and running Juju machine environment
-  * See the [PostgreSQL Tutorial](/tutorial/index) for a quick setup with Multipass
+  * See the {ref}`Charmed PostgreSQL Tutorial <tutorial>` for a quick setup with Multipass
   * See the official [Juju setup guide](https://juju.is/docs/juju/tutorial#set-up-juju) for more details
 * A spare virtual IP address for [`hacluster`](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741)
   * See the PgBouncer guide: [How to use a VIP to connect to PgBouncer](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)

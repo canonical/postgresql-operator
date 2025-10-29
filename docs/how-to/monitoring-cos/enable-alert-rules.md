@@ -12,7 +12,8 @@ Charmed PostgreSQL VM ships a pre-configured and pre-enabled [list of Awesome Al
 For information about accessing and managing COS Alert Rules, refer to the [COS documentation](https://charmhub.io/cos-lite).
 
 ## Prerequisites
-* A deployed [Charmed PostgreSQL VM operator]
+* A deployed Charmed PostgreSQL VM operator
+  * See: {ref}`How to deploy <deploy>`
 * A deployed [`cos-lite` bundle in a Kubernetes environment](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
 * Fully configured [COS Monitoring]
 
@@ -71,8 +72,8 @@ The similar way as above, COS alerts can be send to the long [list of supported 
 Do you have questions? [Contact us]!
 
 <!-- Links -->
+
 [Contact us]: /reference/contacts
-[Charmed PostgreSQL VM operator]: /tutorial/index
 [COS Monitoring]: /how-to/monitoring-cos/enable-monitoring
 [list of Awesome Alert Rules]: /reference/alert-rules
 

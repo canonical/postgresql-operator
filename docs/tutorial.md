@@ -1,3 +1,4 @@
+(tutorial)=
 # Tutorial
 
 This hands-on tutorial aims to help you learn how to deploy Charmed PostgreSQL on machines and become familiar with its available operations.
