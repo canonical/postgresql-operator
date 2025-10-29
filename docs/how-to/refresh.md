@@ -23,9 +23,9 @@ These refreshes are well-tested and should be preferred.
 | Charm        | PostgreSQL | Snap     | Charm        | PostgreSQL | Snap     |                                                                                               |
 | revision     | Version    | revision | revision     | Version    | revision |                                                                                               |
 +==============+============+==========+==============+============+==========+===============================================================================================+
-| 843 (amd64)  | 16.9       | 201, 202 | TODO (amd64) | 16.9       | TODO     | `TODO, TODO <https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.60.0>`__   |
-+--------------+            |          +--------------+            |          | `TODO, TODO <https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.61.0>`__   |
-| 844 (arm64)  |            |          | TODO (arm64) |            |          |                                                                                               |
+| 843 (amd64)  | 16.9       | 201, 202 | 952 (amd64)  | 16.10      | 239, 240 | `951, 952 <https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.135.0>`__    |
++--------------+            |          +--------------+            |          |                                                                                               |
+| 844 (arm64)  |            |          | 951 (arm64)  |            |          |                                                                                               |
 +--------------+------------+----------+--------------+------------+----------+-----------------------------------------------------------------------------------------------+
 ```
 
@@ -40,9 +40,7 @@ If possible, use a [recommended refresh](#recommended-refreshes) instead.
 | Charm      | PostgreSQL | Snap     | Charm      | PostgreSQL | Snap     |
 | revision   | Version    | revision | revision   | Version    | revision |
 +============+============+==========+============+============+==========+
-| 843, 844   | 16.9       | 201, 202 | TODO       | 16.9       | TODO     |
-|            |            |          +------------+------------+----------+
-|            |            |          | TODO       | 16.10      | TODO     |
+| 843, 844   | 16.9       | 201, 202 | 951, 952   | 16.10      | 239, 240 |
 +------------+------------+----------+------------+------------+----------+
 ```
 
