@@ -4,7 +4,7 @@ The legacy PostgreSQL charm is a [Reactive charm](https://documentation.ubuntu.c
 
 The PostgreSQL 16 charm does not support the same endpoints as the legacy charm. To migrate from legacy to PostgreSQL 16, you must implement the modern `database` endpoint for the `postgresql_client` interface on your charm.
 
-To read more about implementing compatible endpoints, see: [](/how-to/development/integrate-with-your-charm)
+To read more about implementing compatible endpoints, see: [](/how-to/integrate-with-your-charm)
 
 To read more about the legacy charm see the {doc}`PostgreSQL 14 documentation <postgresql-14:explanation/charm-versions/legacy-charm>`.
 

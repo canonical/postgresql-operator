@@ -1,8 +1,9 @@
-# Migrate database data using ‘backup/restore’
+(migrate-data-via-backup-restore)=
+# Migrate data via backup/restore
 
-This is a guide for migrating data from modern charms. To migrate [legacy charms](/explanation/charm-versions/legacy-charm) data, refer to the guide [Migrate data via pg_dump](/how-to/development/migrate-data-via-pg-dump).
+This is a guide for migrating data from modern charms. To migrate [legacy charms](/explanation/charm-versions/legacy-charm) data, refer to the guide [Migrate data via pg_dump](/how-to/data-migration/migrate-data-via-pg-dump).
 
-This Charmed PostgreSQL operator is able to restore its own[backups](/how-to/back-up-and-restore/restore-a-backup) stored on [S3-compatible storage](/how-to/back-up-and-restore/configure-s3-aws). The same restore approach is applicable to restore [foreign backups](/how-to/back-up-and-restore/migrate-a-cluster) made by different Charmed PostgreSQL installation or even another PostgreSQL charm. The backup have to be created manually using [pgBackRest](https://pgbackrest.org/)!
+This Charmed PostgreSQL operator is able to restore its own [backups](/how-to/back-up-and-restore/restore-a-backup) stored on [S3-compatible storage](/how-to/back-up-and-restore/configure-s3-aws). The same restore approach is applicable to restore [foreign backups](/how-to/back-up-and-restore/migrate-a-cluster) made by different Charmed PostgreSQL installation or even another PostgreSQL charm. The backup has to be created manually using [pgBackRest](https://pgbackrest.org/)!
 
 ```{caution}
 The Canonical Data Team describes here the general approach and does NOT support nor guarantee the restoration results. 
@@ -19,7 +20,7 @@ Below is the *general approach* to the migration (see warning above!):
 
 1. Retrieve root/admin level credentials from legacy charm. 
 
-   See examples in [](/how-to/development/migrate-data-via-pg-dump).
+   See examples in [](/how-to/data-migration/migrate-data-via-pg-dump).
 
 2. Install [pgBackRest](https://pgbackrest.org/) inside the old charm OR nearby. 
 

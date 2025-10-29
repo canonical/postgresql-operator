@@ -54,12 +54,23 @@ Monitoring (COS) <monitoring-cos/index>
 
 ## Refresh (upgrade)
 
-In-place upgrades to higher revisions of Charmed PostgreSQL 16:
+Instructions for performing an in-place application refresh:
 
 ```{toctree}
 :titlesonly:
 
 Refresh (upgrade) <refresh>
+```
+
+## Data migration
+
+For charm developers looking to support PostgreSQL integrations with their charm:
+
+```{toctree}
+:maxdepth: 2
+:titlesonly:
+
+Data migration <data-migration/index>
 ```
 
 ## Cross-regional (cluster-cluster) async replication
@@ -84,13 +95,16 @@ How to replicate a subset of data to another PostgreSQL cluster:
 Logical replication <logical-replication/index>
 ```
 
-## Development
+## Charm development
 
-For charm developers looking to support PostgreSQL integrations with their charm:
+For charm developers looking to support PostgreSQL integrations with their charm
 
 ```{toctree}
-:maxdepth: 2
 :titlesonly:
 
-Development <development/index>
+Integrate PostgreSQL with your charm <integrate-with-your-charm>
 ```
+
+Other relevant guides:
+* {ref}`migrate-data-via-pg-dump`
+* {ref}`migrate-data-via-backup-restore`
