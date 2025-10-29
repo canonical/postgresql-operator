@@ -925,7 +925,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ]
         return set(hosts)
 
-    @property
+    @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(

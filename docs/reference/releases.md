@@ -12,6 +12,7 @@ The table below shows information for all minor releases of Charmed PostgreSQL 1
 
 | Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [935], [936] | 14.19 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [552], [553] | 14.15 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [467], [468] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [429], [430] | 14.11 | `3.4.2+` | ![check] | ![check] | ![check] | ![check] |  |
@@ -39,26 +40,29 @@ If you deploy with the `--revision` flag, **you must make sure the revision matc
 Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
 ```
 
-### Release 552-553
+### Latest release: 935, 936
 
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS | Snap revision |
-|:--------:|:-----:|:-----:|:-----:|:-----:|
-|[553] | ![check] |          |  ![check]  | 143 |
-|[552] |          | ![check] |  ![check]  | 142 |
+| Revision | amd64 | arm64 |  Snap revision |
+|:--------:|:-----:|:-----:|:-----:|
+| [935]      |         |![check] | 230 |
+| [936]      | ![check]|         | 229 |
+
 
 <details>
 <summary>Older releases</summary>
 
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS | Snap revision |
-|:--------:|:-----:|:-----:|:-----:|:-----:|
-|[468] |![check]  |          | ![check] | 120 |
-|[467] |          | ![check] | ![check] | 121 |
-|[430] |          | ![check] | ![check] | 114 |
-|[429] |![check]  |          | ![check] | 115 |
-|[363] |![check]  |          | ![check] | 96 |      
-|[351] |![check]  |          | ![check] | 89 |      
-|[336] |![check]  |          | ![check] | 85 |    
-|[288] |![check]  |          | ![check] | 31 |    
+| Revision | amd64 | arm64 |  Snap revision |
+|:--------:|:-----:|:-----:|:--------------:|
+|[553] | ![check] |          | 143 |
+|[552] |          | ![check] | 142 |
+|[468] |![check]  |          | 120 |    
+|[467] |          | ![check] | 121 |
+|[430] |          | ![check] | 114 |
+|[429] |![check]  |          | 115 |
+|[363] |![check]  |          | 96  |      
+|[351] |![check]  |          | 89  |      
+|[336] |![check]  |          | 85  |    
+|[288] |![check]  |          | 31  |    
 
 </details>
 
@@ -67,6 +71,9 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
 
 <!-- LINKS-->
+[936]: https://github.com/canonical/postgresql-operator/releases/tag/rev935
+[935]: https://github.com/canonical/postgresql-operator/releases/tag/rev935
+
 [553]: https://github.com/canonical/postgresql-operator/releases/tag/rev552
 [552]: https://github.com/canonical/postgresql-operator/releases/tag/rev552
 
