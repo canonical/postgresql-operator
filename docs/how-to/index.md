@@ -70,7 +70,7 @@ For charm developers looking to support PostgreSQL integrations with their charm
 :maxdepth: 2
 :titlesonly:
 
-Migrate data <migrate-data/index>
+Data migration <data-migration/index>
 ```
 
 ## Cross-regional (cluster-cluster) async replication
