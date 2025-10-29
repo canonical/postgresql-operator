@@ -1,7 +1,7 @@
 (migrate-data-via-pg-dump)=
-# Migrate database data using `pg_dump`
+# Migrate data via `pg_dump`
 
-This guide describes database **data** migration only. To migrate charms on new Juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/development/integrate-with-your-charm). 
+This guide describes database **data** migration only. To migrate charms on new Juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/integrate-with-your-charm). 
 
 A minor difference in commands might be necessary for different revisions and/or Juju versions, but the general logic remains:
 

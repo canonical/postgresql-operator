@@ -2,20 +2,15 @@
 
 There are two possible ways to migrate data from PostgreSQL 14 to 16 depending on how {ref}`roles` are managed:
 
-**In the case of charm roles management**, all the database objects ownership will be handled by charm automatically. This is what this guide will cover.
+**In case of admin roles management**, all database objects ownership are handled manually by the user. In this case, see the more general guide {ref}`migrate-data-via-pg-dump`. Note that you must set `extra-user-roles` to `charmed-admin` once a Juju relation is requested the new database.
 
-**In case of admin roles management**, all database objects ownership are handled manually by the user. See: {ref}`migrate-data-via-pg-dump`.
-
-<!--TODO: Should this note be transferred to pgdump guide? -->
-Note: make sure `extra-user-roles` set to `charmed-admin` once Juju relation requested to such DB. <!--TODO: the new db?-->
-
-This guide covers how to migrate data from Charmed PostgreSQL 14 to 16 using the new charm roles management setup for client applications managed by Juju. The migrated data from PostgreSQL 14 will be mapped to the corresponding ownership in PostgreSQL 16. 
+**In the case of charm roles management**, all the database objects ownership will be handled by charm automatically. This guide covers how to migrate data from Charmed PostgreSQL 14 to 16 using the new charm roles management setup for client applications managed by Juju. The migrated data from PostgreSQL 14 will be mapped to the corresponding ownership in PostgreSQL 16. 
 
 ## Prepare PostgreSQL 14 data
 
-First, in order to make sure the latest data is written to your dump, remove the relation between the client app and Charmed PostgreSQL 14.
+First, in order to make sure the latest data is included, remove the relation between the client app and Charmed PostgreSQL 14.
 
-Define the following variables for the old database:
+Then, define the following variables for the old database:
 
 ```shell
 TMP_PATH="~/old-db-dump/"
@@ -113,5 +108,3 @@ END$$;
 ```
 
 At this stage, the database has been completely imported. The cluster can be scaled, and the client app can be related to the new PostgreSQL 16 database.
-
-contact
