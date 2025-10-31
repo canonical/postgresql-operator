@@ -194,39 +194,41 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     password = await get_password(ops_test)
 
-    # Connect to PostgreSQL.
-    for unit_id in UNIT_IDS:
-        host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
-        logger.info("connecting to the database host: %s", host)
-        try:
-            with (
-                psycopg2.connect(
-                    f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
-                ) as connection,
-                connection.cursor() as cursor,
-            ):
-                settings_names = [
-                    "max_prepared_transactions",
-                    "shared_buffers",
-                    "lc_monetary",
-                    "max_connections",
-                ]
-                cursor.execute(
-                    sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
-                        sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
-                    ),
-                    settings_names,
-                )
-                records = cursor.fetchall()
-                settings = convert_records_to_dict(records)
+    for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(6), reraise=True):
+        with attempt:
+            # Connect to PostgreSQL.
+            for unit_id in UNIT_IDS:
+                host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
+                logger.info("connecting to the database host: %s", host)
+                try:
+                    with (
+                        psycopg2.connect(
+                            f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
+                        ) as connection,
+                        connection.cursor() as cursor,
+                    ):
+                        settings_names = [
+                            "max_prepared_transactions",
+                            "shared_buffers",
+                            "lc_monetary",
+                            "max_connections",
+                        ]
+                        cursor.execute(
+                            sql.SQL(
+                                "SELECT name,setting FROM pg_settings WHERE name IN ({});"
+                            ).format(sql.SQL(", ").join(sql.Placeholder() * len(settings_names))),
+                            settings_names,
+                        )
+                        records = cursor.fetchall()
+                        settings = convert_records_to_dict(records)
 
-                # Validate each configuration set by Patroni on PostgreSQL.
-                assert settings["max_prepared_transactions"] == "100"
-                assert settings["shared_buffers"] == "32768"
-                assert settings["lc_monetary"] == "en_GB.utf8"
-                assert settings["max_connections"] == "200"
-        finally:
-            connection.close()
+                        # Validate each configuration set by Patroni on PostgreSQL.
+                        assert settings["max_prepared_transactions"] == "100"
+                        assert settings["shared_buffers"] == "32768"
+                        assert settings["lc_monetary"] == "en_GB.utf8"
+                        assert settings["max_connections"] == "200"
+                finally:
+                    connection.close()
 
 
 async def test_scale_down_and_up(ops_test: OpsTest):
