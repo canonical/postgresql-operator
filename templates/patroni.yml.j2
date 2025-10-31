@@ -160,7 +160,7 @@ postgresql:
     - local all operator scram-sha-256
     - local all monitoring password
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }}/32 md5
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
@@ -180,7 +180,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 md5
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
+    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/32    md5
     {% endfor %}
   pg_ident:
   - operator snap_daemon backup
