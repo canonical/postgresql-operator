@@ -183,6 +183,7 @@ async def test_postgresql_locales(ops_test: OpsTest) -> None:
     assert locales == SNAP_LOCALES
 
 
+@pytest.mark.abort_on_fail
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
