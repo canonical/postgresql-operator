@@ -12,7 +12,7 @@ from jubilant import Juju
 from tenacity import Retrying, stop_after_attempt
 
 from .. import architecture
-from ..high_availability_helpers_new import (
+from ..high_availability.high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
@@ -43,7 +43,7 @@ def second_model(juju: Juju, lxd_spaces, request: pytest.FixtureRequest) -> Gene
 
     logging.info(f"Creating model: {model_name}")
     juju.add_model(model_name)
-    model_2 = Juju(model=first_model)
+    model_2 = Juju(model=model_name)
     model_2.cli("reload-spaces")
     model_2.cli("add-space", "client", "10.0.0.1/24")
     model_2.cli("add-space", "peers", "10.10.10.1/24")
@@ -102,8 +102,6 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
         bind=bind,
         num_units=3,
     )
-    # TODO switch to 1/stable
-    model_1.deploy(charm="self-signed-certificates", channel="latest/stable", base="ubuntu@22.04")
 
     model_2 = Juju(model=second_model)
     model_2.deploy(
@@ -115,20 +113,34 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
         bind=bind,
         num_units=3,
     )
-    # TODO switch to 1/stable
-    model_2.deploy(charm="self-signed-certificates", channel="latest/stable", base="ubuntu@22.04")
 
-    model_1.integrate(f"{DB_TEST_APP_1}:client-certificates", "self-signed-certificates")
-    model_1.integrate(f"{DB_TEST_APP_1}:peer-certificates", "self-signed-certificates")
-    model_2.integrate(f"{DB_TEST_APP_2}:client-certificates", "self-signed-certificates")
-    model_2.integrate(f"{DB_TEST_APP_2}:peer-certificates", "self-signed-certificates")
+    # TODO switch to 1/stable
+    logging.info("Deploying tls operators")
+    constraints = {"arch": architecture.architecture}
+    model_1.deploy(
+        charm="self-signed-certificates",
+        channel="latest/stable",
+        constraints=constraints,
+        base="ubuntu@22.04",
+    )
+    model_2.deploy(
+        charm="self-signed-certificates",
+        channel="latest/stable",
+        constraints=constraints,
+        base="ubuntu@22.04",
+    )
+
+    model_1.integrate(f"{DB_APP_1}:client-certificates", "self-signed-certificates")
+    model_1.integrate(f"{DB_APP_1}:peer-certificates", "self-signed-certificates")
+    model_2.integrate(f"{DB_APP_2}:client-certificates", "self-signed-certificates")
+    model_2.integrate(f"{DB_APP_2}:peer-certificates", "self-signed-certificates")
 
     model_1.offer(f"{first_model}.self-signed-certificates", endpoint="send-ca-cert")
     model_2.consume(f"{first_model}.self-signed-certificates", "send-ca-offer")
-    model_2.integrate(DB_TEST_APP_2, "send-ca-offer")
+    model_2.integrate(DB_APP_2, "send-ca-offer")
     model_2.offer(f"{second_model}.self-signed-certificates", endpoint="send-ca-cert")
     model_1.consume(f"{second_model}.self-signed-certificates", "send-ca-offer")
-    model_1.integrate(DB_TEST_APP_1, "send-ca-offer")
+    model_1.integrate(DB_APP_1, "send-ca-offer")
 
     logging.info("Deploying test application")
     constraints = {"arch": architecture.architecture, "spaces": "client"}
