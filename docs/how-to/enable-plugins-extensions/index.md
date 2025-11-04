@@ -39,8 +39,7 @@ Not all PostgreSQL extensions are available. The list of supported extensions is
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
-:glob:
 :hidden:
 
 Enable TimescaleDB <enable-timescaledb>
+```

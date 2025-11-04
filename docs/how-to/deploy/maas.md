@@ -2,7 +2,7 @@
 
 This guide aims to provide a quick start to deploying Charmed PostgreSQL on MAAS. It summarises the instructions from the [Build a MAAS and LXD environment with Multipass Tutorial](https://discourse.maas.io/t/5360) to set up and tear down a **playground environment**.
 
-If you want to deploy PostgreSQL on MAAS in a **production environment**, refer to the official [Bootstrap MAAS Tutorial](https://maas.io/docs/tutorial-bootstrapping-maas) followed by the [Charmed PostgreSQL Tutorial](/tutorial/index).
+If you want to deploy PostgreSQL on MAAS in a **production environment**, refer to the official [Bootstrap MAAS Tutorial](https://maas.io/docs/tutorial-bootstrapping-maas) followed by our {ref}`deployment guides <deploy>`.
 
 For further details and explanation about each step, remember you can refer to the [original tutorial](https://discourse.maas.io/t/5360). 
 

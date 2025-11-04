@@ -52,7 +52,7 @@ class CharmConfig(BaseConfigModel):
     logging_log_lock_waits: bool | None = Field(default=None)
     logging_log_min_duration_statement: int | None = Field(ge=-1, le=2147483647, default=None)
     logging_track_functions: Literal["none", "pl", "all"] | None = Field(default=None)
-    logical_replication_subscription_request: str | None
+    # logical_replication_subscription_request: str | None
     memory_maintenance_work_mem: int | None = Field(ge=1024, le=2147483647, default=None)
     memory_max_prepared_transactions: int | None = Field(ge=0, le=262143, default=None)
     memory_shared_buffers: int | None = Field(ge=16, le=1073741823, default=None)

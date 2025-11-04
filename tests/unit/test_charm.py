@@ -15,7 +15,7 @@ import psycopg2
 import pytest
 import tomli
 from charmlibs import snap
-from ops import RelationEvent, Unit
+from ops import JujuVersion, RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (
     ActiveStatus,
@@ -241,10 +241,10 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
-        patch(
-            "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
-            return_value=True,
-        ),
+        # patch(
+        #     "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
+        #     return_value=True,
+        # ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -368,9 +368,9 @@ def test_enable_disable_extensions(harness, caplog):
   synchronous_node_count:
     type: string
     default: "all"
-  logical_replication_subscription_request:
-    type: string
-    default: "{}"
+  # logical_replication_subscription_request:
+  #   type: string
+  #   default: "{}"
   plugin_citext_enable:
     default: false
     type: boolean
@@ -1178,7 +1178,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots={},
+            # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1209,7 +1209,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots={},
+            # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
@@ -2765,12 +2765,24 @@ def test_relations_user_databases_map(harness):
 
 
 def test_on_secret_remove(harness):
-    event = Mock()
-    harness.charm._on_secret_remove(event)
-    event.remove_revision.assert_called_once_with()
-    event.reset_mock()
+    with (
+        patch("ops.model.Model.juju_version", new_callable=PropertyMock) as _juju_version,
+    ):
+        event = Mock()
 
-    # No secret
-    event.secret.label = None
-    harness.charm._on_secret_remove(event)
-    assert not event.remove_revision.called
+        # New juju
+        _juju_version.return_value = JujuVersion("3.6.11")
+        harness.charm._on_secret_remove(event)
+        event.remove_revision.assert_called_once_with()
+        event.reset_mock()
+
+        # Old juju
+        _juju_version.return_value = JujuVersion("3.6.9")
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called
+        event.reset_mock()
+
+        # No secret
+        event.secret.label = None
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called

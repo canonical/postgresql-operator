@@ -231,7 +231,7 @@ Type "help" for help.
 test123=> 
 ```
 
-From here you can begin to use your newly deployed PostgreSQL. Learn more about operations like scaling, enabling TLS, managing users and passwords, and more in the [Charmed PostgreSQL tutorial](/tutorial/index).
+See our {ref}`how-to` for further information about setting up and operating newly deployed Charmed PostgreSQL.
 
 ## Expose database (optional)
 
