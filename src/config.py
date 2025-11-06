@@ -25,6 +25,7 @@ class CharmConfig(BaseConfigModel):
     durability_synchronous_commit: str | None
     durability_wal_keep_size: int | None
     experimental_max_connections: int | None
+    wal_compression: str | None
     instance_default_text_search_config: str | None
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
@@ -42,6 +43,12 @@ class CharmConfig(BaseConfigModel):
     memory_shared_buffers: int | None
     memory_temp_buffers: int | None
     memory_work_mem: int | None
+    max_worker_processes: str | None
+    max_parallel_workers: str | None
+    max_parallel_maintenance_workers: str | None
+    max_logical_replication_workers: str | None
+    max_sync_workers_per_subscription: str | None
+    max_parallel_apply_workers_per_subscription: str | None
     optimizer_constraint_exclusion: str | None
     optimizer_cpu_index_tuple_cost: float | None
     optimizer_cpu_operator_cost: float | None
@@ -287,6 +294,43 @@ class CharmConfig(BaseConfigModel):
         if value < 64 or value > 2147483647:
             raise ValueError("Value is not between 64 and 2147483647")
 
+        return value
+
+    @validator("wal_compression")
+    @classmethod
+    def wal_compression_values(cls, value: str) -> str | None:
+        """Check wal_compression config option is one of `on` or `off`."""
+        if value not in ["on", "off"]:
+            raise ValueError("Value not one of 'on' or 'off'")
+
+        return value
+
+    @validator(
+        "max_worker_processes",
+        "max_parallel_workers",
+        "max_parallel_maintenance_workers",
+        "max_logical_replication_workers",
+        "max_sync_workers_per_subscription",
+        "max_parallel_apply_workers_per_subscription",
+    )
+    @classmethod
+    def worker_values(cls, value: str) -> str | None:
+        """Check worker config options are 'auto' or a valid number.
+        
+        Note: The actual cap validation (10 * vCores) is performed at runtime
+        in the charm layer where CPU information is available.
+        """
+        if value == "auto":
+            return value
+        
+        # Validate that if not "auto", it's a valid positive integer
+        try:
+            num_value = int(value)
+            if num_value < 0:
+                raise ValueError("Value must be 'auto' or a positive number")
+        except ValueError:
+            raise ValueError("Value must be 'auto' or a valid number")
+        
         return value
 
     @validator("optimizer_constraint_exclusion")

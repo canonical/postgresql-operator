@@ -2957,3 +2957,357 @@ def test_on_secret_remove(harness, only_with_juju_secrets):
         event.secret.label = None
         harness.charm._on_secret_remove(event)
         assert not event.remove_revision.called
+
+
+def test_build_postgresql_parameters_wal_compression():
+    """Test wal_compression parameter is correctly passed through."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    # Test with wal_compression on
+    config = {"profile": "testing", "wal_compression": "on"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["wal_compression"] == "on"
+
+    # Test with wal_compression off
+    config = {"profile": "testing", "wal_compression": "off"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["wal_compression"] == "off"
+
+
+def test_build_postgresql_parameters_max_worker_processes_auto():
+    """Test max_worker_processes auto calculation."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    # With 4 cores: min(8, 2*4) = 8
+    config = {"profile": "testing", "max_worker_processes": "auto"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["max_worker_processes"] == 8
+
+    # With 16 cores: min(8, 2*16) = 8 (capped at 8)
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=16)
+    assert params["max_worker_processes"] == 8
+
+    # With 2 cores: min(8, 2*2) = 4
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=2)
+    assert params["max_worker_processes"] == 4
+
+
+def test_build_postgresql_parameters_max_worker_processes_numeric():
+    """Test max_worker_processes with valid numeric values."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    # Valid value within limit (4 cores * 10 = 40 max)
+    config = {"profile": "testing", "max_worker_processes": "16"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["max_worker_processes"] == 16
+
+    # At the maximum limit
+    config = {"profile": "testing", "max_worker_processes": "40"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["max_worker_processes"] == 40
+
+
+def test_build_postgresql_parameters_max_worker_processes_exceeds_limit():
+    """Test max_worker_processes blocks when exceeding 10*vCores."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    # 4 cores * 10 = 40 max, trying 50 should raise ValueError
+    config = {"profile": "testing", "max_worker_processes": "50"}
+    with pytest.raises(ValueError, match="exceeds maximum allowed limit of 40"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_max_worker_processes_negative():
+    """Test max_worker_processes blocks negative values."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {"profile": "testing", "max_worker_processes": "-5"}
+    with pytest.raises(ValueError, match="is below minimum allowed value of 0"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_max_parallel_workers_auto():
+    """Test max_parallel_workers auto uses max_worker_processes value."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "12",
+        "max_parallel_workers": "auto",
+    }
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["max_parallel_workers"] == 12
+
+
+def test_build_postgresql_parameters_max_parallel_workers_numeric():
+    """Test max_parallel_workers with valid numeric value."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {"profile": "testing", "max_parallel_workers": "20"}
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    assert params["max_parallel_workers"] == 20
+
+
+def test_build_postgresql_parameters_max_parallel_workers_exceeds_limit():
+    """Test max_parallel_workers blocks when exceeding limit."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    # 4 cores * 10 = 40 max, trying 45 should raise ValueError
+    config = {"profile": "testing", "max_parallel_workers": "45"}
+    with pytest.raises(ValueError, match="exceeds maximum allowed limit of 40"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_max_parallel_workers_negative():
+    """Test max_parallel_workers blocks negative values."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {"profile": "testing", "max_parallel_workers": "-3"}
+    with pytest.raises(ValueError, match="is below minimum allowed value of 0"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_all_worker_params_auto():
+    """Test all worker parameters with auto setting."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "auto",
+        "max_parallel_workers": "auto",
+        "max_parallel_maintenance_workers": "auto",
+        "max_logical_replication_workers": "auto",
+        "max_sync_workers_per_subscription": "auto",
+        "max_parallel_apply_workers_per_subscription": "auto",
+    }
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+    # All should be 8 (min(8, 2*4))
+    assert params["max_worker_processes"] == 8
+    assert params["max_parallel_workers"] == 8
+    assert params["max_parallel_maintenance_workers"] == 8
+    assert params["max_logical_replication_workers"] == 8
+    assert params["max_sync_workers_per_subscription"] == 8
+    assert params["max_parallel_apply_workers_per_subscription"] == 8
+
+
+def test_build_postgresql_parameters_mixed_worker_params():
+    """Test mix of auto and numeric values for worker parameters."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "10",
+        "max_parallel_workers": "auto",
+        "max_parallel_maintenance_workers": "6",
+        "max_logical_replication_workers": "auto",
+    }
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+    assert params["max_worker_processes"] == 10
+    assert params["max_parallel_workers"] == 10  # auto = max_worker_processes
+    assert params["max_parallel_maintenance_workers"] == 6
+    assert params["max_logical_replication_workers"] == 10  # auto = max_worker_processes
+
+
+def test_get_available_cores(harness):
+    """Test get_available_cores returns CPU count from OS."""
+    with patch("os.cpu_count", return_value=8):
+        assert harness.charm.get_available_cores() == 8
+    
+    with patch("os.cpu_count", return_value=4):
+        assert harness.charm.get_available_cores() == 4
+    
+    with patch("os.cpu_count", return_value=1):
+        assert harness.charm.get_available_cores() == 1
+
+
+def test_get_available_cores_fallback_when_none(harness):
+    """Test get_available_cores returns 1 when os.cpu_count() returns None."""
+    with patch("os.cpu_count", return_value=None):
+        assert harness.charm.get_available_cores() == 1
+
+
+def test_build_postgresql_parameters_no_cores_provided():
+    """Test that worker parameters are not validated when available_cores is None."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # When available_cores is None, even out-of-range values should pass through
+    # (they remain as strings and validation is skipped)
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "1000",  # Would exceed any reasonable limit
+        "max_parallel_workers": "auto",  # Should remain as "auto"
+    }
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=None)
+    
+    # Parameters should be passed through without conversion or validation
+    assert params["max_worker_processes"] == "1000"
+    assert params["max_parallel_workers"] == "auto"
+
+
+def test_build_postgresql_parameters_zero_value():
+    """Test that zero is a valid value for worker parameters."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "0",
+        "max_parallel_workers": "0",
+    }
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    
+    # Zero should be accepted and converted to int
+    assert params["max_worker_processes"] == 0
+    assert params["max_parallel_workers"] == 0
+
+
+def test_build_postgresql_parameters_boundary_max_value():
+    """Test maximum boundary value (exactly 10*vCores)."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # With 4 cores, max is 40
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "40",
+        "max_parallel_workers": "40",
+    }
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    
+    # Exactly at the limit should be accepted
+    assert params["max_worker_processes"] == 40
+    assert params["max_parallel_workers"] == 40
+
+
+def test_build_postgresql_parameters_boundary_just_over_max():
+    """Test value just over maximum boundary (10*vCores + 1)."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # With 4 cores, max is 40, so 41 should fail
+    config = {"profile": "testing", "max_worker_processes": "41"}
+    
+    with pytest.raises(ValueError, match="exceeds maximum allowed limit of 40"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_auto_with_many_cores():
+    """Test auto calculation with many cores (should cap at 8)."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # With 16 cores, 2*16=32, but auto should cap at 8
+    config = {"profile": "testing", "max_worker_processes": "auto"}
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=16)
+    
+    # Should be min(8, 2*16) = 8
+    assert params["max_worker_processes"] == 8
+
+
+def test_build_postgresql_parameters_auto_with_single_core():
+    """Test auto calculation with single core."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # With 1 core, 2*1=2
+    config = {"profile": "testing", "max_worker_processes": "auto"}
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=1)
+    
+    # Should be min(8, 2*1) = 2
+    assert params["max_worker_processes"] == 2
+
+
+def test_build_postgresql_parameters_dependent_workers_when_max_not_set():
+    """Test dependent worker params use fallback when max_worker_processes not configured."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    # Don't set max_worker_processes, but set dependent params
+    config = {
+        "profile": "testing",
+        "max_parallel_workers": "auto",
+        "max_logical_replication_workers": "auto",
+    }
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    
+    # Should use fallback: min(8, 2*4) = 8
+    assert params["max_parallel_workers"] == 8
+    assert params["max_logical_replication_workers"] == 8
+
+
+def test_build_postgresql_parameters_all_worker_params_different_values():
+    """Test all worker parameters can have different valid numeric values."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    config = {
+        "profile": "testing",
+        "max_worker_processes": "20",
+        "max_parallel_workers": "15",
+        "max_parallel_maintenance_workers": "10",
+        "max_logical_replication_workers": "8",
+        "max_sync_workers_per_subscription": "5",
+        "max_parallel_apply_workers_per_subscription": "3",
+    }
+    
+    params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+    
+    # All should be converted to int and within limit (0-40)
+    assert params["max_worker_processes"] == 20
+    assert params["max_parallel_workers"] == 15
+    assert params["max_parallel_maintenance_workers"] == 10
+    assert params["max_logical_replication_workers"] == 8
+    assert params["max_sync_workers_per_subscription"] == 5
+    assert params["max_parallel_apply_workers_per_subscription"] == 3
+
+
+def test_build_postgresql_parameters_string_not_number_or_auto():
+    """Test that invalid string values (not 'auto' or numeric) raise error."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    config = {"profile": "testing", "max_worker_processes": "invalid"}
+    
+    # Should raise ValueError when trying to convert to int
+    with pytest.raises(ValueError, match="invalid literal for int"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_build_postgresql_parameters_float_value():
+    """Test that float values are handled (truncated to int)."""
+    from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+    
+    config = {"profile": "testing", "max_worker_processes": "8.7"}
+    
+    # Should raise ValueError as int() doesn't accept float strings
+    with pytest.raises(ValueError, match="invalid literal for int"):
+        PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=4)
+
+
+def test_update_config_calls_get_available_cores(harness):
+    """Test that update_config properly calls get_available_cores and passes it through."""
+    with (
+        patch("charm.snap.SnapCache"),
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock
+        ) as _is_workload_running,
+        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch.object(harness.charm, "get_available_cores", return_value=8) as mock_cores,
+        patch.object(harness.charm, "get_available_memory", return_value=1073741824),
+        patch.object(harness.charm.postgresql, "build_postgresql_parameters", return_value={}) as mock_build,
+        patch.object(harness.charm._patroni, "render_patroni_yml_file"),
+        patch.object(harness.charm._patroni, "reload_patroni_configuration"),
+        patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
+    ):
+        _is_workload_running.return_value = True
+        _member_started.return_value = True
+        
+        harness.charm.update_config()
+        
+        # Verify get_available_cores was called
+        mock_cores.assert_called_once()
+        
+        # Verify build_postgresql_parameters was called with the cores value
+        mock_build.assert_called_once()
+        call_args = mock_build.call_args
+        assert call_args[0][3] == 8  # available_cores is 4th positional arg

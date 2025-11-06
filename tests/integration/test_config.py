@@ -20,11 +20,18 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test config with wrong parameters."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
+        # Get the current system architecture for deployment constraints
+        import subprocess
+        arch = subprocess.run(
+            ["dpkg", "--print-architecture"], capture_output=True, check=True, encoding="utf-8"
+        ).stdout.strip()
+        
         await ops_test.model.deploy(
             charm,
             num_units=1,
             base=CHARM_BASE,
             config={"profile": "testing"},
+            constraints=f"arch={arch}",
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -211,6 +218,21 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
+        {"wal_compression": [test_string, "on"]},  # config option is one of `on` or `off`
+        {"max_worker_processes": [test_string, "auto"]},  # config option is `auto` or a valid number
+        {"max_parallel_workers": [test_string, "auto"]},  # config option is `auto` or a valid number
+        {
+            "max_parallel_maintenance_workers": [test_string, "auto"]
+        },  # config option is `auto` or a valid number
+        {
+            "max_logical_replication_workers": [test_string, "auto"]
+        },  # config option is `auto` or a valid number
+        {
+            "max_sync_workers_per_subscription": [test_string, "auto"]
+        },  # config option is `auto` or a valid number
+        {
+            "max_parallel_apply_workers_per_subscription": [test_string, "auto"]
+        },  # config option is `auto` or a valid number
     ]
 
     charm_config = {}

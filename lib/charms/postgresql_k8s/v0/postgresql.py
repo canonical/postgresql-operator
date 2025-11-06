@@ -897,7 +897,10 @@ END; $$;"""
 
     @staticmethod
     def build_postgresql_parameters(
-        config_options: dict, available_memory: int, limit_memory: Optional[int] = None
+        config_options: dict,
+        available_memory: int,
+        limit_memory: Optional[int] = None,
+        available_cores: Optional[int] = None,
     ) -> Optional[dict]:
         """Builds the PostgreSQL parameters.
 
@@ -905,6 +908,7 @@ END; $$;"""
             config_options: charm config options containing profile and PostgreSQL parameters.
             available_memory: available memory to use in calculation in bytes.
             limit_memory: (optional) limit memory to use in calculation in bytes.
+            available_cores: (optional) number of available CPU cores for worker process calculations.
 
         Returns:
             Dictionary with the PostgreSQL parameters.
@@ -915,6 +919,19 @@ END; $$;"""
         logger.debug(f"Building PostgreSQL parameters for {profile=} and {available_memory=}")
         parameters = {}
         for config, value in config_options.items():
+            # Handle direct PostgreSQL parameter names (no prefix)
+            if config in [
+                "max_worker_processes",
+                "max_parallel_workers",
+                "max_parallel_maintenance_workers",
+                "max_logical_replication_workers",
+                "max_sync_workers_per_subscription",
+                "max_parallel_apply_workers_per_subscription",
+                "wal_compression",
+            ]:
+                parameters[config] = value
+                continue
+            
             # Filter config option not related to PostgreSQL parameters.
             if not config.startswith((
                 "connection",
@@ -935,6 +952,66 @@ END; $$;"""
             if parameter in ["date_style", "time_zone"]:
                 parameter = "".join(x.capitalize() for x in parameter.split("_"))
             parameters[parameter] = value
+        
+        # Handle worker process parameters with "auto" support
+        if available_cores is not None:
+            # Calculate max_worker_processes first (needed as base for other workers)
+            max_worker_processes_value = None
+            if "max_worker_processes" in parameters:
+                if parameters["max_worker_processes"] == "auto":
+                    # auto = minimum(8, 2*vCores)
+                    max_worker_processes_value = min(8, 2 * available_cores)
+                    parameters["max_worker_processes"] = max_worker_processes_value
+                else:
+                    # It's a number - validate minimum and maximum
+                    max_worker_processes_value = int(parameters["max_worker_processes"])
+                    if max_worker_processes_value < 0:
+                        raise ValueError(
+                            f"max_worker_processes value {max_worker_processes_value} is below "
+                            f"minimum allowed value of 0."
+                        )
+                    max_allowed = 10 * available_cores
+                    if max_worker_processes_value > max_allowed:
+                        raise ValueError(
+                            f"max_worker_processes value {max_worker_processes_value} exceeds "
+                            f"maximum allowed limit of {max_allowed} (10 * vCores)."
+                        )
+                    parameters["max_worker_processes"] = max_worker_processes_value
+            
+            # Handle other worker parameters that default to max_worker_processes
+            worker_params = [
+                "max_parallel_workers",
+                "max_parallel_maintenance_workers",
+                "max_logical_replication_workers",
+                "max_sync_workers_per_subscription",
+                "max_parallel_apply_workers_per_subscription",
+            ]
+            
+            for worker_param in worker_params:
+                if worker_param in parameters:
+                    if parameters[worker_param] == "auto":
+                        # auto = max_worker_processes
+                        if max_worker_processes_value is not None:
+                            parameters[worker_param] = max_worker_processes_value
+                        else:
+                            # Fallback if max_worker_processes not configured
+                            parameters[worker_param] = min(8, 2 * available_cores)
+                    else:
+                        # It's a number - validate minimum and maximum
+                        worker_value = int(parameters[worker_param])
+                        if worker_value < 0:
+                            raise ValueError(
+                                f"{worker_param} value {worker_value} is below "
+                                f"minimum allowed value of 0."
+                            )
+                        max_allowed = 10 * available_cores
+                        if worker_value > max_allowed:
+                            raise ValueError(
+                                f"{worker_param} value {worker_value} exceeds "
+                                f"maximum allowed limit of {max_allowed} (10 * vCores)."
+                            )
+                        parameters[worker_param] = worker_value
+        
         shared_buffers_max_value_in_mb = int(available_memory * 0.4 / 10**6)
         shared_buffers_max_value = int(shared_buffers_max_value_in_mb * 10**3 / 8)
         if parameters.get("shared_buffers", 0) > shared_buffers_max_value:

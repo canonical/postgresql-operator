@@ -2000,7 +2000,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Build PostgreSQL parameters.
         pg_parameters = self.postgresql.build_postgresql_parameters(
-            self.model.config, self.get_available_memory(), limit_memory
+            self.model.config,
+            self.get_available_memory(),
+            limit_memory,
+            self.get_available_cores(),
         )
 
         # Update and reload configuration based on TLS files availability.
@@ -2151,6 +2154,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     return int(line.split()[1]) * 1024
 
         return 0
+
+    def get_available_cores(self) -> int:
+        """Returns the number of available CPU cores.
+        
+        This method uses os.cpu_count() which returns the number of logical CPUs
+        available to the system. This is appropriate for calculating resource
+        limits for PostgreSQL worker processes.
+        
+        Returns:
+            Number of available CPU cores, or 1 as fallback.
+        """
+        cores = os.cpu_count()
+        return cores if cores is not None else 1
 
     @property
     def client_relations(self) -> list[Relation]:
