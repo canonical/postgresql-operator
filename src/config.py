@@ -316,21 +316,21 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def worker_values(cls, value: str) -> str | None:
         """Check worker config options are 'auto' or a valid number.
-        
+
         Note: The actual cap validation (10 * vCores) is performed at runtime
         in the charm layer where CPU information is available.
         """
         if value == "auto":
             return value
-        
+
         # Validate that if not "auto", it's a valid positive integer
         try:
             num_value = int(value)
             if num_value < 0:
                 raise ValueError("Value must be 'auto' or a positive number")
-        except ValueError:
-            raise ValueError("Value must be 'auto' or a valid number")
-        
+        except ValueError as e:
+            raise ValueError("Value must be 'auto' or a valid number") from e
+
         return value
 
     @validator("optimizer_constraint_exclusion")

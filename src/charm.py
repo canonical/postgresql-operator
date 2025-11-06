@@ -2157,11 +2157,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def get_available_cores(self) -> int:
         """Returns the number of available CPU cores.
-        
+
         This method uses os.cpu_count() which returns the number of logical CPUs
         available to the system. This is appropriate for calculating resource
         limits for PostgreSQL worker processes.
-        
+
         Returns:
             Number of available CPU cores, or 1 as fallback.
         """
