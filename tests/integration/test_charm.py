@@ -4,6 +4,7 @@
 
 
 import logging
+from time import sleep
 from typing import get_args
 
 import jubilant
@@ -177,7 +178,8 @@ def test_postgresql_parameters_change(juju: Juju) -> None:
             "experimental_max_connections": "200",
         },
     )
-    juju.wait(ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME), successes=6)
+    sleep(5)
+    juju.wait(ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME))
     password = get_user_password(juju, DB_APP_NAME, "operator")
 
     # Connect to PostgreSQL.
