@@ -177,7 +177,7 @@ def test_postgresql_parameters_change(juju: Juju) -> None:
             "experimental_max_connections": "200",
         },
     )
-    juju.wait(ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME))
+    juju.wait(ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME), successes=6)
     password = get_user_password(juju, DB_APP_NAME, "operator")
 
     # Connect to PostgreSQL.
