@@ -149,7 +149,7 @@ def test_settings_are_correct(juju: Juju, unit_id: int):
     assert settings["maximum_lag_on_failover"] == 1048576
 
     logging.warning("Asserting port ranges")
-    unit = juju.status.apps[DATABASE_APP_NAME].units[f"{DB_APP_NAME}/{unit_id}"]
+    unit = juju.status().apps[DATABASE_APP_NAME].units[f"{DB_APP_NAME}/{unit_id}"]
     assert unit.open_ports == ["5432/tcp"]
 
 

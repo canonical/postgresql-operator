@@ -11,7 +11,7 @@ import pytest
 from jubilant import Juju
 from tenacity import Retrying, stop_after_attempt
 
-from .. import architecture
+from ..architecture import architecture
 from ..high_availability.high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
@@ -88,7 +88,7 @@ def first_model_continuous_writes(first_model: str) -> Generator:
 def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     """Simple test to ensure that the database application charms get deployed."""
     configuration = {"profile": "testing"}
-    constraints = {"arch": architecture.architecture, "spaces": "client,peers"}
+    constraints = {"arch": architecture, "spaces": "client,peers"}
     bind = {"database-peers": "peers", "database": "client"}
 
     logging.info("Deploying postgresql clusters")
@@ -115,7 +115,7 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     )
 
     logging.info("Deploying tls operators")
-    constraints = {"arch": architecture.architecture}
+    constraints = {"arch": architecture}
     model_1.deploy(
         charm="self-signed-certificates",
         channel="1/stable",
@@ -132,7 +132,7 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     model_2.integrate(f"{DB_APP_2}:peer-certificates", "certificates-offer")
 
     logging.info("Deploying test application")
-    constraints = {"arch": architecture.architecture, "spaces": "client"}
+    constraints = {"arch": architecture, "spaces": "client"}
     bind = {"database": "client"}
     model_1.deploy(
         charm=DB_TEST_APP_NAME,
