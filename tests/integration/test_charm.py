@@ -22,7 +22,7 @@ from .helpers import (
     convert_records_to_dict,
     db_connect,
 )
-from .high_availability_helpers_new import (
+from .high_availability.high_availability_helpers_new import (
     get_unit_ip,
     get_user_password,
     wait_for_apps_status,

@@ -26,7 +26,6 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 tls_certificates_app_name = "self-signed-certificates"
 tls_channel = "1/stable"
-tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,6 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         tls_certificates_app_name,
-        tls_config,
         tls_channel,
         credentials,
         AWS,

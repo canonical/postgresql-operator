@@ -21,7 +21,6 @@ CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
 TLS_CHANNEL = "1/stable"
-TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +332,6 @@ async def test_pitr_backup_aws(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         TLS_CERTIFICATES_APP_NAME,
-        TLS_CONFIG,
         TLS_CHANNEL,
         credentials,
         AWS,

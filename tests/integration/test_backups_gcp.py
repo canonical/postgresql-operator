@@ -27,7 +27,6 @@ FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check 
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 tls_certificates_app_name = "self-signed-certificates"
 tls_channel = "1/stable"
-tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,6 @@ async def test_backup_gcp(ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         tls_certificates_app_name,
-        tls_config,
         tls_channel,
         credentials,
         GCP,

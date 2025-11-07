@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 APP_NAME = METADATA["name"]
 tls_certificates_app_name = "self-signed-certificates"
 tls_channel = "1/stable"
-tls_config = {"ca-common-name": "Test CA"}
 
 
 @pytest.mark.abort_on_fail
@@ -55,9 +54,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
-        await ops_test.model.deploy(
-            tls_certificates_app_name, config=tls_config, channel=tls_channel, base=CHARM_BASE
-        )
+        await ops_test.model.deploy(tls_certificates_app_name, channel=tls_channel)
 
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(
