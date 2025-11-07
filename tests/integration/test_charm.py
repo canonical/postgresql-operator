@@ -16,7 +16,6 @@ from psycopg2 import sql
 from locales import SNAP_LOCALES
 
 from .helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     STORAGE_PATH,
     convert_records_to_dict,
@@ -39,7 +38,7 @@ def test_deploy(juju: Juju, charm) -> None:
     juju.deploy(
         charm=charm,
         app=DB_APP_NAME,
-        base=CHARM_BASE,
+        base="ubuntu@24.04",
         config={"profile": "testing"},
         num_units=3,
     )
