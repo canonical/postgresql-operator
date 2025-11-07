@@ -20,8 +20,7 @@ from .helpers import (
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-TLS_CHANNEL = "latest/stable"
-TLS_CONFIG = {"ca-common-name": "Test CA"}
+TLS_CHANNEL = "1/stable"
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ async def pitr_backup_operations(
     ops_test: OpsTest,
     s3_integrator_app_name: str,
     tls_certificates_app_name: str,
-    tls_config,
     tls_channel,
     credentials,
     cloud,
@@ -50,7 +48,7 @@ async def pitr_backup_operations(
 
     logger.info("deploying the next charms: s3-integrator, self-signed-certificates, postgresql")
     await ops_test.model.deploy(s3_integrator_app_name)
-    await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
+    await ops_test.model.deploy(tls_certificates_app_name, channel=tls_channel)
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
@@ -333,7 +331,6 @@ async def test_pitr_backup_gcp(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         TLS_CERTIFICATES_APP_NAME,
-        TLS_CONFIG,
         TLS_CHANNEL,
         credentials,
         GCP,
