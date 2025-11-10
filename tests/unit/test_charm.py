@@ -1399,25 +1399,25 @@ def test_calculate_worker_process_config_auto_values(harness):
         result = harness.charm._calculate_worker_process_config()
 
         # All auto values should resolve to 4 (min(8, 2*2))
-        assert result["max_worker_processes"] == 4
-        assert result["max_parallel_workers"] == 4
-        assert result["max_parallel_maintenance_workers"] == 4
-        assert result["max_logical_replication_workers"] == 4
-        assert result["max_sync_workers_per_subscription"] == 4
-        assert result["max_parallel_apply_workers_per_subscription"] == 4
+        assert result["max_worker_processes"] == "4"
+        assert result["max_parallel_workers"] == "4"
+        assert result["max_parallel_maintenance_workers"] == "4"
+        assert result["max_logical_replication_workers"] == "4"
+        assert result["max_sync_workers_per_subscription"] == "4"
+        assert result["max_parallel_apply_workers_per_subscription"] == "4"
 
         # Test with 8 vCPUs (auto should be min(8, 2*8) = 8)
         _cpu_count.return_value = 8
         result = harness.charm._calculate_worker_process_config()
 
-        assert result["max_worker_processes"] == 8
-        assert result["max_parallel_workers"] == 8
+        assert result["max_worker_processes"] == "8"
+        assert result["max_parallel_workers"] == "8"
 
         # Test with 1 vCPU (auto should be min(8, 2*1) = 2)
         _cpu_count.return_value = 1
         result = harness.charm._calculate_worker_process_config()
 
-        assert result["max_worker_processes"] == 2
+        assert result["max_worker_processes"] == "2"
 
 
 def test_calculate_worker_process_config_numeric_values(harness):
@@ -1436,9 +1436,9 @@ def test_calculate_worker_process_config_numeric_values(harness):
 
         result = harness.charm._calculate_worker_process_config()
 
-        assert result["max_worker_processes"] == 10
-        assert result["max_parallel_workers"] == 8
-        assert result["max_parallel_maintenance_workers"] == 6
+        assert result["max_worker_processes"] == "10"
+        assert result["max_parallel_workers"] == "8"
+        assert result["max_parallel_maintenance_workers"] == "6"
 
 
 def test_calculate_worker_process_config_all_workers_numeric(harness):
@@ -1461,12 +1461,12 @@ def test_calculate_worker_process_config_all_workers_numeric(harness):
         result = harness.charm._calculate_worker_process_config()
 
         # All values should pass through unchanged (within cap of 40)
-        assert result["max_worker_processes"] == 20
-        assert result["max_parallel_workers"] == 15
-        assert result["max_parallel_maintenance_workers"] == 10
-        assert result["max_logical_replication_workers"] == 12
-        assert result["max_sync_workers_per_subscription"] == 8
-        assert result["max_parallel_apply_workers_per_subscription"] == 6
+        assert result["max_worker_processes"] == "20"
+        assert result["max_parallel_workers"] == "15"
+        assert result["max_parallel_maintenance_workers"] == "10"
+        assert result["max_logical_replication_workers"] == "12"
+        assert result["max_sync_workers_per_subscription"] == "8"
+        assert result["max_parallel_apply_workers_per_subscription"] == "6"
 
 
 def test_calculate_worker_process_config_capping(harness, caplog):
@@ -1489,11 +1489,11 @@ def test_calculate_worker_process_config_capping(harness, caplog):
         result = harness.charm._calculate_worker_process_config()
 
         # Should be capped at 20
-        assert result["max_worker_processes"] == 20
+        assert result["max_worker_processes"] == "20"
         assert (
-            result["max_parallel_workers"] == 20
+            result["max_parallel_workers"] == "20"
         )  # Also capped, but limited by max_worker_processes
-        assert result["max_parallel_maintenance_workers"] == 15  # Not capped
+        assert result["max_parallel_maintenance_workers"] == "15"  # Not capped
 
         # Check that warnings were logged
         assert "max_worker_processes value 50 exceeds recommended cap of 20" in caplog.text
@@ -1530,7 +1530,7 @@ def test_calculate_worker_process_config_edge_cases(harness):
             del harness.charm.config
 
         result = harness.charm._calculate_worker_process_config()
-        assert result == {"max_worker_processes": 10, "wal_compression": "on"}
+        assert result == {"max_worker_processes": "10", "wal_compression": "on"}
 
         # Test with very high vCPU count
         _cpu_count.return_value = 128
@@ -1541,7 +1541,7 @@ def test_calculate_worker_process_config_edge_cases(harness):
 
         result = harness.charm._calculate_worker_process_config()
         # Should be min(8, 2*128) = 8
-        assert result["max_worker_processes"] == 8
+        assert result["max_worker_processes"] == "8"
 
 
 def test_calculate_worker_process_config_dependencies(harness):
@@ -1562,9 +1562,9 @@ def test_calculate_worker_process_config_dependencies(harness):
         result = harness.charm._calculate_worker_process_config()
 
         # Auto values should use max_worker_processes (12) as base
-        assert result["max_worker_processes"] == 12
-        assert result["max_parallel_workers"] == 12
-        assert result["max_parallel_maintenance_workers"] == 12
+        assert result["max_worker_processes"] == "12"
+        assert result["max_parallel_workers"] == "12"
+        assert result["max_parallel_maintenance_workers"] == "12"
 
 
 def test_calculate_worker_process_config_wal_compression(harness):
@@ -1617,10 +1617,10 @@ def test_calculate_worker_process_config_mixed_auto_and_numeric(harness):
 
         result = harness.charm._calculate_worker_process_config()
 
-        assert result["max_worker_processes"] == 16
-        assert result["max_parallel_workers"] == 16  # Auto resolved to base
-        assert result["max_parallel_maintenance_workers"] == 8  # Explicit value
-        assert result["max_logical_replication_workers"] == 16  # Auto resolved to base
+        assert result["max_worker_processes"] == "16"
+        assert result["max_parallel_workers"] == "16"  # Auto resolved to base
+        assert result["max_parallel_maintenance_workers"] == "8"  # Explicit value
+        assert result["max_logical_replication_workers"] == "16"  # Auto resolved to base
 
 
 def test_calculate_worker_process_config_zero_cpu_count(harness):
@@ -1638,7 +1638,7 @@ def test_calculate_worker_process_config_zero_cpu_count(harness):
         result = harness.charm._calculate_worker_process_config()
 
         # min(8, 2*0) = 0
-        assert result["max_worker_processes"] == 0
+        assert result["max_worker_processes"] == "0"
 
 
 def test_calculate_worker_process_config_all_workers_with_cap(harness, caplog):
@@ -1665,12 +1665,12 @@ def test_calculate_worker_process_config_all_workers_with_cap(harness, caplog):
 
         result = harness.charm._calculate_worker_process_config()
 
-        assert result["max_worker_processes"] == 20  # Capped
-        assert result["max_parallel_workers"] == 18  # Not capped
-        assert result["max_parallel_maintenance_workers"] == 20  # Capped
-        assert result["max_logical_replication_workers"] == 20  # Capped
-        assert result["max_sync_workers_per_subscription"] == 20  # Capped
-        assert result["max_parallel_apply_workers_per_subscription"] == 20  # Capped
+        assert result["max_worker_processes"] == "20"  # Capped
+        assert result["max_parallel_workers"] == "18"  # Not capped
+        assert result["max_parallel_maintenance_workers"] == "20"  # Capped
+        assert result["max_logical_replication_workers"] == "20"  # Capped
+        assert result["max_sync_workers_per_subscription"] == "20"  # Capped
+        assert result["max_parallel_apply_workers_per_subscription"] == "20"  # Capped
 
         # Verify warnings
         assert "max_worker_processes value 25 exceeds" in caplog.text
@@ -1732,7 +1732,7 @@ def test_update_config_integrates_worker_configs(harness):
 
         # Should have original params plus our calculated ones
         assert "shared_buffers" in parameters
-        assert parameters["max_worker_processes"] == 8  # min(8, 2*4)
+        assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
         assert parameters["wal_compression"] == "on"
 
 

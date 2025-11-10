@@ -2377,19 +2377,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def _calculate_worker_process_config(self) -> dict[str, int | bool]:  # noqa: C901
+    def _calculate_worker_process_config(self) -> dict[str, str]:  # noqa: C901
         """Calculate worker process configuration values.
 
         Handles 'auto' values and capping logic for worker process parameters.
         Returns a dictionary with the calculated values ready for PostgreSQL.
         """
-        result = {}
+        result: dict[str, str] = {}
 
         # Calculate max_worker_processes (baseline for other worker configs)
         if self.config.max_worker_processes is not None:
             if self.config.max_worker_processes == "auto":
                 # auto = minimum(8, 2 * vCores)
-                result["max_worker_processes"] = min(8, 2 * self.cpu_count)
+                result["max_worker_processes"] = str(min(8, 2 * self.cpu_count))
             else:
                 value = self.config.max_worker_processes
                 cap = 10 * self.cpu_count
@@ -2398,18 +2398,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_worker_processes value {value} exceeds recommended cap "
                         f"of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_worker_processes"] = cap
+                    result["max_worker_processes"] = str(cap)
                 else:
-                    result["max_worker_processes"] = value
+                    result["max_worker_processes"] = str(value)
 
         # Get the effective max_worker_processes for dependent configs
         # Use the calculated value, or fall back to PostgreSQL default (8)
-        base_max_workers = result.get("max_worker_processes", 8)
+        base_max_workers = int(result.get("max_worker_processes", "8"))
 
         # Calculate max_parallel_workers
         if self.config.max_parallel_workers is not None:
             if self.config.max_parallel_workers == "auto":
-                result["max_parallel_workers"] = base_max_workers
+                result["max_parallel_workers"] = str(base_max_workers)
             else:
                 value = self.config.max_parallel_workers
                 cap = 10 * self.cpu_count
@@ -2418,14 +2418,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_parallel_workers value {value} exceeds recommended cap "
                         f"of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_parallel_workers"] = min(cap, base_max_workers)
+                    result["max_parallel_workers"] = str(min(cap, base_max_workers))
                 else:
-                    result["max_parallel_workers"] = min(value, base_max_workers)
+                    result["max_parallel_workers"] = str(min(value, base_max_workers))
 
         # Calculate max_parallel_maintenance_workers
         if self.config.max_parallel_maintenance_workers is not None:
             if self.config.max_parallel_maintenance_workers == "auto":
-                result["max_parallel_maintenance_workers"] = base_max_workers
+                result["max_parallel_maintenance_workers"] = str(base_max_workers)
             else:
                 value = self.config.max_parallel_maintenance_workers
                 cap = 10 * self.cpu_count
@@ -2434,14 +2434,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_parallel_maintenance_workers value {value} exceeds recommended cap "
                         f"of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_parallel_maintenance_workers"] = cap
+                    result["max_parallel_maintenance_workers"] = str(cap)
                 else:
-                    result["max_parallel_maintenance_workers"] = value
+                    result["max_parallel_maintenance_workers"] = str(value)
 
         # Calculate max_logical_replication_workers
         if self.config.max_logical_replication_workers is not None:
             if self.config.max_logical_replication_workers == "auto":
-                result["max_logical_replication_workers"] = base_max_workers
+                result["max_logical_replication_workers"] = str(base_max_workers)
             else:
                 value = self.config.max_logical_replication_workers
                 cap = 10 * self.cpu_count
@@ -2450,14 +2450,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_logical_replication_workers value {value} exceeds recommended cap "
                         f"of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_logical_replication_workers"] = cap
+                    result["max_logical_replication_workers"] = str(cap)
                 else:
-                    result["max_logical_replication_workers"] = value
+                    result["max_logical_replication_workers"] = str(value)
 
         # Calculate max_sync_workers_per_subscription
         if self.config.max_sync_workers_per_subscription is not None:
             if self.config.max_sync_workers_per_subscription == "auto":
-                result["max_sync_workers_per_subscription"] = base_max_workers
+                result["max_sync_workers_per_subscription"] = str(base_max_workers)
             else:
                 value = self.config.max_sync_workers_per_subscription
                 cap = 10 * self.cpu_count
@@ -2466,14 +2466,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_sync_workers_per_subscription value {value} exceeds recommended cap "
                         f"of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_sync_workers_per_subscription"] = cap
+                    result["max_sync_workers_per_subscription"] = str(cap)
                 else:
-                    result["max_sync_workers_per_subscription"] = value
+                    result["max_sync_workers_per_subscription"] = str(value)
 
         # Calculate max_parallel_apply_workers_per_subscription
         if self.config.max_parallel_apply_workers_per_subscription is not None:
             if self.config.max_parallel_apply_workers_per_subscription == "auto":
-                result["max_parallel_apply_workers_per_subscription"] = base_max_workers
+                result["max_parallel_apply_workers_per_subscription"] = str(base_max_workers)
             else:
                 value = self.config.max_parallel_apply_workers_per_subscription
                 cap = 10 * self.cpu_count
@@ -2482,9 +2482,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         f"max_parallel_apply_workers_per_subscription value {value} exceeds "
                         f"recommended cap of {cap} (10 * vCores). Capping to {cap}."
                     )
-                    result["max_parallel_apply_workers_per_subscription"] = cap
+                    result["max_parallel_apply_workers_per_subscription"] = str(cap)
                 else:
-                    result["max_parallel_apply_workers_per_subscription"] = value
+                    result["max_parallel_apply_workers_per_subscription"] = str(value)
 
         # Add wal_compression if configured
         if self.config.wal_compression is not None:
@@ -2511,7 +2511,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             base_patch["standby_cluster"] = {"host": primary_endpoint}
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
 
-    def update_config(
+    def update_config(  # noqa: C901
         self,
         is_creating_backup: bool = False,
         no_peers: bool = False,
@@ -2533,7 +2533,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Calculate and merge worker process configurations
         worker_configs = self._calculate_worker_process_config()
-        pg_parameters.update(worker_configs)
+        if pg_parameters is not None:
+            pg_parameters.update(worker_configs)
+        else:
+            pg_parameters = worker_configs
 
         # replication_slots = self.logical_replication.replication_slots()
 
