@@ -3401,3 +3401,28 @@ def test_config_max_parallel_maintenance_workers_invalid():
 
     errors = exc_info.value.errors()
     assert any("max_parallel_maintenance_workers" in str(error) for error in errors)
+
+
+def test_config_worker_values_validator_auto():
+    """Test that worker_values validator accepts 'auto' value."""
+    from src.config import CharmConfig
+
+    # Test the validator directly by calling it
+    result = CharmConfig.worker_values("auto")
+    assert result == "auto"
+
+
+def test_config_worker_values_validator_positive_number():
+    """Test that worker_values validator accepts valid positive numbers."""
+    from src.config import CharmConfig
+
+    # Test the validator directly by calling it with a valid positive number string
+    result = CharmConfig.worker_values("8")
+    assert result == "8"
+    
+    result = CharmConfig.worker_values("0")
+    assert result == "0"
+    
+    result = CharmConfig.worker_values("100")
+    assert result == "100"
+
