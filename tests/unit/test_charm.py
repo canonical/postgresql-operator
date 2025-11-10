@@ -3419,10 +3419,9 @@ def test_config_worker_values_validator_positive_number():
     # Test the validator directly by calling it with a valid positive number string
     result = CharmConfig.worker_values("8")
     assert result == "8"
-    
+
     result = CharmConfig.worker_values("0")
     assert result == "0"
-    
+
     result = CharmConfig.worker_values("100")
     assert result == "100"
-
