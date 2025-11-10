@@ -3313,3 +3313,91 @@ def test_update_config_calls_get_available_cores(harness):
         mock_build.assert_called_once()
         call_args = mock_build.call_args
         assert call_args[0][3] == 8  # available_cores is 4th positional arg
+
+
+# Tests for config.py validators to increase coverage
+def test_config_wal_compression_invalid_value():
+    """Test that wal_compression validator rejects invalid values."""
+    from pydantic import ValidationError
+
+    from src.config import CharmConfig
+
+    # Create a minimal valid config
+    base_config = {
+        "wal_compression": "invalid_value",  # Invalid
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        CharmConfig(**base_config)
+
+    # Check that validation error mentions wal_compression
+    errors = exc_info.value.errors()
+    assert any("wal_compression" in str(error) for error in errors)
+
+
+def test_config_worker_processes_negative_value():
+    """Test that worker process validators reject negative values."""
+    from pydantic import ValidationError
+
+    from src.config import CharmConfig
+
+    base_config = {
+        "max_worker_processes": "-5",  # Negative
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        CharmConfig(**base_config)
+
+    errors = exc_info.value.errors()
+    assert any("max_worker_processes" in str(error) for error in errors)
+
+
+def test_config_worker_processes_invalid_string():
+    """Test that worker process validators reject invalid string values."""
+    from pydantic import ValidationError
+
+    from src.config import CharmConfig
+
+    base_config = {
+        "max_worker_processes": "not_a_number",  # Invalid string
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        CharmConfig(**base_config)
+
+    errors = exc_info.value.errors()
+    assert any("max_worker_processes" in str(error) for error in errors)
+
+
+def test_config_max_parallel_workers_negative():
+    """Test that max_parallel_workers validator rejects negative values."""
+    from pydantic import ValidationError
+
+    from src.config import CharmConfig
+
+    base_config = {
+        "max_parallel_workers": "-10",
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        CharmConfig(**base_config)
+
+    errors = exc_info.value.errors()
+    assert any("max_parallel_workers" in str(error) for error in errors)
+
+
+def test_config_max_parallel_maintenance_workers_invalid():
+    """Test that max_parallel_maintenance_workers validator rejects invalid values."""
+    from pydantic import ValidationError
+
+    from src.config import CharmConfig
+
+    base_config = {
+        "max_parallel_maintenance_workers": "INVALID",
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        CharmConfig(**base_config)
+
+    errors = exc_info.value.errors()
+    assert any("max_parallel_maintenance_workers" in str(error) for error in errors)
