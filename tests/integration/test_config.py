@@ -214,6 +214,39 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
+        # Worker process configs
+        {"max_worker_processes": ["-1", "8"]},  # config option is "auto" or a positive integer
+        {
+            "max_worker_processes": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {"max_parallel_workers": ["-1", "4"]},  # config option is "auto" or a positive integer
+        {
+            "max_parallel_workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_parallel_maintenance_workers": ["-1", "2"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_parallel_maintenance_workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_logical_replication_workers": ["-1", "4"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_logical_replication_workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_sync_workers_per_subscription": ["-1", "2"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_sync_workers_per_subscription": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_parallel_apply_workers_per_subscription": ["-1", "2"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max_parallel_apply_workers_per_subscription": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
     ]
 
     charm_config = {}
@@ -235,3 +268,74 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         lambda: ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
         timeout=100,
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_worker_process_configs(ops_test: OpsTest) -> None:
+    """Test worker process configuration parameters are applied correctly."""
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+
+    # Test setting explicit numeric values
+    worker_configs = {
+        "max-worker-processes": "16",
+        "max-parallel-workers": "8",
+        "max-parallel-maintenance-workers": "4",
+        "max-logical-replication-workers": "4",
+        "max-sync-workers-per-subscription": "2",
+        "max-parallel-apply-workers-per-subscription": "2",
+    }
+
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    # Verify the configs are applied in PostgreSQL
+    for config_name, expected_value in worker_configs.items():
+        # Convert hyphen to underscore for PostgreSQL parameter name
+        pg_param = config_name.replace("-", "_")
+        result = await leader_unit.run(f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A")
+        actual_value = result.results["stdout"].strip()
+        assert actual_value == expected_value, (
+            f"{pg_param}: expected {expected_value}, got {actual_value}"
+        )
+
+    # Test setting "auto" values
+    auto_configs = {
+        "max-worker-processes": "auto",
+        "max-parallel-workers": "auto",
+        "max-parallel-maintenance-workers": "auto",
+        "max-logical-replication-workers": "auto",
+        "max-sync-workers-per-subscription": "auto",
+        "max-parallel-apply-workers-per-subscription": "auto",
+    }
+
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    # Verify "auto" values are resolved to integers (not the string "auto")
+    for config_name in auto_configs:
+        pg_param = config_name.replace("-", "_")
+        result = await leader_unit.run(f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A")
+        actual_value = result.results["stdout"].strip()
+        assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
+        assert actual_value.isdigit(), f"{pg_param} should be a number, got '{actual_value}'"
+        assert int(actual_value) > 0, f"{pg_param} should be positive, got {actual_value}"
+
+
+@pytest.mark.abort_on_fail
+async def test_wal_compression_config(ops_test: OpsTest) -> None:
+    """Test wal_compression configuration parameter."""
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+
+    # Test enabling WAL compression
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "true"})
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    result = await leader_unit.run("charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A")
+    assert result.results["stdout"].strip() == "on"
+
+    # Test disabling WAL compression
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "false"})
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    result = await leader_unit.run("charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A")
+    assert result.results["stdout"].strip() == "off"

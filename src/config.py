@@ -214,6 +214,15 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_multixact_failsafe_age: int | None = Field(ge=0, le=2100000000, default=None)
     vacuum_vacuum_multixact_freeze_min_age: int | None = Field(ge=0, le=1000000000, default=None)
     vacuum_vacuum_multixact_freeze_table_age: int | None = Field(ge=0, le=2000000000, default=None)
+    wal_compression: bool | None = Field(default=None)
+    max_worker_processes: Literal["auto"] | PositiveInt | None = Field(default=None)
+    max_parallel_workers: Literal["auto"] | PositiveInt | None = Field(default=None)
+    max_parallel_maintenance_workers: Literal["auto"] | PositiveInt | None = Field(default=None)
+    max_logical_replication_workers: Literal["auto"] | PositiveInt | None = Field(default=None)
+    max_sync_workers_per_subscription: Literal["auto"] | PositiveInt | None = Field(default=None)
+    max_parallel_apply_workers_per_subscription: Literal["auto"] | PositiveInt | None = Field(
+        default=None
+    )
 
     @classmethod
     def keys(cls) -> list[str]:
