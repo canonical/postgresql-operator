@@ -1795,6 +1795,76 @@ def test_config_validation_valid_worker_values(harness):
         assert harness.charm.config.max_parallel_workers == 1000
 
 
+def test_update_config_with_none_pg_parameters(harness):
+    """Test update_config when build_postgresql_parameters returns None."""
+    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+        _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
+
+    class _MockSnap:
+        revision = _revision
+
+    with (
+        patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
+        patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
+        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
+        patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
+        patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
+        patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.Patroni.member_started", new_callable=PropertyMock, return_value=True),
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_tls_enabled",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
+        patch.object(
+            PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
+        ),
+    ):
+        postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
+        # Return None to test the else branch at line 2539
+        postgresql_mock.build_postgresql_parameters.return_value = None
+
+        # Configure worker processes
+        with harness.hooks_disabled():
+            harness.update_config({
+                "max-worker-processes": "auto",
+                "wal-compression": True,
+            })
+
+        harness.charm.update_config()
+
+        # Verify render was called with worker configs only (no pg_parameters)
+        call_args = _render_patroni_yml_file.call_args
+        parameters = call_args.kwargs["parameters"]
+
+        # Should only have worker configs since pg_parameters was None
+        assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
+        assert parameters["wal_compression"] == "on"
+        assert "shared_buffers" not in parameters  # pg_parameters was None
+
+
+def test_calculate_worker_process_config_wal_compression_false(harness):
+    """Test wal_compression when explicitly set to False."""
+    with harness.hooks_disabled():
+        harness.update_config({"wal-compression": False})
+    if hasattr(harness.charm, "config"):
+        del harness.charm.config
+
+    result = harness.charm._calculate_worker_process_config()
+    # This covers line 2490 - the else "off" branch
+    assert result["wal_compression"] == "off"
+    assert "wal_compression" in result
+
+
 def test_on_peer_relation_changed(harness):
     with (
         patch("charm.snap.SnapCache"),
