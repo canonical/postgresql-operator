@@ -1,0 +1,48 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:82 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  01:52:00Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active       1  data-integrator      latest/edge  295  no       
+postgresql           14.19    blocked      3  postgresql                          0  no       Standalone read-only cluster
+postgresql-test-app           blocked      1  postgresql-test-app  latest/edge  414  no       No database integration available
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+data-integrator/0*      active    idle       3        10.148.80.180             
+postgresql-test-app/0*  blocked   idle       4        10.148.80.99              No database integration available
+postgresql/0            active    executing  0        10.148.80.80    5432/tcp  
+postgresql/1            active    executing  1        10.148.80.237   5432/tcp  
+postgresql/2*           active    executing  2        10.148.80.227   5432/tcp  Standby
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.148.80.80   juju-f995aa-0  ubuntu@22.04  runnervmw9dnm  Running
+1        started  10.148.80.237  juju-f995aa-1  ubuntu@22.04  runnervmw9dnm  Running
+2        started  10.148.80.227  juju-f995aa-2  ubuntu@22.04  runnervmw9dnm  Running
+3        started  10.148.80.180  juju-f995aa-3  ubuntu@24.04  runnervmw9dnm  Running
+4        started  10.148.80.99   juju-f995aa-4  ubuntu@22.04  runnervmw9dnm  Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    0/0        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 01:32:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:32:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:34:19 ERROR unit.postgresql/2.juju-log database:4: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 01:34:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:36:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:36:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:37:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:37:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:37:50 ERROR unit.postgresql/1.juju-log database-peers:2: Failed to list PostgreSQL database users: connection to server at "10.148.80.237", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
