@@ -10,6 +10,7 @@ from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
     get_leader_unit,
+    run_command_on_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -274,6 +275,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
 async def test_worker_process_configs(ops_test: OpsTest) -> None:
     """Test worker process configuration parameters are applied correctly."""
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit_name = leader_unit.name
 
     # Test setting explicit numeric values
     worker_configs = {
@@ -290,10 +292,11 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Verify the configs are applied in PostgreSQL
     for config_name, expected_value in worker_configs.items():
-        # Convert underscore to underscore for PostgreSQL parameter name (they match)
         pg_param = config_name
-        result = await leader_unit.run(f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A")
-        actual_value = result.results["stdout"].strip()
+        result = await run_command_on_unit(
+            ops_test, leader_unit_name, f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A"
+        )
+        actual_value = result.strip()
         assert actual_value == expected_value, (
             f"{pg_param}: expected {expected_value}, got {actual_value}"
         )
@@ -314,8 +317,10 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
     # Verify "auto" values are resolved to integers (not the string "auto")
     for config_name in auto_configs:
         pg_param = config_name
-        result = await leader_unit.run(f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A")
-        actual_value = result.results["stdout"].strip()
+        result = await run_command_on_unit(
+            ops_test, leader_unit_name, f"charmed-postgresql.psql -c 'SHOW {pg_param};' -t -A"
+        )
+        actual_value = result.strip()
         assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
         assert actual_value.isdigit(), f"{pg_param} should be a number, got '{actual_value}'"
         assert int(actual_value) > 0, f"{pg_param} should be positive, got {actual_value}"
@@ -325,17 +330,22 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 async def test_wal_compression_config(ops_test: OpsTest) -> None:
     """Test wal_compression configuration parameter."""
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit_name = leader_unit.name
 
     # Test enabling WAL compression
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal_compression": "true"})
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
-    result = await leader_unit.run("charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A")
-    assert result.results["stdout"].strip() == "on"
+    result = await run_command_on_unit(
+        ops_test, leader_unit_name, "charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A"
+    )
+    assert result.strip() == "on"
 
     # Test disabling WAL compression
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal_compression": "false"})
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
-    result = await leader_unit.run("charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A")
-    assert result.results["stdout"].strip() == "off"
+    result = await run_command_on_unit(
+        ops_test, leader_unit_name, "charmed-postgresql.psql -c 'SHOW wal_compression;' -t -A"
+    )
+    assert result.strip() == "off"

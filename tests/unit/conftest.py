@@ -49,14 +49,6 @@ class _MockRefresh:
 
 @pytest.fixture(autouse=True)
 def patch(monkeypatch):
-    # Map macOS architecture names to Linux equivalents for charm_refresh compatibility
-    original_machine = platform.machine()
-    if original_machine == "arm64":
-        monkeypatch.setattr("platform.machine", lambda: "aarch64")
-        # Also patch it in the charm_refresh module's namespace
-        import charm_refresh._main
-
-        monkeypatch.setattr(charm_refresh._main.platform, "machine", lambda: "aarch64")
     monkeypatch.setattr("charm_refresh.Machines", _MockRefresh)
 
     # Add charm version to refresh_versions.toml
