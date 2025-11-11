@@ -963,7 +963,13 @@ END; $$;"""
             parameters["wal_compression"] = special_params["wal_compression"]
         
         # Handle worker process parameters with "auto" support
-        # Only process if available_cores is provided, otherwise skip these parameters
+        # Use os.cpu_count() as fallback if available_cores not provided
+        if available_cores is None:
+            import os
+            available_cores = os.cpu_count()
+            if available_cores is None:
+                available_cores = 1  # Ultimate fallback
+        
         if available_cores is not None:
             # Calculate max_worker_processes first (needed as base for other workers)
             max_worker_processes_value = None

@@ -3129,23 +3129,26 @@ def test_get_available_cores_fallback_when_none(harness):
 
 
 def test_build_postgresql_parameters_no_cores_provided():
-    """Test that worker parameters are skipped when available_cores is None."""
+    """Test that worker parameters use fallback when available_cores is None."""
     from charms.postgresql_k8s.v0.postgresql import PostgreSQL
 
-    # When available_cores is None, worker parameters should not be added to output
+    # When available_cores is None, should use os.cpu_count() as fallback
     config = {
         "profile": "testing",
         "max_worker_processes": "auto",
         "max_parallel_workers": "auto",
-        "wal_compression": "on",  # This should still be added
+        "wal_compression": "on",
     }
 
     params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=None)
 
-    # Worker parameters should NOT be in the output when cores not available
-    assert "max_worker_processes" not in params
-    assert "max_parallel_workers" not in params
-    # But wal_compression should be present
+    # Worker parameters should be present with fallback values from os.cpu_count()
+    assert "max_worker_processes" in params
+    assert "max_parallel_workers" in params
+    # Both should be integers (converted from "auto")
+    assert isinstance(params["max_worker_processes"], int)
+    assert isinstance(params["max_parallel_workers"], int)
+    # wal_compression should be present
     assert params["wal_compression"] == "on"
 
 
