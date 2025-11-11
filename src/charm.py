@@ -1687,13 +1687,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
             return False
 
+        if not self._patroni.member_started:
+            logger.debug("Restore check early exit: Patroni has not started yet")
+            return False
+
         if "failed" in self._patroni.get_member_status(self._member_name):
             logger.error("Restore failed: database service failed to start")
             self.unit.status = BlockedStatus("Failed to restore backup")
-            return False
-
-        if not self._patroni.member_started:
-            logger.debug("Restore check early exit: Patroni has not started yet")
             return False
 
         restoring_backup = self.app_peer_data.get("restoring-backup")
