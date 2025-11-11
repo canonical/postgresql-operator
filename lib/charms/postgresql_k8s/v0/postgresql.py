@@ -918,18 +918,22 @@ END; $$;"""
         profile = config_options["profile"]
         logger.debug(f"Building PostgreSQL parameters for {profile=} and {available_memory=}")
         parameters = {}
+        
+        # Track worker and other special parameters for later processing
+        worker_param_names = {
+            "max_worker_processes",
+            "max_parallel_workers",
+            "max_parallel_maintenance_workers",
+            "max_logical_replication_workers",
+            "max_sync_workers_per_subscription",
+            "max_parallel_apply_workers_per_subscription",
+        }
+        special_params = {}
+        
         for config, value in config_options.items():
-            # Handle direct PostgreSQL parameter names (no prefix)
-            if config in [
-                "max_worker_processes",
-                "max_parallel_workers",
-                "max_parallel_maintenance_workers",
-                "max_logical_replication_workers",
-                "max_sync_workers_per_subscription",
-                "max_parallel_apply_workers_per_subscription",
-                "wal_compression",
-            ]:
-                parameters[config] = value
+            # Collect special parameters for processing later (don't add to parameters yet)
+            if config in worker_param_names or config == "wal_compression":
+                special_params[config] = value
                 continue
             
             # Filter config option not related to PostgreSQL parameters.
@@ -953,18 +957,24 @@ END; $$;"""
                 parameter = "".join(x.capitalize() for x in parameter.split("_"))
             parameters[parameter] = value
         
+        # Process special parameters (wal_compression and worker parameters)
+        # Handle wal_compression - simple pass-through
+        if "wal_compression" in special_params:
+            parameters["wal_compression"] = special_params["wal_compression"]
+        
         # Handle worker process parameters with "auto" support
+        # Only process if available_cores is provided, otherwise skip these parameters
         if available_cores is not None:
             # Calculate max_worker_processes first (needed as base for other workers)
             max_worker_processes_value = None
-            if "max_worker_processes" in parameters:
-                if parameters["max_worker_processes"] == "auto":
+            if "max_worker_processes" in special_params:
+                if special_params["max_worker_processes"] == "auto":
                     # auto = minimum(8, 2*vCores)
                     max_worker_processes_value = min(8, 2 * available_cores)
                     parameters["max_worker_processes"] = max_worker_processes_value
                 else:
                     # It's a number - validate minimum and maximum
-                    max_worker_processes_value = int(parameters["max_worker_processes"])
+                    max_worker_processes_value = int(special_params["max_worker_processes"])
                     if max_worker_processes_value < 0:
                         raise ValueError(
                             f"max_worker_processes value {max_worker_processes_value} is below "
@@ -988,8 +998,8 @@ END; $$;"""
             ]
             
             for worker_param in worker_params:
-                if worker_param in parameters:
-                    if parameters[worker_param] == "auto":
+                if worker_param in special_params:
+                    if special_params[worker_param] == "auto":
                         # auto = max_worker_processes
                         if max_worker_processes_value is not None:
                             parameters[worker_param] = max_worker_processes_value
@@ -998,7 +1008,7 @@ END; $$;"""
                             parameters[worker_param] = min(8, 2 * available_cores)
                     else:
                         # It's a number - validate minimum and maximum
-                        worker_value = int(parameters[worker_param])
+                        worker_value = int(special_params[worker_param])
                         if worker_value < 0:
                             raise ValueError(
                                 f"{worker_param} value {worker_value} is below "

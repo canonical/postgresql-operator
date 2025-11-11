@@ -3129,22 +3129,24 @@ def test_get_available_cores_fallback_when_none(harness):
 
 
 def test_build_postgresql_parameters_no_cores_provided():
-    """Test that worker parameters are not validated when available_cores is None."""
+    """Test that worker parameters are skipped when available_cores is None."""
     from charms.postgresql_k8s.v0.postgresql import PostgreSQL
 
-    # When available_cores is None, even out-of-range values should pass through
-    # (they remain as strings and validation is skipped)
+    # When available_cores is None, worker parameters should not be added to output
     config = {
         "profile": "testing",
-        "max_worker_processes": "1000",  # Would exceed any reasonable limit
-        "max_parallel_workers": "auto",  # Should remain as "auto"
+        "max_worker_processes": "auto",
+        "max_parallel_workers": "auto",
+        "wal_compression": "on",  # This should still be added
     }
 
     params = PostgreSQL.build_postgresql_parameters(config, 1073741824, available_cores=None)
 
-    # Parameters should be passed through without conversion or validation
-    assert params["max_worker_processes"] == "1000"
-    assert params["max_parallel_workers"] == "auto"
+    # Worker parameters should NOT be in the output when cores not available
+    assert "max_worker_processes" not in params
+    assert "max_parallel_workers" not in params
+    # But wal_compression should be present
+    assert params["wal_compression"] == "on"
 
 
 def test_build_postgresql_parameters_zero_value():
