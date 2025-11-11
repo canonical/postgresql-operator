@@ -757,46 +757,46 @@ options:
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
-  wal-compression:
+  wal_compression:
     description: |
       Enable compression of full-page writes written in WAL. Compression reduces
       the I/O needed for local storage and replication.
       Default is on (true).
     type: boolean
     default: true
-  max-worker-processes:
+  max_worker_processes:
     description: |
       Sets the maximum number of background processes that the system can support.
       Should be either "auto" or a positive integer value.
       auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
       Restart is required when changed.
     type: string
-  max-parallel-workers:
+  max_parallel_workers:
     description: |
       Sets the maximum number of workers that can be used for parallel operations.
-      Should be either "auto" or a positive integer value. Cannot exceed max-worker-processes.
+      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
       auto = max_worker_processes.
     type: string
-  max-parallel-maintenance-workers:
+  max_parallel_maintenance_workers:
     description: |
       Sets the maximum number of workers that can be used for parallel maintenance operations
       like CREATE INDEX. Should be either "auto" or a positive integer value.
-      Cannot exceed max-parallel-workers.
+      Cannot exceed max_parallel_workers.
       auto = max_worker_processes.
     type: string
-  max-logical-replication-workers:
+  max_logical_replication_workers:
     description: |
       Sets the maximum number of logical replication workers. Should be either "auto"
       or a positive integer value. Restart is required when changed.
       auto = max_worker_processes.
     type: string
-  max-sync-workers-per-subscription:
+  max_sync_workers_per_subscription:
     description: |
       Sets the maximum number of synchronization workers per subscription.
       Should be either "auto" or a positive integer value.
       auto = max_worker_processes.
     type: string
-  max-parallel-apply-workers-per-subscription:
+  max_parallel_apply_workers_per_subscription:
     description: |
       Sets the maximum number of parallel apply workers per subscription.
       Should be either "auto" or a positive integer value.

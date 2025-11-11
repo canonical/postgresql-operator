@@ -1388,12 +1388,12 @@ def test_calculate_worker_process_config_auto_values(harness):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "auto",
-                "max-parallel-workers": "auto",
-                "max-parallel-maintenance-workers": "auto",
-                "max-logical-replication-workers": "auto",
-                "max-sync-workers-per-subscription": "auto",
-                "max-parallel-apply-workers-per-subscription": "auto",
+                "max_worker_processes": "auto",
+                "max_parallel_workers": "auto",
+                "max_parallel_maintenance_workers": "auto",
+                "max_logical_replication_workers": "auto",
+                "max_sync_workers_per_subscription": "auto",
+                "max_parallel_apply_workers_per_subscription": "auto",
             })
 
         result = harness.charm._calculate_worker_process_config()
@@ -1429,9 +1429,9 @@ def test_calculate_worker_process_config_numeric_values(harness):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "10",
-                "max-parallel-workers": "8",
-                "max-parallel-maintenance-workers": "6",
+                "max_worker_processes": "10",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "6",
             })
 
         result = harness.charm._calculate_worker_process_config()
@@ -1450,12 +1450,12 @@ def test_calculate_worker_process_config_all_workers_numeric(harness):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "20",
-                "max-parallel-workers": "15",
-                "max-parallel-maintenance-workers": "10",
-                "max-logical-replication-workers": "12",
-                "max-sync-workers-per-subscription": "8",
-                "max-parallel-apply-workers-per-subscription": "6",
+                "max_worker_processes": "20",
+                "max_parallel_workers": "15",
+                "max_parallel_maintenance_workers": "10",
+                "max_logical_replication_workers": "12",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "6",
             })
 
         result = harness.charm._calculate_worker_process_config()
@@ -1481,9 +1481,9 @@ def test_calculate_worker_process_config_capping(harness, caplog):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "50",  # Exceeds cap
-                "max-parallel-workers": "30",  # Exceeds cap
-                "max-parallel-maintenance-workers": "15",  # Within cap
+                "max_worker_processes": "50",  # Exceeds cap
+                "max_parallel_workers": "30",  # Exceeds cap
+                "max_parallel_maintenance_workers": "15",  # Within cap
             })
 
         result = harness.charm._calculate_worker_process_config()
@@ -1507,13 +1507,13 @@ def test_calculate_worker_process_config_edge_cases(harness):
     ) as _cpu_count:
         _cpu_count.return_value = 4
 
-        # Test with no worker config set (but wal-compression has default)
+        # Test with no worker config set (but wal_compression has default)
         with harness.hooks_disabled():
             harness.update_config(
                 unset=[
-                    "max-worker-processes",
-                    "max-parallel-workers",
-                    "wal-compression",
+                    "max_worker_processes",
+                    "max_parallel_workers",
+                    "wal_compression",
                 ]
             )
         with contextlib.suppress(AttributeError):
@@ -1525,7 +1525,7 @@ def test_calculate_worker_process_config_edge_cases(harness):
 
         # Test with only one worker config set
         with harness.hooks_disabled():
-            harness.update_config({"max-worker-processes": "10"})
+            harness.update_config({"max_worker_processes": "10"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
 
@@ -1535,7 +1535,7 @@ def test_calculate_worker_process_config_edge_cases(harness):
         # Test with very high vCPU count
         _cpu_count.return_value = 128
         with harness.hooks_disabled():
-            harness.update_config({"max-worker-processes": "auto"})
+            harness.update_config({"max_worker_processes": "auto"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
 
@@ -1554,9 +1554,9 @@ def test_calculate_worker_process_config_dependencies(harness):
         # Set max_worker_processes to 12, others to auto
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "12",
-                "max-parallel-workers": "auto",
-                "max-parallel-maintenance-workers": "auto",
+                "max_worker_processes": "12",
+                "max_parallel_workers": "auto",
+                "max_parallel_maintenance_workers": "auto",
             })
 
         result = harness.charm._calculate_worker_process_config()
@@ -1571,7 +1571,7 @@ def test_calculate_worker_process_config_wal_compression(harness):
     """Test wal_compression configuration."""
     # Test with wal_compression enabled
     with harness.hooks_disabled():
-        harness.update_config({"wal-compression": True})
+        harness.update_config({"wal_compression": True})
     if hasattr(harness.charm, "config"):
         del harness.charm.config
 
@@ -1580,7 +1580,7 @@ def test_calculate_worker_process_config_wal_compression(harness):
 
     # Test with wal_compression disabled
     with harness.hooks_disabled():
-        harness.update_config({"wal-compression": False})
+        harness.update_config({"wal_compression": False})
     if hasattr(harness.charm, "config"):
         del harness.charm.config
 
@@ -1589,7 +1589,7 @@ def test_calculate_worker_process_config_wal_compression(harness):
 
     # Test with wal_compression not explicitly set (should use default = true)
     with harness.hooks_disabled():
-        harness.update_config(unset=["wal-compression"])
+        harness.update_config(unset=["wal_compression"])
     if hasattr(harness.charm, "config"):
         del harness.charm.config
 
@@ -1607,10 +1607,10 @@ def test_calculate_worker_process_config_mixed_auto_and_numeric(harness):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "16",
-                "max-parallel-workers": "auto",  # Should become 16
-                "max-parallel-maintenance-workers": "8",  # Explicit value
-                "max-logical-replication-workers": "auto",  # Should become 16
+                "max_worker_processes": "16",
+                "max_parallel_workers": "auto",  # Should become 16
+                "max_parallel_maintenance_workers": "8",  # Explicit value
+                "max_logical_replication_workers": "auto",  # Should become 16
             })
         with contextlib.suppress(AttributeError):
             del harness.charm.config
@@ -1631,7 +1631,7 @@ def test_calculate_worker_process_config_zero_cpu_count(harness):
         _cpu_count.return_value = 0
 
         with harness.hooks_disabled():
-            harness.update_config({"max-worker-processes": "auto"})
+            harness.update_config({"max_worker_processes": "auto"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
 
@@ -1653,12 +1653,12 @@ def test_calculate_worker_process_config_all_workers_with_cap(harness, caplog):
 
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "25",  # Will be capped
-                "max-parallel-workers": "18",  # Within cap
-                "max-parallel-maintenance-workers": "22",  # Will be capped
-                "max-logical-replication-workers": "30",  # Will be capped
-                "max-sync-workers-per-subscription": "25",  # Will be capped
-                "max-parallel-apply-workers-per-subscription": "100",  # Will be capped
+                "max_worker_processes": "25",  # Will be capped
+                "max_parallel_workers": "18",  # Within cap
+                "max_parallel_maintenance_workers": "22",  # Will be capped
+                "max_logical_replication_workers": "30",  # Will be capped
+                "max_sync_workers_per_subscription": "25",  # Will be capped
+                "max_parallel_apply_workers_per_subscription": "100",  # Will be capped
             })
         with contextlib.suppress(AttributeError):
             del harness.charm.config
@@ -1720,8 +1720,8 @@ def test_update_config_integrates_worker_configs(harness):
         # Configure worker processes
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "auto",
-                "wal-compression": True,
+                "max_worker_processes": "auto",
+                "wal_compression": True,
             })
 
         harness.charm.update_config()
@@ -1740,7 +1740,7 @@ def test_config_validation_invalid_worker_values(harness):
     """Test that pydantic validates worker process config values."""
     # Test invalid string value (not "auto" or a number)
     with harness.hooks_disabled():
-        harness.update_config({"max-worker-processes": "invalid"})
+        harness.update_config({"max_worker_processes": "invalid"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
@@ -1752,7 +1752,7 @@ def test_config_validation_invalid_worker_values(harness):
 
     # Test negative number (PositiveInt should reject)
     with harness.hooks_disabled():
-        harness.update_config({"max-worker-processes": "-5"})
+        harness.update_config({"max_worker_processes": "-5"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
@@ -1763,7 +1763,7 @@ def test_config_validation_invalid_worker_values(harness):
 
     # Test zero (PositiveInt should reject)
     with harness.hooks_disabled():
-        harness.update_config({"max-parallel-workers": "0"})
+        harness.update_config({"max_parallel_workers": "0"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
@@ -1777,19 +1777,19 @@ def test_config_validation_valid_worker_values(harness):
     """Test that pydantic accepts valid worker process config values."""
     with harness.hooks_disabled():
         # Test "auto"
-        harness.update_config({"max-worker-processes": "auto"})
+        harness.update_config({"max_worker_processes": "auto"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
         assert harness.charm.config.max_worker_processes == "auto"
 
         # Test positive integer
-        harness.update_config({"max-worker-processes": "16"})
+        harness.update_config({"max_worker_processes": "16"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
         assert harness.charm.config.max_worker_processes == 16
 
         # Test large positive integer
-        harness.update_config({"max-parallel-workers": "1000"})
+        harness.update_config({"max_parallel_workers": "1000"})
         with contextlib.suppress(AttributeError):
             del harness.charm.config
         assert harness.charm.config.max_parallel_workers == 1000
@@ -1836,8 +1836,8 @@ def test_update_config_with_none_pg_parameters(harness):
         # Configure worker processes
         with harness.hooks_disabled():
             harness.update_config({
-                "max-worker-processes": "auto",
-                "wal-compression": True,
+                "max_worker_processes": "auto",
+                "wal_compression": True,
             })
 
         harness.charm.update_config()
@@ -1855,7 +1855,7 @@ def test_update_config_with_none_pg_parameters(harness):
 def test_calculate_worker_process_config_wal_compression_false(harness):
     """Test wal_compression when explicitly set to False."""
     with harness.hooks_disabled():
-        harness.update_config({"wal-compression": False})
+        harness.update_config({"wal_compression": False})
     if hasattr(harness.charm, "config"):
         del harness.charm.config
 
