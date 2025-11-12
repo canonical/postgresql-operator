@@ -1014,6 +1014,7 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.Patroni.is_patroni_running", return_value=True),
         patch("charm.Patroni.get_member_status") as _get_member_status,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
     ):
