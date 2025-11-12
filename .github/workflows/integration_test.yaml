@@ -20,6 +20,7 @@ jobs:
       - name: Set up environment
         run: |
           sudo snap install charmcraft --classic
+          sudo snap install spread
           pipx install tox poetry
       - name: Collect spread jobs
         id: collect-jobs
@@ -31,7 +32,7 @@ jobs:
 
           spread_jobs = (
               subprocess.run(
-                  ["charmcraft", "test", "--list", "github-ci"], capture_output=True, check=True, text=True
+                  ["spread", "-list", "github-ci"], capture_output=True, check=True, text=True
               )
               .stdout.strip()
               .split("\n")
@@ -118,6 +119,13 @@ jobs:
           UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
+      - name: Upload logs
+        uses: actions/upload-artifact@v5
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        with:
+          name: pglogs.tar.gz
+          path: /tmp/pglogs.tar.gz
+          if-no-files-found: error
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
