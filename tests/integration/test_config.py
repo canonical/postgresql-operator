@@ -261,18 +261,18 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
                 timeout=100,
             )
             assert "Configuration Error" in leader_unit.workload_status_message
-            
+
             # Reset to valid value
             await ops_test.model.applications[DATABASE_APP_NAME].set_config({k: v[1]})
             await ops_test.model.block_until(
                 lambda: ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
                 timeout=100,
             )
-    
+
     # Reset all tested configs to their defaults to avoid interference with subsequent tests
-    await ops_test.model.applications[DATABASE_APP_NAME].reset_config(list(
-        key for config in configs for key in config.keys()
-    ))
+    await ops_test.model.applications[DATABASE_APP_NAME].reset_config([
+        key for config in configs for key in config
+    ])
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
 
