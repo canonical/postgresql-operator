@@ -20,6 +20,7 @@ jobs:
       - name: Set up environment
         run: |
           sudo snap install charmcraft --classic
+          sudo snap install spread
           pipx install tox poetry
       - name: Collect spread jobs
         id: collect-jobs
@@ -31,7 +32,7 @@ jobs:
 
           spread_jobs = (
               subprocess.run(
-                  ["charmcraft", "test", "--list", "github-ci"], capture_output=True, check=True, text=True
+                  ["spread", "-list", "github-ci"], capture_output=True, check=True, text=True
               )
               .stdout.strip()
               .split("\n")
