@@ -2533,10 +2533,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Calculate and merge worker process configurations
         worker_configs = self._calculate_worker_process_config()
-        if pg_parameters is not None:
-            pg_parameters.update(worker_configs)
-        else:
-            pg_parameters = worker_configs
+        if worker_configs:  # Only merge if there are worker configs to add
+            if pg_parameters is not None:
+                pg_parameters.update(worker_configs)
+            else:
+                pg_parameters = worker_configs
 
         # replication_slots = self.logical_replication.replication_slots()
 
