@@ -79,6 +79,9 @@ async def pitr_backup_operations(
             )
     except Exception as e:
         logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'sudo snap logs -n all charmed-postgresql.patroni')}"
+        )
+        logger.info(
             f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
         )
         logger.info(
@@ -166,6 +169,9 @@ async def pitr_backup_operations(
                 lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR, timeout=500
             )
         except Exception as e:
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'sudo snap logs -n all charmed-postgresql.patroni')}"
+            )
             logger.info(
                 f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
             )
