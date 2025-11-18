@@ -318,7 +318,7 @@ class PostgreSQL:
                     user_definition = "ALTER ROLE {}"
                 else:
                     user_definition = "CREATE ROLE {}"
-                user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
+                user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{' IN ROLE admin CREATEDB' if admin_role else ''}"
                 if privileges:
                     user_definition += f" {' '.join(privileges)}"
                 cursor.execute(SQL("BEGIN;"))
