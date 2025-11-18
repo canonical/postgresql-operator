@@ -283,12 +283,12 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Test setting explicit numeric values
     worker_configs = {
-        "max_worker_processes": "16",
-        "max_parallel_workers": "8",
-        "max_parallel_maintenance_workers": "4",
-        "max_logical_replication_workers": "4",
-        "max_sync_workers_per_subscription": "2",
-        "max_parallel_apply_workers_per_subscription": "2",
+        "max-worker-processes": "16",
+        "max-parallel-workers": "8",
+        "max-parallel-maintenance-workers": "4",
+        "max-logical-replication-workers": "4",
+        "max-sync-workers-per-subscription": "2",
+        "max-parallel-apply-workers-per-subscription": "2",
     }
 
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
@@ -296,7 +296,7 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Verify the configs are applied in PostgreSQL
     for config_name, expected_value in worker_configs.items():
-        pg_param = config_name
+        pg_param = config_name.replace("-", "_")
         result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value == expected_value, (
@@ -305,12 +305,12 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Test setting "auto" values
     auto_configs = {
-        "max_worker_processes": "auto",
-        "max_parallel_workers": "auto",
-        "max_parallel_maintenance_workers": "auto",
-        "max_logical_replication_workers": "auto",
-        "max_sync_workers_per_subscription": "auto",
-        "max_parallel_apply_workers_per_subscription": "auto",
+        "max-worker-processes": "auto",
+        "max-parallel-workers": "auto",
+        "max-parallel-maintenance-workers": "auto",
+        "max-logical-replication-workers": "auto",
+        "max-sync-workers-per-subscription": "auto",
+        "max-parallel-apply-workers-per-subscription": "auto",
     }
 
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
@@ -334,14 +334,14 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     unit_address = get_unit_address(ops_test, leader_unit_name)
 
     # Test enabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal_compression": "true"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "true"})
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
     assert result[0] == "on"
 
     # Test disabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal_compression": "false"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "false"})
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
