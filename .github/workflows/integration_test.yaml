@@ -126,6 +126,11 @@ jobs:
           name: pglogs.tar.gz
           path: /home/runner/pglogs.tar.gz
           if-no-files-found: error
+      - name: Setup upterm session
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        uses: owenthereal/action-upterm@v1
+        with:
+          limit-access-to-actor: true
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
