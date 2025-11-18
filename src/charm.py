@@ -248,6 +248,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
+        logger.error(
+            f"{subprocess.run(['/usr/bin/mountpoint', self._storage_path]).stdout}"  # noqa: S603
+        )
+        logger.error(f"{subprocess.run(['/usr/bin/df', '-h']).stdout}")
+        logger.error(
+            f"{subprocess.run(['/usr/bin/ls', '-alh', '/var/snap/charmed-postgresql/common']).stdout}"
+        )
+
     def _on_databases_change(self, _):
         """Handle databases change event."""
         self.update_config()
