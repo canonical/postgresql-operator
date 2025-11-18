@@ -72,10 +72,19 @@ async def pitr_backup_operations(
     await ops_test.model.relate(
         f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
     )
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, tls_certificates_app_name], status="active", timeout=1000
+    try:
+        async with ops_test.fast_forward(fast_interval="60s"):
+            await ops_test.model.wait_for_idle(
+                apps=[database_app_name, tls_certificates_app_name], status="active", timeout=1000
+            )
+    except Exception as e:
+        logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
         )
+        logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/home/runner/pglogs.tar.gz')}"
+        )
+        raise e
 
     logger.info(f"configuring s3-integrator for {cloud}")
     await ops_test.model.applications[s3_integrator_app_name].set_config(config)
@@ -158,10 +167,10 @@ async def pitr_backup_operations(
             )
         except Exception as e:
             logger.info(
-                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/postgresql/')}"
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
             )
             logger.info(
-                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/tmp/pglogs.tar.gz')}"
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/home/runner/pglogs.tar.gz')}"
             )
             raise e
     logger.info(
