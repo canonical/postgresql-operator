@@ -2657,19 +2657,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 if calculated_value is None:
                     continue
 
-                # Check current PostgreSQL value
+                # Check if parameter has changed from last known value
                 try:
-                    result = self.postgresql.execute_query(f"SHOW {param_name}")
-                    current_pg_value = str(result[0]) if result else None
+                    # Store calculated values in unit data to track changes
+                    last_value_key = f"last_{param_name}"
+                    last_value = self.unit_peer_data.get(last_value_key)
 
-                    if current_pg_value != calculated_value:
+                    if last_value != str(calculated_value):
                         logger.info(
-                            f"Restart required: {param_name} changed from {current_pg_value} to {calculated_value}"
+                            f"Restart required: {param_name} changed from {last_value} to {calculated_value}"
                         )
+                        # Update stored value
+                        self.unit_peer_data[last_value_key] = str(calculated_value)
                         return True
                 except Exception as e:
-                    logger.debug(f"Could not check {param_name}: {e}")
-                    continue
+                    logger.debug(f"Could not check stored value for {param_name}: {e}")
+                    # If we can't check, be conservative and assume restart is needed
+                    return True
 
             return False
         except Exception as e:
