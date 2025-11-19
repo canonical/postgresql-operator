@@ -8,7 +8,7 @@ import logging
 from typing import Literal
 
 from charms.data_platform_libs.v1.data_models import BaseConfigModel
-from pydantic import Field, PositiveInt
+from pydantic import Field, PositiveInt, field_validator
 
 from locales import SNAP_LOCALES
 
@@ -214,25 +214,34 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_multixact_failsafe_age: int | None = Field(ge=0, le=2100000000, default=None)
     vacuum_vacuum_multixact_freeze_min_age: int | None = Field(ge=0, le=1000000000, default=None)
     vacuum_vacuum_multixact_freeze_table_age: int | None = Field(ge=0, le=2000000000, default=None)
-    wal_compression: bool | None = Field(default=None, alias="wal-compression")
-    max_worker_processes: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-worker-processes"
-    )
-    max_parallel_workers: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-parallel-workers"
-    )
-    max_parallel_maintenance_workers: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-parallel-maintenance-workers"
-    )
-    max_logical_replication_workers: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-logical-replication-workers"
-    )
-    max_sync_workers_per_subscription: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-sync-workers-per-subscription"
-    )
+    wal_compression: bool | None = Field(default=None)
+    max_worker_processes: Literal["auto"] | PositiveInt | None = Field(default="auto")
+    max_parallel_workers: Literal["auto"] | PositiveInt | None = Field(default="auto")
+    max_parallel_maintenance_workers: Literal["auto"] | PositiveInt | None = Field(default="auto")
+    max_logical_replication_workers: Literal["auto"] | PositiveInt | None = Field(default="auto")
+    max_sync_workers_per_subscription: Literal["auto"] | PositiveInt | None = Field(default="auto")
     max_parallel_apply_workers_per_subscription: Literal["auto"] | PositiveInt | None = Field(
-        default=None, alias="max-parallel-apply-workers-per-subscription"
+        default="auto"
     )
+
+    @field_validator(
+        "max_worker_processes",
+        "max_parallel_workers",
+        "max_parallel_maintenance_workers",
+        "max_logical_replication_workers",
+        "max_sync_workers_per_subscription",
+        "max_parallel_apply_workers_per_subscription",
+    )
+    @classmethod
+    def validate_worker_process_params(cls, v):
+        """Validate explicit worker process parameters range (auto mode handled separately)."""
+        # Note: Maximum validation (10 * vCores) is done at runtime in charm logic
+        # since it depends on the actual CPU count of the deployment environment
+        if v is not None and v != "auto" and v < 8:
+            raise ValueError(
+                f"Explicit worker process parameter must be at least 8, got {v}. Use 'auto' for system-calculated values."
+            )
+        return v
 
     @classmethod
     def keys(cls) -> list[str]:

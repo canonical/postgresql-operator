@@ -218,37 +218,37 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
         # Worker process configs
-        {"max_worker_processes": ["-1", "8"]},  # config option is "auto" or a positive integer
+        {"max-worker-processes": ["-1", "8"]},  # config option is "auto" or a positive integer
         {
-            "max_worker_processes": ["invalid", "auto"]
+            "max-worker-processes": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max_parallel_workers": ["-1", "4"]},  # config option is "auto" or a positive integer
+        {"max-parallel-workers": ["-1", "4"]},  # config option is "auto" or a positive integer
         {
-            "max_parallel_workers": ["invalid", "auto"]
-        },  # config option is "auto" or a positive integer
-        {
-            "max_parallel_maintenance_workers": ["-1", "2"]
+            "max-parallel-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max_parallel_maintenance_workers": ["invalid", "auto"]
+            "max-parallel-maintenance-workers": ["-1", "2"]
         },  # config option is "auto" or a positive integer
         {
-            "max_logical_replication_workers": ["-1", "4"]
+            "max-parallel-maintenance-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max_logical_replication_workers": ["invalid", "auto"]
+            "max-logical-replication-workers": ["-1", "4"]
         },  # config option is "auto" or a positive integer
         {
-            "max_sync_workers_per_subscription": ["-1", "2"]
+            "max-logical-replication-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max_sync_workers_per_subscription": ["invalid", "auto"]
+            "max-sync-workers-per-subscription": ["-1", "2"]
         },  # config option is "auto" or a positive integer
         {
-            "max_parallel_apply_workers_per_subscription": ["-1", "2"]
+            "max-sync-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max_parallel_apply_workers_per_subscription": ["invalid", "auto"]
+            "max-parallel-apply-workers-per-subscription": ["-1", "2"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max-parallel-apply-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
     ]
 
@@ -281,14 +281,14 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
     password = await get_password(ops_test)
     unit_address = get_unit_address(ops_test, leader_unit_name)
 
-    # Test setting explicit numeric values
+    # Test setting explicit numeric values (all values must be >= 8 per validation)
     worker_configs = {
         "max-worker-processes": "16",
         "max-parallel-workers": "8",
-        "max-parallel-maintenance-workers": "4",
-        "max-logical-replication-workers": "4",
-        "max-sync-workers-per-subscription": "2",
-        "max-parallel-apply-workers-per-subscription": "2",
+        "max-parallel-maintenance-workers": "8",
+        "max-logical-replication-workers": "8",
+        "max-sync-workers-per-subscription": "8",
+        "max-parallel-apply-workers-per-subscription": "8",
     }
 
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
@@ -318,7 +318,9 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Verify "auto" values are resolved to integers (not the string "auto")
     for config_name in auto_configs:
-        pg_param = config_name
+        pg_param = config_name.replace(
+            "-", "_"
+        )  # Convert Juju config name to PostgreSQL parameter name
         result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
@@ -338,7 +340,15 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
-    assert result[0] == "on"
+    # When enabled, PostgreSQL returns the actual algorithm name (not "on")
+    assert result[0] != "off", (
+        f"Expected WAL compression to be enabled (not 'off'), got '{result[0]}'"
+    )
+    # Verify it's a known compression algorithm
+    known_algorithms = ["pglz", "lz4", "zstd"]
+    assert result[0] in known_algorithms, (
+        f"Expected a known compression algorithm, got '{result[0]}'"
+    )
 
     # Test disabling WAL compression
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "false"})
