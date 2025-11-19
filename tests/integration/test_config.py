@@ -28,6 +28,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             num_units=1,
             base=CHARM_BASE,
             config={"profile": "testing"},
+            constraints={"arch": "arm64"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -340,10 +341,6 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
-    # When enabled, PostgreSQL returns the actual algorithm name (not "on")
-    assert result[0] != "off", (
-        f"Expected WAL compression to be enabled (not 'off'), got '{result[0]}'"
-    )
     # Verify it's a known compression algorithm
     known_algorithms = ["pglz", "lz4", "zstd"]
     assert result[0] in known_algorithms, (
