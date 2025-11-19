@@ -15,6 +15,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    run_command_on_unit,
 )
 
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
@@ -148,10 +149,18 @@ async def pitr_backup_operations(
     await action.wait()
     logger.info("1: waiting for the database charm to become blocked after restore")
     async with ops_test.fast_forward():
-        await ops_test.model.block_until(
-            lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR,
-            timeout=1000,
-        )
+        try:
+            await ops_test.model.block_until(
+                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR, timeout=500
+            )
+        except Exception as e:
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
+            )
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/home/runner/pglogs.tar.gz')}"
+            )
+            raise e
     logger.info(
         "1: database charm become in blocked state after restore, as supposed to be with unreachable PITR parameter"
     )

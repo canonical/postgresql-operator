@@ -123,6 +123,22 @@ jobs:
           UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
+      - run: "journalctl | grep audit > /home/runner/audit"
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+      - name: Upload logs
+        uses: actions/upload-artifact@v5
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        with:
+          name: audit-${{ matrix.job.name_in_artifact }}
+          path: /home/runner/audit
+          if-no-files-found: error
+      - name: Upload logs
+        uses: actions/upload-artifact@v5
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        with:
+          name: pglogs-${{ matrix.job.name_in_artifact }}
+          path: /home/runner/pglogs.tar.gz
+          if-no-files-found: error
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
