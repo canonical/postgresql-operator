@@ -28,7 +28,6 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             num_units=1,
             base=CHARM_BASE,
             config={"profile": "testing"},
-            constraints={"arch": "arm64"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -219,35 +218,43 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
         # Worker process configs
-        {"max-worker-processes": ["-1", "8"]},  # config option is "auto" or a positive integer
+        {"max-worker-processes": ["-1", "0"]},  # negative and zero (both invalid)
+        {"max-worker-processes": ["7", "100"]},  # below min (7<8) and above max (100>10*vCores)
         {
             "max-worker-processes": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-parallel-workers": ["-1", "4"]},  # config option is "auto" or a positive integer
+        {"max-parallel-workers": ["-1", "0"]},  # negative and zero (both invalid)
+        {"max-parallel-workers": ["7", "100"]},  # below min (7<8) and above max (100>10*vCores)
         {
             "max-parallel-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
+        {"max-parallel-maintenance-workers": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-parallel-maintenance-workers": ["-1", "2"]
-        },  # config option is "auto" or a positive integer
+            "max-parallel-maintenance-workers": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
         {
             "max-parallel-maintenance-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
+        {"max-logical-replication-workers": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-logical-replication-workers": ["-1", "4"]
-        },  # config option is "auto" or a positive integer
+            "max-logical-replication-workers": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
         {
             "max-logical-replication-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
+        {"max-sync-workers-per-subscription": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-sync-workers-per-subscription": ["-1", "2"]
-        },  # config option is "auto" or a positive integer
+            "max-sync-workers-per-subscription": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
         {
             "max-sync-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max-parallel-apply-workers-per-subscription": ["-1", "2"]
-        },  # config option is "auto" or a positive integer
+            "max-parallel-apply-workers-per-subscription": ["-1", "0"]
+        },  # negative and zero (both invalid)
+        {
+            "max-parallel-apply-workers-per-subscription": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
         {
             "max-parallel-apply-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
