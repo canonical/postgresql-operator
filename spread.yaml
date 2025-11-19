@@ -79,7 +79,8 @@ backends:
       PermitEmptyPasswords yes
       EOF
 
-      sudo passwd -d runner
+      sudo passwd -d runner || true
+      sudo passwd -d ubuntu || true
 
       ADDRESS localhost
 
@@ -100,7 +101,7 @@ backends:
       - ubuntu-24.04:
           username: runner
       - ubuntu-24.04-arm:
-          username: runner
+          username: ubuntu
           variants:
             - -juju29
 
