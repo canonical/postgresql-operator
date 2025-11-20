@@ -17,9 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Show uname
-        run: |
-          uname -a
       - name: Set up environment
         run: |
           sudo snap install go --classic
@@ -94,6 +91,9 @@ jobs:
     runs-on: ${{ matrix.job.runner }}
     timeout-minutes: 216  # Sum of steps `timeout-minutes` + 5
     steps:
+      - name: Show uname
+        run: |
+          uname -a
       - name: Checkout
         timeout-minutes: 3
         uses: actions/checkout@v5
