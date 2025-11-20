@@ -1933,12 +1933,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Args:
             event: the event that triggered this handler
         """
+        cached_status = self.unit.status
         for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1), reraise=True):
             with attempt:
                 if not self._is_storage_attached():
                     logger.error("Data directory not attached.")
                     self.unit.status = WaitingStatus("Data directory not attached")
                     raise StorageUnavailableError()
+        self.unit.status = cached_status
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
