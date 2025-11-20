@@ -34,6 +34,7 @@ from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
+    StorageUnavailableError,
 )
 from cluster import (
     NotReadyError,
@@ -70,17 +71,12 @@ def test_on_install(harness):
         patch("charm.subprocess.check_call") as _check_call,
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True],
         ) as _is_storage_attached,
     ):
-        # Test without storage.
-        harness.charm.on.install.emit()
-        _reboot_on_detached_storage.assert_called_once()
         pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
 
         # Test without adding Patroni resource.
@@ -105,18 +101,13 @@ def test_on_install_failed_to_create_home(harness):
         patch("charm.subprocess.check_call") as _check_call,
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True],
         ) as _is_storage_attached,
         patch("charm.logger.exception") as _logger_exception,
     ):
-        # Test without storage.
-        harness.charm.on.install.emit()
-        _reboot_on_detached_storage.assert_called_once()
         pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
         _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
 
@@ -611,9 +602,7 @@ def test_on_start(harness):
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True) as _idle,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -621,10 +610,6 @@ def test_on_start(harness):
         ) as _is_storage_attached,
     ):
         _get_postgresql_version.return_value = "14.0"
-
-        # Test without storage.
-        harness.charm.on.start.emit()
-        _reboot_on_detached_storage.assert_called_once()
 
         # Test before the passwords are generated.
         _member_started.return_value = False
@@ -1198,13 +1183,15 @@ def test_is_storage_attached(harness):
         assert not (is_storage_attached)
 
 
-def test_reboot_on_detached_storage(harness):
-    with patch("subprocess.check_call") as _check_call:
-        mock_event = MagicMock()
-        harness.charm._reboot_on_detached_storage(mock_event)
-        mock_event.defer.assert_called_once()
+def test_check_detached_storage(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._is_storage_attached") as _is_storage_attached,
+        patch("charm.wait_fixed", return_value=wait_fixed(0)),
+    ):
+        _is_storage_attached.return_value = False
+        with pytest.raises(StorageUnavailableError):
+            harness.charm._check_detached_storage()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
-        _check_call.assert_called_once_with(["/usr/bin/systemctl", "reboot"])
 
 
 def test_restart(harness):

@@ -15,6 +15,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    run_command_on_unit,
 )
 from .juju_ import juju_major_version
 
@@ -71,10 +72,22 @@ async def pitr_backup_operations(
     await ops_test.model.relate(
         f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
     )
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, tls_certificates_app_name], status="active", timeout=1000
+    try:
+        async with ops_test.fast_forward(fast_interval="60s"):
+            await ops_test.model.wait_for_idle(
+                apps=[database_app_name, tls_certificates_app_name], status="active", timeout=1000
+            )
+    except Exception as e:
+        logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'sudo snap logs -n all charmed-postgresql.patroni')}"
         )
+        logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
+        )
+        logger.info(
+            f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/home/runner/pglogs.tar.gz')}"
+        )
+        raise e
 
     logger.info(f"configuring s3-integrator for {cloud}")
     await ops_test.model.applications[s3_integrator_app_name].set_config(config)
@@ -151,10 +164,21 @@ async def pitr_backup_operations(
     await action.wait()
     logger.info("1: waiting for the database charm to become blocked after restore")
     async with ops_test.fast_forward():
-        await ops_test.model.block_until(
-            lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR,
-            timeout=1000,
-        )
+        try:
+            await ops_test.model.block_until(
+                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR, timeout=500
+            )
+        except Exception as e:
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'sudo snap logs -n all charmed-postgresql.patroni')}"
+            )
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await run_command_on_unit(ops_test, 'postgresql-aws/0', 'tar czf /tmp/pglogs.tar.gz /var/snap/charmed-postgresql/common/var/log/')}"
+            )
+            logger.info(
+                f"!!!!!!!!!!!!!!!!!!!!!!!!!!! {await ops_test.juju('scp', 'postgresql-aws/0:/tmp/pglogs.tar.gz', '/home/runner/pglogs.tar.gz')}"
+            )
+            raise e
     logger.info(
         "1: database charm become in blocked state after restore, as supposed to be with unreachable PITR parameter"
     )

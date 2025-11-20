@@ -91,6 +91,9 @@ jobs:
     runs-on: ${{ matrix.job.runner }}
     timeout-minutes: 216  # Sum of steps `timeout-minutes` + 5
     steps:
+      - name: Show uname
+        run: |
+          uname -a
       - name: Checkout
         timeout-minutes: 3
         uses: actions/checkout@v5
@@ -123,6 +126,20 @@ jobs:
           UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
+      - run: "journalctl | grep audit > /home/runner/audit"
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+      - name: Upload logs
+        uses: actions/upload-artifact@v5
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        with:
+          name: audit
+          path: /home/runner/audit
+          if-no-files-found: error
+      # - name: Setup upterm session
+      #   if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+      #   uses: owenthereal/action-upterm@v1
+      #   with:
+      #     limit-access-to-actor: true
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
