@@ -4,7 +4,6 @@
 
 """Charmed Machine Operator for the PostgreSQL database."""
 
-import contextlib
 import dataclasses
 import json
 import logging
@@ -39,7 +38,6 @@ from ops import (
     ActiveStatus,
     BlockedStatus,
     CharmEvents,
-    EventBase,
     HookEvent,
     InstallEvent,
     JujuVersion,
@@ -153,6 +151,10 @@ PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 class CannotConnectError(Exception):
     """Cannot run smoke check on connected Database."""
+
+
+class StorageUnavailableError(Exception):
+    """Cannot find storage mountpoint."""
 
 
 @dataclasses.dataclass(eq=False)
@@ -1383,9 +1385,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         logger.debug("Install start time: %s", datetime.now())
-        if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
-            return
+        self._check_detached_storage()
 
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
@@ -1602,9 +1602,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _can_start(self, event: StartEvent) -> bool:
         """Returns whether the workload can be started on this unit."""
-        if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
-            return False
+        self._check_detached_storage()
 
         # Safeguard against starting while refreshing.
         if self.refresh is None:
@@ -2311,19 +2309,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception("CA file failed to clean. Error in config update")
             return False
 
-    def _reboot_on_detached_storage(self, event: EventBase) -> None:
-        """Reboot on detached storage.
+    def _check_detached_storage(self) -> None:
+        """Wait for storage to become available.
 
         Workaround for lxd containers not getting storage attached on startups.
 
         Args:
             event: the event that triggered this handler
         """
-        event.defer()
-        logger.error("Data directory not attached. Reboot unit.")
-        self.set_unit_status(WaitingStatus("Data directory not attached"))
-        with contextlib.suppress(subprocess.CalledProcessError):
-            subprocess.check_call(["/usr/bin/systemctl", "reboot"])
+        cached_status = self.unit.status
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1), reraise=True):
+            with attempt:
+                if not self._is_storage_attached():
+                    logger.error("Data directory not attached.")
+                    self.unit.status = WaitingStatus("Data directory not attached")
+                    raise StorageUnavailableError()
+        self.unit.status = cached_status
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""

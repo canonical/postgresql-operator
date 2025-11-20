@@ -246,7 +246,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def keys(cls) -> list[str]:
         """Return config as list items."""
-        return list(cls.__fields__.keys())
+        return list(cls.model_fields.keys())
 
     @classmethod
     def plugin_keys(cls) -> filter:
