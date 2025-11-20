@@ -285,16 +285,16 @@ Next, we'll create and connect to a new database within the interactive shell. N
 Create and connect to a new database called `testdatabase`:
 
 ```text
-postgres=# CREATE DATABASE mydb-test;
-postgres=# \c mydb-test
+postgres=# CREATE DATABASE mydb_test;
+postgres=# \c mydb_test
 
-You are now connected to database "mydb-test" as user "operator".
+You are now connected to database "mydb_test" as user "operator".
 ```
 
 We can now create a new table inside this database:
 
 ```text
-mydb-test=# CREATE TABLE mytable (
+mydb_test=# CREATE TABLE mytable (
 	id SERIAL PRIMARY KEY,
 	name VARCHAR(50),
 	age INT
@@ -304,13 +304,13 @@ mydb-test=# CREATE TABLE mytable (
 and insert an element into it:
 
 ```text
-mydb-test=# INSERT INTO mytable (name, age) VALUES ('Numbat', 20);
+mydb_test=# INSERT INTO mytable (name, age) VALUES ('Numbat', 20);
 ```
 
 We can see our new table element by submitting a query:
 
 ```text
-mydb-test=# SELECT * FROM mytable;
+mydb_test=# SELECT * FROM mytable;
 
  id | name | age
 ----+------+-----
@@ -321,10 +321,10 @@ mydb-test=# SELECT * FROM mytable;
 You can try multiple SQL commands inside this environment. Once you're ready, reconnect to the default postgres database and drop the sample database we created:
 
 ```text
-mydb-test=# \c postgres
+mydb_test=# \c postgres
 
 You are now connected to database "postgres" as user "operator".
-postgres=# DROP DATABASE mydb-test;
+postgres=# DROP DATABASE mydb_test;
 ```
 
 When you’re ready to leave the PostgreSQL shell, you can just type `exit`. This will take you back to the host of Charmed PostgreSQL (`postgresql/0`). Exit this host by once again typing exit. Now you will be in your original shell where you first started the tutorial. Here you can interact with Juju and LXD.
