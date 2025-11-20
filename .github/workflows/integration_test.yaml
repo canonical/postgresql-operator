@@ -123,11 +123,11 @@ jobs:
           UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
-      - name: Setup upterm session
-        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
-        uses: owenthereal/action-upterm@v1
-        with:
-          limit-access-to-actor: true
+      # - name: Setup upterm session
+      #   if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+      #   uses: owenthereal/action-upterm@v1
+      #   with:
+      #     limit-access-to-actor: true
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
