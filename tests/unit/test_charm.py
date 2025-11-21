@@ -727,6 +727,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
         patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
+        patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
