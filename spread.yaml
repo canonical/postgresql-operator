@@ -76,10 +76,9 @@ backends:
     allocate: |
       sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
       PasswordAuthentication yes
-      PermitEmptyPasswords yes
       EOF
 
-      sudo passwd -d runner
+      echo "runner:$SPREAD_PASSWORD" | sudo chpasswd
 
       ADDRESS localhost
 
@@ -99,7 +98,7 @@ backends:
     systems:
       - ubuntu-24.04:
           username: runner
-      - ubuntu-24.04-arm:
+      - ubuntu-22.04-arm:
           username: runner
           variants:
             - -juju29
