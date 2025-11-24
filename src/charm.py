@@ -2409,33 +2409,53 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return str(value)
         return None
 
+    def _validate_worker_config_value(self, param_name: str, value: int) -> str:
+        """Shared validation logic for worker process parameters.
+
+        Args:
+            param_name: The configuration parameter name (for error messages)
+            value: The integer value to validate
+
+        Returns:
+            String representation of the validated value
+
+        Raises:
+            ValidationError: If value is less than 8
+            ValueError: If value exceeds 10 * vCores
+        """
+        if value < 8:
+            from pydantic_core import InitErrorDetails
+
+            raise ValidationError.from_exception_data(
+                "ValidationError",
+                [
+                    InitErrorDetails(
+                        type="greater_than_equal",
+                        ctx={"ge": 8},
+                        input=value,
+                        loc=(param_name,),
+                    )
+                ],
+            )
+        cap = 10 * self.cpu_count
+        if value > cap:
+            raise ValueError(
+                f"{param_name} value {value} exceeds maximum allowed "
+                f"of {cap} (10 * vCores). Please set a value <= {cap}."
+            )
+        return str(value)
+
     def _calculate_max_parallel_workers(self, base_max_workers: int) -> str | None:
         """Calculate max_parallel_workers configuration value."""
         if self.config.max_parallel_workers == "auto":
             return str(base_max_workers)
         elif self.config.max_parallel_workers is not None:
-            value = self.config.max_parallel_workers
-            if value < 8:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 8},
-                            input=value,
-                            loc=("max_parallel_workers",),
-                        )
-                    ],
-                )
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(min(value, base_max_workers))
+            # Validate the value first
+            validated_value_str = self._validate_worker_config_value(
+                "max_parallel_workers", self.config.max_parallel_workers
+            )
+            # Apply the min constraint with base_max_workers
+            return str(min(int(validated_value_str), base_max_workers))
         return None
 
     def _calculate_max_parallel_maintenance_workers(self, base_max_workers: int) -> str | None:
@@ -2443,28 +2463,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.config.max_parallel_maintenance_workers == "auto":
             return str(base_max_workers)
         elif self.config.max_parallel_maintenance_workers is not None:
-            value = self.config.max_parallel_maintenance_workers
-            if value < 8:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 8},
-                            input=value,
-                            loc=("max_parallel_maintenance_workers",),
-                        )
-                    ],
-                )
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_maintenance_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(value)
+            return self._validate_worker_config_value(
+                "max_parallel_maintenance_workers", self.config.max_parallel_maintenance_workers
+            )
         return None
 
     def _calculate_max_logical_replication_workers(
@@ -2478,28 +2479,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return str(auto_value)
         elif self.config.max_logical_replication_workers is not None:
-            value = self.config.max_logical_replication_workers
-            if value < 8:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 8},
-                            input=value,
-                            loc=("max_logical_replication_workers",),
-                        )
-                    ],
-                )
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_logical_replication_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(value)
+            return self._validate_worker_config_value(
+                "max_logical_replication_workers", self.config.max_logical_replication_workers
+            )
         return None
 
     def _calculate_max_sync_workers_per_subscription(self, base_max_workers: int) -> str | None:
@@ -2507,28 +2489,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.config.max_sync_workers_per_subscription == "auto":
             return str(base_max_workers)
         elif self.config.max_sync_workers_per_subscription is not None:
-            value = self.config.max_sync_workers_per_subscription
-            if value < 8:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 8},
-                            input=value,
-                            loc=("max_sync_workers_per_subscription",),
-                        )
-                    ],
-                )
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_sync_workers_per_subscription value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(value)
+            return self._validate_worker_config_value(
+                "max_sync_workers_per_subscription", self.config.max_sync_workers_per_subscription
+            )
         return None
 
     def _calculate_max_parallel_apply_workers_per_subscription(
@@ -2538,28 +2501,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.config.max_parallel_apply_workers_per_subscription == "auto":
             return str(base_max_workers)
         elif self.config.max_parallel_apply_workers_per_subscription is not None:
-            value = self.config.max_parallel_apply_workers_per_subscription
-            if value < 8:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 8},
-                            input=value,
-                            loc=("max_parallel_apply_workers_per_subscription",),
-                        )
-                    ],
-                )
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_apply_workers_per_subscription value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(value)
+            return self._validate_worker_config_value(
+                "max_parallel_apply_workers_per_subscription",
+                self.config.max_parallel_apply_workers_per_subscription,
+            )
         return None
 
     def _calculate_worker_process_config(self) -> dict[str, str]:
