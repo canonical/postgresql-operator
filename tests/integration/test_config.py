@@ -218,13 +218,13 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
         # Worker process configs
-        {"max-worker-processes": ["-1", "0"]},  # negative and zero (both invalid)
-        {"max-worker-processes": ["7", "100"]},  # below min (7<8) and above max (100>10*vCores)
+        {"max-worker-processes": ["-1", "16"]},  # negative (invalid) and valid value
+        {"max-worker-processes": ["7", "8"]},  # below min (7<8) and valid min value
         {
             "max-worker-processes": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-parallel-workers": ["-1", "0"]},  # negative and zero (both invalid)
-        {"max-parallel-workers": ["7", "100"]},  # below min (7<8) and above max (100>10*vCores)
+        {"max-parallel-workers": ["-1", "16"]},  # negative (invalid) and valid value
+        {"max-parallel-workers": ["7", "8"]},  # below min (7<8) and valid min value
         {
             "max-parallel-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer

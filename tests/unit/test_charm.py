@@ -1566,7 +1566,6 @@ def test_calculate_worker_process_config_edge_cases(harness):
 
         result = harness.charm._calculate_worker_process_config()
         # All worker parameters default to auto, so they get calculated
-        # wal_compression defaults to true in config.yaml
         expected = {
             "max_worker_processes": "8",  # min(8, 2 * 4) = 8
             "max_parallel_workers": "8",
@@ -1574,7 +1573,6 @@ def test_calculate_worker_process_config_edge_cases(harness):
             "max_logical_replication_workers": "8",
             "max_sync_workers_per_subscription": "8",
             "max_parallel_apply_workers_per_subscription": "8",
-            "wal_compression": "on",
         }
         assert result == expected
 
@@ -1593,7 +1591,6 @@ def test_calculate_worker_process_config_edge_cases(harness):
             "max_logical_replication_workers": "10",
             "max_sync_workers_per_subscription": "10",
             "max_parallel_apply_workers_per_subscription": "10",
-            "wal_compression": "on",
         }
         assert result == expected
 
@@ -1606,7 +1603,15 @@ def test_calculate_worker_process_config_edge_cases(harness):
 
         result = harness.charm._calculate_worker_process_config()
         # Should be min(8, 2*128) = 8
-        assert result["max_worker_processes"] == "8"
+        expected = {
+            "max_worker_processes": "8",
+            "max_parallel_workers": "8",
+            "max_parallel_maintenance_workers": "8",
+            "max_logical_replication_workers": "8",
+            "max_sync_workers_per_subscription": "8",
+            "max_parallel_apply_workers_per_subscription": "8",
+        }
+        assert result == expected
 
 
 def test_calculate_worker_process_config_dependencies(harness):
@@ -1633,34 +1638,29 @@ def test_calculate_worker_process_config_dependencies(harness):
 
 
 def test_calculate_worker_process_config_wal_compression(harness):
-    """Test wal_compression configuration."""
-    # Test with wal_compression enabled
+    """Test that wal_compression is NOT included in worker process config."""
+    # Test with wal_compression enabled - should NOT be in worker config result
     with harness.hooks_disabled():
         harness.update_config({"wal-compression": True})
-    if hasattr(harness.charm, "config"):
-        del harness.charm.config
 
     result = harness.charm._calculate_worker_process_config()
-    assert result["wal_compression"] == "on"
+    assert "wal_compression" not in result  # wal_compression is not part of worker configs
 
-    # Test with wal_compression disabled
+    # Test with wal_compression disabled - should NOT be in worker config result
     with harness.hooks_disabled():
         harness.update_config({"wal-compression": False})
-    if hasattr(harness.charm, "config"):
-        del harness.charm.config
+    del harness.charm.config
 
     result = harness.charm._calculate_worker_process_config()
-    assert result["wal_compression"] == "off"
+    assert "wal_compression" not in result  # wal_compression is not part of worker configs
 
-    # Test with wal_compression not explicitly set (should use default = true)
+    # Test with wal_compression not explicitly set - should NOT be in worker config result
     with harness.hooks_disabled():
         harness.update_config(unset=["wal-compression"])
-    if hasattr(harness.charm, "config"):
-        del harness.charm.config
+    del harness.charm.config
 
     result = harness.charm._calculate_worker_process_config()
-    # When not explicitly set, config.yaml default (true) applies
-    assert result["wal_compression"] == "on"
+    assert "wal_compression" not in result  # wal_compression is not part of worker configs
 
 
 def test_calculate_worker_process_config_mixed_auto_and_numeric(harness):
@@ -1912,7 +1912,7 @@ def test_update_config_with_none_pg_parameters(harness):
         ),
     ):
         postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
-        # Return None to test the else branch at line 2539
+        # Return None to test the case where build_postgresql_parameters returns None
         postgresql_mock.build_postgresql_parameters.return_value = None
 
         # Configure worker processes
@@ -1932,19 +1932,6 @@ def test_update_config_with_none_pg_parameters(harness):
         assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
         assert parameters["wal_compression"] == "on"
         assert "shared_buffers" not in parameters  # pg_parameters was None
-
-
-def test_calculate_worker_process_config_wal_compression_false(harness):
-    """Test wal_compression when explicitly set to False."""
-    with harness.hooks_disabled():
-        harness.update_config({"wal-compression": False})
-    if hasattr(harness.charm, "config"):
-        del harness.charm.config
-
-    result = harness.charm._calculate_worker_process_config()
-    # This covers line 2490 - the else "off" branch
-    assert result["wal_compression"] == "off"
-    assert "wal_compression" in result
 
 
 def test_on_peer_relation_changed(harness):

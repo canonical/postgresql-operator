@@ -2562,12 +2562,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return str(value)
         return None
 
-    def _calculate_wal_compression(self) -> str | None:
-        """Calculate wal_compression configuration value."""
-        if self.config.wal_compression is not None:
-            return "on" if self.config.wal_compression else "off"
-        return None
-
     def _calculate_worker_process_config(self) -> dict[str, str]:
         """Calculate worker process configuration values.
 
@@ -2615,11 +2609,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             result["max_parallel_apply_workers_per_subscription"] = (
                 max_parallel_apply_workers_per_subscription_value
             )
-
-        # Add wal_compression if configured
-        wal_compression_value = self._calculate_wal_compression()
-        if wal_compression_value is not None:
-            result["wal_compression"] = wal_compression_value
 
         return result
 
@@ -2674,16 +2663,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Calculate and merge worker process configurations
         worker_configs = self._calculate_worker_process_config()
+
+        # Add wal_compression configuration (separate from worker processes)
+        if self.config.wal_compression is not None:
+            wal_compression = "on" if self.config.wal_compression else "off"
+        else:
+            # Use config.yaml default when unset (default: true)
+            wal_compression = "on"
+
         if pg_parameters is not None:
             pg_parameters.update(worker_configs)
+            pg_parameters["wal_compression"] = wal_compression
         else:
-            pg_parameters = worker_configs
-            logger.info(f"DEBUG: pg_parameters set to worker_configs = {pg_parameters}")
+            pg_parameters = dict(worker_configs)
+            pg_parameters["wal_compression"] = wal_compression
+            logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
 
         # replication_slots = self.logical_replication.replication_slots()
 
         # Update and reload configuration based on TLS files availability.
-        logger.info(f"DEBUG: Calling render_patroni_yml_file with parameters = {pg_parameters}")
+        logger.debug(f"Calling render_patroni_yml_file with parameters = {pg_parameters}")
         self._patroni.render_patroni_yml_file(
             connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,

@@ -757,6 +757,8 @@ options:
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
+
+  # WAL (Write-Ahead Logging) Configuration
   wal-compression:
     description: |
       Enable compression of full-page writes written in WAL. Compression reduces
@@ -764,18 +766,19 @@ options:
       Default is on (true).
     type: boolean
     default: true
-  max-worker-processes:
+
+  # Worker Process Configuration (alphabetically ordered)
+  max-logical-replication-workers:
     description: |
-      Sets the maximum number of background processes that the system can support.
-      Should be either "auto" or a positive integer value.
-      auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
-      Restart is required when changed.
+      Sets the maximum number of logical replication workers. Should be either "auto"
+      or a positive integer value. Restart is required when changed.
+      auto = max_worker_processes.
     type: string
     default: "auto"
-  max-parallel-workers:
+  max-parallel-apply-workers-per-subscription:
     description: |
-      Sets the maximum number of workers that can be used for parallel operations.
-      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
+      Sets the maximum number of parallel apply workers per subscription.
+      Should be either "auto" or a positive integer value.
       auto = max_worker_processes.
     type: string
     default: "auto"
@@ -787,10 +790,10 @@ options:
       auto = max_worker_processes.
     type: string
     default: "auto"
-  max-logical-replication-workers:
+  max-parallel-workers:
     description: |
-      Sets the maximum number of logical replication workers. Should be either "auto"
-      or a positive integer value. Restart is required when changed.
+      Sets the maximum number of workers that can be used for parallel operations.
+      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
       auto = max_worker_processes.
     type: string
     default: "auto"
@@ -801,11 +804,12 @@ options:
       auto = max_worker_processes.
     type: string
     default: "auto"
-  max-parallel-apply-workers-per-subscription:
+  max-worker-processes:
     description: |
-      Sets the maximum number of parallel apply workers per subscription.
+      Sets the maximum number of background processes that the system can support.
       Should be either "auto" or a positive integer value.
-      auto = max_worker_processes.
+      auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
+      Restart is required when changed.
     type: string
     default: "auto"
 
