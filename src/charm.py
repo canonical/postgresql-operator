@@ -55,6 +55,7 @@ from ops import (
     WaitingStatus,
     main,
 )
+from pydantic import ValidationError
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -2378,7 +2379,196 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def _calculate_worker_process_config(self) -> dict[str, str]:  # noqa: C901
+    def _calculate_max_worker_processes(self) -> str | None:
+        """Calculate max_worker_processes configuration value."""
+        if self.config.max_worker_processes == "auto":
+            # auto = minimum(8, 2 * vCores)
+            return str(min(8, 2 * self.cpu_count))
+        elif self.config.max_worker_processes is not None:
+            value = self.config.max_worker_processes
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_worker_processes",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_worker_processes value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(value)
+        return None
+
+    def _calculate_max_parallel_workers(self, base_max_workers: int) -> str | None:
+        """Calculate max_parallel_workers configuration value."""
+        if self.config.max_parallel_workers == "auto":
+            return str(base_max_workers)
+        elif self.config.max_parallel_workers is not None:
+            value = self.config.max_parallel_workers
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_parallel_workers",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_parallel_workers value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(min(value, base_max_workers))
+        return None
+
+    def _calculate_max_parallel_maintenance_workers(self, base_max_workers: int) -> str | None:
+        """Calculate max_parallel_maintenance_workers configuration value."""
+        if self.config.max_parallel_maintenance_workers == "auto":
+            return str(base_max_workers)
+        elif self.config.max_parallel_maintenance_workers is not None:
+            value = self.config.max_parallel_maintenance_workers
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_parallel_maintenance_workers",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_parallel_maintenance_workers value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(value)
+        return None
+
+    def _calculate_max_logical_replication_workers(
+        self, base_max_workers: int | None
+    ) -> str | None:
+        """Calculate max_logical_replication_workers configuration value."""
+        if self.config.max_logical_replication_workers == "auto":
+            # For auto mode, use base_max_workers if available, otherwise calculate independently
+            auto_value = (
+                base_max_workers if base_max_workers is not None else min(8, 2 * self.cpu_count)
+            )
+            return str(auto_value)
+        elif self.config.max_logical_replication_workers is not None:
+            value = self.config.max_logical_replication_workers
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_logical_replication_workers",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_logical_replication_workers value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(value)
+        return None
+
+    def _calculate_max_sync_workers_per_subscription(self, base_max_workers: int) -> str | None:
+        """Calculate max_sync_workers_per_subscription configuration value."""
+        if self.config.max_sync_workers_per_subscription == "auto":
+            return str(base_max_workers)
+        elif self.config.max_sync_workers_per_subscription is not None:
+            value = self.config.max_sync_workers_per_subscription
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_sync_workers_per_subscription",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_sync_workers_per_subscription value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(value)
+        return None
+
+    def _calculate_max_parallel_apply_workers_per_subscription(
+        self, base_max_workers: int
+    ) -> str | None:
+        """Calculate max_parallel_apply_workers_per_subscription configuration value."""
+        if self.config.max_parallel_apply_workers_per_subscription == "auto":
+            return str(base_max_workers)
+        elif self.config.max_parallel_apply_workers_per_subscription is not None:
+            value = self.config.max_parallel_apply_workers_per_subscription
+            if value < 8:
+                from pydantic_core import InitErrorDetails
+
+                raise ValidationError.from_exception_data(
+                    "ValidationError",
+                    [
+                        InitErrorDetails(
+                            type="greater_than_equal",
+                            ctx={"ge": 8},
+                            input=value,
+                            loc=("max_parallel_apply_workers_per_subscription",),
+                        )
+                    ],
+                )
+            cap = 10 * self.cpu_count
+            if value > cap:
+                raise ValueError(
+                    f"max_parallel_apply_workers_per_subscription value {value} exceeds maximum allowed "
+                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
+                )
+            return str(value)
+        return None
+
+    def _calculate_wal_compression(self) -> str | None:
+        """Calculate wal_compression configuration value."""
+        if self.config.wal_compression is not None:
+            return "on" if self.config.wal_compression else "off"
+        return None
+
+    def _calculate_worker_process_config(self) -> dict[str, str]:
         """Calculate worker process configuration values.
 
         Handles 'auto' values and capping logic for worker process parameters.
@@ -2387,97 +2577,49 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         result: dict[str, str] = {}
 
         # Calculate max_worker_processes (baseline for other worker configs)
-        if self.config.max_worker_processes == "auto":
-            # auto = minimum(8, 2 * vCores)
-            result["max_worker_processes"] = str(min(8, 2 * self.cpu_count))
-        elif self.config.max_worker_processes is not None:
-            value = self.config.max_worker_processes
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_worker_processes value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_worker_processes"] = str(value)
+        max_worker_processes_value = self._calculate_max_worker_processes()
+        if max_worker_processes_value is not None:
+            result["max_worker_processes"] = max_worker_processes_value
 
         # Get the effective max_worker_processes for dependent configs
         # Use the calculated value, or fall back to PostgreSQL default (8)
         base_max_workers = int(result.get("max_worker_processes", "8"))
 
-        # Calculate max_parallel_workers
-        if self.config.max_parallel_workers == "auto":
-            result["max_parallel_workers"] = str(base_max_workers)
-        elif self.config.max_parallel_workers is not None:
-            value = self.config.max_parallel_workers
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_parallel_workers"] = str(min(value, base_max_workers))
+        # Calculate other worker parameters
+        max_parallel_workers_value = self._calculate_max_parallel_workers(base_max_workers)
+        if max_parallel_workers_value is not None:
+            result["max_parallel_workers"] = max_parallel_workers_value
 
-        # Calculate max_parallel_maintenance_workers
-        if self.config.max_parallel_maintenance_workers == "auto":
-            result["max_parallel_maintenance_workers"] = str(base_max_workers)
-        elif self.config.max_parallel_maintenance_workers is not None:
-            value = self.config.max_parallel_maintenance_workers
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_maintenance_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_parallel_maintenance_workers"] = str(value)
+        max_parallel_maintenance_workers_value = self._calculate_max_parallel_maintenance_workers(
+            base_max_workers
+        )
+        if max_parallel_maintenance_workers_value is not None:
+            result["max_parallel_maintenance_workers"] = max_parallel_maintenance_workers_value
 
-        # Calculate max_logical_replication_workers (restart-required parameter)
-        if self.config.max_logical_replication_workers == "auto":
-            # For auto mode, use base_max_workers if available, otherwise calculate independently
-            auto_value = (
-                base_max_workers
-                if "max_worker_processes" in result
-                else min(8, 2 * self.cpu_count)
+        max_logical_replication_workers_value = self._calculate_max_logical_replication_workers(
+            int(max_worker_processes_value) if max_worker_processes_value else None
+        )
+        if max_logical_replication_workers_value is not None:
+            result["max_logical_replication_workers"] = max_logical_replication_workers_value
+
+        max_sync_workers_per_subscription_value = (
+            self._calculate_max_sync_workers_per_subscription(base_max_workers)
+        )
+        if max_sync_workers_per_subscription_value is not None:
+            result["max_sync_workers_per_subscription"] = max_sync_workers_per_subscription_value
+
+        max_parallel_apply_workers_per_subscription_value = (
+            self._calculate_max_parallel_apply_workers_per_subscription(base_max_workers)
+        )
+        if max_parallel_apply_workers_per_subscription_value is not None:
+            result["max_parallel_apply_workers_per_subscription"] = (
+                max_parallel_apply_workers_per_subscription_value
             )
-            result["max_logical_replication_workers"] = str(auto_value)
-        elif self.config.max_logical_replication_workers is not None:
-            value = self.config.max_logical_replication_workers
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_logical_replication_workers value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_logical_replication_workers"] = str(value)
-
-        # Calculate max_sync_workers_per_subscription
-        if self.config.max_sync_workers_per_subscription == "auto":
-            result["max_sync_workers_per_subscription"] = str(base_max_workers)
-        elif self.config.max_sync_workers_per_subscription is not None:
-            value = self.config.max_sync_workers_per_subscription
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_sync_workers_per_subscription value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_sync_workers_per_subscription"] = str(value)
-
-        # Calculate max_parallel_apply_workers_per_subscription
-        if self.config.max_parallel_apply_workers_per_subscription == "auto":
-            result["max_parallel_apply_workers_per_subscription"] = str(base_max_workers)
-        elif self.config.max_parallel_apply_workers_per_subscription is not None:
-            value = self.config.max_parallel_apply_workers_per_subscription
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"max_parallel_apply_workers_per_subscription value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            result["max_parallel_apply_workers_per_subscription"] = str(value)
 
         # Add wal_compression if configured
-        if self.config.wal_compression is not None:
-            result["wal_compression"] = "on" if self.config.wal_compression else "off"
+        wal_compression_value = self._calculate_wal_compression()
+        if wal_compression_value is not None:
+            result["wal_compression"] = wal_compression_value
 
         return result
 
@@ -2498,11 +2640,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Add restart-required worker process parameters via Patroni API
         worker_configs = self._calculate_worker_process_config()
-        restart_required_params = ["max_worker_processes", "max_logical_replication_workers"]
-
-        for param in restart_required_params:
-            if param in worker_configs:
-                cfg_patch[param] = worker_configs[param]
+        if "max_worker_processes" in worker_configs:
+            cfg_patch["max_worker_processes"] = worker_configs["max_worker_processes"]
+        if "max_logical_replication_workers" in worker_configs:
+            cfg_patch["max_logical_replication_workers"] = worker_configs[
+                "max_logical_replication_workers"
+            ]
 
         base_patch = {}
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
@@ -2531,11 +2674,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Calculate and merge worker process configurations
         worker_configs = self._calculate_worker_process_config()
-        logger.info(f"DEBUG: worker_configs calculated = {worker_configs}")
         if pg_parameters is not None:
-            logger.info(f"DEBUG: pg_parameters before merge = {pg_parameters}")
             pg_parameters.update(worker_configs)
-            logger.info(f"DEBUG: pg_parameters after merge = {pg_parameters}")
         else:
             pg_parameters = worker_configs
             logger.info(f"DEBUG: pg_parameters set to worker_configs = {pg_parameters}")
@@ -2641,46 +2781,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _check_restart_required_params(self) -> bool:
-        """Check if restart-required parameters have changed from their current PostgreSQL values."""
-        if not self._can_connect_to_postgresql:
-            return False
-
-        try:
-            # Calculate what the new values should be
-            worker_configs = self._calculate_worker_process_config()
-
-            # Parameters that require restart according to PostgreSQL documentation
-            restart_required_params = ["max_worker_processes", "max_logical_replication_workers"]
-
-            for param_name in restart_required_params:
-                calculated_value = worker_configs.get(param_name)
-                if calculated_value is None:
-                    continue
-
-                # Check if parameter has changed from last known value
-                try:
-                    # Store calculated values in unit data to track changes
-                    last_value_key = f"last_{param_name}"
-                    last_value = self.unit_peer_data.get(last_value_key)
-
-                    if last_value != str(calculated_value):
-                        logger.info(
-                            f"Restart required: {param_name} changed from {last_value} to {calculated_value}"
-                        )
-                        # Update stored value
-                        self.unit_peer_data[last_value_key] = str(calculated_value)
-                        return True
-                except Exception as e:
-                    logger.debug(f"Could not check stored value for {param_name}: {e}")
-                    # If we can't check, be conservative and assume restart is needed
-                    return True
-
-            return False
-        except Exception as e:
-            logger.debug(f"Error checking restart-required params: {e}")
-            return False
-
     def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
@@ -2690,26 +2790,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             restart_postgresql = False
 
-        # Check if restart-required worker process parameters have changed
-        restart_postgresql = restart_postgresql or self._check_restart_required_params()
-
         try:
             self._patroni.reload_patroni_configuration()
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
         restart_pending = self._patroni.is_restart_pending()
-        logger.info(f"DEBUG: Patroni restart_pending = {restart_pending}")
         logger.debug(
             f"Checking if restart pending: TLS={restart_postgresql} or API={restart_pending}"
         )
         restart_postgresql = restart_postgresql or restart_pending
-        logger.info(f"DEBUG: Final restart_postgresql decision = {restart_postgresql}")
 
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
-
-        # Note: restart-required parameter checking is already done above via _check_restart_required_params()
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).

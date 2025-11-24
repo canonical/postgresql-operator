@@ -1143,6 +1143,19 @@ def test_update_config(harness):
         ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
+        patch.object(
+            harness.charm,
+            "_calculate_worker_process_config",
+            return_value={
+                "wal_compression": "on",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "8",
+            },
+        ),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Mock some properties.
@@ -1151,31 +1164,36 @@ def test_update_config(harness):
         _member_started.side_effect = [True, True, False]
         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
-        # Mock the worker process config calculation to include wal_compression
-        with patch.object(harness.charm, "_calculate_worker_process_config") as mock_worker_config:
-            mock_worker_config.return_value = {"wal_compression": "on"}
-
-            # Test without TLS files available.
-            with harness.hooks_disabled():
-                harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
-            _is_tls_enabled.return_value = False
-            harness.charm.update_config()
-            _render_patroni_yml_file.assert_called_once_with(
-                connectivity=True,
-                is_creating_backup=False,
-                enable_ldap=False,
-                enable_tls=False,
-                backup_id=None,
-                stanza=None,
-                restore_stanza=None,
-                restore_timeline=None,
-                pitr_target=None,
-                restore_to_latest=False,
-                parameters={"test": "test", "wal_compression": "on"},
-                no_peers=False,
-                user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-                # slots={},
-            )
+        # Test without TLS files available.
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
+        _is_tls_enabled.return_value = False
+        harness.charm.update_config()
+        _render_patroni_yml_file.assert_called_once_with(
+            connectivity=True,
+            is_creating_backup=False,
+            enable_ldap=False,
+            enable_tls=False,
+            backup_id=None,
+            stanza=None,
+            restore_stanza=None,
+            restore_timeline=None,
+            pitr_target=None,
+            restore_to_latest=False,
+            parameters={
+                "test": "test",
+                "wal_compression": "on",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "8",
+            },
+            no_peers=False,
+            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            # slots={},
+        )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
         _restart_metrics_service.assert_called_once()
@@ -1818,27 +1836,23 @@ def test_config_validation_invalid_worker_values(harness):
     # Pydantic should reject this
     assert "validation error" in str(e.value).lower()
 
-    # Test negative number (PositiveInt should reject)
+    # Test negative number - should be accepted at config level but fail during calculation
     with harness.hooks_disabled():
         harness.update_config({"max-worker-processes": "-5"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
-    with pytest.raises(ValueError) as e:
-        _ = harness.charm.config
+    # The config should accept it (as it gets validated later in the calculation method)
+    assert harness.charm.config.max_worker_processes == -5
 
-    assert "validation error" in str(e.value).lower()
-
-    # Test zero (PositiveInt should reject)
+    # Test value less than 8 - should be accepted at config level but fail during calculation
     with harness.hooks_disabled():
-        harness.update_config({"max-parallel-workers": "0"})
+        harness.update_config({"max-parallel-workers": "7"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
-    with pytest.raises(ValueError) as e:
-        _ = harness.charm.config
-
-    assert "validation error" in str(e.value).lower()
+    # The config should accept it (as it gets validated later in the calculation method)
+    assert harness.charm.config.max_parallel_workers == 7
 
 
 def test_config_validation_valid_worker_values(harness):
@@ -3369,7 +3383,7 @@ def test_worker_process_validation_minimum_values(harness):
 
             with pytest.raises(
                 ValidationError,
-                match=f"Explicit worker process parameter must be at least 8, got {invalid_value}",
+                match=r"Input should be greater than or equal to 8",
             ):
                 harness.charm._calculate_worker_process_config()
 
