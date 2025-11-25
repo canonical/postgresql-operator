@@ -38,6 +38,7 @@ from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
+    StorageUnavailableError,
 )
 from cluster import (
     NotReadyError,
@@ -94,17 +95,12 @@ def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True],
         ) as _is_storage_attached,
     ):
-        # Test without storage.
-        harness.charm.on.install.emit()
-        _reboot_on_detached_storage.assert_called_once()
         pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
 
         # Test without adding Patroni resource.
@@ -576,9 +572,7 @@ def test_on_start(harness):
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
@@ -597,10 +591,6 @@ def test_on_start(harness):
         patch("charm.TLS.generate_internal_peer_cert"),
     ):
         _get_postgresql_version.return_value = "16.6"
-
-        # Test without storage.
-        harness.charm.on.start.emit()
-        _reboot_on_detached_storage.assert_called_once()
 
         # Test before the passwords are generated.
         _member_started.return_value = False
@@ -737,6 +727,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
         patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
+        patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -1083,13 +1074,15 @@ def test_is_storage_attached(harness):
         assert not (is_storage_attached)
 
 
-def test_reboot_on_detached_storage(harness):
-    with patch("subprocess.check_call") as _check_call:
-        mock_event = MagicMock()
-        harness.charm._reboot_on_detached_storage(mock_event)
-        mock_event.defer.assert_called_once()
+def test_check_detached_storage(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._is_storage_attached") as _is_storage_attached,
+        patch("charm.wait_fixed", return_value=wait_fixed(0)),
+    ):
+        _is_storage_attached.return_value = False
+        with pytest.raises(StorageUnavailableError):
+            harness.charm._check_detached_storage()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
-        _check_call.assert_called_once_with(["/usr/bin/systemctl", "reboot"])
 
 
 def test_restart(harness):

@@ -4,7 +4,6 @@
 
 """Charmed Machine Operator for the PostgreSQL database."""
 
-import contextlib
 import dataclasses
 import json
 import logging
@@ -39,7 +38,6 @@ from ops import (
     ActiveStatus,
     BlockedStatus,
     CharmEvents,
-    EventBase,
     HookEvent,
     InstallEvent,
     JujuVersion,
@@ -153,6 +151,10 @@ PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 class CannotConnectError(Exception):
     """Cannot run smoke check on connected Database."""
+
+
+class StorageUnavailableError(Exception):
+    """Cannot find storage mountpoint."""
 
 
 @dataclasses.dataclass(eq=False)
@@ -1383,9 +1385,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         logger.debug("Install start time: %s", datetime.now())
-        if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
-            return
+        self._check_detached_storage()
 
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
@@ -1602,9 +1602,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _can_start(self, event: StartEvent) -> bool:
         """Returns whether the workload can be started on this unit."""
-        if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
-            return False
+        self._check_detached_storage()
 
         # Safeguard against starting while refreshing.
         if self.refresh is None:
@@ -2311,19 +2309,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception("CA file failed to clean. Error in config update")
             return False
 
-    def _reboot_on_detached_storage(self, event: EventBase) -> None:
-        """Reboot on detached storage.
+    def _check_detached_storage(self) -> None:
+        """Wait for storage to become available.
 
         Workaround for lxd containers not getting storage attached on startups.
 
         Args:
             event: the event that triggered this handler
         """
-        event.defer()
-        logger.error("Data directory not attached. Reboot unit.")
-        self.set_unit_status(WaitingStatus("Data directory not attached"))
-        with contextlib.suppress(subprocess.CalledProcessError):
-            subprocess.check_call(["/usr/bin/systemctl", "reboot"])
+        cached_status = self.unit.status
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1), reraise=True):
+            with attempt:
+                if not self._is_storage_attached():
+                    logger.error("Data directory not attached.")
+                    self.unit.status = WaitingStatus("Data directory not attached")
+                    raise StorageUnavailableError()
+        self.unit.status = cached_status
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
@@ -2566,17 +2567,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def relations_user_databases_map(self) -> dict:
         """Returns a user->databases map for all relations."""
-        user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
-        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
-        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
-            if user not in user_database_map and (
-                database := self.postgresql_client_relation.database_provides.fetch_relation_field(
-                    relation.id, "database"
-                )
-            ):
-                user_database_map[user] = database
+        user_database_map = self._collect_user_relations()
+
         if not self.is_cluster_initialised or not self._patroni.member_started:
             user_database_map.update({
                 USER: "all",
@@ -2597,8 +2590,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 ):
                     continue
                 if databases := ",".join(
-                    self.postgresql.list_accessible_databases_for_user(
-                        user, current_host=self.is_connectivity_enabled
+                    sorted(
+                        self.postgresql.list_accessible_databases_for_user(
+                            user, current_host=self.is_connectivity_enabled
+                        )
                     )
                 ):
                     user_database_map[user] = databases
@@ -2620,18 +2615,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @cached_property
-    def generate_user_hash(self) -> str:
-        """Generate expected user and database hash."""
+    def _collect_user_relations(self) -> dict[str, str]:
         user_db_pairs = {}
         custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
+        prefix_database_mapping = self.postgresql_client_relation.get_databases_prefix_mapping()
+
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
             if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                 relation.id, "database"
             ):
                 user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
+                database = ",".join(prefix_database_mapping.get(str(relation.id), [database]))
                 user_db_pairs[user] = database
-        return shake_128(str(user_db_pairs).encode()).hexdigest(16)
+        return user_db_pairs
+
+    @cached_property
+    def generate_user_hash(self) -> str:
+        """Generate expected user and database hash."""
+        return shake_128(str(self._collect_user_relations()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
