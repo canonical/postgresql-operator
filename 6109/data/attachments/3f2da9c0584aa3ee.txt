@@ -1,0 +1,47 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:82 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  01:59:24Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active       1  data-integrator      latest/edge  301  no       
+postgresql           14.19    active       3  postgresql                          0  no       
+postgresql-test-app           blocked      1  postgresql-test-app  latest/edge  418  no       No database integration available
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+data-integrator/0*      active    idle   3        10.166.138.241            
+postgresql-test-app/0*  blocked   idle   4        10.166.138.128            No database integration available
+postgresql/0            active    idle   0        10.166.138.12   5432/tcp  
+postgresql/1            active    idle   1        10.166.138.7    5432/tcp  Standby (degraded)
+postgresql/2*           active    idle   2        10.166.138.104  5432/tcp  Primary (degraded)
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.166.138.12   juju-9c8e94-0  ubuntu@22.04  runnervmg1sw1  Running
+1        started  10.166.138.7    juju-9c8e94-1  ubuntu@22.04  runnervmg1sw1  Running
+2        started  10.166.138.104  juju-9c8e94-2  ubuntu@22.04  runnervmg1sw1  Running
+3        started  10.166.138.241  juju-9c8e94-3  ubuntu@24.04  runnervmg1sw1  Running
+4        started  10.166.138.128  juju-9c8e94-4  ubuntu@22.04  runnervmg1sw1  Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    0/0        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 01:35:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:35:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:37:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:37:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:37:20 ERROR unit.postgresql/2.juju-log database:4: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 01:39:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:39:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:54:58 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "6cb99022-8c86-455a-837d-feec669c8e94:r#7#remote-93d79c5374e040808411eaca96a96ebf": settings 6cb99022-8c86-455a-837d-feec669c8e94:r#7#remote-93d79c5374e040808411eaca96a96ebf not found (not found)
+unit-postgresql-2: 01:55:10 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "6cb99022-8c86-455a-837d-feec669c8e94:r#7#remote-93d79c5374e040808411eaca96a96ebf": settings 6cb99022-8c86-455a-837d-feec669c8e94:r#7#remote-93d79c5374e040808411eaca96a96ebf not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
