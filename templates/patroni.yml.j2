@@ -180,7 +180,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_admin 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_databases_owner 0.0.0.0/0 scram-sha-256
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} {{ instance_password_encryption }}
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }}/32 {{ instance_password_encryption }}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
@@ -204,7 +204,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 scram-sha-256
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ peer_ip }}/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ peer_ip }}/32 scram-sha-256
     {%- endfor %}
 
   pg_ident:
