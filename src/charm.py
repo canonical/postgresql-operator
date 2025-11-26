@@ -327,6 +327,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
+        # Do not use collect status events elsewhere—otherwise ops will prioritize statuses
+        # incorrectly
+        # https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/#implementation
         self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
