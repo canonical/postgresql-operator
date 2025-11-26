@@ -2456,7 +2456,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.debug(
                     "Early exit update_config: patroni not responding but TLS is enabled."
                 )
-                self._handle_postgresql_restart_need()
+                self._handle_postgresql_restart_need(True)
                 return True
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
@@ -2470,7 +2470,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
-        self._handle_postgresql_restart_need()
+        self._handle_postgresql_restart_need(
+            self.unit_peer_data.get("config_hash") != self.generate_config_hash
+        )
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2483,7 +2485,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._restart_metrics_service(postgres_snap)
         self._restart_ldap_sync_service(postgres_snap)
 
-        self.unit_peer_data.update({"user_hash": self.generate_user_hash})
+        self.unit_peer_data.update({
+            "user_hash": self.generate_user_hash,
+            "config_hash": self.generate_config_hash,
+        })
         if self.unit.is_leader():
             self.app_peer_data.update({"user_hash": self.generate_user_hash})
         return True
@@ -2517,7 +2522,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self) -> None:
+    def _handle_postgresql_restart_need(self, config_changed: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
             restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled(
@@ -2530,11 +2535,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
-        restart_pending = self._patroni.is_restart_pending()
-        logger.debug(
-            f"Checking if restart pending: TLS={restart_postgresql} or API={restart_pending}"
-        )
-        restart_postgresql = restart_postgresql or restart_pending
+        if config_changed and not restart_postgresql:
+            # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
+            # which tells how much time Patroni will wait before checking the configuration
+            # file again to reload it.
+            try:
+                for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                    with attempt:
+                        restart_postgresql = restart_postgresql or self.is_restart_pending()
+                        if not restart_postgresql:
+                            raise Exception
+            except RetryError:
+                # Ignore the error, as it happens only to indicate that the configuration has not changed.
+                pass
 
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
@@ -2633,6 +2646,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         return shake_128(str(self._collect_user_relations()).encode()).hexdigest(16)
+
+    @cached_property
+    def generate_config_hash(self) -> str:
+        """Generate current configuration hash."""
+        return shake_128(str(self.config.dict()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
@@ -2789,6 +2807,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         })
 
         return params
+
+    def is_restart_pending(self) -> bool:
+        """Query pg_settings for pending restart."""
+        connection = None
+        try:
+            with (
+                self.postgresql._connect_to_database() as connection,
+                connection.cursor() as cursor,
+            ):
+                cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")
+                result = cursor.fetchone()
+                if result is not None:
+                    return result[0] > 0
+                else:
+                    return False
+        except psycopg2.OperationalError:
+            logger.warning("Failed to connect to PostgreSQL.")
+            return False
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check if restart is pending: {e}")
+            return False
+        finally:
+            if connection:
+                connection.close()
 
 
 if __name__ == "__main__":
