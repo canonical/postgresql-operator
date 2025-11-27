@@ -67,7 +67,9 @@ class TLS(Object):
             peer_addrs.add(addr)
         if addr := self.charm.unit_peer_data.get("replication-offer-address"):
             peer_addrs.add(addr)
-        if addr := self.charm.unit_peer_data.get("private-address"):
+        if addr := self.charm.unit_peer_data.get("ip") or self.charm.unit_peer_data.get(
+            "private-address"
+        ):
             peer_addrs.add(addr)
         return peer_addrs
 
