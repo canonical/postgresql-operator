@@ -1,6 +1,5 @@
 resource "juju_application" "machine_postgresql" {
-  name  = var.app_name
-  model = var.juju_model_name
+  name = var.app_name
 
   charm {
     name     = var.charm_name
@@ -14,6 +13,7 @@ resource "juju_application" "machine_postgresql" {
   config             = var.config
   constraints        = var.constraints
   storage_directives = var.storage
+  model_uuid         = var.juju_model
 
   dynamic "expose" {
     for_each = var.enable_expose ? [1] : []
