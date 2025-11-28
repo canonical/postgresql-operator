@@ -25,7 +25,7 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 )
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 tls_certificates_app_name = "self-signed-certificates"
-tls_channel = "latest/stable"
+tls_channel = "1/stable"
 tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
