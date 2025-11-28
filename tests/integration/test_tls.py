@@ -33,10 +33,12 @@ APP_NAME = METADATA["name"]
 if juju_major_version < 3:
     tls_certificates_app_name = "tls-certificates-operator"
     tls_channel = "legacy/stable"
+    tls_base = "ubuntu@22.04"
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/stable"
+    tls_channel = "1/stable"
+    tls_base = "ubuntu@24.04"
     tls_config = {"ca-common-name": "Test CA"}
 
 
@@ -62,7 +64,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
         await ops_test.model.deploy(
-            tls_certificates_app_name, config=tls_config, channel=tls_channel, base=CHARM_BASE
+            tls_certificates_app_name, config=tls_config, channel=tls_channel, base=tls_base
         )
 
         # Relate it to the PostgreSQL to enable TLS.
