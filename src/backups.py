@@ -195,7 +195,8 @@ class PostgreSQLBackups(Object):
 
         else:
             if return_code != 0:
-                logger.error(f"Failed to run pgbackrest: {stderr}")
+                extracted_error = self._extract_error_message(stdout, stderr)
+                logger.error(f"Failed to run pgbackrest: {extracted_error}")
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
@@ -357,6 +358,41 @@ class PostgreSQLBackups(Object):
         )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
+    @staticmethod
+    def _extract_error_message(stdout: str, stderr: str) -> str:
+        """Extract key error message from pgBackRest output.
+
+        Args:
+            stdout: Standard output from pgBackRest command.
+            stderr: Standard error from pgBackRest command.
+
+        Returns:
+            Extracted error message, prioritizing ERROR/WARN lines from output.
+        """
+        combined_output = f"{stdout}\n{stderr}".strip()
+        if not combined_output:
+            return f"Unknown error occurred. Please check the logs at {PGBACKREST_LOGS_PATH}"
+
+        # Extract lines with ERROR or WARN markers from pgBackRest output
+        error_lines = []
+        for line in combined_output.splitlines():
+            if "ERROR:" in line or "WARN:" in line:
+                # Clean up the line by removing debug prefixes like "P00  ERROR:"
+                cleaned = re.sub(r"^.*?(ERROR:|WARN:)", r"\1", line).strip()
+                error_lines.append(cleaned)
+
+        # If we found error/warning lines, return them joined
+        if error_lines:
+            return " ".join(error_lines)
+
+        # Otherwise return the last non-empty line from stderr or stdout
+        if stderr.strip():
+            return stderr.strip().splitlines()[-1]
+        if stdout.strip():
+            return stdout.strip().splitlines()[-1]
+
+        return f"Unknown error occurred. Please check the logs at {PGBACKREST_LOGS_PATH}"
+
     def _format_backup_list(self, backup_list) -> str:
         """Formats provided list of backups as a table."""
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -405,7 +441,8 @@ class PostgreSQLBackups(Object):
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+            extracted_error = self._extract_error_message(output, stderr)
+            raise ListBackupsError(f"Failed to list backups with error: {extracted_error}")
 
         backups = json.loads(output)[0]["backup"]
         for backup in backups:
@@ -476,7 +513,8 @@ class PostgreSQLBackups(Object):
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+            extracted_error = self._extract_error_message(output, stderr)
+            raise ListBackupsError(f"Failed to list backups with error: {extracted_error}")
 
         repository_info = next(iter(json.loads(output)), None)
 
@@ -511,7 +549,8 @@ class PostgreSQLBackups(Object):
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list repository with error: {stderr}")
+            extracted_error = self._extract_error_message(output, stderr)
+            raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
         if repository is None:
@@ -733,15 +772,16 @@ class PostgreSQLBackups(Object):
         if not self.charm.primary_endpoint:
             logger.warning("Failed to contact pgBackRest TLS server: no primary endpoint")
             return False
-        return_code, _, stderr = self._execute_command([
+        return_code, stdout, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             "server-ping",
             "--io-timeout=10",
             self.charm.primary_endpoint,
         ])
         if return_code != 0:
+            extracted_error = self._extract_error_message(stdout, stderr)
             logger.warning(
-                f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {stderr}"
+                f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {extracted_error}"
             )
         return return_code == 0
 
@@ -967,7 +1007,8 @@ Stderr:
                 f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 s3_parameters,
             )
-            error_message = f"Failed to backup PostgreSQL with error: {stderr}"
+            extracted_error = self._extract_error_message(stdout, stderr)
+            error_message = f"Failed to backup PostgreSQL with error: {extracted_error}"
             logger.error(f"Backup failed: {error_message}")
             event.fail(error_message)
         else:
@@ -1122,7 +1163,7 @@ Stderr:
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
-        return_code, _, stderr = self._execute_command(
+        return_code, stdout, stderr = self._execute_command(
             [
                 "charmed-postgresql.patronictl",
                 "-c",
@@ -1134,7 +1175,10 @@ Stderr:
             timeout=10,
         )
         if return_code != 0:
-            error_message = f"Failed to remove previous cluster information with error: {stderr}"
+            extracted_error = self._extract_error_message(stdout, stderr)
+            error_message = (
+                f"Failed to remove previous cluster information with error: {extracted_error}"
+            )
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
