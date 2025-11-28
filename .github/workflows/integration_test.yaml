@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up environment
         run: |
           sudo snap install go --classic
@@ -93,7 +93,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up environment
         timeout-minutes: 5
         run: sudo snap install charmcraft --classic
@@ -108,6 +108,12 @@ jobs:
         with:
           pattern: ${{ inputs.artifact-prefix }}-*
           merge-multiple: true
+      # TODO Remove pinned image when problem is resolved on jammy
+      - name: Pin arm lxc image for jammy
+        if: ${{ contains(matrix.job.spread_job, 'arm') }}
+        run: |
+          sudo lxc image copy ubuntu:3e7ef486d7a6 local:
+          sudo lxc image alias create "juju/ubuntu@22.04/arm64" 3e7ef486d7a6
       - name: Run spread job
         timeout-minutes: 180
         id: spread
@@ -208,7 +214,7 @@ jobs:
       # git push origin gh-pages-beta
       # )
       - name: Checkout GitHub pages branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: gh-pages-beta
           path: repo/
