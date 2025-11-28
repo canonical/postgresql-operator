@@ -9,7 +9,10 @@ from pytest_operator.plugin import OpsTest
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
+    execute_query_on_unit,
     get_leader_unit,
+    get_password,
+    get_unit_address,
 )
 
 logger = logging.getLogger(__name__)
@@ -214,6 +217,47 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
+        # Worker process configs
+        {"max-worker-processes": ["-1", "16"]},  # negative (invalid) and valid value
+        {"max-worker-processes": ["7", "8"]},  # below min (7<8) and valid min value
+        {
+            "max-worker-processes": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {"max-parallel-workers": ["-1", "16"]},  # negative (invalid) and valid value
+        {"max-parallel-workers": ["7", "8"]},  # below min (7<8) and valid min value
+        {
+            "max-parallel-workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {"max-parallel-maintenance-workers": ["-1", "0"]},  # negative and zero (both invalid)
+        {
+            "max-parallel-maintenance-workers": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
+        {
+            "max-parallel-maintenance-workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {"max-logical-replication-workers": ["-1", "0"]},  # negative and zero (both invalid)
+        {
+            "max-logical-replication-workers": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
+        {
+            "max-logical-replication-workers": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {"max-sync-workers-per-subscription": ["-1", "0"]},  # negative and zero (both invalid)
+        {
+            "max-sync-workers-per-subscription": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
+        {
+            "max-sync-workers-per-subscription": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
+        {
+            "max-parallel-apply-workers-per-subscription": ["-1", "0"]
+        },  # negative and zero (both invalid)
+        {
+            "max-parallel-apply-workers-per-subscription": ["7", "100"]
+        },  # below min (7<8) and above max (100>10*vCores)
+        {
+            "max-parallel-apply-workers-per-subscription": ["invalid", "auto"]
+        },  # config option is "auto" or a positive integer
     ]
 
     charm_config = {}
@@ -235,3 +279,84 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         lambda: ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
         timeout=100,
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_worker_process_configs(ops_test: OpsTest) -> None:
+    """Test worker process configuration parameters are applied correctly."""
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit_name = leader_unit.name
+    password = await get_password(ops_test)
+    unit_address = get_unit_address(ops_test, leader_unit_name)
+
+    # Test setting explicit numeric values (all values must be >= 8 per validation)
+    worker_configs = {
+        "max-worker-processes": "16",
+        "max-parallel-workers": "8",
+        "max-parallel-maintenance-workers": "8",
+        "max-logical-replication-workers": "8",
+        "max-sync-workers-per-subscription": "8",
+        "max-parallel-apply-workers-per-subscription": "8",
+    }
+
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    # Verify the configs are applied in PostgreSQL
+    for config_name, expected_value in worker_configs.items():
+        pg_param = config_name.replace("-", "_")
+        result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
+        actual_value = str(result[0]) if result else ""
+        assert actual_value == expected_value, (
+            f"{pg_param}: expected {expected_value}, got {actual_value}"
+        )
+
+    # Test setting "auto" values
+    auto_configs = {
+        "max-worker-processes": "auto",
+        "max-parallel-workers": "auto",
+        "max-parallel-maintenance-workers": "auto",
+        "max-logical-replication-workers": "auto",
+        "max-sync-workers-per-subscription": "auto",
+        "max-parallel-apply-workers-per-subscription": "auto",
+    }
+
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    # Verify "auto" values are resolved to integers (not the string "auto")
+    for config_name in auto_configs:
+        pg_param = config_name.replace(
+            "-", "_"
+        )  # Convert Juju config name to PostgreSQL parameter name
+        result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
+        actual_value = str(result[0]) if result else ""
+        assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
+        assert actual_value.isdigit(), f"{pg_param} should be a number, got '{actual_value}'"
+
+
+@pytest.mark.abort_on_fail
+async def test_wal_compression_config(ops_test: OpsTest) -> None:
+    """Test wal_compression configuration parameter."""
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit_name = leader_unit.name
+    password = await get_password(ops_test)
+    unit_address = get_unit_address(ops_test, leader_unit_name)
+
+    # Test enabling WAL compression
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "true"})
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
+    # Verify it's a known compression algorithm
+    known_algorithms = ["pglz", "lz4", "zstd"]
+    assert result[0] in known_algorithms, (
+        f"Expected a known compression algorithm, got '{result[0]}'"
+    )
+
+    # Test disabling WAL compression
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "false"})
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+
+    result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
+    assert result[0] == "off"

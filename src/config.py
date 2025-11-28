@@ -5,14 +5,17 @@
 """Structured configuration for the PostgreSQL charm."""
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
 from charms.data_platform_libs.v1.data_models import BaseConfigModel
-from pydantic import Field, PositiveInt
+from pydantic import Field, PositiveInt, conint
 
 from locales import SNAP_LOCALES
 
 logger = logging.getLogger(__name__)
+
+# Type for worker process parameters that must be >= 8
+WorkerProcessInt = Annotated[int, conint(ge=8)]
 
 
 class CharmConfig(BaseConfigModel):
@@ -214,6 +217,21 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_multixact_failsafe_age: int | None = Field(ge=0, le=2100000000, default=None)
     vacuum_vacuum_multixact_freeze_min_age: int | None = Field(ge=0, le=1000000000, default=None)
     vacuum_vacuum_multixact_freeze_table_age: int | None = Field(ge=0, le=2000000000, default=None)
+    wal_compression: bool | None = Field(default=None)
+    max_worker_processes: Literal["auto"] | WorkerProcessInt | None = Field(default="auto")
+    max_parallel_workers: Literal["auto"] | WorkerProcessInt | None = Field(default="auto")
+    max_parallel_maintenance_workers: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    max_logical_replication_workers: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    max_sync_workers_per_subscription: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    max_parallel_apply_workers_per_subscription: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
 
     @classmethod
     def keys(cls) -> list[str]:
