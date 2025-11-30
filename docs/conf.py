@@ -214,7 +214,8 @@ linkcheck_ignore = [
     "http://127.0.0.1:8000",
     "https://github.com/canonical/ACME/*",
     "https://matrix.to/*",
-    "https://portal.azure.com/#browse/Microsoft.Compute/VirtualMachines",
+    "https://portal.azure.com/*",
+    "https://microsoft.com/*",
     "https://developer.hashicorp.com/*",
     "https://www.terraform.io/*"
     ]

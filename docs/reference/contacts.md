@@ -13,4 +13,3 @@ Useful links:
 * [Git sources for Charmed PostgreSQL](https://github.com/canonical/postgresql-operator)
 * [Canonical Data on Launchpad](https://launchpad.net/~data-platform)
 * [Canonical Data on Matrix](https://matrix.to/#/#charmhub-data-platform:ubuntu.com) 
-
