@@ -2383,13 +2383,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return True
 
     def _calculate_max_worker_processes(self) -> str | None:
-        """Calculate max_worker_processes configuration value."""
-        if self.config.max_worker_processes == "auto":
+        """Calculate cpu_max_worker_processes configuration value."""
+        if self.config.cpu_max_worker_processes == "auto":
             # auto = minimum(8, 2 * vCores)
             return str(min(8, 2 * self.cpu_count))
-        elif self.config.max_worker_processes is not None:
-            value = self.config.max_worker_processes
-            if value < 8:
+        elif self.config.cpu_max_worker_processes is not None:
+            value = self.config.cpu_max_worker_processes
+            if value < 2:
                 from pydantic_core import InitErrorDetails
 
                 raise ValidationError.from_exception_data(
@@ -2397,16 +2397,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     [
                         InitErrorDetails(
                             type="greater_than_equal",
-                            ctx={"ge": 8},
+                            ctx={"ge": 2},
                             input=value,
-                            loc=("max_worker_processes",),
+                            loc=("cpu_max_worker_processes",),
                         )
                     ],
                 )
             cap = 10 * self.cpu_count
             if value > cap:
                 raise ValueError(
-                    f"max_worker_processes value {value} exceeds maximum allowed "
+                    f"cpu_max_worker_processes value {value} exceeds maximum allowed "
                     f"of {cap} (10 * vCores). Please set a value <= {cap}."
                 )
             return str(value)
@@ -2423,10 +2423,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             String representation of the validated value
 
         Raises:
-            ValidationError: If value is less than 8
+            ValidationError: If value is less than 2
             ValueError: If value exceeds 10 * vCores
         """
-        if value < 8:
+        if value < 2:
             from pydantic_core import InitErrorDetails
 
             raise ValidationError.from_exception_data(
@@ -2434,7 +2434,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 [
                     InitErrorDetails(
                         type="greater_than_equal",
-                        ctx={"ge": 8},
+                        ctx={"ge": 2},
                         input=value,
                         loc=(param_name,),
                     )
@@ -2449,64 +2449,67 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return str(value)
 
     def _calculate_max_parallel_workers(self, base_max_workers: int) -> str | None:
-        """Calculate max_parallel_workers configuration value."""
-        if self.config.max_parallel_workers == "auto":
+        """Calculate cpu_max_parallel_workers configuration value."""
+        if self.config.cpu_max_parallel_workers == "auto":
             return str(base_max_workers)
-        elif self.config.max_parallel_workers is not None:
+        elif self.config.cpu_max_parallel_workers is not None:
             # Validate the value first
             validated_value_str = self._validate_worker_config_value(
-                "max_parallel_workers", self.config.max_parallel_workers
+                "cpu_max_parallel_workers", self.config.cpu_max_parallel_workers
             )
             # Apply the min constraint with base_max_workers
             return str(min(int(validated_value_str), base_max_workers))
         return None
 
     def _calculate_max_parallel_maintenance_workers(self, base_max_workers: int) -> str | None:
-        """Calculate max_parallel_maintenance_workers configuration value."""
-        if self.config.max_parallel_maintenance_workers == "auto":
+        """Calculate cpu_max_parallel_maintenance_workers configuration value."""
+        if self.config.cpu_max_parallel_maintenance_workers == "auto":
             return str(base_max_workers)
-        elif self.config.max_parallel_maintenance_workers is not None:
+        elif self.config.cpu_max_parallel_maintenance_workers is not None:
             return self._validate_worker_config_value(
-                "max_parallel_maintenance_workers", self.config.max_parallel_maintenance_workers
+                "cpu_max_parallel_maintenance_workers",
+                self.config.cpu_max_parallel_maintenance_workers,
             )
         return None
 
     def _calculate_max_logical_replication_workers(
         self, base_max_workers: int | None
     ) -> str | None:
-        """Calculate max_logical_replication_workers configuration value."""
-        if self.config.max_logical_replication_workers == "auto":
+        """Calculate cpu_max_logical_replication_workers configuration value."""
+        if self.config.cpu_max_logical_replication_workers == "auto":
             # For auto mode, use base_max_workers if available, otherwise calculate independently
             auto_value = (
                 base_max_workers if base_max_workers is not None else min(8, 2 * self.cpu_count)
             )
             return str(auto_value)
-        elif self.config.max_logical_replication_workers is not None:
+        elif self.config.cpu_max_logical_replication_workers is not None:
             return self._validate_worker_config_value(
-                "max_logical_replication_workers", self.config.max_logical_replication_workers
+                "cpu_max_logical_replication_workers",
+                self.config.cpu_max_logical_replication_workers,
             )
         return None
 
     def _calculate_max_sync_workers_per_subscription(self, base_max_workers: int) -> str | None:
-        """Calculate max_sync_workers_per_subscription configuration value."""
-        if self.config.max_sync_workers_per_subscription == "auto":
+        """Calculate cpu_max_sync_workers_per_subscription configuration value."""
+        if self.config.cpu_max_sync_workers_per_subscription == "auto":
             return str(base_max_workers)
-        elif self.config.max_sync_workers_per_subscription is not None:
+        elif self.config.cpu_max_sync_workers_per_subscription is not None:
             return self._validate_worker_config_value(
-                "max_sync_workers_per_subscription", self.config.max_sync_workers_per_subscription
+                "cpu_max_sync_workers_per_subscription",
+                self.config.cpu_max_sync_workers_per_subscription,
             )
         return None
 
     def _calculate_max_parallel_apply_workers_per_subscription(
         self, base_max_workers: int
     ) -> str | None:
-        """Calculate max_parallel_apply_workers_per_subscription configuration value."""
-        if self.config.max_parallel_apply_workers_per_subscription == "auto":
+        """Calculate cpu_max_parallel_apply_workers_per_subscription configuration value."""
+        if self.config.cpu_max_parallel_apply_workers_per_subscription == "auto":
             return str(base_max_workers)
-        elif self.config.max_parallel_apply_workers_per_subscription is not None:
+        elif self.config.cpu_max_parallel_apply_workers_per_subscription is not None:
             return self._validate_worker_config_value(
-                "max_parallel_apply_workers_per_subscription",
-                self.config.max_parallel_apply_workers_per_subscription,
+                "cpu_max_parallel_apply_workers_per_subscription",
+                self.config.cpu_max_parallel_apply_workers_per_subscription,
             )
         return None
 
@@ -2518,44 +2521,48 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         result: dict[str, str] = {}
 
-        # Calculate max_worker_processes (baseline for other worker configs)
-        max_worker_processes_value = self._calculate_max_worker_processes()
-        if max_worker_processes_value is not None:
-            result["max_worker_processes"] = max_worker_processes_value
+        # Calculate cpu_max_worker_processes (baseline for other worker configs)
+        cpu_max_worker_processes_value = self._calculate_max_worker_processes()
+        if cpu_max_worker_processes_value is not None:
+            result["max_worker_processes"] = cpu_max_worker_processes_value
 
-        # Get the effective max_worker_processes for dependent configs
+        # Get the effective cpu_max_worker_processes for dependent configs
         # Use the calculated value, or fall back to PostgreSQL default (8)
         base_max_workers = int(result.get("max_worker_processes", "8"))
 
         # Calculate other worker parameters
-        max_parallel_workers_value = self._calculate_max_parallel_workers(base_max_workers)
-        if max_parallel_workers_value is not None:
-            result["max_parallel_workers"] = max_parallel_workers_value
+        cpu_max_parallel_workers_value = self._calculate_max_parallel_workers(base_max_workers)
+        if cpu_max_parallel_workers_value is not None:
+            result["max_parallel_workers"] = cpu_max_parallel_workers_value
 
-        max_parallel_maintenance_workers_value = self._calculate_max_parallel_maintenance_workers(
-            base_max_workers
+        cpu_max_parallel_maintenance_workers_value = (
+            self._calculate_max_parallel_maintenance_workers(base_max_workers)
         )
-        if max_parallel_maintenance_workers_value is not None:
-            result["max_parallel_maintenance_workers"] = max_parallel_maintenance_workers_value
+        if cpu_max_parallel_maintenance_workers_value is not None:
+            result["max_parallel_maintenance_workers"] = cpu_max_parallel_maintenance_workers_value
 
-        max_logical_replication_workers_value = self._calculate_max_logical_replication_workers(
-            int(max_worker_processes_value) if max_worker_processes_value else None
+        cpu_max_logical_replication_workers_value = (
+            self._calculate_max_logical_replication_workers(
+                int(cpu_max_worker_processes_value) if cpu_max_worker_processes_value else None
+            )
         )
-        if max_logical_replication_workers_value is not None:
-            result["max_logical_replication_workers"] = max_logical_replication_workers_value
+        if cpu_max_logical_replication_workers_value is not None:
+            result["max_logical_replication_workers"] = cpu_max_logical_replication_workers_value
 
-        max_sync_workers_per_subscription_value = (
+        cpu_max_sync_workers_per_subscription_value = (
             self._calculate_max_sync_workers_per_subscription(base_max_workers)
         )
-        if max_sync_workers_per_subscription_value is not None:
-            result["max_sync_workers_per_subscription"] = max_sync_workers_per_subscription_value
+        if cpu_max_sync_workers_per_subscription_value is not None:
+            result["max_sync_workers_per_subscription"] = (
+                cpu_max_sync_workers_per_subscription_value
+            )
 
-        max_parallel_apply_workers_per_subscription_value = (
+        cpu_max_parallel_apply_workers_per_subscription_value = (
             self._calculate_max_parallel_apply_workers_per_subscription(base_max_workers)
         )
-        if max_parallel_apply_workers_per_subscription_value is not None:
+        if cpu_max_parallel_apply_workers_per_subscription_value is not None:
             result["max_parallel_apply_workers_per_subscription"] = (
-                max_parallel_apply_workers_per_subscription_value
+                cpu_max_parallel_apply_workers_per_subscription_value
             )
 
         return result
@@ -2612,19 +2619,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Calculate and merge worker process configurations
         worker_configs = self._calculate_worker_process_config()
 
-        # Add wal_compression configuration (separate from worker processes)
-        if self.config.wal_compression is not None:
-            wal_compression = "on" if self.config.wal_compression else "off"
+        # Add cpu_wal_compression configuration (separate from worker processes)
+        if self.config.cpu_wal_compression is not None:
+            cpu_wal_compression = "on" if self.config.cpu_wal_compression else "off"
         else:
             # Use config.yaml default when unset (default: true)
-            wal_compression = "on"
+            cpu_wal_compression = "on"
 
         if pg_parameters is not None:
             pg_parameters.update(worker_configs)
-            pg_parameters["wal_compression"] = wal_compression
+            pg_parameters["wal_compression"] = cpu_wal_compression
         else:
             pg_parameters = dict(worker_configs)
-            pg_parameters["wal_compression"] = wal_compression
+            pg_parameters["wal_compression"] = cpu_wal_compression
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
 
         # replication_slots = self.logical_replication.replication_slots()

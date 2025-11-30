@@ -218,45 +218,45 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "vacuum_vacuum_multixact_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
         # Worker process configs
-        {"max-worker-processes": ["-1", "16"]},  # negative (invalid) and valid value
-        {"max-worker-processes": ["7", "8"]},  # below min (7<8) and valid min value
+        {"cpu-max-worker-processes": ["-1", "16"]},  # negative (invalid) and valid value
+        {"cpu-max-worker-processes": ["1", "2"]},  # below min (1<2) and valid min value
         {
-            "max-worker-processes": ["invalid", "auto"]
+            "cpu-max-worker-processes": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-parallel-workers": ["-1", "16"]},  # negative (invalid) and valid value
-        {"max-parallel-workers": ["7", "8"]},  # below min (7<8) and valid min value
+        {"cpu-max-parallel-workers": ["-1", "16"]},  # negative (invalid) and valid value
+        {"cpu-max-parallel-workers": ["1", "2"]},  # below min (1<2) and valid min value
         {
-            "max-parallel-workers": ["invalid", "auto"]
+            "cpu-max-parallel-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-parallel-maintenance-workers": ["-1", "0"]},  # negative and zero (both invalid)
+        {"cpu-max-parallel-maintenance-workers": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-parallel-maintenance-workers": ["7", "100"]
-        },  # below min (7<8) and above max (100>10*vCores)
+            "cpu-max-parallel-maintenance-workers": ["1", "100"]
+        },  # below min (1<2) and above max (100>10*vCores)
         {
-            "max-parallel-maintenance-workers": ["invalid", "auto"]
+            "cpu-max-parallel-maintenance-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-logical-replication-workers": ["-1", "0"]},  # negative and zero (both invalid)
+        {"cpu-max-logical-replication-workers": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-logical-replication-workers": ["7", "100"]
-        },  # below min (7<8) and above max (100>10*vCores)
+            "cpu-max-logical-replication-workers": ["1", "100"]
+        },  # below min (1<2) and above max (100>10*vCores)
         {
-            "max-logical-replication-workers": ["invalid", "auto"]
+            "cpu-max-logical-replication-workers": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
-        {"max-sync-workers-per-subscription": ["-1", "0"]},  # negative and zero (both invalid)
+        {"cpu-max-sync-workers-per-subscription": ["-1", "0"]},  # negative and zero (both invalid)
         {
-            "max-sync-workers-per-subscription": ["7", "100"]
-        },  # below min (7<8) and above max (100>10*vCores)
+            "cpu-max-sync-workers-per-subscription": ["1", "100"]
+        },  # below min (1<2) and above max (100>10*vCores)
         {
-            "max-sync-workers-per-subscription": ["invalid", "auto"]
+            "cpu-max-sync-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
         {
-            "max-parallel-apply-workers-per-subscription": ["-1", "0"]
+            "cpu-max-parallel-apply-workers-per-subscription": ["-1", "0"]
         },  # negative and zero (both invalid)
         {
-            "max-parallel-apply-workers-per-subscription": ["7", "100"]
-        },  # below min (7<8) and above max (100>10*vCores)
+            "cpu-max-parallel-apply-workers-per-subscription": ["1", "100"]
+        },  # below min (1<2) and above max (100>10*vCores)
         {
-            "max-parallel-apply-workers-per-subscription": ["invalid", "auto"]
+            "cpu-max-parallel-apply-workers-per-subscription": ["invalid", "auto"]
         },  # config option is "auto" or a positive integer
     ]
 
@@ -289,14 +289,14 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
     password = await get_password(ops_test)
     unit_address = get_unit_address(ops_test, leader_unit_name)
 
-    # Test setting explicit numeric values (all values must be >= 8 per validation)
+    # Test setting explicit numeric values (all values must be >= 2 per validation)
     worker_configs = {
-        "max-worker-processes": "16",
-        "max-parallel-workers": "8",
-        "max-parallel-maintenance-workers": "8",
-        "max-logical-replication-workers": "8",
-        "max-sync-workers-per-subscription": "8",
-        "max-parallel-apply-workers-per-subscription": "8",
+        "cpu-max-worker-processes": "16",
+        "cpu-max-parallel-workers": "8",
+        "cpu-max-parallel-maintenance-workers": "8",
+        "cpu-max-logical-replication-workers": "8",
+        "cpu-max-sync-workers-per-subscription": "8",
+        "cpu-max-parallel-apply-workers-per-subscription": "8",
     }
 
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
@@ -313,12 +313,12 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Test setting "auto" values
     auto_configs = {
-        "max-worker-processes": "auto",
-        "max-parallel-workers": "auto",
-        "max-parallel-maintenance-workers": "auto",
-        "max-logical-replication-workers": "auto",
-        "max-sync-workers-per-subscription": "auto",
-        "max-parallel-apply-workers-per-subscription": "auto",
+        "cpu-max-worker-processes": "auto",
+        "cpu-max-parallel-workers": "auto",
+        "cpu-max-parallel-maintenance-workers": "auto",
+        "cpu-max-logical-replication-workers": "auto",
+        "cpu-max-sync-workers-per-subscription": "auto",
+        "cpu-max-parallel-apply-workers-per-subscription": "auto",
     }
 
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
@@ -344,7 +344,9 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     unit_address = get_unit_address(ops_test, leader_unit_name)
 
     # Test enabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "true"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "cpu-wal-compression": "true"
+    })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
@@ -355,7 +357,9 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     )
 
     # Test disabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"wal-compression": "false"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "cpu-wal-compression": "false"
+    })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
