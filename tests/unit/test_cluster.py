@@ -139,7 +139,7 @@ def test_get_patroni_health(peers_ips, patroni):
 
 
 def test_get_postgresql_version(peers_ips, patroni):
-    assert patroni.get_postgresql_version() == "16.10"
+    assert patroni.get_postgresql_version() == "16.11"
 
 
 def test_dict_to_hba_string(harness, patroni):

@@ -23,7 +23,7 @@ For `16/edge`, use the `--channel` flag when installing or refreshing the snap.
 ```shell
 juju ssh postgresql/0 snap list charmed-postgresql
 Name                Version  Rev  Tracking       Publisher        Notes
-charmed-postgresql  16.10    TODO TODO/edge      dataplatformbot  held
+charmed-postgresql  16.11    TODO TODO/edge      dataplatformbot  held
 ```
 -->
 
