@@ -42,6 +42,13 @@ options:
     type: int
     description: |
       [EXPERIMENTAL] Force set max_connections.
+  wal_compression:
+    description: |
+      Enables compression of full-page writes written to WAL.
+      Compression can reduce the volume of WAL written and improve I/O performance.
+      Allowed values are: "on" or "off".
+    type: string
+    default: "on"
   instance_default_text_search_config:
     description: |
       Selects the text search configuration that is used by those variants of the text
@@ -148,6 +155,49 @@ options:
       Allowed values are: from 64 to 2147483647.
     type: int
     default: 4096
+  max_worker_processes:
+    description: |
+      Sets the maximum number of background processes that the system can support.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to minimum(8, 2*vCores).
+      If a number is provided, it will be capped to 10 * vCores with a warning logged if exceeded.
+    type: string
+    default: "auto"
+  max_parallel_workers:
+    description: |
+      Sets the maximum number of workers that can be started for parallel operations.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to max_worker_processes.
+    type: string
+    default: "auto"
+  max_parallel_maintenance_workers:
+    description: |
+      Sets the maximum number of parallel workers for maintenance operations.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to max_worker_processes.
+    type: string
+    default: "auto"
+  max_logical_replication_workers:
+    description: |
+      Sets the maximum number of logical replication workers.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to max_worker_processes.
+    type: string
+    default: "auto"
+  max_sync_workers_per_subscription:
+    description: |
+      Sets the maximum number of synchronization workers per subscription.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to max_worker_processes.
+    type: string
+    default: "auto"
+  max_parallel_apply_workers_per_subscription:
+    description: |
+      Sets the maximum number of parallel apply workers per subscription.
+      Allowed values are: "auto" or a number.
+      When set to "auto", defaults to max_worker_processes.
+    type: string
+    default: "auto"
   optimizer_constraint_exclusion:
     description: |
       Enables the planner to use constraints to optimize queries.
