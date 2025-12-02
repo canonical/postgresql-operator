@@ -698,9 +698,19 @@ class PostgreSQLBackups(Object):
                         f"--stanza={self.stanza_name}",
                         "check",
                     ])
+                    if return_code == 82:
+                        # Raise an error if the archive command timeouts, so the user has the possibility
+                        # to fix network issues and call juju resolve to re-trigger the hook that calls
+                        # this method.
+                        logger.error(
+                            f"error: {stderr} - please fix the error and call juju resolve on this unit"
+                        )
+                        raise TimeoutError
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
+        except TimeoutError as e:
+            raise e
         except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
