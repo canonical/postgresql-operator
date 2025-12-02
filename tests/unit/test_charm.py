@@ -3659,21 +3659,20 @@ def test_api_update_config_with_async_replication_primary(harness):
         assert base_patch["standby_cluster"]["host"] == "primary-host:5432"
 
 
-def test_calculate_max_logical_replication_workers_with_none_base(harness):
-    """Test max_logical_replication_workers when base_max_workers is None."""
+def test_calculate_max_logical_replication_workers_with_base_value(harness):
+    """Test max_logical_replication_workers uses base_max_workers consistently."""
     with patch.object(
         PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
     ) as _cpu_count:
         _cpu_count.return_value = 3  # vCores = 3
 
-        # Test auto mode with None base_max_workers
+        # Test auto mode with specific base_max_workers value
         with harness.hooks_disabled():
             harness.update_config({"cpu-max-logical-replication-workers": "auto"})
 
-        # When base_max_workers is None, should calculate independently
-        result = harness.charm._calculate_max_logical_replication_workers(None)
-        # Should be min(8, 2 * 3) = 6
-        assert result == "6"
+        # Should use base_max_workers directly (like other worker params)
+        result = harness.charm._calculate_max_logical_replication_workers(10)
+        assert result == "10"
 
 
 def test_update_config_integrates_all_worker_configs(harness):

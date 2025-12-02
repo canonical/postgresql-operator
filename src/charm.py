@@ -2472,16 +2472,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
         return None
 
-    def _calculate_max_logical_replication_workers(
-        self, base_max_workers: int | None
-    ) -> str | None:
+    def _calculate_max_logical_replication_workers(self, base_max_workers: int) -> str | None:
         """Calculate cpu_max_logical_replication_workers configuration value."""
         if self.config.cpu_max_logical_replication_workers == "auto":
-            # For auto mode, use base_max_workers if available, otherwise calculate independently
-            auto_value = (
-                base_max_workers if base_max_workers is not None else min(8, 2 * self.cpu_count)
-            )
-            return str(auto_value)
+            return str(base_max_workers)
         elif self.config.cpu_max_logical_replication_workers is not None:
             return self._validate_worker_config_value(
                 "cpu_max_logical_replication_workers",
@@ -2542,9 +2536,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             result["max_parallel_maintenance_workers"] = cpu_max_parallel_maintenance_workers_value
 
         cpu_max_logical_replication_workers_value = (
-            self._calculate_max_logical_replication_workers(
-                int(cpu_max_worker_processes_value) if cpu_max_worker_processes_value else None
-            )
+            self._calculate_max_logical_replication_workers(base_max_workers)
         )
         if cpu_max_logical_replication_workers_value is not None:
             result["max_logical_replication_workers"] = cpu_max_logical_replication_workers_value
@@ -2596,17 +2588,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             base_patch["standby_cluster"] = {"host": primary_endpoint}
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
 
-    def update_config(  # noqa: C901
-        self,
-        is_creating_backup: bool = False,
-        no_peers: bool = False,
-        *,
-        refresh: charm_refresh.Machines | None = None,
-    ) -> bool:
-        """Updates Patroni config file based on the existence of the TLS files."""
-        if refresh is None:
-            refresh = self.refresh
+    def _build_postgresql_parameters(self) -> dict[str, str] | None:
+        """Build PostgreSQL configuration parameters.
 
+        Returns:
+            Dictionary of PostgreSQL parameters or None if base parameters couldn't be built.
+        """
         limit_memory = None
         if self.config.profile_limit_memory:
             limit_memory = self.config.profile_limit_memory * 10**6
@@ -2633,6 +2620,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             pg_parameters = dict(worker_configs)
             pg_parameters["wal_compression"] = cpu_wal_compression
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
+
+        return pg_parameters
+
+    def update_config(
+        self,
+        is_creating_backup: bool = False,
+        no_peers: bool = False,
+        *,
+        refresh: charm_refresh.Machines | None = None,
+    ) -> bool:
+        """Updates Patroni config file based on the existence of the TLS files."""
+        if refresh is None:
+            refresh = self.refresh
+
+        # Build PostgreSQL parameters
+        pg_parameters = self._build_postgresql_parameters()
 
         # replication_slots = self.logical_replication.replication_slots()
 
