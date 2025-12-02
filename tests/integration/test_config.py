@@ -303,8 +303,18 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     # Verify the configs are applied in PostgreSQL
+    # Map charm config names to PostgreSQL parameter names
+    config_to_pg_param = {
+        "cpu-max-worker-processes": "max_worker_processes",
+        "cpu-max-parallel-workers": "max_parallel_workers",
+        "cpu-max-parallel-maintenance-workers": "max_parallel_maintenance_workers",
+        "cpu-max-logical-replication-workers": "max_logical_replication_workers",
+        "cpu-max-sync-workers-per-subscription": "max_sync_workers_per_subscription",
+        "cpu-max-parallel-apply-workers-per-subscription": "max_parallel_apply_workers_per_subscription",
+    }
+
     for config_name, expected_value in worker_configs.items():
-        pg_param = config_name.replace("-", "_")
+        pg_param = config_to_pg_param.get(config_name, config_name.replace("-", "_"))
         result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value == expected_value, (
@@ -326,9 +336,7 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     # Verify "auto" values are resolved to integers (not the string "auto")
     for config_name in auto_configs:
-        pg_param = config_name.replace(
-            "-", "_"
-        )  # Convert Juju config name to PostgreSQL parameter name
+        pg_param = config_to_pg_param.get(config_name, config_name.replace("-", "_"))
         result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
