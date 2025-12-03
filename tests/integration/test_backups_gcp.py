@@ -32,7 +32,7 @@ if juju_major_version < 3:
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/stable"
+    tls_channel = "1/stable"
     tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
