@@ -1,0 +1,54 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  01:51:17Z
+
+App                   Version  Status   Scale  Charm                Channel        Rev  Exposed  Message
+mailman3-core                  active       1  mailman3-core        latest/stable   18  no       Ready (source version/commit e1d5a03)
+postgresql            14.19    active       2  postgresql                            0  no       
+postgresql-test-app            blocked      1  postgresql-test-app  latest/edge    420  no       No database integration available
+postgresql-test-app2           blocked      1  postgresql-test-app  latest/edge    420  no       No database integration available
+
+Unit                     Workload  Agent  Machine  Public address  Ports     Message
+mailman3-core/0*         active    idle   2        10.125.127.61   25/tcp    Ready (source version/commit e1d5a03)
+postgresql-test-app2/0*  blocked   idle   6        10.125.127.166            No database integration available
+postgresql-test-app/0*   blocked   idle   5        10.125.127.34             No database integration available
+postgresql/2             active    idle   3        10.125.127.210  5432/tcp  Primary
+postgresql/3*            active    idle   4        10.125.127.71   5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+2        started  10.125.127.61   juju-453e42-2  ubuntu@20.04  runnervmoqczp  Running
+3        started  10.125.127.210  juju-453e42-3  ubuntu@22.04  runnervmoqczp  Running
+4        started  10.125.127.71   juju-453e42-4  ubuntu@22.04  runnervmoqczp  Running
+5        started  10.125.127.34   juju-453e42-5  ubuntu@22.04  runnervmoqczp  Running
+6        started  10.125.127.166  juju-453e42-6  ubuntu@22.04  runnervmoqczp  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:37:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:37:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:42:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:42:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:42:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:42:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:44:12 ERROR unit.postgresql/2.juju-log restart:1: Failed to list PostgreSQL database users: connection to server at "10.125.127.210", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-mailman3-core-0: 01:47:25 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-3: 01:47:30 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-2: 01:47:36 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-2: 01:47:37 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-3: 01:47:37 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 01:47:37 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-5: 01:49:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:49:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:49:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:49:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:50:54 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "bba204a6-896e-40f3-8170-acc7af453e42:r#9#postgresql-test-app2": settings bba204a6-896e-40f3-8170-acc7af453e42:r#9#postgresql-test-app2 not found (not found)
+unit-postgresql-test-app-0: 01:51:02 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "bba204a6-896e-40f3-8170-acc7af453e42:r#8#postgresql": settings bba204a6-896e-40f3-8170-acc7af453e42:r#8#postgresql not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
