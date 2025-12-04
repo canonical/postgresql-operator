@@ -32,6 +32,27 @@ charm = None
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
+    # Set controller idle-connection-timeout to prevent premature disconnections
+    logger.info("Setting controller idle-connection-timeout to 90s")
+    return_code, _, stderr = await ops_test.juju(
+        "controller-config", "idle-connection-timeout=90s"
+    )
+    assert return_code == 0, f"Failed to set controller config: {stderr}"
+
+    # Verify the setting was applied correctly
+    return_code, config_output, stderr = await ops_test.juju(
+        "controller-config", "idle-connection-timeout"
+    )
+    assert return_code == 0, f"Failed to verify controller config: {stderr}"
+
+    # Check that the correct value was set
+    actual_value = config_output.strip()
+    expected_value = "90s"
+    assert actual_value == expected_value, (
+        f"Controller config not set correctly. Expected: {expected_value}, Got: {actual_value}"
+    )
+    logger.info(f"Controller idle-connection-timeout verified: {actual_value}")
+
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
