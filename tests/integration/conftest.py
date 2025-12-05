@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import logging
 import os
+import subprocess
 import uuid
 
 import boto3
@@ -23,6 +24,38 @@ def charm():
     # juju bundle files expect local charms to begin with `./` or `/` to distinguish them from
     # Charmhub charms.
     return f"./postgresql_ubuntu@22.04-{architecture.architecture}.charm"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def idle_connection_timeout():
+    """Set controller idle-connection-timeout to prevent premature disconnections."""
+    logger.info("Setting controller idle-connection-timeout to 90s")
+
+    # Set the controller config
+    result = subprocess.run(
+        ["juju", "controller-config", "idle-connection-timeout=90s"],
+        capture_output=True,
+        encoding="utf-8",
+        text=True,
+    )
+    assert result.returncode == 0, f"Failed to set controller config: {result.stderr}"
+
+    # Verify the setting was applied correctly
+    result = subprocess.run(
+        ["juju", "controller-config", "idle-connection-timeout"],
+        capture_output=True,
+        encoding="utf-8",
+        text=True,
+    )
+    assert result.returncode == 0, f"Failed to verify controller config: {result.stderr}"
+
+    # Check that the correct value was set
+    actual_value = result.stdout.strip()
+    expected_value = "90s"
+    assert actual_value == expected_value, (
+        f"Controller config not set correctly. Expected: {expected_value}, Got: {actual_value}"
+    )
+    logger.info(f"Controller idle-connection-timeout verified: {actual_value}")
 
 
 def get_cloud_config(cloud: str) -> tuple[dict[str, str], dict[str, str]]:
