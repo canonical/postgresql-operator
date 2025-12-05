@@ -153,11 +153,9 @@ prepare-each: |
   
   juju kill-controller -t 1s --no-prompt concierge-lxd
   
-  # Build and install custom Juju (only for non-juju29 variants)
-  if [[ $SPREAD_VARIANT == *"juju29"* ]]; then
-    # Use snap for juju29 variant
-    sudo snap refresh juju --channel 2.9/stable
-  else
+  # Check if Juju is version 3.x and build custom version if so
+  JUJU_VERSION=$(juju version 2>&1 | head -1)
+  if [[ $JUJU_VERSION == "3."* ]]; then
     # Build custom Juju from source for 3.x variants
     export PATH=/usr/local/go/bin:$PATH
     export GOPATH=/root/go
@@ -228,6 +226,8 @@ prepare-each: |
     # Verify installation
     echo "Juju binary location: $(which juju)"
     echo "Juju version: $(juju version)"
+  else
+    echo "Juju version is not 3.x (detected: $JUJU_VERSION), skipping custom build"
   fi
   
   juju bootstrap localhost concierge-lxd --build-agent --verbose
