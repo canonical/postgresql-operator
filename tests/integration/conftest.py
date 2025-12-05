@@ -11,6 +11,7 @@ from pytest_operator.plugin import OpsTest
 
 from . import architecture
 from .helpers import construct_endpoint
+from .juju_ import juju_major_version
 
 AWS = "AWS"
 GCP = "GCP"
@@ -28,7 +29,13 @@ def charm():
 
 @pytest.fixture(scope="session", autouse=True)
 def idle_connection_timeout():
-    """Set controller idle-connection-timeout to prevent premature disconnections."""
+    """Set controller idle-connection-timeout to prevent premature disconnections.
+
+    Requires Juju 3+. Skipped on Juju 2.
+    """
+    if juju_major_version < 3:
+        return
+
     logger.info("Setting controller idle-connection-timeout to 90s")
 
     # Set the controller config
