@@ -21,6 +21,57 @@ options:
     description: |
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
+  cpu-max-logical-replication-workers:
+    description: |
+      Sets the maximum number of logical replication workers. Should be either "auto"
+      or a positive integer value. Restart is required when changed.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-apply-workers-per-subscription:
+    description: |
+      Sets the maximum number of parallel apply workers per subscription.
+      Should be either "auto" or a positive integer value.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-maintenance-workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel maintenance operations
+      like CREATE INDEX. Should be either "auto" or a positive integer value.
+      Cannot exceed max_parallel_workers.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel operations.
+      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-sync-workers-per-subscription:
+    description: |
+      Sets the maximum number of synchronization workers per subscription.
+      Should be either "auto" or a positive integer value.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-worker-processes:
+    description: |
+      Sets the maximum number of background processes that the system can support.
+      Should be either "auto" or a positive integer value.
+      auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
+      Restart is required when changed.
+    type: string
+    default: "auto"
+  cpu-wal-compression:
+    description: |
+      Enable compression of full-page writes written in WAL. Compression reduces
+      the I/O needed for local storage and replication.
+      Default is on (true).
+    type: boolean
+    default: true
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -757,6 +808,7 @@ options:
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
+
 
   # Deprecated options
   synchronous_node_count:
