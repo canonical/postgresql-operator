@@ -127,7 +127,8 @@ prepare-each: |
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
   concierge prepare --trace
   # TEST Juju 3.6.12
-  # juju controller-config idle-connection-timeout=1s
+  juju controller-config idle-connection-timeout=180m
+  juju exec -m controller --unit controller/0 -- systemctl restart jujud-machine-0.service
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
