@@ -128,7 +128,8 @@ prepare-each: |
   concierge prepare --trace
   # TEST Juju 3.6.12
   juju controller-config idle-connection-timeout=180m
-  juju exec -m controller --unit controller/0 -- systemctl restart jujud-machine-0.service
+  juju exec -m controller --unit controller/0 -- systemctl restart jujud-machine-0.service || true
+  juju exec -m controller --unit controller/0 -- systemctl status jujud-machine-0.service 
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
