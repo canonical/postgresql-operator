@@ -111,7 +111,7 @@ path: /root/spread_project
 
 kill-timeout: 3h
 environment:
-  PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
+  PATH: /usr/local/bin:$PATH:$(pipx environment --value PIPX_BIN_DIR)
   CONCIERGE_JUJU_CHANNEL/juju36: 3.6/stable
   CONCIERGE_JUJU_CHANNEL/juju29: 2.9/stable
 prepare: |
@@ -119,6 +119,22 @@ prepare: |
   chown -R root:root "$SPREAD_PATH"
   cd "$SPREAD_PATH"
   snap install --classic concierge
+
+  # Install Go 1.25.5 (required for custom Juju build)
+  ARCH=$(dpkg --print-architecture)
+  GO_VERSION="1.25.5"
+  
+  if [ ! -f /usr/local/go/bin/go ] || [ "$(/usr/local/go/bin/go version | awk '{print $3}')" != "go${GO_VERSION}" ]; then
+    echo "Installing Go ${GO_VERSION}..."
+    wget -q "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+    rm -rf /usr/local/go
+    tar -C /usr/local -xzf "go${GO_VERSION}.linux-${ARCH}.tar.gz"
+    rm "go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  fi
+  
+  # Install build dependencies for Juju
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential git
 
   # Install charmcraft & pipx (on lxd-vm backend)
   concierge prepare --trace
@@ -137,11 +153,88 @@ prepare-each: |
   
   juju kill-controller -t 1s --no-prompt concierge-lxd
   
-  sudo snap refresh juju --channel 3/stable
+  # Build and install custom Juju (only for non-juju29 variants)
+  if [[ $SPREAD_VARIANT == *"juju29"* ]]; then
+    # Use snap for juju29 variant
+    sudo snap refresh juju --channel 2.9/stable
+  else
+    # Build custom Juju from source for 3.x variants
+    export PATH=/usr/local/go/bin:$PATH
+    export GOPATH=/root/go
+    export JUJU_BUILD_DIR=/opt/juju-custom
+    export JUJU_CACHE_BINARY=$JUJU_BUILD_DIR/juju-binary
+    export JUJU_REPO=https://github.com/marceloneppel/juju.git
+    export JUJU_BRANCH=allow-timeouts-configuration
+    
+    mkdir -p "$JUJU_BUILD_DIR"
+    
+    # Clone or update repository
+    if [ ! -d "$JUJU_BUILD_DIR/.git" ]; then
+      echo "Cloning Juju from $JUJU_REPO (branch: $JUJU_BRANCH)..."
+      git clone --depth 1 --branch "$JUJU_BRANCH" "$JUJU_REPO" "$JUJU_BUILD_DIR"
+    else
+      echo "Updating Juju repository..."
+      cd "$JUJU_BUILD_DIR"
+      git fetch origin "$JUJU_BRANCH"
+      git reset --hard "origin/$JUJU_BRANCH"
+      git clean -fdx
+    fi
+    
+    cd "$JUJU_BUILD_DIR"
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+    
+    # Check if we can use cached binary
+    REBUILD_NEEDED=true
+    if [ -f "$JUJU_CACHE_BINARY" ] && [ -f "$JUJU_BUILD_DIR/.build_commit" ]; then
+      CACHED_COMMIT=$(cat "$JUJU_BUILD_DIR/.build_commit")
+      if [ "$CURRENT_COMMIT" = "$CACHED_COMMIT" ]; then
+        echo "Using cached Juju binary (commit: $CURRENT_COMMIT)"
+        REBUILD_NEEDED=false
+        cp "$JUJU_CACHE_BINARY" /usr/local/bin/juju
+        chmod +x /usr/local/bin/juju
+      fi
+    fi
+    
+    # Build if needed
+    if [ "$REBUILD_NEEDED" = true ]; then
+      echo "Building Juju from source (commit: $CURRENT_COMMIT)..."
+      
+      # Build using make install (installs to $GOPATH/bin by default)
+      make install || {
+        echo "ERROR: Failed to build Juju from source"
+        exit 1
+      }
+      
+      # Copy built binary from GOPATH to /usr/local/bin
+      if [ -f "$GOPATH/bin/juju" ]; then
+        cp "$GOPATH/bin/juju" /usr/local/bin/juju
+        chmod +x /usr/local/bin/juju
+        
+        # Cache the binary for future runs
+        cp /usr/local/bin/juju "$JUJU_CACHE_BINARY"
+        echo "$CURRENT_COMMIT" > "$JUJU_BUILD_DIR/.build_commit"
+        
+        echo "Build complete and cached"
+      else
+        echo "ERROR: Built binary not found at $GOPATH/bin/juju"
+        exit 1
+      fi
+      
+      # Clean up Go build cache to save disk space
+      echo "Cleaning Go build cache..."
+      go clean -cache -modcache
+    fi
+    
+    # Verify installation
+    echo "Juju binary location: $(which juju)"
+    echo "Juju version: $(juju version)"
+  fi
   
-  juju bootstrap localhost concierge-lxd --verbose
+  juju bootstrap localhost concierge-lxd --build-agent --verbose
   
   juju add-model -c concierge-lxd testing
+  
+  cd "$SPREAD_PATH"
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
