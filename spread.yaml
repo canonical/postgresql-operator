@@ -134,6 +134,14 @@ prepare-each: |
   fi
   # `concierge prepare` needs to be run for each spread job in case Juju version changed
   concierge prepare --trace
+  
+  juju kill-controller -t 1s --no-prompt concierge-lxd
+  
+  sudo snap refresh juju --channel 3/stable
+  
+  juju bootstrap localhost concierge-lxd --verbose
+  
+  juju add-model -c concierge-lxd testing
 
   # Unable to set constraint on all models because of Juju bug:
   # https://bugs.launchpad.net/juju/+bug/2065050
