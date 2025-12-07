@@ -35,3 +35,15 @@ def snap_refreshed(target_rev: str) -> bool:
             return False
 
     return True
+
+
+def label2name(label: str) -> str:
+    """Convert a unit label (with `-`) to a unit name (with `/`).
+
+    Args:
+        label: The label to convert.
+
+    Returns:
+        The converted name.
+    """
+    return label.rsplit("-", 1)[0] + "/" + label.rsplit("-", 1)[1]
