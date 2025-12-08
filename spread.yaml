@@ -229,32 +229,32 @@ prepare-each: |
     
     # Bootstrap with --build-agent for custom Juju 3.x build
     juju bootstrap localhost concierge-lxd --build-agent --verbose
+    
+    # Set read-timeout and write-timeout after bootstrap
+    # See https://github.com/juju/juju/issues/21409#issuecomment-3615964734
+    juju controller-config read-timeout=3600s write-timeout=3600s
+    
+    # Restart controller LXD machine for timeout settings to take effect
+    CONTROLLER_MACHINE=$(juju machines -m controller --format=json | jq -r '.machines | keys[0]')
+    juju ssh -m controller "$CONTROLLER_MACHINE" -- sudo reboot || true
+    
+    # Wait for controller to come back up
+    echo "Waiting for controller to restart..."
+    sleep 10
+    for i in {1..60}; do
+      if juju status -m controller &>/dev/null; then
+        echo "Controller is back online"
+        break
+      fi
+      echo "Waiting for controller... ($i/60)"
+      sleep 5
+    done
   else
     echo "Juju version is not 3.x (detected: $JUJU_VERSION), skipping custom build"
     
     # Bootstrap without --build-agent for official Juju 2.9.x snap
     juju bootstrap localhost concierge-lxd --verbose
   fi
-  
-  # Set read-timeout and write-timeout after bootstrap
-  # See https://github.com/juju/juju/issues/21409#issuecomment-3615964734
-  juju controller-config read-timeout=3600s write-timeout=3600s
-  
-  # Restart controller LXD machine for timeout settings to take effect
-  CONTROLLER_MACHINE=$(juju machines -m controller --format=json | jq -r '.machines | keys[0]')
-  juju ssh -m controller "$CONTROLLER_MACHINE" -- sudo reboot || true
-  
-  # Wait for controller to come back up
-  echo "Waiting for controller to restart..."
-  sleep 10
-  for i in {1..60}; do
-    if juju status -m controller &>/dev/null; then
-      echo "Controller is back online"
-      break
-    fi
-    echo "Waiting for controller... ($i/60)"
-    sleep 5
-  done
   
   juju add-model -c concierge-lxd testing
   
