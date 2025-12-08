@@ -226,11 +226,15 @@ prepare-each: |
     # Verify installation
     echo "Juju binary location: $(which juju)"
     echo "Juju version: $(juju version)"
+    
+    # Bootstrap with --build-agent for custom Juju 3.x build
+    juju bootstrap localhost concierge-lxd --build-agent --config read-timeout=3600s --config write-timeout=3600s --verbose
   else
     echo "Juju version is not 3.x (detected: $JUJU_VERSION), skipping custom build"
+    
+    # Bootstrap without --build-agent for official Juju 2.9.x snap
+    juju bootstrap localhost concierge-lxd --config read-timeout=3600s --config write-timeout=3600s --verbose
   fi
-  
-  juju bootstrap localhost concierge-lxd --build-agent --config read-timeout=3600s --config write-timeout=3600s --verbose
   
   juju add-model -c concierge-lxd testing
   
