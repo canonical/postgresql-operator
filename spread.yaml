@@ -242,6 +242,8 @@ prepare-each: |
     echo "Waiting for controller to restart..."
     sleep 10
     for i in {1..60}; do
+      # Clear lock files on each attempt in case they're stale
+      rm -f /tmp/juju-store-lock-* || true
       if juju status -m controller &>/dev/null; then
         echo "Controller is back online"
         break
