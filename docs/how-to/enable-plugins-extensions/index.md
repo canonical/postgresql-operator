@@ -9,7 +9,7 @@ For a list of available extensions, see the page [Supported plugins/extensions](
 Enable the extension by setting `True` as the value of its respective config option, like in the following example:
 
 ```text
-juju config postgresql plugin_<plugin name>_enable=True
+juju config postgresql plugin-<plugin name>-enable=True
 ```
 ## Integrate your application
 Integrate (formerly known as "relate" in `juju v.2.9`) your application charm with the PostgreSQL charm:
