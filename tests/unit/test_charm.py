@@ -2944,3 +2944,376 @@ def test_on_secret_remove(harness, only_with_juju_secrets):
         event.secret.label = None
         harness.charm._on_secret_remove(event)
         assert not event.remove_revision.called
+
+
+def test_calculate_worker_process_config_auto_values(harness):
+    """Test worker process config calculation with 'auto' values."""
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        # Test with 2 vCPUs (auto should be min(8, 2*2) = 4)
+        _cpu_count.return_value = 2
+
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "auto",
+                "cpu_max_parallel_workers": "auto",
+                "cpu_max_parallel_maintenance_workers": "auto",
+                "cpu_max_logical_replication_workers": "auto",
+                "cpu_max_sync_workers_per_subscription": "auto",
+            })
+
+        result = harness.charm._calculate_worker_process_config()
+
+        # All auto values should resolve to 4 (min(8, 2*2))
+        assert result["max_worker_processes"] == "4"
+        assert result["max_parallel_workers"] == "4"
+        assert result["max_parallel_maintenance_workers"] == "4"
+        assert result["max_logical_replication_workers"] == "4"
+        assert result["max_sync_workers_per_subscription"] == "4"
+
+        # Test with 8 vCPUs (auto should be min(8, 2*8) = 8)
+        _cpu_count.return_value = 8
+        result = harness.charm._calculate_worker_process_config()
+
+        assert result["max_worker_processes"] == "8"
+        assert result["max_parallel_workers"] == "8"
+
+        # Test with 1 vCPU (auto should be min(8, 2*1) = 2)
+        _cpu_count.return_value = 1
+        result = harness.charm._calculate_worker_process_config()
+
+        assert result["max_worker_processes"] == "2"
+
+
+def test_calculate_worker_process_config_numeric_values(harness):
+    """Test worker process config calculation with numeric values."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "10",
+                "cpu_max_parallel_workers": "8",
+                "cpu_max_parallel_maintenance_workers": "8",
+            })
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        assert result["max_worker_processes"] == "10"
+        assert result["max_parallel_workers"] == "8"
+        assert result["max_parallel_maintenance_workers"] == "8"
+
+
+def test_calculate_worker_process_config_all_workers_numeric(harness):
+    """Test all worker configs with numeric values within limits (not capped)."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4  # Cap = 40
+
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "20",
+                "cpu_max_parallel_workers": "16",
+                "cpu_max_parallel_maintenance_workers": "12",
+                "cpu_max_logical_replication_workers": "10",
+                "cpu_max_sync_workers_per_subscription": "8",
+            })
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        # All values should be accepted as-is (within limits)
+        assert result["max_worker_processes"] == "20"
+        assert result["max_parallel_workers"] == "16"
+        assert result["max_parallel_maintenance_workers"] == "12"
+        assert result["max_logical_replication_workers"] == "10"
+        assert result["max_sync_workers_per_subscription"] == "8"
+
+
+def test_calculate_worker_process_config_validation_blocking_max_worker_processes(harness):
+    """Test worker process config validation blocks max_worker_processes exceeding values instead of capping."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 2  # Cap should be 20
+
+        # Test max_worker_processes exceeding cap - should raise ValueError
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_worker_processes": "50"})  # Exceeds cap
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        with pytest.raises(
+            ValueError, match="max_worker_processes value 50 exceeds maximum allowed of 20"
+        ):
+            harness.charm._calculate_worker_process_config()
+
+
+def test_calculate_worker_process_config_validation_blocking_max_parallel_workers(harness):
+    """Test worker process config validation blocks max_parallel_workers exceeding values instead of capping."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 2  # Cap should be 20
+
+        # Test max_parallel_workers exceeding cap - should raise ValueError
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_parallel_workers": "30"})  # Exceeds cap
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        with pytest.raises(
+            ValueError, match="max_parallel_workers value 30 exceeds maximum allowed of 20"
+        ):
+            harness.charm._calculate_worker_process_config()
+
+
+def test_calculate_worker_process_config_validation_blocking_valid_value(harness):
+    """Test worker process config validation accepts valid values within cap."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 2  # Cap should be 20
+
+        # Test valid value within cap - should work
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_parallel_maintenance_workers": "15"})  # Within cap
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+        assert result["max_parallel_maintenance_workers"] == "15"  # Should accept valid value
+
+
+def test_calculate_worker_process_config_edge_cases(harness):
+    """Test worker process config edge cases."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        # Test with no worker config set (all default to auto)
+        with harness.hooks_disabled():
+            harness.update_config(
+                unset=[
+                    "cpu_max_worker_processes",
+                    "cpu_max_parallel_workers",
+                ]
+            )
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+        # All worker parameters default to auto, so they get calculated
+        expected = {
+            "max_worker_processes": "8",  # min(8, 2 * 4) = 8
+            "max_parallel_workers": "8",
+            "max_parallel_maintenance_workers": "8",
+            "max_logical_replication_workers": "8",
+            "max_sync_workers_per_subscription": "8",
+        }
+        assert result == expected
+
+        # Test with only one worker config set
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_worker_processes": "10"})
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+        # Other worker parameters still get auto-calculated since they default to "auto"
+        expected = {
+            "max_worker_processes": "10",
+            "max_parallel_workers": "10",  # auto = base_max_workers (10)
+            "max_parallel_maintenance_workers": "10",
+            "max_logical_replication_workers": "10",
+            "max_sync_workers_per_subscription": "10",
+        }
+        assert result == expected
+
+        # Test with very high vCPU count
+        _cpu_count.return_value = 128
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_worker_processes": "auto"})
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+        # Should be min(8, 2*128) = 8
+        expected = {
+            "max_worker_processes": "8",
+            "max_parallel_workers": "8",
+            "max_parallel_maintenance_workers": "8",
+            "max_logical_replication_workers": "8",
+            "max_sync_workers_per_subscription": "8",
+        }
+        assert result == expected
+
+
+def test_calculate_worker_process_config_dependencies(harness):
+    """Test that dependent worker configs properly use max_worker_processes as base."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        # Set max_worker_processes to 12, others to auto
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "12",
+                "cpu_max_parallel_workers": "auto",
+                "cpu_max_parallel_maintenance_workers": "auto",
+            })
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        # Auto values should use max_worker_processes (12) as base
+        assert result["max_worker_processes"] == "12"
+        assert result["max_parallel_workers"] == "12"
+        assert result["max_parallel_maintenance_workers"] == "12"
+
+
+def test_calculate_worker_process_config_wal_compression(harness):
+    """Test that wal_compression is NOT included in worker process config."""
+    import contextlib
+
+    # Test with wal_compression enabled - should NOT be in worker config result
+    with harness.hooks_disabled():
+        harness.update_config({"cpu_wal_compression": True})
+    with contextlib.suppress(AttributeError):
+        del harness.charm.config
+
+    result = harness.charm._calculate_worker_process_config()
+    assert "wal_compression" not in result  # wal_compression is not part of worker configs
+
+    # Test with wal_compression disabled - should NOT be in worker config result
+    with harness.hooks_disabled():
+        harness.update_config({"cpu_wal_compression": False})
+    with contextlib.suppress(AttributeError):
+        del harness.charm.config
+
+    result = harness.charm._calculate_worker_process_config()
+    assert "wal_compression" not in result  # wal_compression is not part of worker configs
+
+
+def test_calculate_worker_process_config_mixed_auto_and_numeric(harness):
+    """Test worker process config with mixed auto and numeric values."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "16",
+                "cpu_max_parallel_workers": "auto",  # Should become 16
+                "cpu_max_parallel_maintenance_workers": "8",  # Explicit value
+                "cpu_max_logical_replication_workers": "auto",  # Should become 16
+            })
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        assert result["max_worker_processes"] == "16"
+        assert result["max_parallel_workers"] == "16"  # Auto resolved to base
+        assert result["max_parallel_maintenance_workers"] == "8"  # Explicit value
+        assert result["max_logical_replication_workers"] == "16"  # Auto resolved to base
+
+
+def test_calculate_worker_process_config_zero_cpu_count(harness):
+    """Test worker process config when cpu_count is 0 (edge case)."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 0
+
+        with harness.hooks_disabled():
+            harness.update_config({"cpu_max_worker_processes": "auto"})
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        # min(8, 2*0) = 0
+        assert result["max_worker_processes"] == "0"
+
+
+def test_calculate_worker_process_config_partial_configs(harness):
+    """Test worker process config with only some parameters set."""
+    import contextlib
+
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu_max_worker_processes": "12",
+                "cpu_max_parallel_workers": "8",
+                # Leave others as auto
+            })
+        with contextlib.suppress(AttributeError):
+            del harness.charm.config
+
+        result = harness.charm._calculate_worker_process_config()
+
+        assert result["max_worker_processes"] == "12"
+        assert result["max_parallel_workers"] == "8"
+        # Others should use base_max_workers (12) when set to auto
+        assert result["max_parallel_maintenance_workers"] == "12"
+        assert result["max_logical_replication_workers"] == "12"
+        assert result["max_sync_workers_per_subscription"] == "12"
+
+
+def test_calculate_worker_process_config_all_none(harness):
+    """Test worker process config when all values are explicitly None."""
+    with patch.object(
+        PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
+    ) as _cpu_count:
+        _cpu_count.return_value = 4
+
+        # Mock config to return None for all worker process configs
+        with patch.object(type(harness.charm), "config", new_callable=PropertyMock) as mock_config:
+            mock_config.return_value.cpu_max_worker_processes = None
+            mock_config.return_value.cpu_max_parallel_workers = None
+            mock_config.return_value.cpu_max_parallel_maintenance_workers = None
+            mock_config.return_value.cpu_max_logical_replication_workers = None
+            mock_config.return_value.cpu_max_sync_workers_per_subscription = None
+
+            result = harness.charm._calculate_worker_process_config()
+
+            # When None, should not be in the result
+            assert "max_worker_processes" not in result
+            assert "max_parallel_workers" not in result
+            assert "max_parallel_maintenance_workers" not in result
+            assert "max_logical_replication_workers" not in result
+            assert "max_sync_workers_per_subscription" not in result

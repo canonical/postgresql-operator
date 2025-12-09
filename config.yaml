@@ -25,6 +25,50 @@ options:
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
     default: true
+  cpu_max_logical_replication_workers:
+    description: |
+      Sets the maximum number of logical replication workers. Should be either "auto"
+      or a positive integer value. Restart is required when changed.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu_max_parallel_maintenance_workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel maintenance operations
+      like CREATE INDEX. Should be either "auto" or a positive integer value.
+      Cannot exceed max_parallel_workers.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu_max_parallel_workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel operations.
+      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu_max_sync_workers_per_subscription:
+    description: |
+      Sets the maximum number of synchronization workers per subscription.
+      Should be either "auto" or a positive integer value.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu_max_worker_processes:
+    description: |
+      Sets the maximum number of background processes that the system can support.
+      Should be either "auto" or a positive integer value.
+      auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
+      Restart is required when changed.
+    type: string
+    default: "auto"
+  cpu_wal_compression:
+    description: |
+      Enable compression of full-page writes written in WAL. Compression reduces
+      the I/O needed for local storage and replication.
+      Default is on (true).
+    type: boolean
+    default: true
   durability_synchronous_commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
