@@ -1573,7 +1573,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.postgresql.enable_disable_extensions(extensions, database)
         except psycopg2.errors.DependentObjectsStillExist as e:
             logger.error(
-                "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql-k8s plugin_<plugin_name>_enable=True`",
+                "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql plugin-<plugin_name>-enable=True`",
                 str(e),
             )
             self.set_unit_status(BlockedStatus(EXTENSION_OBJECT_MESSAGE))
