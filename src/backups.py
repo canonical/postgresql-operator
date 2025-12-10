@@ -36,6 +36,7 @@ from constants import (
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
     PATRONI_CONF_PATH,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
@@ -395,7 +396,7 @@ class PostgreSQLBackups(Object):
 
         # If we found error/warning lines, return them joined
         if error_lines:
-            return " ".join(error_lines)
+            return "; ".join(error_lines)
 
         # Otherwise return the last non-empty line from stderr or stdout
         if stderr.strip():
@@ -737,7 +738,7 @@ class PostgreSQLBackups(Object):
                         f"--stanza={self.stanza_name}",
                         "check",
                     ])
-                    if return_code == 82:
+                    if return_code == PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE:
                         # Raise an error if the archive command timeouts, so the user has the possibility
                         # to fix network issues and call juju resolve to re-trigger the hook that calls
                         # this method.
@@ -750,6 +751,7 @@ class PostgreSQLBackups(Object):
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
         except TimeoutError as e:
+            # Re-raise to put charm in error state (not blocked), allowing juju resolve
             raise e
         except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
