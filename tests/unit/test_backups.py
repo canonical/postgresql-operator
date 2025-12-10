@@ -77,7 +77,7 @@ P00 WARN: warning message
 P00 ERROR: second error"""
     stderr = ""
     result = PostgreSQLBackups._extract_error_message(stdout, stderr)
-    assert result == "ERROR: first error WARN: warning message ERROR: second error"
+    assert result == "ERROR: first error; WARN: warning message; ERROR: second error"
 
 
 def test_extract_error_message_with_empty_output():

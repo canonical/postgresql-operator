@@ -383,7 +383,7 @@ class PostgreSQLBackups(Object):
 
         # If we found error/warning lines, return them joined
         if error_lines:
-            return " ".join(error_lines)
+            return "; ".join(error_lines)
 
         # Otherwise return the last non-empty line from stderr or stdout
         if stderr.strip():
