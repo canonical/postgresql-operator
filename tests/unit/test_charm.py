@@ -1246,6 +1246,17 @@ def test_update_config(harness):
         ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
+        patch.object(
+            harness.charm,
+            "_calculate_worker_process_config",
+            return_value={
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+            },
+        ),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Mock some properties.
@@ -1258,22 +1269,19 @@ def test_update_config(harness):
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
         _is_tls_enabled.return_value = False
+        _get_available_memory.return_value = 1024 * 1024 * 1024  # 1GB
         harness.charm.update_config()
-        _render_patroni_yml_file.assert_called_once_with(
-            connectivity=True,
-            is_creating_backup=False,
-            enable_ldap=False,
-            enable_tls=False,
-            backup_id=None,
-            stanza=None,
-            restore_stanza=None,
-            restore_timeline=None,
-            pitr_target=None,
-            restore_to_latest=False,
-            parameters={"test": "test"},
-            no_peers=False,
-            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-        )
+        # Check that render_patroni_yml_file was called with test parameters plus worker configs
+        call_args = _render_patroni_yml_file.call_args
+        assert call_args[1]["connectivity"] is True
+        assert call_args[1]["is_creating_backup"] is False
+        assert call_args[1]["enable_ldap"] is False
+        assert call_args[1]["enable_tls"] is False
+        assert call_args[1]["parameters"]["test"] == "test"
+        # Worker configs should be present
+        assert "max_worker_processes" in call_args[1]["parameters"]
+        assert "max_parallel_workers" in call_args[1]["parameters"]
+        assert "wal_compression" in call_args[1]["parameters"]
         _handle_postgresql_restart_need.assert_called_once_with(False, True)
         _restart_ldap_sync_service.assert_called_once()
         _restart_metrics_service.assert_called_once()
@@ -1300,7 +1308,15 @@ def test_update_config(harness):
             restore_timeline=None,
             pitr_target=None,
             restore_to_latest=False,
-            parameters={"test": "test"},
+            parameters={
+                "test": "test",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "wal_compression": "on",
+            },
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
         )

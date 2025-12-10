@@ -2147,32 +2147,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.model.config, self.get_available_memory(), limit_memory
         )
 
-        # Only add worker process configurations if explicitly set (not at default "auto")
-        if (
-            self.config.cpu_max_parallel_workers != "auto"
-            or self.config.cpu_max_parallel_maintenance_workers != "auto"
-            or self.config.cpu_max_sync_workers_per_subscription != "auto"
-        ):
-            # Calculate worker process configuration
-            worker_config = self._calculate_worker_process_config()
+        # Calculate and add worker process configurations
+        # All worker configs (both restart-required and non-restart-required) go to patroni.yml
+        # Patroni will detect which parameters need restart and mark them as pending_restart
+        worker_config = self._calculate_worker_process_config()
+        if pg_parameters is not None:
+            pg_parameters.update(worker_config)
+        else:
+            pg_parameters = worker_config
 
-            # Add non-restart-required worker process parameters to pg_parameters
-            # (max_worker_processes and max_logical_replication_workers are handled separately via Patroni API)
-            non_restart_worker_params = {
-                k: v
-                for k, v in worker_config.items()
-                if k not in ["max_worker_processes", "max_logical_replication_workers"]
-            }
-            if pg_parameters is not None and non_restart_worker_params:
-                pg_parameters.update(non_restart_worker_params)
-
-        # Only add WAL compression configuration if explicitly set (not at default true)
-        # Since we can't distinguish user-set from default in Juju, we skip this in default case
-        # to avoid breaking existing tests and behavior
-        if (
-            self.config.cpu_wal_compression is not None
-            and self.config.cpu_wal_compression is not True
-        ):
+        # Add WAL compression configuration
+        if self.config.cpu_wal_compression is not None:
             if pg_parameters is None:
                 pg_parameters = {}
             pg_parameters["wal_compression"] = "on" if self.config.cpu_wal_compression else "off"
@@ -2239,11 +2224,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
 
         # Add restart-required worker process parameters via Patroni API
-        worker_config = self._calculate_worker_process_config()
-        # Add restart-required parameters to cfg_patch
-        for param in ["max_worker_processes", "max_logical_replication_workers"]:
-            if param in worker_config:
-                cfg_patch[param] = worker_config[param]
+        worker_configs = self._calculate_worker_process_config()
+        if "max_worker_processes" in worker_configs:
+            cfg_patch["max_worker_processes"] = worker_configs["max_worker_processes"]
+        if "max_logical_replication_workers" in worker_configs:
+            cfg_patch["max_logical_replication_workers"] = worker_configs[
+                "max_logical_replication_workers"
+            ]
 
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch)
 
