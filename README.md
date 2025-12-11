@@ -75,19 +75,6 @@ juju remove-unit postgresql <name_of_unit_1> <name_of_unit_2>
 
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
 
-### Password rotation
-
-#### Charm users
-
-To rotate the password of users internal to the Charmed PostgreSQL operator, use the `set-password` action as follows:
-
-```shell
-juju run postgresql/leader set-password username=<user> password=<password>
-```
-
->[!NOTE]
->Currently, internal users are `operator`, `replication`, `backup` and `rewind`. These users should not be used outside the operator.
-
 #### Integrated (related) application users
 
 To rotate the passwords of users created for integrated applications, the integration to Charmed PostgreSQL should be removed and re-created. This process will generate a new user and password for the application (and remove the old user).
