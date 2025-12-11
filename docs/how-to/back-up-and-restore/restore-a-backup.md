@@ -14,16 +14,25 @@ To restore a backup that was made from a *different* cluster, (i.e. cluster migr
    - 467+ for `arm64`
   -  468+ for `amd64`
 
+## Apply cluster credentials
+
+When restoring a backup that was taken from the same cluster and the `operator`, `monitoring`, `replication`, and `rewind` passwords have not changed since then, you do not need to do this step.
+
+```{include} migrate-a-cluster.md
+    :start-after: "<!--begin include-->"
+    :end-before: "<!--end include-->"
+```
+
 ## List backups
 
 To view the available backups to restore, use the command `list-backups`:
 
-```text
+```shell
 juju run postgresql/leader list-backups
 ```
 
 This should show your available backups like in the sample output below:
-<!--TODO: Update output with any missing parameters (id, repository, etc...) -->
+
 ```text
 list-backups: |-
   Storage bucket name: canonical-postgres
@@ -40,6 +49,7 @@ list-backups: |-
 ```
 
 Below is a complete list of parameters shown for each backup/restore operation:
+
 * `backup-id`: unique identifier of the backup.
 * `action`: indicates the action performed by the user through one of the charm action; can be any of full backup, incremental backup, differential backup or restore.
 * `status`: either finished (successfully) or failed.
@@ -51,20 +61,24 @@ Below is a complete list of parameters shown for each backup/restore operation:
 * `timeline`: number which identifies different branches in the database transactions history; every time a restore or PITR is made, this number is incremented by 1.
 
 ## Point-in-time recovery
+
 Point-in-time recovery (PITR) is a PostgreSQL feature that enables restorations to the database state at specific points in time.
 
 After performing a PITR in a PostgreSQL cluster, a new timeline is created to track from the point to where the database was restored. They can be tracked via the `timeline` parameter in the `list-backups` output.
 
 ## Restore backup
+
 To restore a backup from that list, run the `restore` command and pass the parameter corresponding to the backup type.
 
-When the user needs to restore a specific backup that was made, they can use the `backup-id` that is listed in the `list-backups` output. 
- ```text
+When the user needs to restore a specific backup that was made, they can use the `backup-id` that is listed in the `list-backups` output.
+
+```shell
 juju run postgresql/leader restore backup-id=YYYY-MM-DDTHH:MM:SSZ
 ```
 
 However, if the user needs to restore to a specific point in time between different backups (e.g. to restore only specific transactions made between those backups), they can use the `restore-to-time` parameter to pass a timestamp related to the moment they want to restore.
- ```text
+
+```shell
 juju run postgresql/leader restore restore-to-time="YYYY-MM-DDTHH:MM:SSZ"
 ```
 
@@ -72,6 +86,6 @@ Your restore will then be in progress.
 
 It’s also possible to restore to the latest point from a specific timeline by passing the ID of a backup taken on that timeline and `restore-to-time=latest` when requesting a restore:
 
- ```text
+```shell
 juju run postgresql/leader restore restore-to-time=latest
 ```

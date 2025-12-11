@@ -1,4 +1,5 @@
-# How to create and list backups
+(create-a-backup)=
+# How to create a backup
 
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
 
@@ -7,11 +8,45 @@ This guide contains recommended steps and useful commands for creating and manag
 * Access to S3 storage
 * [Configured settings for S3 storage](/how-to/back-up-and-restore/configure-s3-aws)
 
-## Save your current cluster credentials
+(save-current-cluster-credentials)=
+## Save current cluster credentials
 
-For security reasons, charm credentials are not stored inside backups. So, if you plan to restore to a backup at any point in the future, **you will need the `operator`, `replication`, and `rewind` user passwords for your existing cluster**. <!--TODO: just these users? -->
+For security reasons, charm credentials are not stored inside backups. So, if you plan to restore to a backup at any point in the future, **you will need the following user passwords for your existing cluster**:
+* `operator`
+* `monitoring`
+* `replication`
+* `rewind`
 
-See: [Juju | How to view secrets](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#view-all-the-available-secrets)
+To retrieve the Juju secret that includes your user passwords, run
+
+```shell
+juju config postgresql system-users
+```
+
+This will output a secret URI that starts with `secret:`. To display its contents (i.e. the credentials):
+
+```shell
+juju show-secret --reveal <secret URI>
+```
+
+The output will include the credentials for the system users:
+
+```
+<secret URI>:
+    ...
+
+    monitoring-password: <password-to-copy>
+    operator-password: <password-to-copy>
+    patroni-password: ...
+    raft-password: ...
+    replication-password: <password-to-copy>
+    rewind-password: <password-to-copy>
+```
+
+```{seealso}
+* {ref}`manage-passwords`
+* [Juju | How to view secrets](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#view-all-the-available-secrets)
+```
 
 ## Create a backup
 

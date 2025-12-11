@@ -7,31 +7,42 @@ To perform a basic restore (from a *local* backup), see [](/how-to/back-up-and-r
 ## Prerequisites
 
 Restoring a backup from a previous cluster to a current cluster requires:
-- A single unit Charmed PostgreSQL deployed and running
-- Access to S3 storage
-- [](/how-to/back-up-and-restore/configure-s3-aws)
-- Backups from the previous cluster in your S3 storage
-- Passwords from your previous cluster
+* A single unit Charmed PostgreSQL deployed and running
+* Backups from the previous cluster in your S3 storage
+  * See: {ref}`create-a-backup`
+* Saved credentials from your previous cluster
+  * See: {ref}`manage-passwords` and {ref}`save-current-cluster-credentials`
 
-## Manage cluster passwords
+## Apply cluster credentials
 
-When you restore a backup from an old cluster, it will restore the password from the previous cluster to your current cluster. Set the password of your current cluster to the previous cluster’s password:
+Charmed PostgreSQL will enable authentication by default after restoring a backup. It will either use the credentials that are already configured to the deployed PostgreSQL application, or automatically generate an admin password if none are provided - so make sure you've {ref}`saved your current previous cluster credentials <save-current-cluster-credentials>` before restoring.
 
-```text
-juju run postgresql/leader set-password username=operator password=<previous cluster password> 
-juju run postgresql/leader set-password username=replication password=<previous cluster password> 
-juju run postgresql/leader set-password username=rewind password=<previous cluster password> 
+<!--begin include-->
+Create a secret with the password values you saved when creating the backup:
+
+```shell
+juju add-secret <secret name> monitoring=<password1> operator=<password2> replication=<password3> rewind=<password4>
 ```
+
+where `<secret name>` can be any name you'd like for the restored secrets.
+
+Then, grant the secret to the `postgresql` application that will initiate the restore:
+
+```shell
+juju grant-secret <secret name> postgresql
+```
+<!--end include-->
 
 ## List backups
 
 To view the available backups to restore, use the command `list-backups`:
 
-```text
+```shell
 juju run postgresql/leader list-backups 
 ```
 
-This shows a list of the available backups (it is up to you to identify which `backup-id` corresponds to the previous-cluster):
+This shows a list of the available backups (it is up to you to identify which `backup-id` corresponds to the previous cluster):
+
 ```text
 backups: |-
   backup-id             | backup-type  | backup-status
@@ -40,9 +51,10 @@ backups: |-
 ```
 
 ## Restore backup
+
 To restore your current cluster to the state of the previous cluster, run the `restore` command and pass the correct `backup-id` to the command:
 
- ```text
+```shell
 juju run postgresql/leader restore backup-id=YYYY-MM-DDTHH:MM:SSZ 
 ```
 
