@@ -169,7 +169,7 @@ html_theme_options = {
 # Syntax highlighting settings
 
 highlight_language = "none" # default
-pygments_style = "autumn" # see https://pygments.org/styles for more
+pygments_style = "tango" # see https://pygments.org/styles for more
 
 # Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
 #
@@ -268,8 +268,11 @@ extensions = [
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
-    "sphinxext.rediraffe"
+    "sphinxext.rediraffe",
+    "sphinx_new_tab_link"
 ]
+
+new_tab_link_show_external_link_icon = True
 
 # Excludes files or directories from processing
 
