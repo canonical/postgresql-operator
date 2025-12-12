@@ -16,7 +16,7 @@ To restore a backup that was made from a *different* cluster, (i.e. cluster migr
 
 ## Apply cluster credentials
 
-When restoring a backup that was taken from the same cluster and the `operator`, `monitoring`, `replication`, and `rewind` passwords have not changed since then, you do not need to do this step.
+When restoring a backup that was taken from the same cluster and the `operator`, `monitoring`, `replication`, and `rewind` passwords have not changed since then, you **do not** need to do this step.
 
 ```{include} migrate-a-cluster.md
     :start-after: "<!--begin include-->"

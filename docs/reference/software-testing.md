@@ -6,13 +6,13 @@ Most types of standard [software tests](https://en.wikipedia.org/wiki/Software_t
 
 This type of test ensures that basic functionality works over a short amount of time. 
 
-One way to do this is by integrating your PostgreSQL application with the [PostgreSQL Test Appplication](https://charmhub.io/postgresql-test-app), and running the "continuous writes" test:
+One way to do this is by integrating your PostgreSQL application with the [PostgreSQL Test Application](https://charmhub.io/postgresql-test-app), and running the "continuous writes" test:
 
 ```shell
 juju run postgresql-test-app/leader start-continuous-writes
 ```
 
-The expected behavior is:
+The expected behaviour is:
 * `postgresql-test-app` will continuously inserts records into the database received through the integration (the table `continuous_writes`).
 * The counters (amount of records in table) will grow on all cluster members
 

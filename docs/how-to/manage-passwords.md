@@ -29,6 +29,7 @@ To grant the secret to the `postgresql` charm:
 juju grant-secret <secret_name> postgresql
 ```
 
+(configure-system-users)=
 ## Configure `system-users`
 
 To set the `system-users` config option to the secret URI:

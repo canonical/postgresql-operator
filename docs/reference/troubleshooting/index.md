@@ -143,7 +143,7 @@ ubuntu@juju-fd7874-0:~$
 
 The list of running snap/`systemd` services will depend on configured (enabled) [COS integration](/how-to/monitoring-cos/enable-monitoring) and/or [backup](/how-to/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
-Access PostgreSQL with the `psql` CLI tool and continue troubleshooting your dataabase-related issues from here. 
+Access PostgreSQL with the `psql` CLI tool and continue troubleshooting your database-related issues from here. 
 
 ```{seealso}
 * {ref}`users`

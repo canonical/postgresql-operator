@@ -39,50 +39,8 @@ It is forbidden to use/manage described above users, as they are dedicated to th
 
 Use the [data-integrator](https://charmhub.io/data-integrator) charm to generate, manage, and remove external credentials.
 ```
-<!-- TODO: check if this can be replaced with secrets 
-Passwords for *internal* users can be rotated using the action 'set-password':
 
-```text
-> juju show-action postgresql set-password
-Change the system user's password, which is used by charm. It is for internal charm users and SHOULD NOT be used by applications.
-
-Arguments
-password:
-  type: string
-  description: The password will be auto-generated if this option is not specified.
-username:
-  type: string
-  description: The username, the default value 'operator'. Possible values - operator, replication, rewind.
-```
-
-For example, to generate a new random password for *internal* user:
-
-
-```text
-> juju run-action --wait postgresql/leader set-password username=operator
-
-unit-postgresql-1:
-  UnitId: postgresql/1
-  id: "2"
-  results:
-    password: k4qqnWSZJZrcMt4B
-  status: completed
-```
-To set a predefined password for the specific user, run:
-```text
-> juju run-action --wait postgresql/leader set-password username=operator password=newpassword
-
-unit-postgresql-1:
-  UnitId: postgresql/1
-  id: "4"
-  results:
-    password: newpassword
-  status: completed
-```
-
-The action `set-password` must be executed on juju leader unit (to update peer relation data with new value).
-
--->
+Passwords for internal users can be managed using Juju secrets. See {ref}`manage-passwords`.
 
 ## Relation users
 
