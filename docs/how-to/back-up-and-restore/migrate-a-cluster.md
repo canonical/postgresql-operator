@@ -15,7 +15,9 @@ Restoring a backup from a previous cluster to a current cluster requires:
 
 ## Apply cluster credentials
 
-Charmed PostgreSQL will enable authentication by default after restoring a backup. It will either use the credentials that are already configured to the deployed PostgreSQL application, or automatically generate an admin password if none are provided - so make sure you've {ref}`saved your current previous cluster credentials <save-current-cluster-credentials>` before restoring.
+Charmed PostgreSQL will enable authentication by default after restoring a backup, and it will automatically generate admin user passwords if none are provided.
+
+To make sure it uses the credentials from the previous cluster, we must apply the credentials you {ref}`saved during the backup process <save-current-cluster-credentials>` before restoring.
 
 <!--begin include-->
 Create a secret with the password values you saved when creating the backup:
