@@ -13,8 +13,40 @@ juju run postgresql-test-app/leader start-continuous-writes
 ```
 
 The expected behavior is:
-* `postgresql-test-app` continuously inserts records into the database received through the integration (the table `continuous_writes`).
-* The counters (amount of records in table) are growing on all cluster members
+* `postgresql-test-app` will continuously inserts records into the database received through the integration (the table `continuous_writes`).
+* The counters (amount of records in table) will grow on all cluster members
+
+```{dropdown} Full example
+
+    juju add-model smoke-test
+
+    juju deploy postgresql --channel 16/stable
+    juju add-unit postgresql -n 2 
+
+    juju deploy postgresql-test-app
+    juju integrate postgresql-test-app:first-database postgresql
+    
+    juju run postgresql-test-app/leader start-continuous-writes
+
+    # Observe database
+    
+    export user=operator
+
+    # TODO: Update password retrieval method. juju config postgresql system-users, reveal secret, then find operator password?
+    # TODO export pass=
+
+    export relname=first-database
+    export ip=$(juju show-unit postgresql/0 --endpoint database | yq '.. | select(. | has("public-address")).public-address')
+    export db=$(juju show-unit postgresql/0 --endpoint database | yq '.. | select(. | has("database")).database')
+    export relid=$(juju show-unit postgresql/0 --endpoint database | yq '.. | select(. | has("relation-id")).relation-id')
+    export query="select count(*) from continuous_writes"
+
+    watch -n1 -x juju run postgresql-test-app/leader run-sql dbname=${db} query="${query}" relation-id=${relid} relation-name=${relname}
+
+    # or
+
+    watch -n1 -x juju ssh postgresql/leader "psql postgresql://${user}:${pass}@${ip}:5432/${db} -c \"${query}\""
+```
 
 To stop the "continuous write" test, run
 
