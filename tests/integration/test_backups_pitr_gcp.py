@@ -20,7 +20,7 @@ from .helpers import (
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-TLS_CHANNEL = "latest/stable"
+TLS_CHANNEL = "1/stable"
 TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
