@@ -5,14 +5,17 @@
 """Structured configuration for the PostgreSQL charm."""
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
 from charms.data_platform_libs.v0.data_models import BaseConfigModel
-from pydantic import PositiveInt, validator
+from pydantic import PositiveInt, conint, validator
 
 from locales import SNAP_LOCALES
 
 logger = logging.getLogger(__name__)
+
+# Type for worker process parameters that must be >= 2
+WorkerProcessInt = Annotated[int, conint(ge=2)]
 
 
 class CharmConfig(BaseConfigModel):
@@ -21,7 +24,13 @@ class CharmConfig(BaseConfigModel):
     synchronous_node_count: Literal["all", "majority"] | PositiveInt
     connection_authentication_timeout: int | None
     connection_statement_timeout: int | None
+    cpu_max_logical_replication_workers: Literal["auto"] | WorkerProcessInt | None
+    cpu_max_parallel_maintenance_workers: Literal["auto"] | WorkerProcessInt | None
+    cpu_max_parallel_workers: Literal["auto"] | WorkerProcessInt | None
+    cpu_max_sync_workers_per_subscription: Literal["auto"] | WorkerProcessInt | None
+    cpu_max_worker_processes: Literal["auto"] | WorkerProcessInt | None
     cpu_parallel_leader_participation: bool | None
+    cpu_wal_compression: bool | None
     durability_synchronous_commit: str | None
     durability_wal_keep_size: int | None
     experimental_max_connections: int | None
