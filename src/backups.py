@@ -750,9 +750,9 @@ class PostgreSQLBackups(Object):
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
-        except TimeoutError as e:
+        except TimeoutError:
             # Re-raise to put charm in error state (not blocked), allowing juju resolve
-            raise e
+            raise
         except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
