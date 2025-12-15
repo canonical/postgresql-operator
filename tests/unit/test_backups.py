@@ -37,57 +37,79 @@ def harness():
     harness.cleanup()
 
 
-def test_extract_error_message_with_error_in_stderr():
-    """Test extracting error from stderr with ERROR marker."""
-    stderr = """2025-11-07 07:21:11.120 P00  ERROR: [056]: unable to find primary cluster - cannot proceed
+def test_extract_error_message_with_error_in_stdout():
+    """Test extracting error from stdout with ERROR marker."""
+    stdout = """2025-11-07 07:21:11.120 P00  ERROR: [056]: unable to find primary cluster - cannot proceed
                                     HINT: are all available clusters in recovery?"""
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "ERROR: [056]: unable to find primary cluster - cannot proceed"
 
 
-def test_extract_error_message_with_plain_stderr():
+def test_extract_error_message_with_error_in_stderr():
     """Test extracting error from stderr when no ERROR marker."""
+    stdout = ""
     stderr = "Connection refused: cannot connect to S3"
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "Connection refused: cannot connect to S3"
 
 
+def test_extract_error_message_with_both_stdout_and_stderr():
+    """Test extracting error when ERROR marker is in stdout and stderr has additional info."""
+    stdout = "P00  ERROR: database error occurred"
+    stderr = "Additional stderr info"
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "ERROR: database error occurred"
+
+
 def test_extract_error_message_with_warning():
-    """Test extracting warning message from stderr."""
-    stderr = "P00  WARN: configuration issue detected"
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    """Test extracting warning message from output."""
+    stdout = "P00  WARN: configuration issue detected"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "WARN: configuration issue detected"
 
 
 def test_extract_error_message_with_multiple_errors():
-    """Test extracting multiple ERROR/WARN lines from stderr."""
-    stderr = """P00 ERROR: first error
+    """Test extracting multiple ERROR/WARN lines."""
+    stdout = """P00 ERROR: first error
 P00 WARN: warning message
 P00 ERROR: second error"""
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "ERROR: first error; WARN: warning message; ERROR: second error"
 
 
 def test_extract_error_message_with_empty_output():
-    """Test with empty stderr returns helpful message."""
-    result = PostgreSQLBackups._extract_error_message("")
+    """Test with empty stdout and stderr returns helpful message."""
+    result = PostgreSQLBackups._extract_error_message("", "")
     assert (
         result
         == "Unknown error occurred. Please check the logs at /var/snap/charmed-postgresql/common/var/log/pgbackrest"
     )
 
 
+def test_extract_error_message_fallback_to_stdout_last_line():
+    """Test fallback to last line of stdout when no ERROR/WARN markers."""
+    stdout = "Some generic output\nMore details here\nFinal error message"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "Final error message"
+
+
 def test_extract_error_message_fallback_to_stderr_last_line():
-    """Test fallback to last line of stderr when no ERROR/WARN markers."""
+    """Test fallback to last line of stderr when no ERROR/WARN markers and no stdout."""
+    stdout = ""
     stderr = "Line 1\nLine 2\nFinal error message"
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "Final error message"
 
 
 def test_extract_error_message_cleans_debug_prefix():
     """Test that debug prefixes like 'P00  ERROR:' are cleaned up."""
-    stderr = "2025-11-07 07:21:11.120 P00  ERROR: test error message"
-    result = PostgreSQLBackups._extract_error_message(stderr)
+    stdout = "2025-11-07 07:21:11.120 P00  ERROR: test error message"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
     assert result == "ERROR: test error message"
 
 
