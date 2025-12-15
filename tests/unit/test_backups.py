@@ -860,6 +860,14 @@ def test_check_stanza(harness):
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
         )
 
+        # Test when the failure in the stanza check is due to an archive timeout.
+        _execute_command.reset_mock()
+        _s3_initialization_set_failure.reset_mock()
+        _execute_command.return_value = (82, "", "fake stderr")
+        with pytest.raises(TimeoutError):
+            harness.charm.backup.check_stanza()
+        _s3_initialization_set_failure.assert_not_called()
+
         _execute_command.reset_mock()
         _s3_initialization_set_failure.reset_mock()
         _execute_command.return_value = (0, "fake stdout", "")

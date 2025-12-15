@@ -34,6 +34,7 @@ from constants import (
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
     PATRONI_CONF_PATH,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
@@ -717,15 +718,27 @@ class PostgreSQLBackups(Object):
             # for that or else the s3 initialization sequence will fail.
             for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
-                    return_code, _, stderr = self._execute_command([
+                    return_code, stdout, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
                         f"--stanza={self.stanza_name}",
                         "check",
                     ])
+                    if return_code == PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE:
+                        # Raise an error if the archive command timeouts, so the user has the possibility
+                        # to fix network issues and call juju resolve to re-trigger the hook that calls
+                        # this method.
+                        extracted_error = self._extract_error_message(stdout, stderr)
+                        logger.error(
+                            f"error: {extracted_error} - please fix the error and call juju resolve on this unit"
+                        )
+                        raise TimeoutError
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
+        except TimeoutError as e:
+            # Re-raise to put charm in error state (not blocked), allowing juju resolve
+            raise e
         except Exception:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.

@@ -26,6 +26,10 @@ PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
+# pgBackRest error codes
+PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE = (
+    82  # Archive timeout - unable to archive WAL files within configured timeout period
+)
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
