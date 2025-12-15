@@ -726,7 +726,7 @@ class PostgreSQLBackups(Object):
             # for that or else the s3 initialization sequence will fail.
             for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
-                    return_code, stdout, stderr = self._execute_command([
+                    return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
                         PGBACKREST_LOG_LEVEL_STDERR,
@@ -794,7 +794,7 @@ class PostgreSQLBackups(Object):
         if not self.charm.primary_endpoint:
             logger.warning("Failed to contact pgBackRest TLS server: no primary endpoint")
             return False
-        return_code, stdout, stderr = self._execute_command([
+        return_code, _, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "server-ping",
@@ -996,6 +996,7 @@ Juju Version: {self.charm.model.juju_version!s}
             PGBACKREST_CONFIGURATION_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             f"--stanza={self.stanza_name}",
+            "--log-level-console=debug",
             f"--type={BACKUP_TYPE_OVERRIDES[backup_type]}",
             "backup",
         ]
@@ -1186,7 +1187,7 @@ Stderr:
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
-        return_code, stdout, stderr = self._execute_command(
+        return_code, _, stderr = self._execute_command(
             [
                 "charmed-postgresql.patronictl",
                 "-c",

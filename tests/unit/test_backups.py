@@ -748,6 +748,7 @@ def test_initialise_stanza(harness):
         stanza_creation_command = [
             "charmed-postgresql.pgbackrest",
             "--config=/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
+            "--log-level-stderr=warn",
             f"--stanza={harness.charm.backup.stanza_name}",
             "stanza-create",
         ]
