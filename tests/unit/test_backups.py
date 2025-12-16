@@ -14,7 +14,7 @@ from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
 from tenacity import RetryError, wait_fixed
 
-from backups import ListBackupsError
+from backups import ListBackupsError, PostgreSQLBackups
 from charm import PostgresqlOperatorCharm
 from constants import PEER
 
@@ -36,6 +36,82 @@ def harness():
     harness.begin()
     yield harness
     harness.cleanup()
+
+
+def test_extract_error_message_with_error_in_stdout():
+    """Test extracting error from stdout with ERROR marker."""
+    stdout = """2025-11-07 07:21:11.120 P00  ERROR: [056]: unable to find primary cluster - cannot proceed
+                                    HINT: are all available clusters in recovery?"""
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "ERROR: [056]: unable to find primary cluster - cannot proceed"
+
+
+def test_extract_error_message_with_error_in_stderr():
+    """Test extracting error from stderr when no ERROR marker."""
+    stdout = ""
+    stderr = "Connection refused: cannot connect to S3"
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "Connection refused: cannot connect to S3"
+
+
+def test_extract_error_message_with_both_stdout_and_stderr():
+    """Test extracting error when ERROR marker is in stdout and stderr has additional info."""
+    stdout = "P00  ERROR: database error occurred"
+    stderr = "Additional stderr info"
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "ERROR: database error occurred"
+
+
+def test_extract_error_message_with_warning():
+    """Test extracting warning message from output."""
+    stdout = "P00  WARN: configuration issue detected"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "WARN: configuration issue detected"
+
+
+def test_extract_error_message_with_multiple_errors():
+    """Test extracting multiple ERROR/WARN lines."""
+    stdout = """P00 ERROR: first error
+P00 WARN: warning message
+P00 ERROR: second error"""
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "ERROR: first error; WARN: warning message; ERROR: second error"
+
+
+def test_extract_error_message_with_empty_output():
+    """Test with empty stdout and stderr returns helpful message."""
+    result = PostgreSQLBackups._extract_error_message("", "")
+    assert (
+        result
+        == "Unknown error occurred. Please check the logs at /var/snap/charmed-postgresql/common/var/log/pgbackrest"
+    )
+
+
+def test_extract_error_message_fallback_to_stdout_last_line():
+    """Test fallback to last line of stdout when no ERROR/WARN markers."""
+    stdout = "Some generic output\nMore details here\nFinal error message"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "Final error message"
+
+
+def test_extract_error_message_fallback_to_stderr_last_line():
+    """Test fallback to last line of stderr when no ERROR/WARN markers and no stdout."""
+    stdout = ""
+    stderr = "Line 1\nLine 2\nFinal error message"
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "Final error message"
+
+
+def test_extract_error_message_cleans_debug_prefix():
+    """Test that debug prefixes like 'P00  ERROR:' are cleaned up."""
+    stdout = "2025-11-07 07:21:11.120 P00  ERROR: test error message"
+    stderr = ""
+    result = PostgreSQLBackups._extract_error_message(stdout, stderr)
+    assert result == "ERROR: test error message"
 
 
 def test_stanza_name(harness):
@@ -813,6 +889,15 @@ def test_check_stanza(harness):
         _s3_initialization_set_failure.assert_called_once_with(
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
         )
+
+        # Test when the failure in the stanza check is due to an archive timeout.
+        _execute_command.reset_mock()
+        _s3_initialization_set_failure.reset_mock()
+        _execute_command.return_value = (82, "", "fake stderr")
+        with pytest.raises(TimeoutError):
+            harness.charm.backup.check_stanza()
+            assert False
+        _s3_initialization_set_failure.assert_not_called()
 
         _execute_command.reset_mock()
         _s3_initialization_set_failure.reset_mock()

@@ -32,6 +32,10 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USE
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
+# pgBackRest error codes
+PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE = (
+    82  # Archive timeout - unable to archive WAL files within configured timeout period
+)
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
