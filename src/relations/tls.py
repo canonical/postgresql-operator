@@ -122,9 +122,10 @@ class TLS(Object):
         cert = None
         key = None
         certs, private_key = self.certificate.get_assigned_certificates()
-        if private_key:
-            key = str(private_key)
-        if certs:
-            cert = str(certs[0].certificate)
-            ca_file = str(certs[0].ca)
+        if self.charm.is_cluster_initialised:
+            if private_key:
+                key = str(private_key)
+            if certs:
+                cert = str(certs[0].certificate)
+                ca_file = str(certs[0].ca)
         return key, ca_file, cert

@@ -25,9 +25,16 @@ def harness():
 
 
 def test_get_tls_files(harness, only_with_juju_secrets):
-    with patch(
-        "relations.tls.TLSCertificatesRequiresV4.get_assigned_certificates"
-    ) as _get_assigned_certificates:
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_cluster_initialised",
+            new_callable=PropertyMock,
+            return_value=True,
+        ) as _is_cluster_initialised,
+        patch(
+            "relations.tls.TLSCertificatesRequiresV4.get_assigned_certificates"
+        ) as _get_assigned_certificates,
+    ):
         cert_mock = Mock()
         cert_mock.certificate = sentinel.certificate
         cert_mock.ca = sentinel.ca
