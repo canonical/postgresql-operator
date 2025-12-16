@@ -1,6 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-from unittest.mock import Mock, patch, sentinel
+from unittest.mock import Mock, PropertyMock, patch, sentinel
 
 import pytest
 from ops.testing import Harness
@@ -46,12 +46,25 @@ def test_get_tls_files(harness, only_with_juju_secrets):
 def test_on_certificate_available(harness, only_with_juju_secrets):
     with (
         patch(
+            "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
+        ) as _is_cluster_initialised,
+        patch(
             "charm.PostgresqlOperatorCharm.push_tls_files_to_workload"
         ) as _push_tls_files_to_workload,
     ):
-        # Defers if can't push
         event_mock = Mock()
+        # Defers if cluster not ready
+        _is_cluster_initialised.return_value = False
+
+        harness.charm.tls._on_certificate_available(event_mock)
+
+        event_mock.defer.assert_called_once_with()
+        assert not _push_tls_files_to_workload.called
+        event_mock.reset_mock()
+
+        # Defers if can't push
         _push_tls_files_to_workload.return_value = False
+        _is_cluster_initialised.return_value = True
 
         harness.charm.tls._on_certificate_available(event_mock)
 

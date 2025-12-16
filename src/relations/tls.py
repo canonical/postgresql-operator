@@ -96,6 +96,10 @@ class TLS(Object):
         )
 
     def _on_certificate_available(self, event: EventBase) -> None:
+        if not self.charm.is_cluster_initialised:
+            logger.debug("Cluster not initialised yet")
+            event.defer()
+            return
         try:
             if not self.charm.push_tls_files_to_workload():
                 logger.debug("Cannot push TLS certificates at this moment")
