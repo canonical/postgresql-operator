@@ -25,7 +25,10 @@ DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 @pytest.mark.abort_on_fail
 def test_deploy_with_persistent_temp_storage(juju: jubilant.Juju, charm) -> None:
-    """Deploy PostgreSQL with 3 units using default persistent storage and data-integrator."""
+    """Deploy PostgreSQL with 3 units using default persistent storage and data-integrator.
+
+    Required: subsequent test depends on successful deployment.
+    """
     # Deploy database app with default storage (persistent, no storage directive).
     if DATABASE_APP_NAME not in juju.status().apps:
         logger.info("Deploying PostgreSQL with 3 units (default persistent storage)")
