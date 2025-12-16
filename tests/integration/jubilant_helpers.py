@@ -336,6 +336,10 @@ def force_leader_election(juju: jubilant.Juju, original_leader: str) -> str:
         jujud_service,
     ])
 
+    # Allow time for agent shutdown to propagate before polling
+    logger.info("Waiting for agent shutdown to propagate")
+    time.sleep(5)
+
     # Wait for a new leader to be elected
     logger.info("Waiting for new leader election")
     new_leader = None
