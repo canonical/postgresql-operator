@@ -21,7 +21,7 @@ from typing import Any, TypedDict
 
 import psutil
 import requests
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
@@ -231,13 +231,7 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(
-            f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-            verify=self.verify,
-            timeout=API_REQUEST_TIMEOUT,
-            auth=self._patroni_auth,
-        )
-        return {member["name"] for member in cluster_status.json()["members"]}
+        return {member["name"] for member in self.cluster_status()}
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -468,20 +462,12 @@ class Patroni:
         # cluster member; the "is_creating_backup" tag means that the member is creating
         # a backup).
         try:
-            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
-                with attempt:
-                    r = requests.get(
-                        f"{self._patroni_url}/cluster",
-                        verify=self.verify,
-                        auth=self._patroni_auth,
-                        timeout=PATRONI_TIMEOUT,
-                    )
+            members = self.cached_cluster_status
         except RetryError:
             return False
 
         return any(
-            "tags" in member and member["tags"].get("is_creating_backup")
-            for member in r.json()["members"]
+            "tags" in member and member["tags"].get("is_creating_backup") for member in members
         )
 
     def is_replication_healthy(self, raft_encryption: bool = False) -> bool:
@@ -558,27 +544,6 @@ class Patroni:
         ]
 
     @property
-    def member_replication_lag(self) -> str:
-        """Member replication lag."""
-        try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    cluster_status = requests.get(
-                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                        verify=self.verify,
-                        timeout=API_REQUEST_TIMEOUT,
-                        auth=self._patroni_auth,
-                    )
-        except RetryError:
-            return "unknown"
-
-        for member in cluster_status.json()["members"]:
-            if member["name"] == self.member_name:
-                return member.get("lag", "unknown")
-
-        return "unknown"
-
-    @property
     def is_member_isolated(self) -> bool:
         """Returns whether the unit is isolated from the cluster."""
         try:
@@ -599,18 +564,10 @@ class Patroni:
     def are_replicas_up(self) -> dict[str, bool] | None:
         """Check if cluster members are running or streaming."""
         try:
-            response = requests.get(
-                f"{self._patroni_url}/cluster",
-                verify=self.verify,
-                auth=self._patroni_auth,
-                timeout=PATRONI_TIMEOUT,
-            )
-            return {
-                member["host"]: member["state"] in ["running", "streaming"]
-                for member in response.json()["members"]
-            }
-        except Exception as e:
-            logger.debug(f"Unable to get the state of the cluster: {e}")
+            members = self.cluster_status()
+            return {member["host"]: member["state"] in STARTED_STATES for member in members}
+        except Exception:
+            logger.exception("Unable to get the state of the cluster")
             return
 
     def promote_standby_cluster(self) -> None:
@@ -918,14 +875,10 @@ class Patroni:
     def get_running_cluster_members(self) -> list[str]:
         """List running patroni members."""
         try:
-            members = requests.get(
-                f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                verify=self.verify,
-                timeout=API_REQUEST_TIMEOUT,
-                auth=self._patroni_auth,
-            ).json()["members"]
             return [
-                member["name"] for member in members if member["state"] in ("streaming", "running")
+                member["name"]
+                for member in self.cluster_status()
+                if member["state"] in ("streaming", "running")
             ]
         except Exception:
             return []
