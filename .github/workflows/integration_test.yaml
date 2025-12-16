@@ -72,7 +72,7 @@ jobs:
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
         if: ${{ github.event_name == 'schedule' && github.run_attempt == '1' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: allure-default-results-integration-test
           path: allure-default-results/
@@ -104,7 +104,7 @@ jobs:
           go install github.com/snapcore/spread/cmd/spread@latest
       - name: Download packed charm(s)
         timeout-minutes: 5
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: ${{ inputs.artifact-prefix }}-*
           merge-multiple: true
@@ -135,7 +135,7 @@ jobs:
         # Allure can only process one result per pytest test ID. If parameterization is done via
         # spread instead of pytest, there will be overlapping pytest test IDs.
         if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && startsWith(matrix.job.spread_job, 'github-ci:ubuntu-24.04:') && endsWith(matrix.job.spread_job, ':juju36') && github.event_name == 'schedule' && github.run_attempt == '1' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: allure-results-integration-test-${{ matrix.job.name_in_artifact }}
           path: artifacts/${{ matrix.job.spread_job }}/allure-results/
@@ -176,7 +176,7 @@ jobs:
       - name: Upload logs
         timeout-minutes: 5
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: logs-integration-test-${{ matrix.job.name_in_artifact }}
           path: ~/logs/
@@ -221,12 +221,12 @@ jobs:
       - name: Download default test results
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: allure-default-results/
           name: allure-default-results-integration-test
       - name: Download test results
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: allure-results/
           pattern: allure-results-integration-test-*
