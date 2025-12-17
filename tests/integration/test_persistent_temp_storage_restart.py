@@ -125,7 +125,9 @@ def test_leader_change_and_restart(juju: jubilant.Juju) -> None:
     logger.info(f"New leader {new_leader} is active after restart")
 
     # Check for the log message that confirms the fix is working
-    check_for_fix_log_message(juju, new_leader)
+    assert check_for_fix_log_message(juju, new_leader), (
+        "Expected library fix log message not found in unit logs"
+    )
 
     # Test temporary table creation
     logger.info("Testing temporary table creation on database")

@@ -415,8 +415,8 @@ def check_for_fix_log_message(juju: jubilant.Juju, unit_name: str) -> bool:
     )
 
     expected_message = (
-        "Fixed permissions on temp tablespace directory (persistent storage), "
-        "existing tablespace remains valid"
+        "Fixed permissions on temp tablespace directory at /var/snap/charmed-postgresql/common/data/temp "
+        "(persistent storage), existing tablespace remains valid"
     )
 
     if expected_message in result.stdout:
