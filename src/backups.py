@@ -34,10 +34,12 @@ from constants import (
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
     PATRONI_CONF_PATH,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
+    PGBACKREST_LOG_LEVEL_STDERR,
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
@@ -183,7 +185,13 @@ class PostgreSQLBackups(Object):
 
         try:
             return_code, stdout, stderr = self._execute_command(
-                [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
+                [
+                    PGBACKREST_EXECUTABLE,
+                    PGBACKREST_CONFIGURATION_FILE,
+                    PGBACKREST_LOG_LEVEL_STDERR,
+                    "info",
+                    "--output=json",
+                ],
                 timeout=30,
             )
         except TimeoutExpired as e:
@@ -195,7 +203,8 @@ class PostgreSQLBackups(Object):
 
         else:
             if return_code != 0:
-                logger.error(f"Failed to run pgbackrest: {stderr}")
+                extracted_error = self._extract_error_message(stderr)
+                logger.error(f"Failed to run pgbackrest: {extracted_error}")
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
@@ -357,6 +366,38 @@ class PostgreSQLBackups(Object):
         )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
+    @staticmethod
+    def _extract_error_message(stderr: str) -> str:
+        """Extract key error message from pgBackRest stderr output.
+
+        Since we standardize all pgBackRest commands to use --log-level-stderr=warn,
+        all errors and warnings are consistently written to stderr. This makes error
+        extraction predictable and avoids potential log duplication issues.
+
+        Args:
+            stderr: Standard error from pgBackRest command containing errors/warnings.
+
+        Returns:
+            Extracted error message from stderr, prioritizing ERROR/WARN lines.
+        """
+        if not stderr.strip():
+            return f"Unknown error occurred. Please check the logs at {PGBACKREST_LOGS_PATH}"
+
+        # Extract lines with ERROR or WARN markers from pgBackRest stderr output
+        error_lines = []
+        for line in stderr.splitlines():
+            if "ERROR:" in line or "WARN:" in line:
+                # Clean up the line by removing debug prefixes like "P00  ERROR:"
+                cleaned = re.sub(r"^.*?(ERROR:|WARN:)", r"\1", line).strip()
+                error_lines.append(cleaned)
+
+        # If we found error/warning lines, return them joined
+        if error_lines:
+            return "; ".join(error_lines)
+
+        # Otherwise return the last non-empty line from stderr
+        return stderr.strip().splitlines()[-1]
+
     def _format_backup_list(self, backup_list) -> str:
         """Formats provided list of backups as a table."""
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -401,11 +442,13 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+            extracted_error = self._extract_error_message(stderr)
+            raise ListBackupsError(f"Failed to list backups with error: {extracted_error}")
 
         backups = json.loads(output)[0]["backup"]
         for backup in backups:
@@ -472,11 +515,13 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+            extracted_error = self._extract_error_message(stderr)
+            raise ListBackupsError(f"Failed to list backups with error: {extracted_error}")
 
         repository_info = next(iter(json.loads(output)), None)
 
@@ -506,12 +551,14 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
             "--recurse",
             "--output=json",
         ])
         if return_code != 0:
-            raise ListBackupsError(f"Failed to list repository with error: {stderr}")
+            extracted_error = self._extract_error_message(stderr)
+            raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
         if repository is None:
@@ -623,6 +670,7 @@ class PostgreSQLBackups(Object):
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
+                        PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "stanza-create",
                     ])
@@ -681,12 +729,25 @@ class PostgreSQLBackups(Object):
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
+                        PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "check",
                     ])
+                    if return_code == PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE:
+                        # Raise an error if the archive command timeouts, so the user has the possibility
+                        # to fix network issues and call juju resolve to re-trigger the hook that calls
+                        # this method.
+                        extracted_error = self._extract_error_message(stderr)
+                        logger.error(
+                            f"error: {extracted_error} - please fix the error and call juju resolve on this unit"
+                        )
+                        raise TimeoutError
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
+        except TimeoutError as e:
+            # Re-raise to put charm in error state (not blocked), allowing juju resolve
+            raise e
         except Exception:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
@@ -735,13 +796,15 @@ class PostgreSQLBackups(Object):
             return False
         return_code, _, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
+            PGBACKREST_LOG_LEVEL_STDERR,
             "server-ping",
             "--io-timeout=10",
             self.charm.primary_endpoint,
         ])
         if return_code != 0:
+            extracted_error = self._extract_error_message(stderr)
             logger.warning(
-                f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {stderr}"
+                f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {extracted_error}"
             )
         return return_code == 0
 
@@ -931,6 +994,7 @@ Juju Version: {self.charm.model.juju_version!s}
         command = [
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_LOG_LEVEL_STDERR,
             f"--stanza={self.stanza_name}",
             "--log-level-console=debug",
             f"--type={BACKUP_TYPE_OVERRIDES[backup_type]}",
@@ -967,7 +1031,8 @@ Stderr:
                 f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 s3_parameters,
             )
-            error_message = f"Failed to backup PostgreSQL with error: {stderr}"
+            extracted_error = self._extract_error_message(stderr)
+            error_message = f"Failed to backup PostgreSQL with error: {extracted_error}"
             logger.error(f"Backup failed: {error_message}")
             event.fail(error_message)
         else:
@@ -1134,7 +1199,10 @@ Stderr:
             timeout=10,
         )
         if return_code != 0:
-            error_message = f"Failed to remove previous cluster information with error: {stderr}"
+            extracted_error = self._extract_error_message(stderr)
+            error_message = (
+                f"Failed to remove previous cluster information with error: {extracted_error}"
+            )
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
