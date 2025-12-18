@@ -1,12 +1,20 @@
 import json
+import logging
 import subprocess
+import time
 from enum import Enum
 
 import jubilant
+import psycopg2
 
 from constants import PEER
 
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError
+
+logger = logging.getLogger(__name__)
+
+RELATION_ENDPOINT = "postgresql"
+DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 
 class RoleAttributeValue(Enum):
@@ -222,3 +230,201 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
             "write-data": write_data,
         },
     }
+
+
+def get_lxd_machine_name(status, unit_name: str) -> str:
+    """Get the LXD machine/container name for a given unit.
+
+    Args:
+        status: Juju status object
+        unit_name: Full unit name (e.g., "postgresql/0")
+
+    Returns:
+        LXD machine/container name (instance_id)
+    """
+    unit_info = status.get_units(DATABASE_APP_NAME).get(unit_name)
+    if not unit_info:
+        raise RuntimeError(f"Unable to find unit {unit_name} in status")
+
+    machine_id = getattr(unit_info, "machine", None)
+    if not machine_id:
+        raise RuntimeError(f"Unable to find machine ID for unit {unit_name}")
+
+    machine_obj = (
+        getattr(status, "machines", {}).get(machine_id) if hasattr(status, "machines") else None
+    )
+    if not machine_obj:
+        raise RuntimeError(f"Unable to find machine object for machine {machine_id}")
+
+    machine_name = getattr(machine_obj, "instance_id", None)
+    if not machine_name:
+        raise RuntimeError(f"Unable to find instance_id for machine {machine_id}")
+
+    return machine_name
+
+
+def verify_leader_active(status, unit_name: str) -> None:
+    """Verify that a unit is the active leader.
+
+    Args:
+        status: Juju status object
+        unit_name: Full unit name to verify
+
+    Raises:
+        AssertionError if unit is not active leader
+    """
+    unit = status.get_units(DATABASE_APP_NAME).get(unit_name)
+    assert unit is not None, f"Unit {unit_name} not found in status"
+    assert unit.leader, f"Unit {unit_name} is not the leader"
+    assert unit.workload_status.current == "active", (
+        f"Unit {unit_name} is not active. "
+        f"Status: {unit.workload_status.current}, "
+        f"Message: {unit.workload_status.message}"
+    )
+
+
+def verify_temp_table_creation(juju: jubilant.Juju) -> None:
+    """Test that temporary tables can be created successfully."""
+    creds = get_credentials(juju, f"{DATA_INTEGRATOR_APP_NAME}/0")
+    uri = creds[RELATION_ENDPOINT]["uris"]
+
+    connection = None
+    try:
+        connection = psycopg2.connect(uri)
+        connection.autocommit = True
+        with connection.cursor() as cur:
+            cur.execute("CREATE TEMPORARY TABLE test (lines TEXT);")
+        logger.info("Successfully created temporary table")
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+def force_leader_election(juju: jubilant.Juju, original_leader: str) -> str:
+    """Force a leader election by stopping the current leader's juju agent.
+
+    Args:
+        juju: Juju client
+        original_leader: Current leader unit name
+
+    Returns:
+        Name of the newly elected leader unit
+
+    Raises:
+        RuntimeError: If no new leader is elected within timeout
+    """
+    logger.info(f"Stopping juju agent on {original_leader} to force leader election")
+    status = juju.status()
+    machine_name = get_lxd_machine_name(status, original_leader)
+
+    # Get the machine ID from the status
+    unit_info = status.get_units(DATABASE_APP_NAME).get(original_leader)
+    machine_id = getattr(unit_info, "machine", None)
+    if not machine_id:
+        raise RuntimeError(f"Unable to find machine ID for unit {original_leader}")
+
+    jujud_service = f"jujud-machine-{machine_id}"
+    logger.info(f"Stopping {jujud_service} service")
+
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "systemctl",
+        "stop",
+        jujud_service,
+    ])
+
+    # Allow time for agent shutdown to propagate before polling
+    logger.info("Waiting for agent shutdown to propagate")
+    time.sleep(5)
+
+    # Wait for a new leader to be elected
+    logger.info("Waiting for new leader election")
+    new_leader = None
+    for _ in range(60):  # Wait up to 60 seconds
+        time.sleep(1)
+        try:
+            status = juju.status()
+            for unit_name, unit_status in status.get_units(DATABASE_APP_NAME).items():
+                if unit_status.leader and unit_name != original_leader:
+                    new_leader = unit_name
+                    break
+            if new_leader:
+                break
+        except Exception as e:
+            logger.debug(f"Error checking leader status: {e}")
+            continue
+
+    if new_leader is None:
+        # Restart the original leader's agent in case election failed
+        logger.info(f"Restarting {jujud_service} service after failed election")
+        subprocess.check_call([
+            "lxc",
+            "exec",
+            machine_name,
+            "--",
+            "systemctl",
+            "start",
+            jujud_service,
+        ])
+        raise RuntimeError("No new leader elected within timeout")
+
+    logger.info(f"New leader elected: {new_leader}")
+
+    # Restart the original leader's agent so the cluster is healthy
+    logger.info(f"Restarting {jujud_service} service on {original_leader}")
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "systemctl",
+        "start",
+        jujud_service,
+    ])
+
+    return new_leader
+
+
+def check_for_fix_log_message(juju: jubilant.Juju, unit_name: str) -> bool:
+    """Check if the library fix log message appears in the unit's logs.
+
+    Args:
+        juju: Juju client
+        unit_name: Unit name to check logs for
+
+    Returns:
+        True if the log message was found, False otherwise
+    """
+    logger.info("Checking debug logs for the library fix log message")
+    result = subprocess.run(
+        [
+            "juju",
+            "debug-log",
+            "--replay",
+            "--no-tail",
+            "-m",
+            juju.model,
+            "--include",
+            unit_name,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    expected_message = (
+        "Fixed permissions on temp tablespace directory at /var/snap/charmed-postgresql/common/data/temp "
+        "(persistent storage), existing tablespace remains valid"
+    )
+
+    if expected_message in result.stdout:
+        logger.info(f"✓ Found expected log message in {unit_name} logs")
+        return True
+
+    logger.warning(
+        f"Expected log message not found in {unit_name} logs. "
+        "This may indicate the code path was not triggered or permissions were already correct."
+    )
+    return False
