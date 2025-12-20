@@ -254,7 +254,7 @@ if TYPE_CHECKING:
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 22
+LIBPATCH = 23
 
 PYDEPS = ["cosl >= 0.0.50", "pydantic"]
 
@@ -263,12 +263,6 @@ DEFAULT_PEER_RELATION_NAME = "peers"
 
 logger = logging.getLogger(__name__)
 SnapEndpoint = namedtuple("SnapEndpoint", "owner, name")
-
-# Note: MutableMapping is imported from the typing module and not collections.abc
-# because subscripting collections.abc.MutableMapping was added in python 3.9, but
-# most of our charms are based on 20.04, which has python 3.8.
-
-_RawDatabag = MutableMapping[str, str]
 
 
 class TransportProtocolType(str, enum.Enum):
@@ -303,6 +297,15 @@ _tracing_receivers_ports = {
 }
 
 ReceiverProtocol = Literal["otlp_grpc", "otlp_http", "zipkin", "jaeger_thrift_http", "jaeger_grpc"]
+
+
+def _dedupe_list(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Deduplicate items in the list via object identity."""
+    unique_items = []
+    for item in items:
+        if item not in unique_items:
+            unique_items.append(item)
+    return unique_items
 
 
 class TracingError(Exception):
@@ -619,7 +622,8 @@ class COSAgentProvider(Object):
         refresh_events: Optional[List] = None,
         tracing_protocols: Optional[List[str]] = None,
         *,
-        scrape_configs: Optional[Union[List[dict], Callable]] = None,
+        scrape_configs: Optional[Union[List[dict], Callable[[], List[Dict[str, Any]]]]] = None,
+        extra_alert_groups: Optional[Callable[[], Dict[str, Any]]] = None,
     ):
         """Create a COSAgentProvider instance.
 
@@ -640,6 +644,9 @@ class COSAgentProvider(Object):
             scrape_configs: List of standard scrape_configs dicts or a callable
                 that returns the list in case the configs need to be generated dynamically.
                 The contents of this list will be merged with the contents of `metrics_endpoints`.
+            extra_alert_groups: A callable that returns a dict of alert rule groups in case the
+                alerts need to be generated dynamically. The contents of this dict will be merged
+                with generic and bundled alert rules.
         """
         super().__init__(charm, relation_name)
         dashboard_dirs = dashboard_dirs or ["./src/grafana_dashboards"]
@@ -648,6 +655,7 @@ class COSAgentProvider(Object):
         self._relation_name = relation_name
         self._metrics_endpoints = metrics_endpoints or []
         self._scrape_configs = scrape_configs or []
+        self._extra_alert_groups = extra_alert_groups or {}
         self._metrics_rules = metrics_rules_dir
         self._logs_rules = logs_rules_dir
         self._recursive = recurse_rules_dirs
@@ -691,10 +699,11 @@ class COSAgentProvider(Object):
 
     @property
     def _scrape_jobs(self) -> List[Dict]:
-        """Return a prometheus_scrape-like data structure for jobs.
+        """Return a list of scrape_configs.
 
         https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
         """
+        # Optionally allow the charm to set the scrape_configs
         if callable(self._scrape_configs):
             scrape_configs = self._scrape_configs()
         else:
@@ -712,17 +721,17 @@ class COSAgentProvider(Object):
 
         scrape_configs = scrape_configs or []
 
-        # Augment job name to include the app name and a unique id (index)
-        for idx, scrape_config in enumerate(scrape_configs):
-            scrape_config["job_name"] = "_".join(
-                [self._charm.app.name, str(idx), scrape_config.get("job_name", "default")]
-            )
-
         return scrape_configs
 
     @property
     def _metrics_alert_rules(self) -> Dict:
-        """Use (for now) the prometheus_scrape AlertRules to initialize this."""
+        """Return a dict of alert rule groups."""
+        # Optionally allow the charm to add the metrics_alert_rules
+        if callable(self._extra_alert_groups):
+            rules = self._extra_alert_groups()
+        else:
+            rules = {"groups": []}
+
         alert_rules = AlertRules(
             query_type="promql", topology=JujuTopology.from_charm(self._charm)
         )
@@ -731,7 +740,11 @@ class COSAgentProvider(Object):
             generic_alert_groups.application_rules,
             group_name_prefix=JujuTopology.from_charm(self._charm).identifier,
         )
-        return alert_rules.as_dict()
+
+        # NOTE: The charm could supply rules we implement in this method, so we deduplicate
+        rules["groups"] = _dedupe_list(rules["groups"] + alert_rules.as_dict()["groups"])
+
+        return rules
 
     @property
     def _log_alert_rules(self) -> Dict:
