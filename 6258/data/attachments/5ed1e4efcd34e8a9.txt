@@ -1,0 +1,57 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  pg (waiting for exactly 3 units, current : 4)
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  pg/1 [idle] waiting: waiting for primary to be reachable from this unit
+  pg/2 [idle] waiting: waiting for primary to be reachable from this unit
+  pg/3 [idle] waiting: waiting for primary to be reachable from this unit
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  pg/1 [idle] waiting: waiting for primary to be reachable from this unit
+  pg/2 [idle] active: 
+  pg/3 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  pg/1 [idle] active: 
+  pg/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  ubuntu-advantage/2 [idle] active: Attached (esm-apps,esm-infra)
+  ubuntu-advantage/3 [idle] active: Attached (esm-apps,esm-infra)
+  ubuntu-advantage/4 [idle] active: Attached (esm-apps,esm-infra)
+  pg/1 [idle] active: 
+  pg/2 [idle] active: 
+  pg/3 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  01:43:43Z
+
+App               Version  Status   Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           unknown      0  landscape-client  latest/edge   73  no       
+pg                14.20    active       3  postgresql                       0  no       
+ubuntu-advantage           active       3  ubuntu-advantage  latest/edge  148  no       Attached (esm-apps,esm-infra)
+
+Unit                   Workload  Agent  Machine  Public address  Ports     Message
+pg/1                   active    idle   1        10.210.241.233  5432/tcp  
+  ubuntu-advantage/2*  active    idle            10.210.241.233            Attached (esm-apps,esm-infra)
+pg/2                   active    idle   2        10.210.241.118  5432/tcp  
+  ubuntu-advantage/3   active    idle            10.210.241.118            Attached (esm-apps,esm-infra)
+pg/3*                  active    idle   3        10.210.241.213  5432/tcp  
+  ubuntu-advantage/4   active    idle            10.210.241.213            Attached (esm-apps,esm-infra)
+
+Machine  State    Address         Inst id        Base          AZ             Message
+1        started  10.210.241.233  juju-08e352-1  ubuntu@22.04  runnervmh13bl  Running
+2        started  10.210.241.118  juju-08e352-2  ubuntu@22.04  runnervmh13bl  Running
+3        started  10.210.241.213  juju-08e352-3  ubuntu@22.04  runnervmh13bl  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:32:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:32:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-0: 01:33:36 ERROR unit.pg/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 01:33:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:37:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:37:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
