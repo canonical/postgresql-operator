@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from typing import ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
-import charm_refresh
 import psycopg2
 import pytest
 import tomli
@@ -35,6 +34,7 @@ from single_kernel_postgresql.utils.postgresql import (
 )
 from tenacity import RetryError, wait_fixed
 
+import charm_refresh
 from backups import CANNOT_RESTORE_PITR
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,

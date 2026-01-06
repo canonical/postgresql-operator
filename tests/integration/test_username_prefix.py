@@ -73,11 +73,11 @@ def test_prefix_too_short(juju: jubilant.Juju) -> None:
     logging.info("Waiting for the applications to settle")
     db_leader = get_app_leader(juju, DATABASE_APP_NAME)
     juju.wait(
-        ready=lambda status: status.apps[DATABASE_APP_NAME]
-        .units[db_leader]
-        .workload_status.message
-        == "Prefix too short"
-        and status.apps[DATABASE_APP_NAME].units[db_leader].is_blocked,
+        ready=lambda status: (
+            status.apps[DATABASE_APP_NAME].units[db_leader].workload_status.message
+            == "Prefix too short"
+            and status.apps[DATABASE_APP_NAME].units[db_leader].is_blocked
+        ),
         timeout=5 * MINUTE_SECS,
     )
 
