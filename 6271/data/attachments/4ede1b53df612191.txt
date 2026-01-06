@@ -1,0 +1,65 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  01:52:18Z
+
+App                   Version  Status   Scale  Charm                Channel        Rev  Exposed  Message
+mailman3-core                  active       1  mailman3-core        latest/stable   18  no       Ready (source version/commit e1d5a03)
+postgresql            14.20    active       2  postgresql                            0  no       
+postgresql-test-app            blocked      1  postgresql-test-app  latest/edge    424  no       No database integration available
+postgresql-test-app2           blocked      1  postgresql-test-app  latest/edge    424  no       No database integration available
+
+Unit                     Workload  Agent  Machine  Public address  Ports     Message
+mailman3-core/0*         active    idle   2        10.17.222.115   25/tcp    Ready (source version/commit e1d5a03)
+postgresql-test-app2/0*  blocked   idle   6        10.17.222.11              No database integration available
+postgresql-test-app/0*   blocked   idle   5        10.17.222.208             No database integration available
+postgresql/2*            active    idle   3        10.17.222.111   5432/tcp  
+postgresql/3             active    idle   4        10.17.222.144   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+2        started  10.17.222.115  juju-540f20-2  ubuntu@20.04  runnervmh13bl  Running
+3        started  10.17.222.111  juju-540f20-3  ubuntu@22.04  runnervmh13bl  Running
+4        started  10.17.222.144  juju-540f20-4  ubuntu@22.04  runnervmh13bl  Running
+5        started  10.17.222.208  juju-540f20-5  ubuntu@22.04  runnervmh13bl  Running
+6        started  10.17.222.11   juju-540f20-6  ubuntu@22.04  runnervmh13bl  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:43:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:43:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:43:24 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:43:24 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:44:52 ERROR unit.postgresql/2.juju-log restart:1: Failed to list PostgreSQL database users: connection to server at "10.17.222.111", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-2: 01:44:53 ERROR unit.postgresql/2.juju-log restart:1: Failed to list PostgreSQL database users: connection to server at "10.17.222.111", port 5432 failed: FATAL:  the database system is starting up
+
+unit-postgresql-3: 01:45:30 ERROR unit.postgresql/3.juju-log database-peers:0: Failed to list PostgreSQL database users: connection to server at "10.17.222.144", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-3: 01:45:31 ERROR unit.postgresql/3.juju-log database-peers:0: Failed to list PostgreSQL database users: connection to server at "10.17.222.144", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-2: 01:48:26 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-mailman3-core-0: 01:48:26 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-3: 01:48:28 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-2: 01:49:00 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-3: 01:49:00 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 01:49:00 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-5: 01:50:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:50:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:50:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:50:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:51:57 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-2: 01:51:57 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-2: 01:51:58 ERROR unit.postgresql/2.juju-log db:9: ERROR - `extensions` (pg_trgm, unaccent) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+unit-postgresql-2: 01:52:00 ERROR unit.postgresql/2.juju-log db:8: ERROR - `extensions` (unaccent, pg_trgm) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+unit-postgresql-2: 01:52:02 ERROR unit.postgresql/2.juju-log db:9: ERROR - `extensions` (pg_trgm, unaccent) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
