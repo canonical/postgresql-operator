@@ -115,8 +115,10 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
 
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(
-        lambda: ("waiting" if "pre-upgrade-check" in actions else "maintenance")
-        in {unit.workload_status for unit in application.units},
+        lambda: (
+            ("waiting" if "pre-upgrade-check" in actions else "maintenance")
+            in {unit.workload_status for unit in application.units}
+        ),
         timeout=TIMEOUT,
     )
 

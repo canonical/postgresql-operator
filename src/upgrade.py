@@ -159,7 +159,8 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         raft_encryption = (
             int(
-                json.loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
+                json
+                .loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
                 .get("charm", {})
                 .get("version", 0)
             )
