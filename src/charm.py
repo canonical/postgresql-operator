@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Literal, get_args
 from urllib.parse import urlparse
 
+import charm_refresh
 import ops.log
 import psycopg2
 import tomli
@@ -83,7 +84,6 @@ from single_kernel_postgresql.utils.postgresql import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-import charm_refresh
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import (
     NotReadyError,
