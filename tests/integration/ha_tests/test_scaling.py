@@ -70,13 +70,16 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
             break
 
     await ops_test.model.block_until(
-        lambda: left_unit.workload_status == "blocked"
-        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+        lambda: (
+            left_unit.workload_status == "blocked"
+            and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary"
+        ),
         timeout=600,
     )
 
     run_action = (
-        await ops_test.model.applications[DATABASE_APP_NAME]
+        await ops_test.model
+        .applications[DATABASE_APP_NAME]
         .units[0]
         .run_action("promote-to-primary", scope="unit", force=True)
     )
@@ -163,8 +166,10 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
 
     left_unit = ops_test.model.units[original_roles["sync_standbys"][2]]
     await ops_test.model.block_until(
-        lambda: left_unit.workload_status == "blocked"
-        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+        lambda: (
+            left_unit.workload_status == "blocked"
+            and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary"
+        ),
         timeout=600,
     )
 

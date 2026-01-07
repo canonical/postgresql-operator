@@ -116,7 +116,8 @@ def test_extra_user_roles(
 
         juju.wait(lambda status: all_units_blocked(status))
         assert (
-            juju.status()
+            juju
+            .status()
             .get_units(DATABASE_APP_NAME)
             .get(f"{DATABASE_APP_NAME}/0")
             .workload_status.message
