@@ -267,8 +267,9 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             charm_config[k] = v[0]
             await ops_test.model.applications[DATABASE_APP_NAME].set_config(charm_config)
             await ops_test.model.block_until(
-                lambda: ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status
-                == "blocked",
+                lambda: (
+                    ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "blocked"
+                ),
                 timeout=100,
             )
             assert "Configuration Error" in leader_unit.workload_status_message

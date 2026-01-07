@@ -1177,8 +1177,10 @@ async def wait_for_idle_on_blocked(
     await asyncio.gather(
         ops_test.model.wait_for_idle(apps=[other_app_name], status="active"),
         ops_test.model.block_until(
-            lambda: unit.workload_status == "blocked"
-            and unit.workload_status_message == status_message
+            lambda: (
+                unit.workload_status == "blocked"
+                and unit.workload_status_message == status_message
+            )
         ),
     )
 
