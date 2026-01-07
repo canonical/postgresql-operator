@@ -1,0 +1,17 @@
+on:
+  # GitHub will only trigger workflows `on: schedule` for workflow files in the default GitHub branch
+  schedule:
+    - cron: '53 0 * * *'  # Daily at 00:53 UTC
+
+jobs:
+  trigger:
+    name: Trigger workflow on branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger workflow
+        run: gh workflow run ci.yaml --ref 16/edge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      actions: write  # Needed to trigger workflow
