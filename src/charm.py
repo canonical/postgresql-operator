@@ -116,7 +116,6 @@ from relations.async_replication import (
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
-from relations.tls import TLS
 from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -230,9 +229,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = (
-            TLS(self, PEER) if self.model.juju_version.has_secrets else PostgreSQLTLS(self, PEER)
-        )
+        self.tls = PostgreSQLTLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
@@ -1813,10 +1810,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
         if all(self.tls.get_tls_files()):
-            if self.model.juju_version.has_secrets:
-                self.tls.refresh_tls_certificates_event.emit()
-            else:
-                self.tls._request_certificate(self.get_secret("unit", "private-key"))
+            self.tls._request_certificate(self.get_secret("unit", "private-key"))
 
     @property
     def is_blocked(self) -> bool:
