@@ -191,13 +191,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ensure `workflow_dispatch` was triggered on branch
+      - name: Parse branch name
+        id: branch
         shell: python
         run: |
+          import os
+
           if not "${{ github.ref }}".startswith("refs/heads/"):
               raise Exception(
                   "Allure Report generation assumes `workflow_dispatch` is triggered on a branch"
               )
+          output = f"branch={'${{ github.ref_name }}'.replace('/', '_')}"
+          print(output)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as file:
+              file.write(output)
       - name: Download Allure
         # Following instructions from https://allurereport.org/docs/install-for-linux/#install-from-a-deb-package
         run: gh release download --repo allure-framework/allure2 --pattern 'allure_*.deb'
@@ -277,11 +284,11 @@ jobs:
               default_result.path.rename(actual_results / default_result.path.name)
       - name: Load test report history
         run: |
-          mkdir -p repo/${{ github.ref_name }}/
-          if [[ -d repo/${{ github.ref_name }}/_latest/history/ ]]
+          mkdir -p repo/${{ steps.branch.outputs.branch }}/
+          if [[ -d repo/${{ steps.branch.outputs.branch }}/_latest/history/ ]]
           then
             echo 'Loading history'
-            cp -r repo/${{ github.ref_name }}/_latest/history/ allure-results/
+            cp -r repo/${{ steps.branch.outputs.branch }}/_latest/history/ allure-results/
           fi
       - name: Create executor.json
         shell: python
@@ -340,10 +347,10 @@ jobs:
           <meta http-equiv="cache-control" content="no-cache">
           <meta http-equiv="refresh" content="0; url=${{ github.run_number }}">
           """
-          with open("repo/${{ github.ref_name }}/index.html", "w") as file:
+          with open("repo/${{ steps.branch.outputs.branch }}/index.html", "w") as file:
               file.write(DATA)
       - name: Update GitHub pages branch
-        working-directory: repo/${{ github.ref_name }}/
+        working-directory: repo/${{ steps.branch.outputs.branch }}/
         # TODO future improvement: commit message
         run: |
           mkdir '${{ github.run_number }}'
