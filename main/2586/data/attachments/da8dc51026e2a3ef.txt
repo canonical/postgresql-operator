@@ -1,0 +1,61 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  01:52:11Z
+
+App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql                14.11    active      3  postgresql                                 0  no       
+self-signed-certificates           active      1  self-signed-certificates  latest/stable   72  no       
+
+Unit                         Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*                active    idle   0        10.210.58.181   5432/tcp  
+postgresql/1                 active    idle   1        10.210.58.35    5432/tcp  Primary
+postgresql/2                 active    idle   2        10.210.58.171   5432/tcp  
+self-signed-certificates/0*  active    idle   3        10.210.58.76              
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.210.58.181  juju-1b7a99-0  ubuntu@22.04      Running
+1        started  10.210.58.35   juju-1b7a99-1  ubuntu@22.04      Running
+2        started  10.210.58.171  juju-1b7a99-2  ubuntu@22.04      Running
+3        started  10.210.58.76   juju-1b7a99-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-3: 01:31:45 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:31:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:31:46 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:31:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:51 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:31:51 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:31:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:51 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:31:52 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:31:53 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:31:53 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:40:25 ERROR unit.postgresql/0.juju-log certificates:3: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 1470, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-0: 01:49:56 ERROR unit.postgresql/0.juju-log Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 1470, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-1: 01:51:04 ERROR unit.postgresql/1.juju-log restart:1: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/./src/charm.py", line 1470, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-2: 01:51:22 ERROR unit.postgresql/2.juju-log restart:1: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/./src/charm.py", line 1470, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...

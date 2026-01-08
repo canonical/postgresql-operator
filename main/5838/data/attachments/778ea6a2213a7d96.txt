@@ -1,0 +1,27 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.9    unsupported  01:34:56Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.19    error     1/3  postgresql             0  no       hook failed: "secret-remove"
+
+Unit           Workload  Agent       Machine  Public address  Ports     Message
+postgresql/0*  error     idle        0        10.147.19.145   5432/tcp  hook failed: "secret-remove"
+postgresql/1   waiting   allocating  1                                  waiting for machine
+postgresql/2   waiting   allocating  2        10.147.19.57              waiting for machine
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.147.19.145  juju-85dc21-0  ubuntu@22.04  runnervmzdgdc  Running
+1        down                    juju-85dc21-1  ubuntu@22.04  runnervmzdgdc  Container started
+2        down     10.147.19.57   juju-85dc21-2  ubuntu@22.04  runnervmzdgdc  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:33:42 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:34:53 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

@@ -1,0 +1,67 @@
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:116 starting continuous writes to the database
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:120 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 4, 'testing.postgresql-1': 4, 'testing.postgresql-2': 4}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 6, 'testing.postgresql-1': 6, 'testing.postgresql-2': 6}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:123 Get leader unit
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:127 Run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:135 Inject dependency fault
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:140 Refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:143 Wait for upgrade to fail
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:150 Ensure continuous_writes while in failure state on remaining units
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 45, 'testing.postgresql-1': 46, 'testing.postgresql-2': 46}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 50, 'testing.postgresql-1': 50, 'testing.postgresql-2': 50}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:153 Re-run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:157 Re-refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:160 Wait for upgrade to start
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:166 Wait for application to recover
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] blocked: ready to rollback application
+  postgresql/1 [idle] waiting: other units upgrading first...
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:172 Ensure continuous_writes after rollback procedure
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 161, 'testing.postgresql-1': 161, 'testing.postgresql-2': 161}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 163, 'testing.postgresql-1': 163, 'testing.postgresql-2': 163}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:177 Checking whether no writes were lost
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  01:39:53Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.19    active      3  postgresql                          2  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  414  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.75.78.25               received database credentials of the first database
+postgresql/0*           active    idle   0        10.75.78.13     5432/tcp  
+postgresql/1            active    idle   1        10.75.78.214    5432/tcp  
+postgresql/2            active    idle   2        10.75.78.3      5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.75.78.13   juju-bf87e3-0  ubuntu@22.04  runnervmw9dnm  Running
+1        started  10.75.78.214  juju-bf87e3-1  ubuntu@22.04  runnervmw9dnm  Running
+2        started  10.75.78.3    juju-bf87e3-2  ubuntu@22.04  runnervmw9dnm  Running
+3        started  10.75.78.25   juju-bf87e3-3  ubuntu@22.04  runnervmw9dnm  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:33:53 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-3: 01:34:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:34:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:36:00 ERROR unit.postgresql/2.juju-log database-peers:0: Failed to list PostgreSQL database users: connection to server at "10.75.78.3", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-0: 01:38:38 ERROR unit.postgresql/0.juju-log charms.data_platform_libs.v0.upgrade.VersionError - {'message': 'Versions incompatible, snap 14.12 can not be upgraded to 15.0', 'cause': 'Upgrades only supported for specific versions, snap versions satisfying requirement ^15', 'resolution': ''}
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

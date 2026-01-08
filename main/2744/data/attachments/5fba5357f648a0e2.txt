@@ -1,0 +1,130 @@
+[32mINFO    [0m juju.model:model.py:2098 Deploying ch:amd64/jammy/nextcloud-24
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [executing] maintenance: installing charm software
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [executing] maintenance: installing dependencies...
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [executing] maintenance: fetching nextcloud from network...
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [executing] maintenance: fetching nextcloud from network...
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [idle] blocked: Nextcloud not initialized.
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [idle] blocked: Nextcloud not initialized.
+[33mWARNING [0m juju.model:model.py:1564 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  database/2 [idle] active: Primary
+  database/3 [idle] active: 
+  nextcloud/0 [executing] blocked: Nextcloud not initialized.
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  nextcloud/0 [executing] maintenance: initialized nextcloud...
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  02:28:10Z
+
+App                      Version    Status   Scale  Charm                Channel        Rev  Exposed  Message
+another-application                 active       1  postgresql-test-app  edge           148  no       received database credentials of the first database
+another-data-integrator             blocked      1  data-integrator      latest/stable   27  no       Please relate the data-integrator with the desired product
+another-database         14.11      active       2  postgresql                            1  no       Primary
+data-integrator                     blocked      1  data-integrator      latest/stable   27  no       Please relate the data-integrator with the desired product
+database                 14.11      active       2  postgresql                            0  no       Primary
+nextcloud                27.1.10.2  active       1  nextcloud            edge            24  no       27.1.10.2 ☁
+postgresql-test-app                 active       2  postgresql-test-app  edge           148  no       received database credentials of the second database
+
+Unit                        Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*      active    idle   6        10.214.46.122             received database credentials of the first database
+another-data-integrator/0*  blocked   idle   10       10.214.46.174             Please relate the data-integrator with the desired product
+another-database/0*         active    idle   2        10.214.46.59    5432/tcp  Primary
+another-database/1          active    idle   3        10.214.46.44    5432/tcp  
+data-integrator/0*          blocked   idle   9        10.214.46.90              Please relate the data-integrator with the desired product
+database/2*                 active    idle   7        10.214.46.89    5432/tcp  Primary
+database/3                  active    idle   8        10.214.46.82    5432/tcp  
+nextcloud/0*                active    idle   11       10.214.46.78    80/tcp    27.1.10.2 ☁
+postgresql-test-app/0       active    idle   0        10.214.46.157             received database credentials of the second database
+postgresql-test-app/1*      active    idle   1        10.214.46.14              received database credentials of the second database
+
+Machine  State    Address        Inst id         Base          AZ  Message
+0        started  10.214.46.157  juju-2121c5-0   ubuntu@22.04      Running
+1        started  10.214.46.14   juju-2121c5-1   ubuntu@22.04      Running
+2        started  10.214.46.59   juju-2121c5-2   ubuntu@22.04      Running
+3        started  10.214.46.44   juju-2121c5-3   ubuntu@22.04      Running
+6        started  10.214.46.122  juju-2121c5-6   ubuntu@22.04      Running
+7        started  10.214.46.89   juju-2121c5-7   ubuntu@22.04      Running
+8        started  10.214.46.82   juju-2121c5-8   ubuntu@22.04      Running
+9        started  10.214.46.90   juju-2121c5-9   ubuntu@22.04      Running
+10       started  10.214.46.174  juju-2121c5-10  ubuntu@22.04      Running
+11       started  10.214.46.78   juju-2121c5-11  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-1: 01:48:19 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:48:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:48:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-1: 01:48:20 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:48:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:48:22 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:48:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:48:23 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:48:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:48:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:48:45 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-another-database-0: 01:48:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:48:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:48:46 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:48:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-1: 01:48:46 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:49:09 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:49:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:49:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 01:49:09 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 02:01:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:01:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:01:00 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-database-1: 02:01:00 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 02:05:35 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-6: 02:05:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 02:05:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-application-0: 02:05:35 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-8: 02:08:47 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-8: 02:08:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 02:08:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-3: 02:08:48 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-7: 02:08:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-7: 02:08:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 02:08:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-2: 02:08:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-9: 02:18:56 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 02:18:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 02:18:56 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-data-integrator-0: 02:18:56 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-10: 02:21:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 02:21:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 02:21:26 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-another-data-integrator-0: 02:21:26 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-2: 02:22:06 ERROR unit.database/2.juju-log database:19: Invalid extra user roles: test
+unit-database-2: 02:22:06 ERROR unit.database/2.juju-log database:19: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-2/charm/src/relations/postgresql_provider.py", line 93, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 222, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+unit-database-2: 02:22:07 ERROR unit.database/2.juju-log database:20: Invalid extra user roles: test
+unit-database-2: 02:22:07 ERROR unit.database/2.juju-log database:20: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-2/charm/src/relations/postgresql_provider.py", line 93, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 222, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+machine-11: 02:24:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-11: 02:24:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-11: 02:24:17 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-nextcloud-0: 02:24:17 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...

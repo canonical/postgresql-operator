@@ -1,0 +1,82 @@
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:123 starting continuous writes to the database
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:127 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:130 Get leader unit
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:134 Run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:146 Inject dependency fault
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:151 Refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:154 Wait for upgrade to fail
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:161 Ensure continuous_writes while in failure state on remaining units
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:164 Re-run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:168 Re-refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:171 Wait for upgrade to start
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:177 Wait for application to recover
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [idle] blocked: ready to rollback application
+  postgresql/1 [idle] waiting: other units upgrading first...
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [idle] waiting: other units upgrading first...
+  postgresql/1 [executing] maintenance: refreshing the snap
+  postgresql/2 [executing] maintenance: updating configuration
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [executing] maintenance: refreshing the snap
+  postgresql/2 [executing] waiting: waiting for database initialisation
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [executing] maintenance: refreshing the snap
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: Primary
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: 
+  postgresql/2 [executing] active: Primary
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/2 [idle] active: Primary
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:183 Ensure continuous_writes after rollback procedure
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:188 Checking whether no writes were lost
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  01:51:50Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.11    active      3  postgresql                          2  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  127  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.130.144.45             received database credentials of the first database
+postgresql/0*           active    idle   0        10.130.144.199  5432/tcp  
+postgresql/1            active    idle   1        10.130.144.249  5432/tcp  
+postgresql/2            active    idle   2        10.130.144.179  5432/tcp  Primary
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.130.144.199  juju-e1907d-0  ubuntu@22.04      Running
+1        started  10.130.144.249  juju-e1907d-1  ubuntu@22.04      Running
+2        started  10.130.144.179  juju-e1907d-2  ubuntu@22.04      Running
+3        started  10.130.144.45   juju-e1907d-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:31:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:15 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:15 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:31:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 01:31:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:31:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:20 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:31:20 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:31:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:21 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:31:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:31:22 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:48:11 ERROR unit.postgresql/0.juju-log charms.data_platform_libs.v0.upgrade.VersionError - {'message': 'Versions incompatible, snap 14.9 can not be upgraded to 15.0', 'cause': 'Upgrades only supported for specific versions, snap versions satisfying requirement ^15', 'resolution': ''}
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...

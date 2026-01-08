@@ -1,0 +1,60 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:766 Connecting to existing model localhost-localhost:test on unspecified cloud
+[32mINFO    [0m juju.model:model.py:2097 Deploying ch:amd64/jammy/postgresql-test-app-279
+[32mINFO    [0m juju.model:model.py:2097 Deploying local:postgresql-0
+[33mWARNING [0m juju.model:model.py:1563 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+  postgresql/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+  postgresql/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+  postgresql/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+  postgresql/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [idle] active: 
+  postgresql/0 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [idle] active: 
+  postgresql/0 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql/0 [executing] active: Primary
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql/0 [executing] active: Primary
+[32mINFO    [0m integration.test_audit:test_audit.py:38 Checking that the audit plugin is enabled
+[32mINFO    [0m integration.test_audit:test_audit.py:70 Disabling the audit plugin
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql/0 [idle] active: Primary
+[32mINFO    [0m integration.test_audit:test_audit.py:76 Removing the previous logs
+[32mINFO    [0m integration.test_audit:test_audit.py:83 Checking that the audit plugin is disabled
+[1m[31mERROR   [0m integration.helpers:helpers.py:929 grep: /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log: No such file or directory
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  01:36:00Z
+
+App                  Version  Status  Scale  Charm                Channel        Rev  Exposed  Message
+postgresql           14.13    active      1  postgresql                            0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/stable  279  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   0        10.104.171.3              received database credentials of the first database
+postgresql/0*           active    idle   1        10.104.171.195  5432/tcp  Primary
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.104.171.3    juju-21d9ac-0  ubuntu@22.04      Running
+1        started  10.104.171.195  juju-21d9ac-1  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-0: 01:33:10 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:10 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:33:10 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:33:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:33:17 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...

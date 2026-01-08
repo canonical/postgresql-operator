@@ -1,0 +1,49 @@
+[32mINFO    [0m juju.model:model.py:2087 Deploying ch:amd64/jammy/self-signed-certificates-57
+[33mWARNING [0m juju.model:model.py:1553 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m pytest_operator.plugin:plugin.py:784 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  03:38:27Z
+
+App                        Version  Status   Scale  Charm                      Channel        Rev  Exposed  Message
+postgresql                 14.10    active       3  postgresql                                  0  no       
+self-signed-certificates            waiting    0/1  self-signed-certificates   latest/stable   57  no       waiting for machine
+tls-certificates-operator           active       1  tls-certificates-operator  legacy/stable   22  no       
+
+Unit                          Workload  Agent       Machine  Public address  Ports     Message
+postgresql/0                  active    idle        0        10.237.217.243  5432/tcp  
+postgresql/1                  waiting   executing   1        10.237.217.66   5432/tcp  awaiting for member to start
+postgresql/2*                 active    idle        2        10.237.217.103  5432/tcp  Primary
+self-signed-certificates/0    waiting   allocating  4                                  waiting for machine
+tls-certificates-operator/0*  active    idle        3        10.237.217.230            
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.237.217.243  juju-c07fd0-0  ubuntu@22.04      Running
+1        started  10.237.217.66   juju-c07fd0-1  ubuntu@22.04      Running
+2        started  10.237.217.103  juju-c07fd0-2  ubuntu@22.04      Running
+3        started  10.237.217.230  juju-c07fd0-3  ubuntu@22.04      Running
+4        pending                  pending        ubuntu@22.04      
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:790 Juju error logs:
+
+machine-2: 03:16:14 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 03:16:14 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 03:16:14 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 03:16:14 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 03:16:14 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 03:16:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 03:16:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 03:16:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 03:16:17 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 03:16:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 03:16:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 03:16:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 03:16:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 03:16:17 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-tls-certificates-operator-0: 03:16:18 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 03:16:19 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-2: 03:26:58 ERROR unit.postgresql/2.juju-log Failed to list PostgreSQL database users: connection to server at "10.237.217.103", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:856 Forgetting main...

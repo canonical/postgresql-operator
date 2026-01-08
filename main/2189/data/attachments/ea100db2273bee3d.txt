@@ -1,0 +1,138 @@
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  pg (waiting for exactly 3 units, current : 4)
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  pg/1 [executing] maintenance: reconfiguring cluster
+  pg/2 [executing] active: 
+  pg/3 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  pg/1 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  landscape-client/0 [idle] active: Client registered!
+  landscape-client/1 [idle] active: Client registered!
+  landscape-client/3 [idle] active: Client registered!
+  pg/1 [idle] active: 
+  pg/2 [idle] active: 
+  pg/3 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:49:11Z
+
+App               Version  Status  Scale  Charm             Channel        Rev  Exposed  Message
+haproxy                    active      1  haproxy           stable          75  yes      Unit is ready
+landscape-client           active      3  landscape-client  latest/stable   69  no       Client registered!
+landscape-server           active      1  landscape-server  stable         107  no       Unit is ready
+pg                14.11    active      3  postgresql                         0  no       
+postgresql        14.11    active      1  postgresql        latest/stable  345  no       Live master (14.11)
+rabbitmq-server   3.9.13   active      1  rabbitmq-server   3.9/stable     183  no       Unit is ready
+
+Unit                   Workload  Agent  Machine  Public address  Ports           Message
+haproxy/0*             active    idle   3        10.9.206.96     80,443/tcp      Unit is ready
+landscape-server/0*    active    idle   4        10.9.206.153                    Unit is ready
+pg/1*                  active    idle   1        10.9.206.230    5432/tcp        
+  landscape-client/0*  active    idle            10.9.206.230                    Client registered!
+pg/2                   active    idle   2        10.9.206.135    5432/tcp        
+  landscape-client/1   active    idle            10.9.206.135                    Client registered!
+pg/3                   active    idle   7        10.9.206.66     5432/tcp        
+  landscape-client/3   active    idle            10.9.206.66                     Client registered!
+postgresql/0*          active    idle   5        10.9.206.231    5432/tcp        Live master (14.11)
+rabbitmq-server/0*     active    idle   6        10.9.206.129    5672,15672/tcp  Unit is ready
+
+Machine  State    Address       Inst id        Base          AZ  Message
+1        started  10.9.206.230  juju-70f443-1  ubuntu@22.04      Running
+2        started  10.9.206.135  juju-70f443-2  ubuntu@22.04      Running
+3        started  10.9.206.96   juju-70f443-3  ubuntu@22.04      Running
+4        started  10.9.206.153  juju-70f443-4  ubuntu@22.04      Running
+5        started  10.9.206.231  juju-70f443-5  ubuntu@22.04      Running
+6        started  10.9.206.129  juju-70f443-6  ubuntu@22.04      Running
+7        started  10.9.206.66   juju-70f443-7  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-1: 01:31:40 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-1: 01:31:42 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:31:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:46 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-0: 01:31:46 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:31:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:31:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:31:48 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:31:48 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:31:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-landscape-server-0: 01:31:51 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-haproxy-0: 01:31:51 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-pg-2: 01:31:52 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:31:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:31:53 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-5: 01:31:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:31:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:31:54 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-6: 01:31:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:31:55 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-rabbitmq-server-0: 01:31:56 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:34:41 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:34:41 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:34:41 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:34:41 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:35:14 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:14 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:14 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:14 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: peers of pgpeer
+unit-landscape-server-0: 01:35:19 ERROR unit.landscape-server/0.juju-log Bootstrap account waiting on default root url..
+unit-postgresql-0: 01:35:27 ERROR unit.postgresql/0.juju-log replication:7: Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:27 ERROR unit.postgresql/0.juju-log replication:7: Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:27 ERROR unit.postgresql/0.juju-log replication:7: Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:27 ERROR unit.postgresql/0.juju-log replication:7: Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:35:36 ERROR unit.postgresql/0.juju-log coordinator:6: Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:36 ERROR unit.postgresql/0.juju-log coordinator:6: Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:36 ERROR unit.postgresql/0.juju-log coordinator:6: Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:36 ERROR unit.postgresql/0.juju-log coordinator:6: Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:35:44 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:44 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:44 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:44 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:35:46 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:46 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:46 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:46 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:35:53 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:35:53 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:35:53 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:35:53 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:36:01 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:36:01 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:36:01 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:36:01 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:36:10 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:36:10 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:36:10 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:36:10 ERROR unit.postgresql/0.juju-log db-admin:10: Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:37:57 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:37:57 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:37:57 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:37:57 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-postgresql-0: 01:42:25 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:42:25 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:42:25 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:42:25 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+unit-landscape-client-0: 01:42:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-2: 01:42:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-1: 01:42:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-7: 01:43:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:43:45 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-7: 01:43:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-3: 01:43:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-3: 01:44:26 ERROR juju.worker.meterstatus error running "meter-status-changed": exit status 127
+unit-postgresql-0: 01:47:14 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of block-storage
+unit-postgresql-0: 01:47:14 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of local-monitors
+unit-postgresql-0: 01:47:14 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: provides of pgreplication
+unit-postgresql-0: 01:47:14 ERROR unit.postgresql/0.juju-log Unable to find implementation for relation: peers of pgpeer
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...

@@ -1,0 +1,90 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:784 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:37:02Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql           error       3  postgresql             0  no       hook failed: "update-status"
+
+Unit           Workload  Agent      Machine  Public address  Ports  Message
+postgresql/0   error     idle       0        10.53.249.250          hook failed: "update-status"
+postgresql/1*  waiting   executing  1        10.53.249.209          (config-changed) waiting to start PostgreSQL
+postgresql/2   waiting   idle       2        10.53.249.104          awaiting passwords generation
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.53.249.250  juju-1e2efe-0  ubuntu@22.04      Running
+1        started  10.53.249.209  juju-1e2efe-1  ubuntu@22.04      Running
+2        started  10.53.249.104  juju-1e2efe-2  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:790 Juju error logs:
+
+machine-1: 01:32:18 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:32:18 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:32:18 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:32:18 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:32:20 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:32:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:32:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:32:22 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:32:23 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:32:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:32:25 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:37:00 ERROR unit.postgresql/0.juju-log Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/model.py", line 2955, in _run
+    result = subprocess.run(args, **kwargs)  # type: ignore
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/var/lib/juju/tools/unit-postgresql-0/secret-get', '--label', 'postgresql.app', '--format=json')' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 1516, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/main.py", line 434, in main
+    framework.reemit()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/framework.py", line 863, in reemit
+    self._reemit()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/framework.py", line 942, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 951, in _on_start
+    postgres_password = self._get_password()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 1264, in _get_password
+    return self.get_secret(APP_SCOPE, USER_PASSWORD_KEY)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 251, in get_secret
+    value = self.peer_relation_app.fetch_my_relation_field(peers.id, secret_key)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1008, in fetch_my_relation_field
+    if relation_data := self.fetch_my_relation_data([relation_id], [field], relation_name):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 997, in fetch_my_relation_data
+    data[relation.id] = self._fetch_my_specific_relation_data(relation, fields)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1592, in _fetch_my_specific_relation_data
+    return self._fetch_relation_data_with_secrets(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 875, in _fetch_relation_data_with_secrets
+    result, normal_fields = self._process_secret_fields(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 815, in _process_secret_fields
+    if group_result := operation(relation, group, secret_fields, *args, **kwargs):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1561, in _get_group_secret_contents
+    result = super()._get_group_secret_contents(relation, group, secret_fields)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 749, in _get_group_secret_contents
+    if (secret := self._get_relation_secret(relation.id, group)) and (
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 462, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1545, in _get_relation_secret
+    secret = self.secrets.get(label, secret_uri)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 574, in get
+    if secret.meta:
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 516, in meta
+    self._secret_meta = self.charm.model.get_secret(label=self.label)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/model.py", line 276, in get_secret
+    content = self._backend.secret_get(id=id, label=label)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/model.py", line 3311, in secret_get
+    result = self._run('secret-get', *args, return_output=True, use_json=True)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/ops/model.py", line 2957, in _run
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR permission denied
+
+unit-postgresql-0: 01:37:01 ERROR juju.worker.uniter.operation hook "update-status" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:856 Forgetting main...

@@ -1,0 +1,75 @@
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:488 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:493 Cutting network for postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:499 checking for no connectivity between postgresql/2 and postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:499 checking for no connectivity between postgresql/2 and postgresql/3
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:506 checking for no connectivity between postgresql/2 and the controller
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:513 checking whether the connectivity to the database is not working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:519 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:522 checking whether a new primary was elected
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:529 Restoring network for postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:533 waiting for cluster to become idle
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:538 waiting for the database service to be ready on postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:542 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:209 checking that the former primary is now a replica
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:215 checking that all units are part of the same cluster
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:229 checking that no writes to the database were missed after stopping the writes
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:233 checking that the former primary is up to date with the cluster after restarting
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.5    unsupported  02:24:42Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.12    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  231  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.190.201.3              received database credentials of the first database
+postgresql/1*           active    idle   1        10.190.201.247  5432/tcp  Primary
+postgresql/2            active    idle   2        10.190.201.40   5432/tcp  
+postgresql/3            active    idle   4        10.190.201.10   5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ  Message
+1        started  10.190.201.247  juju-1bbb3c-1  ubuntu@22.04      Running
+2        started  10.190.201.40   juju-1bbb3c-2  ubuntu@22.04      Running
+3        started  10.190.201.3    juju-1bbb3c-3  ubuntu@22.04      Running
+4        started  10.190.201.10   juju-1bbb3c-4  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-1: 01:34:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:34:57 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:35:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:35:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:35:03 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:35:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:35:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:35:09 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:35:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:35:11 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:45:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:45:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:45:37 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 02:14:07 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-4: 02:14:07 ERROR juju.worker.uniter.metrics failed to close the collect-metrics listener: close unix /var/lib/juju/agents/unit-postgresql-3/4093291579/s: use of closed network connection
+machine-4: 02:14:10 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-4" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: network is unreachable
+machine-4: 02:14:14 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-4" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: network is unreachable
+machine-4: 02:14:19 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-4" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: network is unreachable
+machine-4: 02:14:24 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-4" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: network is unreachable
+machine-2: 02:22:41 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-2: 02:22:41 ERROR juju.worker.uniter.metrics failed to close the collect-metrics listener: close unix /var/lib/juju/agents/unit-postgresql-2/4292804906/s: use of closed network connection
+machine-2: 02:22:47 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: i/o timeout
+machine-2: 02:22:53 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+machine-2: 02:22:59 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+machine-2: 02:23:06 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+machine-2: 02:23:15 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+machine-2: 02:23:24 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+machine-2: 02:23:33 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [e27632] "machine-2" cannot open api: unable to connect to API: dial tcp 10.190.201.150:17070: connect: no route to host
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...

@@ -1,0 +1,47 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:86 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.5    unsupported  02:30:18Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active      1  data-integrator      latest/edge   38  no       
+postgresql           14.12    active      2  postgresql                          0  no       Primary
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  206  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+data-integrator/0*      active    idle   3        10.241.90.234             
+postgresql-test-app/0*  active    idle   4        10.241.90.89              received database credentials of the first database
+postgresql/0*           active    idle   0        10.241.90.157   5432/tcp  Primary
+postgresql/1            active    idle   1        10.241.90.110   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.241.90.157  juju-6d05d5-0  ubuntu@22.04      Running
+1        started  10.241.90.110  juju-6d05d5-1  ubuntu@22.04      Running
+3        started  10.241.90.234  juju-6d05d5-3  ubuntu@22.04      Running
+4        started  10.241.90.89   juju-6d05d5-4  ubuntu@22.04      Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    1/1        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:51:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:51:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:51:43 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:51:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:51:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:51:54 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:51:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:51:56 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:51:57 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:52:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:52:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-data-integrator-0: 01:52:06 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:53:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:53:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:53:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 02:17:59 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "6823728d-a7fc-4dc6-8037-1276d26d05d5:r#6#postgresql-test-app": settings 6823728d-a7fc-4dc6-8037-1276d26d05d5:r#6#postgresql-test-app not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...

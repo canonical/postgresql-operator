@@ -1,0 +1,71 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:56:14Z
+
+App                  Version  Status  Scale  Charm                Channel  Rev  Exposed  Message
+another-application           active      1  postgresql-test-app  edge      76  no       received database credentials of the first database
+another-database     14.11    active      2  postgresql                      0  no       
+database             14.11    active      2  postgresql                      1  no       
+postgresql-test-app           active      2  postgresql-test-app  edge      76  no       received database credentials of the second database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*  active    idle   6        10.86.22.252              received database credentials of the first database
+another-database/0      active    idle   3        10.86.22.178    5432/tcp  
+another-database/1*     active    idle   4        10.86.22.236    5432/tcp  Primary
+database/2*             active    idle   7        10.86.22.36     5432/tcp  
+database/3              active    idle   8        10.86.22.65     5432/tcp  
+postgresql-test-app/0   active    idle   0        10.86.22.88               received database credentials of the second database
+postgresql-test-app/1*  active    idle   1        10.86.22.41               received database credentials of the second database
+
+Machine  State    Address       Inst id        Base          AZ  Message
+0        started  10.86.22.88   juju-64b828-0  ubuntu@22.04      Running
+1        started  10.86.22.41   juju-64b828-1  ubuntu@22.04      Running
+3        started  10.86.22.178  juju-64b828-3  ubuntu@22.04      Running
+4        started  10.86.22.236  juju-64b828-4  ubuntu@22.04      Running
+6        started  10.86.22.252  juju-64b828-6  ubuntu@22.04      Running
+7        started  10.86.22.36   juju-64b828-7  ubuntu@22.04      Running
+8        started  10.86.22.65   juju-64b828-8  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-1: 01:31:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:30 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-1: 01:31:30 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:31:34 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:31:34 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:31:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:31:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:31:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-1: 01:31:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:31:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:54 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:54 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 01:31:54 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-0: 01:31:54 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:41:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:41:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:41:28 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-database-1: 01:41:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:45:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:45:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:45:25 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-another-application-0: 01:45:25 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-7: 01:48:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:48:44 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-7: 01:48:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-2: 01:48:44 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-8: 01:48:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:48:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:48:44 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-database-3: 01:48:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-2: 01:55:47 ERROR unit.database/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...

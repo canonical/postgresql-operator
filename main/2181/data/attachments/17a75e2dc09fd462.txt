@@ -1,0 +1,92 @@
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:102 starting continuous writes to the database
+[33mWARNING [0m juju.model:model.py:1563 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: Primary
+  postgresql-test-app/0 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:106 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:115 Build charm locally
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:118 Refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:121 Wait for upgrade to start
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:128 Wait for upgrade to complete
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [executing] waiting: other units upgrading first...
+  postgresql/1 [executing] waiting: other units upgrading first...
+  postgresql/2 [idle] active: Primary
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] waiting: other units upgrading first...
+  postgresql/1 [executing] maintenance: refreshing the snap
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] waiting: other units upgrading first...
+  postgresql/1 [executing] maintenance: refreshing the snap
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [executing] maintenance: updating configuration
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [executing] maintenance: refreshing the snap
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] maintenance: upgrade completed
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [executing] maintenance: updating configuration
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] maintenance: upgrade completed
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [executing] waiting: waiting for database initialisation
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:135 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:140 checking whether no writes were lost
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:145 checking the number of switchovers
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:42:14Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.11    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge   71  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.128.192.179            received database credentials of the first database
+postgresql/0            active    idle   0        10.128.192.188  5432/tcp  
+postgresql/1            active    idle   1        10.128.192.33   5432/tcp  Primary
+postgresql/2*           active    idle   2        10.128.192.59   5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.128.192.188  juju-a56c05-0  ubuntu@22.04      Running
+1        started  10.128.192.33   juju-a56c05-1  ubuntu@22.04      Running
+2        started  10.128.192.59   juju-a56c05-2  ubuntu@22.04      Running
+3        started  10.128.192.179  juju-a56c05-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-2: 01:27:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:27:56 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:27:56 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-2: 01:27:56 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:28:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:28:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:28:00 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-test-app-0: 01:28:01 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:28:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:28:01 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:28:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:28:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:28:02 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:28:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:28:02 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 01:28:02 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...
