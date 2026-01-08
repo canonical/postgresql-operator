@@ -940,7 +940,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            bool(self.unit_peer_data.get("tls")),
             self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
@@ -974,6 +973,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
         return all(self.tls.get_tls_files())
+
+    @property
+    def is_peer_data_tls_set(self) -> bool:
+        """Return whether the TLS flag is raised in the peer data."""
+        return bool(self.unit_peer_data.get("tls"))
 
     @property
     def _peer_members_ips(self) -> set[str]:

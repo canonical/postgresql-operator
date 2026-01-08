@@ -119,7 +119,6 @@ class Patroni:
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
-        tls_enabled: bool,
         raft_password: str,
         patroni_password: str,
     ):
@@ -135,7 +134,6 @@ class Patroni:
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
-            tls_enabled: whether TLS is enabled
             raft_password: password for raft
             patroni_password: password for the user used on patroni
         """
@@ -150,20 +148,23 @@ class Patroni:
         self.rewind_password = rewind_password
         self.raft_password = raft_password
         self.patroni_password = patroni_password
-        self.tls_enabled = tls_enabled
+
+    @property
+    def verify(self) -> str | bool:
+        """Return the TLS bundle location if necessary."""
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
+        return f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if self.charm.is_peer_data_tls_set else True
 
     @cached_property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
-    @cached_property
+    @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
-        return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
+        return f"{'https' if self.charm.is_peer_data_tls_set else 'http'}://{self.unit_ip}:8008"
 
     @staticmethod
     def _dict_to_hba_string(_dict: dict[str, Any]) -> str:
