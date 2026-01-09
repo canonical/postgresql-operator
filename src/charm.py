@@ -645,7 +645,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return PostgreSQL(
             substrate=Substrates.VM,
             primary_host=self.primary_endpoint,
-            current_host="/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/",
+            # Connecting to local Postgresql socket
+            current_host="/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/",  # noqa: S108
             user=USER,
             password=str(self.get_secret(APP_SCOPE, f"{USER}-password")),
             database=DATABASE_DEFAULT_NAME,
