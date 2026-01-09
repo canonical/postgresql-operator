@@ -84,7 +84,6 @@ def patroni(harness, peers_ips):
         "fake-superuser-password",
         "fake-replication-password",
         "fake-rewind-password",
-        False,
         "fake-raft-password",
         "fake-patroni-password",
     )
