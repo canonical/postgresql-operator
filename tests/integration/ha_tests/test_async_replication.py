@@ -91,7 +91,8 @@ async def second_model_continuous_writes(second_model) -> None:
     for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3), reraise=True):
         with attempt:
             action = (
-                await second_model.applications[APPLICATION_NAME]
+                await second_model
+                .applications[APPLICATION_NAME]
                 .units[0]
                 .run_action("clear-continuous-writes")
             )

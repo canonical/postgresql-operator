@@ -833,7 +833,8 @@ async def start_continuous_writes(ops_test: OpsTest, app: str, model: Model = No
     for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
         with attempt:
             action = (
-                await model.applications[APPLICATION_NAME]
+                await model
+                .applications[APPLICATION_NAME]
                 .units[0]
                 .run_action("start-continuous-writes")
             )
@@ -844,7 +845,8 @@ async def start_continuous_writes(ops_test: OpsTest, app: str, model: Model = No
 async def stop_continuous_writes(ops_test: OpsTest) -> int:
     """Stops continuous writes to PostgreSQL and returns the last written value."""
     action = (
-        await ops_test.model.applications[APPLICATION_NAME]
+        await ops_test.model
+        .applications[APPLICATION_NAME]
         .units[0]
         .run_action("stop-continuous-writes")
     )
