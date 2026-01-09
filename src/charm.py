@@ -645,7 +645,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return PostgreSQL(
             substrate=Substrates.VM,
             primary_host=self.primary_endpoint,
-            current_host=self._unit_ip,
+            current_host="/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/",
             user=USER,
             password=str(self.get_secret(APP_SCOPE, f"{USER}-password")),
             database=DATABASE_DEFAULT_NAME,
