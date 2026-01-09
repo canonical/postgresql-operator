@@ -872,7 +872,8 @@ def remove_chown_workaround(original_charm_filename: str, patched_charm_filename
                     content = file.read()
                     # Modify the content of the file by replacing a string
                     content = (
-                        content.decode()
+                        content
+                        .decode()
                         .replace(
                             """        try:
             self._patch_snap_seccomp_profile()
@@ -1088,8 +1089,10 @@ async def wait_for_idle_on_blocked(
     await asyncio.gather(
         ops_test.model.wait_for_idle(apps=[other_app_name], status="active"),
         ops_test.model.block_until(
-            lambda: unit.workload_status == "blocked"
-            and unit.workload_status_message == status_message
+            lambda: (
+                unit.workload_status == "blocked"
+                and unit.workload_status_message == status_message
+            )
         ),
     )
 

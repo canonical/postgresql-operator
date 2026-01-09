@@ -91,15 +91,18 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 break
         try:
             await ops_test.model.block_until(
-                lambda: left_unit.workload_status == "blocked"
-                and left_unit.workload_status_message
-                == "Raft majority loss, run: promote-to-primary",
+                lambda: (
+                    left_unit.workload_status == "blocked"
+                    and left_unit.workload_status_message
+                    == "Raft majority loss, run: promote-to-primary"
+                ),
                 timeout=600,
             )
             await ops_test.model.wait_for_idle(timeout=600, idle_period=45)
 
             run_action = (
-                await ops_test.model.applications[DATABASE_APP_NAME]
+                await ops_test.model
+                .applications[DATABASE_APP_NAME]
                 .units[0]
                 .run_action("promote-to-primary", scope="unit", force=True)
             )
