@@ -1,0 +1,32 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  00:19:40Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.20    active      1  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.96.99.161    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.96.99.161  juju-6714e6-0  ubuntu@22.04  runnervmi13qx  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:16:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:16:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:17:46 ERROR unit.postgresql/0.juju-log Invalid configuration: 2 validation errors for CharmConfig
+synchronous_node_count
+  unexpected value; permitted: 'all', 'majority' (type=value_error.const; given=0; permitted=('all', 'majority'))
+synchronous_node_count
+  ensure this value is greater than 0 (type=value_error.number.not_gt; limit_value=0)
+unit-postgresql-0: 00:17:47 ERROR unit.postgresql/0.juju-log Invalid configuration: 1 validation error for CharmConfig
+vacuum_vacuum_cost_limit
+  Value is not between 1 and 10000 (type=value_error)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
