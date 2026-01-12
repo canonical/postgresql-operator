@@ -219,9 +219,13 @@ async def change_wal_settings(
 async def is_cluster_updated(
     ops_test: OpsTest, primary_name: str, use_ip_from_inside: bool = False
 ) -> None:
-
-    logger.info("Patroni cluster status on postgresql/0:")
-    await get_cluster_roles(ops_test, ops_test.model.applications["postgresql"].units[0].name)
+    app_name = primary_name.split("/")[0]
+    for unit in ops_test.model.applications[app_name].units:
+        logger.info(f"Patroni cluster status for {unit.name}")
+        try:
+            await get_cluster_roles(ops_test, unit.name)
+        except Exception:
+            logger.exception("Failed to get cluster status:")
     # Verify that the old primary is now a replica.
     logger.info("checking that the former primary is now a replica")
     assert await is_replica(ops_test, primary_name, use_ip_from_inside), (
@@ -256,8 +260,12 @@ async def is_cluster_updated(
                 ops_test, primary_name, total_expected_writes, use_ip_from_inside
             ), "secondary not up to date with the cluster after restarting."
 
-    logger.info("Patroni cluster status on postgresql/0 (try 2):")
-    await get_cluster_roles(ops_test, ops_test.model.applications["postgresql"].units[0].name)
+    for unit in ops_test.model.applications[app_name].units:
+        logger.info(f"Patroni cluster status for {unit.name} (try 2)")
+        try:
+            await get_cluster_roles(ops_test, unit.name)
+        except Exception:
+            logger.exception("Failed to get cluster status:")
 
 
 async def check_writes(
