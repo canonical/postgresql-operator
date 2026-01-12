@@ -399,7 +399,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
             primary_host=self.primary_endpoint,
-            current_host=self._unit_ip,
+            # Connecting to local Postgresql socket
+            current_host="/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/",  # noqa: S108
             user=USER,
             password=self.get_secret(APP_SCOPE, f"{USER}-password"),
             database=DATABASE_DEFAULT_NAME,
