@@ -1,0 +1,31 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  00:12:16Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.20    active      3  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.51.197.190   5432/tcp  Primary
+postgresql/1   active    idle   1        10.51.197.2     5432/tcp  
+postgresql/2   active    idle   2        10.51.197.194   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.51.197.190  juju-5929b1-0  ubuntu@22.04  runnervmi13qx  Running
+1        started  10.51.197.2    juju-5929b1-1  ubuntu@22.04  runnervmi13qx  Running
+2        started  10.51.197.194  juju-5929b1-2  ubuntu@22.04  runnervmi13qx  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:06:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:10:33 ERROR unit.postgresql/1.juju-log restart:2: Failed to list PostgreSQL database users: connection to server at "10.51.197.2", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
