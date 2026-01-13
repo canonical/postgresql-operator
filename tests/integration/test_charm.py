@@ -192,7 +192,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         "response_lc_monetary": "en_GB.utf8",
         "experimental_max_connections": "200",
     })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=60)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     password = await get_password(ops_test, any_unit_name)
 
