@@ -2299,8 +2299,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
             # which tells how much time Patroni will wait before checking the configuration
             # file again to reload it.
+            # On heavy loaded CI, Patroni might need more time for PostgreSQL to indicate pending_restart
             try:
-                for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(3)):
                     with attempt:
                         restart_postgresql = (
                             restart_postgresql or self.postgresql.is_restart_pending()
