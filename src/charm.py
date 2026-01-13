@@ -2301,7 +2301,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # file again to reload it.
             # On heavy loaded CI, Patroni might need more time for PostgreSQL to indicate pending_restart
             try:
-                for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(3)):
+                for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(3)):
                     with attempt:
                         restart_postgresql = (
                             restart_postgresql or self.postgresql.is_restart_pending()
