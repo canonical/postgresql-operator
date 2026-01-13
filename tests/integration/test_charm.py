@@ -186,13 +186,14 @@ async def test_postgresql_locales(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=60)
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
         "memory_max_prepared_transactions": "100",
         "memory_shared_buffers": "32768",  # 2 * 128MB. Patroni may refuse the config if < 128MB
         "response_lc_monetary": "en_GB.utf8",
         "experimental_max_connections": "200",
     })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=60)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     password = await get_password(ops_test, any_unit_name)
 
