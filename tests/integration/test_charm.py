@@ -197,6 +197,10 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     password = await get_password(ops_test, any_unit_name)
 
     # Connect to PostgreSQL.
+    unit_ip = get_unit_address(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    logger.info(requests.get(f"http://{unit_ip}:8008/config").json())
     for unit_id in UNIT_IDS:
         host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
         logger.info("connecting to the database host: %s", host)
@@ -212,6 +216,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
                     "shared_buffers",
                     "lc_monetary",
                     "max_connections",
+                    "pending_restart",
                 ]
                 cursor.execute(
                     sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
@@ -221,6 +226,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
                 )
                 records = cursor.fetchall()
                 settings = convert_records_to_dict(records)
+                logger.info(f"Pending restart is {settings['pending_restart']}")
 
                 # Validate each configuration set by Patroni on PostgreSQL.
                 assert settings["max_prepared_transactions"] == "100"
