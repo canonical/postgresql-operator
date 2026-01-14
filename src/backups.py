@@ -553,6 +553,7 @@ class PostgreSQLBackups(Object):
             PGBACKREST_CONFIGURATION_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
+            "archive",
             "--recurse",
             "--output=json",
         ])
