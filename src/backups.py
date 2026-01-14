@@ -560,6 +560,8 @@ class PostgreSQLBackups(Object):
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
             "repo-ls",
+            "archive",
+            "--recurse",
             "--output=json",
         ])
         if return_code != 0:
