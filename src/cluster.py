@@ -383,8 +383,8 @@ class Patroni:
             auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
         ) as client:
             try:
-                return (await client.get(url)).json()
-            except (HTTPError, ValueError):
+                return (await client.get(url)).raise_for_status().json()
+            except HTTPError:
                 return None
 
     async def _async_get_request(
