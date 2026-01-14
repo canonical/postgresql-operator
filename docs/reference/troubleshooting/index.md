@@ -145,6 +145,14 @@ The list of running snap/`systemd` services will depend on configured (enabled) 
 
 Access PostgreSQL with the `psql` CLI tool and continue troubleshooting your database-related issues from here. 
 
+```shell
+juju show-unit postgresql/0 | awk '/private-address:/{print $2;exit}'
+
+juju secrets # to find secret ID
+
+juju show-secret --reveal <secret ID> | grep operator
+```
+
 ```{seealso}
 * {ref}`users`
 * {ref}`manage-passwords`

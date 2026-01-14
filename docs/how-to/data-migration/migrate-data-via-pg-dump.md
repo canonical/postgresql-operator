@@ -1,7 +1,9 @@
 (migrate-data-via-pg-dump)=
 # Migrate data via `pg_dump`
 
-This guide describes database **data** migration only. To migrate charms on new Juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/integrate-with-your-charm). 
+This guide describes database **data** migration from the {ref}`legacy PostgreSQL charm <charm-versions>` running PostgreSQL 16 to the modern PostgreSQL 16 charm.
+
+To migrate charms on new Juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/integrate-with-your-charm). 
 
 A minor difference in commands might be necessary for different revisions and/or Juju versions, but the general logic remains:
 
@@ -37,13 +39,12 @@ NEW_DB_APP=< new-postgresql/leader | postgresql/0 >
 DB_NAME=< your_db_name_to_migrate >
 ```
 
-<!-- TODO: secrets 
+
 Then, obtain the username from the existing legacy database via its relation info:
 
 ```text
 OLD_DB_USER=$(juju show-unit ${CLIENT_APP} | yq '.[] | .relation-info | select(.[].endpoint == "db") | .[0].application-data.user')
 ```
--->
 
 ## Deploy new PostgreSQL databases and obtain credentials
 
@@ -53,14 +54,12 @@ Deploy new PostgreSQL database charm:
 juju deploy postgresql ${NEW_DB_APP} --channel 16/stable
 ```
 
-<!-- TODO: secrets 
-Obtain the `operator` user password of new PostgreSQL database from PostgreSQL charm. See
+Obtain the `operator` user password of the new PostgreSQL database via Juju secrets. See {ref}`save-current-cluster-credentials` for more details.
 
 ```text
 NEW_DB_USER=operator
 NEW_DB_PASS=<your password>
 ```
--->
 
 ## Migrate database
 
