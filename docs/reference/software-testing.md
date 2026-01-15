@@ -48,14 +48,8 @@ juju run postgresql-test-app/leader clear-continuous-writes
 
 ## Unit test
 
-Check the [Contributing guide](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md#testing) on GitHub and follow `tox run -e unit` examples there.
+Check the [Contributing guide](https://github.com/canonical/postgresql-operator/blob/16/edge/CONTRIBUTING.md#testing) on GitHub and follow `tox run -e unit` examples there.
 
 ## Integration test
 
-Check the [Contributing guide](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md#testing) on GitHub and follow `tox run -e integration` examples there.
-
-## System test
-
-To perform a system test, deploy  [`postgresql-bundle`](https://charmhub.io/postgresql-bundle). 
-
-This charm bundle automatically deploys and tests all the necessary parts at once.
+Check the [Contributing guide](https://github.com/canonical/postgresql-operator/blob/16/edge/CONTRIBUTING.md#testing) on GitHub and follow `tox run -e integration` examples there.
