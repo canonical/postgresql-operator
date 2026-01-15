@@ -77,15 +77,10 @@ juju integrate <charm> postgresql
 `<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
 
 ### Internal operator user
-The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.
 
-To set a specific password for the operator user, run
-```text
-juju run postgresql/leader set-password password=<password>
+The `operator` user is used internally by the Charmed PostgreSQL application. All user credentials are managed with Juju secrets.
+
+```{seealso}
+* {ref}`manage-passwords`
+* [Juju | How to update a secret](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#update-a-secret)
 ```
-
-To randomly generate a password for the `operator` user, run
-```text
-juju run postgresql/leader set-password
-```
-
