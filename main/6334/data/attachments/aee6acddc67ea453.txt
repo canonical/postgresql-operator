@@ -1,0 +1,161 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the second database
+  postgresql-test-app/1 [idle] active: received database credentials of the second database
+  database/2 [executing] active: 
+  database/3 [executing] active: Primary
+  another-database/0 [idle] active: Primary
+  another-database/1 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/jammy/data-integrator-305
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [idle] blocked: Please specify either topic, index, database name, or prefix
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [executing] blocked: Please relate the data-integrator with the desired product
+  another-data-integrator/0 [executing] blocked: Please specify either topic, index, database name, or prefix
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] active: 
+  database/3 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] active: 
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] blocked: invalid role(s) for extra user roles
+  database/3 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] blocked: invalid role(s) for extra user roles
+  database/3 [executing] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  00:39:52Z
+
+App                      Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+another-application               active       1  postgresql-test-app  latest/edge  426  no       received database credentials of the first database
+another-data-integrator           blocked      1  data-integrator      latest/edge  305  no       Please relate the data-integrator with the desired product
+another-database         14.20    active       2  postgresql                          0  no       
+data-integrator                   blocked      1  data-integrator      latest/edge  305  no       Please relate the data-integrator with the desired product
+database                 14.20    active       2  postgresql                          1  no       
+postgresql-test-app               active       2  postgresql-test-app  latest/edge  426  no       received database credentials of the second database
+
+Unit                        Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*      active    idle   6        10.110.244.15             received database credentials of the first database
+another-data-integrator/0*  blocked   idle   10       10.110.244.251            Please relate the data-integrator with the desired product
+another-database/0*         active    idle   3        10.110.244.152  5432/tcp  Primary
+another-database/1          active    idle   4        10.110.244.106  5432/tcp  
+data-integrator/0*          blocked   idle   9        10.110.244.239            Please relate the data-integrator with the desired product
+database/2*                 active    idle   7        10.110.244.85   5432/tcp  
+database/3                  active    idle   8        10.110.244.193  5432/tcp  Primary
+postgresql-test-app/0*      active    idle   0        10.110.244.133            received database credentials of the second database
+postgresql-test-app/1       active    idle   1        10.110.244.166            received database credentials of the second database
+
+Machine  State    Address         Inst id         Base          AZ             Message
+0        started  10.110.244.133  juju-f22115-0   ubuntu@22.04  runnervmi13qx  Running
+1        started  10.110.244.166  juju-f22115-1   ubuntu@22.04  runnervmi13qx  Running
+3        started  10.110.244.152  juju-f22115-3   ubuntu@22.04  runnervmi13qx  Running
+4        started  10.110.244.106  juju-f22115-4   ubuntu@22.04  runnervmi13qx  Running
+6        started  10.110.244.15   juju-f22115-6   ubuntu@22.04  runnervmi13qx  Running
+7        started  10.110.244.85   juju-f22115-7   ubuntu@22.04  runnervmi13qx  Running
+8        started  10.110.244.193  juju-f22115-8   ubuntu@22.04  runnervmi13qx  Running
+9        started  10.110.244.239  juju-f22115-9   ubuntu@22.04  runnervmi13qx  Running
+10       started  10.110.244.251  juju-f22115-10  ubuntu@22.04  runnervmi13qx  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:06:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:08:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:08:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:09:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:09:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 00:09:28 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0c6e737490 state=finished raised Exception>]
+unit-another-database-0: 00:09:45 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff0c87af430 state=finished raised Exception>]
+machine-5: 00:13:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:13:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-1: 00:16:38 ERROR unit.database/1.juju-log Data directory not attached.
+machine-6: 00:18:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:18:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 00:19:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-1: 00:19:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-0: 00:19:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:19:25 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-1: 00:19:43 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-0: 00:20:59 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-0: 00:20:59 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-1: 00:21:10 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-7: 00:23:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:23:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:24:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:24:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 00:26:18 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-1: 00:26:40 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-application-0: 00:26:42 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-0: 00:26:50 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:29:21 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-2: 00:29:52 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-3: 00:29:52 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-1: 00:30:25 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-3: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-0: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-1: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-8: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-7: 00:31:16 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-6: 00:31:39 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): write tcp 10.110.244.15:44310->10.110.244.65:17070: write: broken pipe
+unit-database-2: 00:33:04 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-3: 00:33:13 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-9: 00:34:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 00:34:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 00:37:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 00:37:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-application-0: 00:37:38 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-2: 00:38:28 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-2: 00:38:43 ERROR unit.database/2.juju-log database-peers:2: Invalid extra user roles: test
+unit-database-2: 00:38:43 ERROR unit.database/2.juju-log database-peers:2: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-2/charm/src/relations/postgresql_provider.py", line 122, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 310, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+unit-database-2: 00:38:44 ERROR unit.database/2.juju-log database-peers:2: Invalid extra user roles: test
+unit-database-2: 00:38:44 ERROR unit.database/2.juju-log database-peers:2: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-2/charm/src/relations/postgresql_provider.py", line 122, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-2/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 310, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+unit-postgresql-test-app-0: 00:39:12 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
