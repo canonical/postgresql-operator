@@ -206,7 +206,10 @@ def test_on_database_requested(harness):
 
 
 def test_oversee_users(harness):
-    with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+    with (
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgreSQLProvider._on_relation_broken"),
+    ):
         # Create two relations and add the username in their databags.
         rel_id = harness.add_relation(RELATION_NAME, "application")
         harness.update_relation_data(
