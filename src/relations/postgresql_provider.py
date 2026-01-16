@@ -11,7 +11,15 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
 )
-from ops import ActiveStatus, BlockedStatus, ModelError, Object, Relation, RelationBrokenEvent
+from ops import (
+    ActiveStatus,
+    BlockedStatus,
+    ModelError,
+    Object,
+    Relation,
+    RelationBrokenEvent,
+    RelationDepartedEvent,
+)
 from single_kernel_postgresql.config.literals import SYSTEM_USERS
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
@@ -66,6 +74,9 @@ class PostgreSQLProvider(Object):
         self.relation_name = relation_name
 
         super().__init__(charm, self.relation_name)
+        self.framework.observe(
+            charm.on[self.relation_name].relation_departed, self._on_relation_departed
+        )
         self.framework.observe(
             charm.on[self.relation_name].relation_broken, self._on_relation_broken
         )
@@ -319,8 +330,56 @@ class PostgreSQLProvider(Object):
             )
             return
 
+    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
+        """Set a flag to avoid deleting database users when not wanted."""
+        # Set a flag to avoid deleting database users when this unit
+        # is removed and receives relation broken events from related applications.
+        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
+        if event.departing_unit == self.charm.unit and self.charm._peers:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Correctly update the status."""
+        """Remove the user created for this relation."""
+        # Check for some conditions before trying to access the PostgreSQL instance.
+        if (
+            not self.charm._peers
+            or not self.charm.is_cluster_initialised
+            or not self.charm._patroni.member_started
+        ):
+            logger.debug(
+                "Deferring on_relation_broken: Cluster must be initialized before user can be deleted"
+            )
+            event.defer()
+            return
+
+        self._update_unit_status(event.relation)
+
+        if self.charm.is_unit_departing:
+            logger.debug("Early exit on_relation_broken: Skipping departing unit")
+            return
+
+        user = self.get_username_mapping().get(
+            str(event.relation.id), f"relation-{event.relation.id}"
+        )
+        if not self.charm.unit.is_leader():
+            if user in self.charm.postgresql.list_users():
+                logger.debug("Deferring on_relation_broken: user was not deleted yet")
+                event.defer()
+            else:
+                self.charm.update_config()
+            return
+
+        # Delete the user.
+        try:
+            self.charm.postgresql.delete_user(user)
+        except PostgreSQLDeleteUserError as e:
+            logger.exception(e)
+            self.charm.set_unit_status(
+                BlockedStatus(
+                    f"Failed to delete user during {self.relation_name} relation broken event"
+                )
+            )
+
         self.update_username_mapping(event.relation.id, None)
         self.set_databases_prefix_mapping(event.relation.id, None, None, None)
         if (
@@ -330,8 +389,7 @@ class PostgreSQLProvider(Object):
         ):
             for prefixed_user in self.remove_database_from_prefix_mapping(database):
                 self.charm.postgresql.remove_user_from_databases(prefixed_user, [database])
-
-        self._update_unit_status(event.relation)
+        self.charm.update_config()
 
     def oversee_users(self) -> None:
         """Remove users from database if their relations were broken."""
