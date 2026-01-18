@@ -1,0 +1,93 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.12   unsupported  00:40:34Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+another-application           active      1  postgresql-test-app  latest/edge  426  no       received database credentials of the first database
+another-database     14.20    active      2  postgresql                          1  no       
+database             14.20    active      3  postgresql                          0  no       
+postgresql-test-app           active      2  postgresql-test-app  latest/edge  426  no       received database credentials of the second database
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+another-application/0*  active    idle       6        10.58.142.39              received database credentials of the first database
+another-database/0*     active    idle       3        10.58.142.157   5432/tcp  Primary
+another-database/1      active    idle       4        10.58.142.215   5432/tcp  
+database/0*             active    executing  2        10.58.142.166   5432/tcp  Primary
+database/2              active    idle       7        10.58.142.213   5432/tcp  Primary
+database/3              active    idle       8        10.58.142.231   5432/tcp  
+postgresql-test-app/0*  active    idle       0        10.58.142.199             received database credentials of the second database
+postgresql-test-app/1   active    idle       1        10.58.142.65              received database credentials of the second database
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.58.142.199  juju-821cdd-0  ubuntu@22.04  runnervmmtnos  Running
+1        started  10.58.142.65   juju-821cdd-1  ubuntu@22.04  runnervmmtnos  Running
+2        started  10.58.142.166  juju-821cdd-2  ubuntu@22.04  runnervmmtnos  Running
+3        started  10.58.142.157  juju-821cdd-3  ubuntu@22.04  runnervmmtnos  Running
+4        started  10.58.142.215  juju-821cdd-4  ubuntu@22.04  runnervmmtnos  Running
+6        started  10.58.142.39   juju-821cdd-6  ubuntu@22.04  runnervmmtnos  Running
+7        started  10.58.142.213  juju-821cdd-7  ubuntu@22.04  runnervmmtnos  Running
+8        started  10.58.142.231  juju-821cdd-8  ubuntu@22.04  runnervmmtnos  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:05:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:05:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:07:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:07:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:07:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:07:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 00:08:13 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f975140e680 state=finished raised Exception>]
+unit-another-database-0: 00:08:26 ERROR unit.another-database/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-database-0: 00:08:53 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3d0411b430 state=finished raised Exception>]
+machine-5: 00:12:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:12:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:16:57 ERROR juju.worker.dependency "upgrade-steps-runner" manifold worker returned unexpected error: can't get life for machine: connection is shut down
+unit-database-1: 00:16:59 ERROR unit.database/1.juju-log Data directory not attached.
+machine-6: 00:18:33 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:18:33 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 00:19:44 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-0: 00:19:44 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-1: 00:19:44 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-1: 00:20:19 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:20:19 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-0: 00:22:49 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-0: 00:24:28 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-1: 00:24:29 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-7: 00:24:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:24:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:25:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:25:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-1: 00:27:55 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-application-0: 00:28:32 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-1: 00:29:30 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:29:31 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-2: 00:30:31 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-2: 00:32:18 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-0: 00:32:39 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-0: 00:32:39 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-another-database-1: 00:32:50 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-database-3: 00:33:03 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
