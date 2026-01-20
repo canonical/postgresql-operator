@@ -14,6 +14,8 @@ jobs:
     name: Collect integration test spread jobs
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write  # Needed for Allure Report
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -90,6 +92,7 @@ jobs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
     timeout-minutes: 216  # Sum of steps `timeout-minutes` + 5
+    permissions: {}
     steps:
       - name: Checkout
         timeout-minutes: 3
@@ -190,6 +193,8 @@ jobs:
       - integration-test
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write  # Needed for Allure Report
     steps:
       - name: Parse branch name
         id: branch
