@@ -238,7 +238,6 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Update the configuration.
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
-        self._charm.updated_synchronous_node_count()
 
         # TODO add graceful shutdown before refreshing snap?
         # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
@@ -2556,7 +2555,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "max_logical_replication_workers"
             ]
 
-        base_patch = {}
+        base_patch = {**self._patroni.synchronous_configuration}
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
