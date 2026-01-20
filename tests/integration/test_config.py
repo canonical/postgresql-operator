@@ -35,7 +35,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
     test_string = "abcXYZ123"
 
     configs = [
-        {"synchronous_node_count": ["0", "1"]},  # config option is greater than 0
+        {"synchronous_node_count": ["-1", "1"]},  # config option is greater than -1
         {
             "synchronous_node_count": [test_string, "all"]
         },  # config option is one of `all`, `minority` or `majority`

@@ -1174,6 +1174,7 @@ class Patroni:
                     json={
                         "synchronous_node_count": self._synchronous_node_count,
                         "synchronous_mode_strict": len(member_units) > 1
+                        and self.charm.config.synchronous_node_count != 0
                         and self._synchronous_node_count > 0,
                     },
                     verify=self.verify,

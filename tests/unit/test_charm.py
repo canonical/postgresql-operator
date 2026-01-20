@@ -1838,18 +1838,21 @@ def test_config_validation_invalid_worker_values(harness):
     # Pydantic should reject this
     assert "validation error" in str(e.value).lower()
 
-    # Test negative number - should be accepted at config level but fail during calculation
+    # Test negative number
     with harness.hooks_disabled():
         harness.update_config({"cpu-max-worker-processes": "-5"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
-    # The config should accept it (as it gets validated later in the calculation method)
-    assert harness.charm.config.cpu_max_worker_processes == -5
+    with pytest.raises(ValueError) as e:
+        _ = harness.charm.config
+
+    # Pydantic should reject this
+    assert "validation error" in str(e.value).lower()
 
     # Test value less than 2 - should be accepted at config level but fail during calculation
     with harness.hooks_disabled():
-        harness.update_config({"cpu-max-parallel-workers": "7"})
+        harness.update_config({"cpu-max-worker-processes": "2", "cpu-max-parallel-workers": "7"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 

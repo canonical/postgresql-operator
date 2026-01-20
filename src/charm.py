@@ -55,7 +55,6 @@ from ops import (
     WaitingStatus,
     main,
 )
-from pydantic import ValidationError
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -2390,20 +2389,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return str(min(8, 2 * self.cpu_count))
         elif self.config.cpu_max_worker_processes is not None:
             value = self.config.cpu_max_worker_processes
-            if value < 2:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 2},
-                            input=value,
-                            loc=("cpu_max_worker_processes",),
-                        )
-                    ],
-                )
             cap = 10 * self.cpu_count
             if value > cap:
                 raise ValueError(
@@ -2427,20 +2412,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ValidationError: If value is less than 2
             ValueError: If value exceeds 10 * vCores
         """
-        if value < 2:
-            from pydantic_core import InitErrorDetails
-
-            raise ValidationError.from_exception_data(
-                "ValidationError",
-                [
-                    InitErrorDetails(
-                        type="greater_than_equal",
-                        ctx={"ge": 2},
-                        input=value,
-                        loc=(param_name,),
-                    )
-                ],
-            )
         cap = 10 * self.cpu_count
         if value > cap:
             raise ValueError(
