@@ -2247,7 +2247,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch)
 
         self._handle_postgresql_restart_need(
-            enable_tls, self.unit_peer_data.get("config_hash") != self.generate_config_hash
+            self.unit_peer_data.get("config_hash") != self.generate_config_hash
         )
 
         cache = snap.SnapCache()
@@ -2295,11 +2295,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self, enable_tls: bool, config_changed: bool) -> None:
+    def _handle_postgresql_restart_need(self, config_changed: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
         try:
             self._patroni.reload_patroni_configuration()
+            self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
@@ -2318,8 +2319,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except RetryError:
                 # Ignore the error, as it happens only to indicate that the configuration has not changed.
                 pass
+        elif restart_postgresql:
+            try:
+                self._patroni.get_patroni_health()
+            except RetryError:
+                logger.warning("Unable to get health endpoint after switching tls")
 
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed
