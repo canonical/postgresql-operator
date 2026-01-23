@@ -1512,11 +1512,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
-        if not self.updated_synchronous_node_count():
-            logger.debug("Defer on_config_changed: unable to set synchronous node count")
-            event.defer()
-            return
-
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
 
