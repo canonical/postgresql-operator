@@ -124,8 +124,8 @@ def test_get_patroni_health(peers_ips, patroni):
         health = patroni.get_patroni_health()
 
         # Check needed to ensure a fast charm deployment.
-        _stop_after_delay.assert_called_once_with(60)
-        _wait_fixed.assert_called_once_with(7)
+        _stop_after_delay.assert_called_once_with(15)
+        _wait_fixed.assert_called_once_with(3)
 
         assert health == {"state": "running"}
 

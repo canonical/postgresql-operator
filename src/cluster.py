@@ -16,6 +16,7 @@ from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
+from signal import SIGHUP
 from ssl import CERT_NONE, create_default_context
 from typing import Any, TypedDict
 
@@ -445,7 +446,7 @@ class Patroni:
 
     def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
+        for attempt in Retrying(stop=stop_after_delay(15), wait=wait_fixed(3)):
             with attempt:
                 r = requests.get(
                     f"{self._patroni_url}/health",
@@ -943,15 +944,27 @@ class Patroni:
             logger.debug("Remove raft member: Remove call not successful")
             raise RemoveRaftMemberFailedError()
 
-    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(
-            f"{self._patroni_url}/reload",
-            verify=self.verify,
-            auth=self._patroni_auth,
-            timeout=PATRONI_TIMEOUT,
-        )
+        pid = None
+        module_patern = re.compile("/snap/charmed-postgresql/[0-9]+/usr/bin/patroni")
+        conf_pattern = re.compile("/var/snap/charmed-postgresql/[0-9]+/etc/patroni/patroni.yaml")
+        for proc in psutil.process_iter():
+            cmdline = proc.cmdline()
+            if (
+                len(cmdline) == 3
+                and cmdline[0] == "python3"
+                and re.match(module_patern, cmdline[1])
+                and re.match(conf_pattern, cmdline[2])
+            ):
+                pid = proc.pid
+                break
+
+        if not pid:
+            logger.warning("Unable to find Patroni pid. Skipping reload")
+            return
+
+        os.kill(pid, SIGHUP)
 
     def is_patroni_running(self) -> bool:
         """Check if the Patroni service is running."""
