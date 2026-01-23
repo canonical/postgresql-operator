@@ -73,6 +73,11 @@ options:
       Default is on (true).
     type: boolean
     default: true
+  durability-maximum-lag-on-failover:
+    description: |
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -688,6 +693,13 @@ options:
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
+  storage-hot-standby-feedback:
+    description: |
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is off
+    type: string
   storage-old-snapshot-threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
@@ -843,6 +855,14 @@ options:
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
     default: true
+  durability_maximum_lag_on_failover:
+    description: |
+      Deprecated: Use durability-maximum-lag-on-failover instead.
+
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
+    defalut: 1048576
   durability_synchronous_commit:
     description: |
       Deprecated: Use durability-synchronous-commit instead.
@@ -1924,6 +1944,16 @@ options:
       Allowed values are: from 64 to 2147483647.
     type: int
     default: 4096
+  storage_hot_standby_feedback:
+    description: |
+      Deprecated: Use storage-hot-standby-feedback instead.
+
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is off
+    type: string
+    default: "off"
   storage_old_snapshot_threshold:
     description: |
       Deprecated: Use storage-old-snapshot-threshold instead.

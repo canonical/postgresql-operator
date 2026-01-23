@@ -8,7 +8,7 @@ import logging
 from typing import Annotated, Literal
 
 from charms.data_platform_libs.v1.data_models import BaseConfigModel
-from pydantic import Field, NonNegativeInt
+from pydantic import Field, NonNegativeInt, PositiveInt
 
 from locales import SNAP_LOCALES
 
@@ -40,6 +40,7 @@ class CharmConfig(BaseConfigModel):
     cpu_max_worker_processes: Literal["auto"] | WorkerProcessInt | None = Field(default="auto")
     cpu_parallel_leader_participation: bool | None = Field(default=None)
     cpu_wal_compression: bool | None = Field(default=None)
+    durability_maximum_lag_on_failover: PositiveInt | None = Field(default=None)
     durability_synchronous_commit: Literal["on", "remote_apply", "remote_write"] | None = Field(
         default=None
     )
@@ -207,6 +208,7 @@ class CharmConfig(BaseConfigModel):
         | None
     ) = Field(default=None)
     storage_gin_pending_list_limit: int | None = Field(ge=64, le=2147483647, default=None)
+    storage_hot_standby_feedback: Literal["on", "off"] | None = Field(default=None)
     storage_old_snapshot_threshold: int | None = Field(ge=-1, le=86400, default=None)
     system_users: str | None = Field(default=None)
     vacuum_autovacuum_analyze_scale_factor: float | None = Field(ge=0, le=100, default=None)

@@ -739,6 +739,7 @@ class Patroni:
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             synchronous_node_count=self._synchronous_node_count,
+            maximum_lag_on_failover=self.charm.config.durability_maximum_lag_on_failover,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
