@@ -1,0 +1,85 @@
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:229 waiting for the database charm to become blocked
+[32mINFO    [0m integration.conftest:conftest.py:54 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.13   unsupported  00:25:38Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  14.20    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable  145  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   idle   5        10.198.233.251  5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle   0        10.198.233.136            
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.198.233.136  juju-61c410-0  ubuntu@22.04  runnervmymu0l  Running
+5        started  10.198.233.251  juju-61c410-5  ubuntu@22.04  runnervmymu0l  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:06:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:06:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 00:07:42 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+machine-2: 00:07:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:07:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 00:08:33 ERROR unit.self-signed-certificates/0.juju-log certificates:4: At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:08:36 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:08:39 ERROR unit.self-signed-certificates/0.juju-log certificates:4: At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-postgresql-gcp-0: 00:08:39 ERROR unit.postgresql-gcp/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4c03647e20 state=finished raised Exception>]
+unit-self-signed-certificates-0: 00:08:48 ERROR unit.self-signed-certificates/0.juju-log certificates:4: At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:09:13 ERROR unit.self-signed-certificates/0.juju-log certificates:4: At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:09:41 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:12:34 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:12:44 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:13:50 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:14:29 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:14:37 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-postgresql-gcp-0: 00:18:36 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-s3-integrator-0: 00:18:41 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-self-signed-certificates-0: 00:18:44 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-self-signed-certificates-0: 00:18:44 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+unit-self-signed-certificates-0: 00:18:53 ERROR unit.self-signed-certificates/0.juju-log At least 1 matching relation ID not found with the relation name 'send-ca-cert'
+machine-2: 00:18:59 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-0: 00:19:40 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 00:20:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:20:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:20:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:20:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-2: 00:21:01 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff0ed3efe80 state=finished raised Exception>]
+unit-new-postgresql-0: 00:21:13 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 568, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 368, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdeafb3be80 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:22:07 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d3ab241e-f216-44b7-8346-61046861c410:r#12#s3-integrator": settings d3ab241e-f216-44b7-8346-61046861c410:r#12#s3-integrator not found (not found)
+unit-postgresql-gcp-2: 00:22:13 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d3ab241e-f216-44b7-8346-61046861c410:r#6#postgresql-gcp": settings d3ab241e-f216-44b7-8346-61046861c410:r#6#postgresql-gcp not found (not found)
+unit-new-postgresql-0: 00:25:06 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-new-postgresql-0: 00:25:34 ERROR unit.new-postgresql/0.juju-log s3-parameters:13: Invalid stanza name from s3
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
