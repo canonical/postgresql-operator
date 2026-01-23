@@ -336,7 +336,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_password=rewind_password,
             version=postgresql_version,
             synchronous_node_count=0,
-            maximum_lag_on_failover=None,
+            maximum_lag_on_failover=1048576,
             raft_password=raft_password,
             patroni_password=patroni_password,
             instance_password_encryption="scram-sha-256",

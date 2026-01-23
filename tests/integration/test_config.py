@@ -44,7 +44,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "durability_synchronous_commit": [test_string, "on"]
         },  # config option is one of `on`, `remote_apply` or `remote_write`
-        {"durability_synchronous_commit": ["-1", "1024"]},  # config option is integer
+        {"durability-maximum-lag-on-failover": ["-1", "1024"]},  # config option is integer
         {
             "instance_default_text_search_config": [test_string, "pg_catalog.simple"]
         },  # config option is validated against the db
@@ -167,7 +167,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "storage_gin_pending_list_limit": ["-1", "4096"]
         },  # config option is between 64 and 2147483647
         {
-            "storage_hot_standby_feedback": [test_string, "on"]
+            "storage-hot-standby-feedback": [test_string, "on"]
         },  # config option is one of on and off
         {"storage_old_snapshot_threshold": ["-2", "-1"]},  # config option is between -1 and 86400
         {
