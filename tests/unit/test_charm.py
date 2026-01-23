@@ -251,9 +251,6 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm._validate_config_options"
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch(
-            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
-        ) as _updated_synchronous_node_count,
         patch("relations.db.DbProvides.set_up_relation") as _set_up_relation,
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
@@ -281,7 +278,6 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         assert not _update_config.called
         _validate_config_options.side_effect = None
-        _updated_synchronous_node_count.assert_called_once_with()
 
         # Test after the cluster was initialised.
         with harness.hooks_disabled():
