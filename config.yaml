@@ -5,7 +5,8 @@ options:
   synchronous_node_count:
     description: |
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
-      either "all", "majority" or a positive integer value.
+      either "all", "majority" or an integer value.
+      Setting to 0 disables strict synchronous mode.
     type: string
     default: "all"
   connection_authentication_timeout:
@@ -69,6 +70,12 @@ options:
       Default is on (true).
     type: boolean
     default: true
+  durability_maximum_lag_on_failover:
+    description: |
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
+    default: 1048576
   durability_synchronous_commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -811,6 +818,14 @@ options:
       Allowed values are: from 64 to 2147483647.
     type: int
     default: 4096
+  storage_hot_standby_feedback:
+    description: |
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is off
+    type: string
+    default: "off"
   storage_old_snapshot_threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.

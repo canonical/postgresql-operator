@@ -299,7 +299,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         patch(
             "relations.async_replication.PostgreSQLAsyncReplication.get_partner_addresses",
             return_value=["2.2.2.2", "3.3.3.3"],
-        ) as _get_partner_addresses,
+        ),
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
@@ -336,6 +336,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_password=rewind_password,
             version=postgresql_version,
             synchronous_node_count=0,
+            maximum_lag_on_failover=1048576,
             raft_password=raft_password,
             patroni_password=patroni_password,
         )
