@@ -1,0 +1,42 @@
+[32mINFO    [0m root:test_async_replication.py:224 Remove async relation
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju remove-relation --model testing-other db1 db2:replication
+[32mINFO    [0m root:test_async_replication.py:227 Waiting for the applications to settle
+[32mINFO    [0m root:test_async_replication.py:235 Re-relating the two postgresql clusters
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju integrate --model testing-other db1 db2:replication
+[32mINFO    [0m root:test_async_replication.py:245 Running create replication action
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju run --model testing --format json db1/0 create-replication --wait 300s
+[32mINFO    [0m root:test_async_replication.py:373 Reintegrating db1 and test-app1
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju remove-relation --model testing db1 test-app1:database
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju integrate --model testing db1:database test-app1:database
+[32mINFO    [0m root:test_async_replication.py:387 Clearing continuous writes
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju run --model testing --format json test-app1/0 clear-continuous-writes --wait 120s
+[32mINFO    [0m root:test_async_replication.py:391 Starting continuous writes
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju run --model testing --format json test-app1/0 start-continuous-writes
+[32mINFO    [0m root:test_async_replication.py:252 Waiting for the applications to settle
+[32mINFO    [0m root:test_async_replication.py:351 Stopping continuous writes
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju run --model testing --format json test-app1/0 stop-continuous-writes
+[32mINFO    [0m root:test_async_replication.py:359 Querying max value on all db1 units
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing secret:d5qn7shuap5d3tq8grog --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing secret:d5qn7shuap5d3tq8grog --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing secret:d5qn7shuap5d3tq8grog --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing --format json
+[32mINFO    [0m root:test_async_replication.py:364 Querying max value on all db2 units
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing-other secret:d5qn82puap5d3tq8grpg --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing-other secret:d5qn82puap5d3tq8grpg --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju show-secret --model testing-other secret:d5qn82puap5d3tq8grpg --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:391 cli: juju status --model testing-other --format json
