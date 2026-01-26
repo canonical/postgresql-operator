@@ -1,0 +1,97 @@
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-1
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] waiting: agent initialising
+  second-postgresql/1 [allocating] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] maintenance: installing PostgreSQL
+  second-postgresql/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] waiting: waiting to start PostgreSQL
+  second-postgresql/1 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] active: Primary (degraded)
+  second-postgresql/1 [executing] waiting: awaiting for cluster to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary (degraded)
+  second-postgresql/1 [executing] waiting: awaiting for cluster to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary
+  second-postgresql/1 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-2': 5}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-2': 6}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-1, count: 7, max_number_written: 7, total_expected_writes: 7
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 7, max_number_written: 7, total_expected_writes: 7
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.13   unsupported  01:46:33Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.11    active      2  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  432  no       received database credentials of the first database
+second-postgresql    16.11    active      2  postgresql                          1  no       
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.113.44.182             received database credentials of the first database
+postgresql/1*           active    idle   1        10.113.44.126   5432/tcp  Primary
+postgresql/2            active    idle   2        10.113.44.106   5432/tcp  
+second-postgresql/0*    active    idle   4        10.113.44.34    5432/tcp  Primary
+second-postgresql/1     active    idle   5        10.113.44.210   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+1        started  10.113.44.126  juju-9fca80-1  ubuntu@24.04  runnervmymu0l  Running
+2        started  10.113.44.106  juju-9fca80-2  ubuntu@24.04  runnervmymu0l  Running
+3        started  10.113.44.182  juju-9fca80-3  ubuntu@22.04  runnervmymu0l  Running
+4        started  10.113.44.34   juju-9fca80-4  ubuntu@24.04  runnervmymu0l  Running
+5        started  10.113.44.210  juju-9fca80-5  ubuntu@24.04  runnervmymu0l  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:34:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:34:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:34:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:35:22 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 592, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 283, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f562e3a7020 state=finished raised Exception>]
+unit-postgresql-0: 01:35:29 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 592, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 283, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f007a9e9610 state=finished raised Exception>]
+unit-postgresql-1: 01:42:52 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 01:42:57 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-2: 01:42:59 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 01:43:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:43:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:43:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:43:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
