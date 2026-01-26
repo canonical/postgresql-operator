@@ -875,3 +875,16 @@ def test_reload_patroni_configuration(patroni):
         patroni.reload_patroni_configuration()
 
         assert not _kill.called
+
+        # Manually installed snap
+        patroni_proc.cmdline.return_value = [
+            "python3",
+            "/snap/charmed-postgresql/x1/usr/bin/patroni",
+            "/var/snap/charmed-postgresql/x1/etc/patroni/patroni.yaml",
+        ]
+        _process_iter.return_value = [proc1, proc2, patroni_proc]
+
+        patroni.reload_patroni_configuration()
+
+        _kill.assert_called_once_with(sentinel.patroni_pid, SIGHUP)
+        _kill.reset_mock()

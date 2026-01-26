@@ -947,8 +947,8 @@ class Patroni:
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         pid = None
-        module_patern = re.compile("/snap/charmed-postgresql/[0-9]+/usr/bin/patroni")
-        conf_pattern = re.compile("/var/snap/charmed-postgresql/[0-9]+/etc/patroni/patroni.yaml")
+        module_patern = re.compile("/snap/charmed-postgresql/x?[0-9]+/usr/bin/patroni")
+        conf_pattern = re.compile("/var/snap/charmed-postgresql/x?[0-9]+/etc/patroni/patroni.yaml")
         for proc in psutil.process_iter():
             cmdline = proc.cmdline()
             if (
