@@ -175,6 +175,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             ops_test, "pause", False, patroni_password, use_random_unit=True, tls=True
         )
 
+
+@pytest.mark.abort_on_fail
+async def test_tls_disabled(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
@@ -186,3 +189,17 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             assert await check_tls(ops_test, unit.name, enabled=False)
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
+
+
+@pytest.mark.abort_on_fail
+async def test_tls_reenabled(ops_test: OpsTest) -> None:
+    async with ops_test.fast_forward():
+        await ops_test.model.relate(
+            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.wait_for_idle(status="active", timeout=1500, raise_on_error=False)
+
+        # Wait for all units disabling TLS.
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            assert await check_tls(ops_test, unit.name, enabled=True)
+            assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)

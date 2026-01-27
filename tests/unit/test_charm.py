@@ -1229,6 +1229,7 @@ def test_update_config(harness):
             "charm.PostgresqlOperatorCharm._restart_ldap_sync_service"
         ) as _restart_ldap_sync_service,
         patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.Patroni.reload_patroni_configuration"),
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock

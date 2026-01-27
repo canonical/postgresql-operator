@@ -2235,6 +2235,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
 
         if not self._patroni.member_started:
+            # Potentially expired cert reloading and deferring
+            self._patroni.reload_patroni_configuration()
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 

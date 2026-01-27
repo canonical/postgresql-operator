@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 from pathlib import Path
+from signal import SIGHUP
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
@@ -124,8 +125,8 @@ def test_get_patroni_health(peers_ips, patroni):
         health = patroni.get_patroni_health()
 
         # Check needed to ensure a fast charm deployment.
-        _stop_after_delay.assert_called_once_with(60)
-        _wait_fixed.assert_called_once_with(7)
+        _stop_after_delay.assert_called_once_with(15)
+        _wait_fixed.assert_called_once_with(3)
 
         assert health == {"state": "running"}
 
@@ -847,3 +848,44 @@ def test_are_replicas_up(patroni):
         # Return None on error
         _cluster_status.side_effect = Exception
         assert patroni.are_replicas_up() is None
+
+
+def test_reload_patroni_configuration(patroni):
+    with patch("cluster.psutil.process_iter") as _process_iter, patch("cluster.os.kill") as _kill:
+        proc1 = Mock()
+        proc2 = Mock()
+        patroni_proc = Mock()
+        proc1.cmdline.return_value = ["python3", "first", "second"]
+        proc2.cmdline.return_value = ["other"]
+        patroni_proc.cmdline.return_value = [
+            "python3",
+            "/snap/charmed-postgresql/1/usr/bin/patroni",
+            "/var/snap/charmed-postgresql/1/etc/patroni/patroni.yaml",
+        ]
+        patroni_proc.pid = sentinel.patroni_pid
+        _process_iter.return_value = [proc1, proc2, patroni_proc]
+
+        patroni.reload_patroni_configuration()
+
+        _kill.assert_called_once_with(sentinel.patroni_pid, SIGHUP)
+        _kill.reset_mock()
+
+        # No patroni process found
+        _process_iter.return_value = [proc1, proc2]
+
+        patroni.reload_patroni_configuration()
+
+        assert not _kill.called
+
+        # Manually installed snap
+        patroni_proc.cmdline.return_value = [
+            "python3",
+            "/snap/charmed-postgresql/x1/usr/bin/patroni",
+            "/var/snap/charmed-postgresql/x1/etc/patroni/patroni.yaml",
+        ]
+        _process_iter.return_value = [proc1, proc2, patroni_proc]
+
+        patroni.reload_patroni_configuration()
+
+        _kill.assert_called_once_with(sentinel.patroni_pid, SIGHUP)
+        _kill.reset_mock()
