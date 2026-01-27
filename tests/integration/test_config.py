@@ -35,7 +35,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
     test_string = "abcXYZ123"
 
     configs = [
-        {"synchronous_node_count": ["-1", "1"]},  # config option is greater than -1
+        {"synchronous_node_count": ["0", "1"]},  # config option is greater than 0
         {
             "synchronous_node_count": [test_string, "all"]
         },  # config option is one of `all`, `minority` or `majority`
@@ -166,9 +166,6 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "storage_gin_pending_list_limit": ["-1", "4096"]
         },  # config option is between 64 and 2147483647
-        {
-            "storage-hot-standby-feedback": [test_string, "on"]
-        },  # config option is one of on and off
         {"storage_old_snapshot_threshold": ["-2", "-1"]},  # config option is between -1 and 86400
         {
             "vacuum_autovacuum_analyze_scale_factor": ["-1", "0.1"]

@@ -1172,8 +1172,7 @@ class Patroni:
         return {
             "synchronous_node_count": self._synchronous_node_count,
             "synchronous_mode_strict": len(member_units) > 1
-            # Explicitly setting 0 is to disable sync mode
-            and self.charm.config.synchronous_node_count != 0
+            and self.charm.config.synchronous_mode_strict
             and self._synchronous_node_count > 0,
         }
 
