@@ -134,6 +134,7 @@ from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.tls_transfer import TLSTransfer
+from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -343,6 +344,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
+        self.watcher = PostgreSQLWatcherRelation(self)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart

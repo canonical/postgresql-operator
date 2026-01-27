@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Set LD_LIBRARY_PATH to include libpq from the charm's lib directory
+JUJU_DISPATCH_PATH="${JUJU_DISPATCH_PATH:-$0}" PYTHONPATH=lib:venv \
+  LD_LIBRARY_PATH=lib:${LD_LIBRARY_PATH:-} exec python3 ./src/charm.py

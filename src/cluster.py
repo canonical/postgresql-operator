@@ -748,6 +748,9 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
+            watcher_addr=self.charm.watcher.watcher_address
+            if hasattr(self.charm, "watcher")
+            else None,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
