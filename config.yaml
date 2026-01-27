@@ -5,10 +5,15 @@ options:
   synchronous_node_count:
     description: |
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
-      either "all", "majority" or an integer value.
-      Setting to 0 disables strict synchronous mode.
+      either "all", "majority" or a positive integer value.
     type: string
     default: "all"
+  synchronous_mode_strict:
+    description: |
+      Enforce transactions to be committed on Primary and at least one more synchronous node.
+      Default is true.
+    type: boolean
+    default: true
   connection_authentication_timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -823,9 +828,9 @@ options:
       Send feedback to the primary or upstream standby about queries currently executing on
       the standby.
       Warning: enabling can cause database bloat on the Primary for some workloads.
-      Default is off
-    type: string
-    default: "off"
+      Default is false.
+    type: boolean
+    default: false
   storage_old_snapshot_threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
