@@ -28,7 +28,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v41.1.0
 
   unit-test:
     name: Unit test charm
@@ -47,6 +47,7 @@ jobs:
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    permissions: {}
 
   alert-test:
     name: Test Prometheus Alert Rules
@@ -61,10 +62,12 @@ jobs:
         run: promtool check rules src/prometheus_alert_rules/*
       - name: Run unit tests for prometheus alert rules
         run: promtool test rules tests/alerts/*.yaml
+    permissions: {}
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v41.1.0
+    permissions: {}
 
   integration-test:
     name: Integration test charm
