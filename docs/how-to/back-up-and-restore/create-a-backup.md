@@ -17,7 +17,7 @@ For security reasons, charm credentials are not stored inside backups. So, if yo
 * `replication`
 * `rewind`
 
-To retrieve the Juju secret that includes your user passwords, run
+If custom passwords were set with a secret previously, retrieve them with
 
 ```shell
 juju config postgresql system-users
@@ -41,6 +41,18 @@ The output will include the credentials for the system users:
     raft-password: ...
     replication-password: <password-to-copy>
     rewind-password: <password-to-copy>
+```
+
+If custom passwords were not previously set with a secret, you can find the peer secret with:
+
+```shell
+juju secrets --format=json | jq -r 'to_entries[] | select(.value.label == "database-peers.postgresql.app") | .key' 
+```
+
+Copy the secret URI, and use it in the following command:
+
+```shell
+juju show-secret --reveal <secret URI> --format=json | jq '.[].content.Data | with_entries(select(.key|contains("password")))'  
 ```
 
 ```{seealso}
