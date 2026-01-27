@@ -23,11 +23,12 @@ import ipaddress
 import logging
 import re
 import socket
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
+    CertificateInvalidatedEvent,
     TLSCertificatesRequiresV2,
     generate_csr,
     generate_private_key,
@@ -79,6 +80,9 @@ class PostgreSQLTLS(Object):
         )
         self.framework.observe(
             self.certs_creation.on.certificate_expiring, self._on_certificate_expiring
+        )
+        self.framework.observe(
+            self.certs_creation.on.certificate_invalidated, self._on_certificate_expiring
         )
 
     def _on_set_tls_private_key(self, event: ActionEvent) -> None:
@@ -156,7 +160,9 @@ class PostgreSQLTLS(Object):
             event.defer()
             return
 
-    def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
+    def _on_certificate_expiring(
+        self, event: Union[CertificateExpiringEvent, CertificateInvalidatedEvent]
+    ) -> None:
         """Request the new certificate when old certificate is expiring."""
         if event.certificate.strip() != str(self.charm.get_secret(SCOPE, "cert")).strip():
             logger.error("An unknown certificate expiring.")
