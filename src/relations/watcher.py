@@ -188,9 +188,12 @@ class PostgreSQLWatcherRelation(Object):
             # Use syncobj_admin to add the watcher to the Raft cluster
             cmd = [
                 "charmed-postgresql.syncobj-admin",
-                "-conn", "127.0.0.1:2222",
-                "-pass", self.charm._patroni.raft_password,
-                "-add", watcher_raft_addr,
+                "-conn",
+                "127.0.0.1:2222",
+                "-pass",
+                self.charm._patroni.raft_password,
+                "-add",
+                watcher_raft_addr,
             ]
             result = subprocess.run(  # noqa: S603
                 cmd,
@@ -388,9 +391,12 @@ class PostgreSQLWatcherRelation(Object):
                 # Use syncobj_admin to add the peer to the Raft cluster
                 cmd = [
                     "charmed-postgresql.syncobj-admin",
-                    "-conn", "127.0.0.1:2222",
-                    "-pass", self.charm._patroni.raft_password,
-                    "-add", peer_raft_addr,
+                    "-conn",
+                    "127.0.0.1:2222",
+                    "-pass",
+                    self.charm._patroni.raft_password,
+                    "-add",
+                    peer_raft_addr,
                 ]
                 result = subprocess.run(  # noqa: S603
                     cmd,

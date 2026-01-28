@@ -30,10 +30,10 @@ from .helpers import APPLICATION_NAME as TEST_APP_NAME
 from .helpers import (
     are_writes_increasing,
     check_writes,
-    cut_network_from_unit_without_ip_change,
+    cut_network_from_unit,
     get_cluster_roles,
     get_primary,
-    restore_network_for_unit_without_ip_change,
+    restore_network_for_unit,
 )
 
 
@@ -50,6 +50,7 @@ async def start_writes(ops_test: OpsTest) -> None:
             await action.wait()
             assert action.results["result"] == "True", "Unable to create continuous_writes table"
 
+
 logger = logging.getLogger(__name__)
 
 WATCHER_APP_NAME = "postgresql-watcher"
@@ -61,7 +62,10 @@ def watcher_charm():
     # The charm should be built before running tests (e.g., by charmcraft pack)
     # Similar to how the main PostgreSQL charm is handled
     from .. import architecture
-    return f"./postgresql-watcher/postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
+
+    return (
+        f"./postgresql-watcher/postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -213,9 +217,7 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
             logger.info(f"Cluster roles: {new_roles}")
             assert len(new_roles["primaries"]) == 1, "Should have exactly one primary"
             assert new_roles["primaries"][0] == primary, "Primary should not have changed"
-            assert len(new_roles["sync_standbys"]) == 1, (
-                "New replica should become sync_standby"
-            )
+            assert len(new_roles["sync_standbys"]) == 1, "New replica should become sync_standby"
 
     await check_writes(ops_test)
 
@@ -305,9 +307,7 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
             )
             logger.info(f"Final cluster roles: {final_roles}")
             assert len(final_roles["primaries"]) == 1, "Should have exactly one primary"
-            assert len(final_roles["sync_standbys"]) == 1, (
-                "New replica should become sync_standby"
-            )
+            assert len(final_roles["sync_standbys"]) == 1, "New replica should become sync_standby"
 
     # Now that we have a sync_standby, restart continuous writes and verify
     # The continuous writes app caches the connection string, so we need to restart it
@@ -395,8 +395,8 @@ async def test_primary_network_isolation_with_watcher(
     logger.info(f"Isolating primary network: {primary} on {primary_machine}")
 
     try:
-        # Cut network from primary
-        cut_network_from_unit_without_ip_change(primary_machine)
+        # Cut network from primary (this removes the eth0 interface entirely)
+        cut_network_from_unit(primary_machine)
 
         # Wait for failover to happen - Patroni needs time to detect leader failure
         # and elect a new leader. This can take 30-90 seconds depending on TTL settings.
@@ -414,24 +414,33 @@ async def test_primary_network_isolation_with_watcher(
     finally:
         # Restore network
         logger.info(f"Restoring network for {primary_machine}")
-        restore_network_for_unit_without_ip_change(primary_machine)
+        restore_network_for_unit(primary_machine)
 
     # Wait for cluster to stabilize with restored network
+    # The old primary may take time to rejoin after getting a new IP address,
+    # so we use raise_on_error=False and wait longer
     await ops_test.model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
-        status="active",
-        timeout=600,
+        timeout=900,
         idle_period=30,
+        raise_on_error=False,  # Old primary may be in error while rejoining
     )
 
-    # Verify old primary is now a replica
-    final_roles = await get_cluster_roles(ops_test, replica)
-    assert primary not in final_roles["primaries"], "Old primary should now be a replica"
-    assert replica in final_roles["primaries"], (
-        "Replica should remain primary after network restore"
-    )
+    # Wait for the old primary to rejoin as replica
+    # This can take a while as it needs to recover with a new IP
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(15), reraise=True):
+        with attempt:
+            final_roles = await get_cluster_roles(ops_test, replica)
+            logger.info(f"Final cluster roles: {final_roles}")
+            assert replica in final_roles["primaries"], (
+                "Replica should remain primary after network restore"
+            )
+            # Old primary should not be primary anymore
+            assert primary not in final_roles["primaries"], "Old primary should now be a replica"
 
-    await check_writes(ops_test)
+    # Use use_ip_from_inside=True because the old primary got a new IP after network restore
+    # and Juju's cached IP may be stale
+    await check_writes(ops_test, use_ip_from_inside=True)
 
 
 @pytest.mark.abort_on_fail
@@ -467,7 +476,7 @@ async def test_replica_network_isolation_with_watcher(
 
     try:
         # Cut network from replica
-        cut_network_from_unit_without_ip_change(replica_machine)
+        cut_network_from_unit(replica_machine)
 
         # Verify writes continue on primary
         await are_writes_increasing(ops_test, down_unit=replica)
@@ -479,7 +488,7 @@ async def test_replica_network_isolation_with_watcher(
     finally:
         # Restore network
         logger.info(f"Restoring network for {replica_machine}")
-        restore_network_for_unit_without_ip_change(replica_machine)
+        restore_network_for_unit(replica_machine)
 
     # Wait for cluster to stabilize
     await ops_test.model.wait_for_idle(
@@ -493,7 +502,8 @@ async def test_replica_network_isolation_with_watcher(
     final_roles = await get_cluster_roles(ops_test, any_unit)
     assert final_roles["primaries"][0] == primary
 
-    await check_writes(ops_test)
+    # Use use_ip_from_inside=True because the replica got a new IP after network restore
+    await check_writes(ops_test, use_ip_from_inside=True)
 
 
 @pytest.mark.abort_on_fail
@@ -518,7 +528,7 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
 
     try:
         # Cut network from watcher
-        cut_network_from_unit_without_ip_change(watcher_machine)
+        cut_network_from_unit(watcher_machine)
 
         # Verify writes continue without interruption
         await are_writes_increasing(ops_test)
@@ -530,12 +540,13 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
     finally:
         # Restore network
         logger.info(f"Restoring watcher network: {watcher_machine}")
-        restore_network_for_unit_without_ip_change(watcher_machine)
+        restore_network_for_unit(watcher_machine)
 
     # Wait for full recovery
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
-    await check_writes(ops_test)
+    # Use use_ip_from_inside=True because the watcher got a new IP after network restore
+    await check_writes(ops_test, use_ip_from_inside=True)
 
 
 @pytest.mark.abort_on_fail

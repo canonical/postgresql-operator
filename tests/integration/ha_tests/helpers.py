@@ -358,22 +358,45 @@ def cut_network_from_unit(machine_name: str) -> None:
 def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     """Cut network from a lxc container (without causing the change of the unit IP address).
 
-    Uses iptables inside the container to drop all non-localhost traffic, which provides
-    network isolation while preserving the IP address and allowing local services to
-    communicate. This is critical for Raft-based DCS to properly detect quorum loss.
+    Uses iptables inside the container to reject all non-localhost traffic, which provides
+    network isolation while preserving the IP address. REJECT is used instead of DROP
+    to trigger faster TCP RST responses and connection failures, helping Raft detect
+    the partition more quickly.
 
     Args:
         machine_name: lxc container hostname
     """
-    # Use iptables to drop all non-localhost INPUT and OUTPUT traffic inside the container
-    # We allow localhost traffic so local services (like Patroni talking to its local Raft node)
-    # continue to work, but external network is blocked
-    subprocess.check_call(
-        ["lxc", "exec", machine_name, "--", "iptables", "-I", "INPUT", "!", "-i", "lo", "-j", "DROP"]
-    )
-    subprocess.check_call(
-        ["lxc", "exec", machine_name, "--", "iptables", "-I", "OUTPUT", "!", "-o", "lo", "-j", "DROP"]
-    )
+    # Use iptables to REJECT all non-localhost INPUT and OUTPUT traffic inside the container
+    # REJECT sends back ICMP unreachable / TCP RST, causing faster failure detection than DROP
+    # which just silently discards packets and waits for timeouts
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "iptables",
+        "-I",
+        "INPUT",
+        "!",
+        "-i",
+        "lo",
+        "-j",
+        "REJECT",
+    ])
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "iptables",
+        "-I",
+        "OUTPUT",
+        "!",
+        "-o",
+        "lo",
+        "-j",
+        "REJECT",
+    ])
 
 
 async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = False):
@@ -752,18 +775,40 @@ def restore_network_for_unit(machine_name: str) -> None:
 def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     """Restore network from a lxc container (without causing the change of the unit IP address).
 
-    Removes the iptables rules that were added to drop all non-localhost traffic.
+    Removes the iptables rules that were added to reject all non-localhost traffic.
 
     Args:
         machine_name: lxc container hostname
     """
-    # Remove the iptables DROP rules we added (matching the rules with lo interface exception)
-    subprocess.check_call(
-        ["lxc", "exec", machine_name, "--", "iptables", "-D", "INPUT", "!", "-i", "lo", "-j", "DROP"]
-    )
-    subprocess.check_call(
-        ["lxc", "exec", machine_name, "--", "iptables", "-D", "OUTPUT", "!", "-o", "lo", "-j", "DROP"]
-    )
+    # Remove the iptables REJECT rules we added (matching the rules with lo interface exception)
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "iptables",
+        "-D",
+        "INPUT",
+        "!",
+        "-i",
+        "lo",
+        "-j",
+        "REJECT",
+    ])
+    subprocess.check_call([
+        "lxc",
+        "exec",
+        machine_name,
+        "--",
+        "iptables",
+        "-D",
+        "OUTPUT",
+        "!",
+        "-o",
+        "lo",
+        "-j",
+        "REJECT",
+    ])
 
 
 async def is_secondary_up_to_date(
