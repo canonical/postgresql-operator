@@ -1,3 +1,4 @@
+(create-a-backup)=
 # How to create and list backups
 
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
@@ -52,4 +53,3 @@ You can list your available, failed, and in progress backups by running the `lis
 ```text
 juju run postgresql/leader list-backups
 ```
-
