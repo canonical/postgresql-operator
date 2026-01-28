@@ -987,6 +987,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
+        # A new member may be running but not registered if it was added to Raft after starting.
+        if self.watcher.is_watcher_connected and not self._patroni.is_member_registered_in_cluster():
+            logger.info("Member running but not registered in Raft cluster - restarting Patroni")
+            self._patroni.restart_patroni()
+            event.defer()
+            return
+
         self._start_stop_pgbackrest_service(event)
 
         # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
@@ -1045,6 +1053,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
+            # Update watcher relation with current cluster endpoints
+            self.watcher.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 

@@ -586,6 +586,59 @@ class Patroni:
 
         return len(r.json()["members"]) == 0
 
+    def is_member_registered_in_cluster(self) -> bool:
+        """Check if this member is registered in the Raft DCS cluster.
+
+        In Raft mode, a new member may be running and replicating but not yet
+        registered in the DCS if it hasn't been added to the Raft cluster.
+
+        Returns:
+            True if this member appears in the /cluster endpoint, False otherwise.
+        """
+        try:
+            cluster_status = self.cluster_status()
+        except RetryError:
+            logger.debug("Could not get cluster status to check member registration")
+            return False
+
+        if not cluster_status:
+            return False
+
+        # Check if this member's name appears in the cluster members list
+        member_name = self.member_name
+        return any(member.get("name") == member_name for member in cluster_status)
+
+    def ensure_member_registered(self) -> bool:
+        """Ensure this member is properly registered in the Raft DCS cluster.
+
+        If the member is running but not registered (which can happen when a new
+        unit joins a Raft cluster), restart Patroni to trigger re-registration.
+
+        Returns:
+            True if member is registered or restart was triggered, False if check failed.
+        """
+        if not self.is_patroni_running():
+            return False
+
+        # Check if we're running but not in the cluster
+        try:
+            health = self.cached_patroni_health
+            if health.get("state") not in RUNNING_STATES:
+                # Not running yet, nothing to do
+                return True
+        except RetryError:
+            return False
+
+        # If we're running, check if we're registered in the cluster
+        if self.is_member_registered_in_cluster():
+            return True
+
+        # We're running but not registered - need to restart Patroni
+        logger.warning(
+            "Member is running but not registered in cluster - restarting Patroni"
+        )
+        return self.restart_patroni()
+
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
         try:

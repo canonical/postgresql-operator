@@ -12,6 +12,7 @@ when one of the two PostgreSQL nodes becomes unavailable.
 
 import json
 import logging
+import subprocess
 import typing
 
 from ops import (
@@ -159,10 +160,53 @@ class PostgreSQLWatcherRelation(Object):
             logger.info(f"Watcher address updated: {watcher_address}")
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
+            # Dynamically add watcher to the running Raft cluster
+            self._add_watcher_to_raft(watcher_address)
 
         # Update relation data for the watcher
         if self.charm.unit.is_leader():
             self._update_relation_data(event.relation)
+
+    def _add_watcher_to_raft(self, watcher_address: str) -> None:
+        """Dynamically add the watcher to the running Raft cluster.
+
+        Uses syncobj_admin to add the watcher as a new member to the existing
+        Raft cluster. This is necessary because simply updating partner_addrs
+        in the config file doesn't add the member to a running cluster.
+
+        Args:
+            watcher_address: The watcher's IP address.
+        """
+        if not self.charm.is_cluster_initialised:
+            logger.debug("Cluster not initialized, skipping Raft member addition")
+            return
+
+        watcher_raft_addr = f"{watcher_address}:{RAFT_PORT}"
+        logger.info(f"Adding watcher to Raft cluster: {watcher_raft_addr}")
+
+        try:
+            # Use syncobj_admin to add the watcher to the Raft cluster
+            cmd = [
+                "charmed-postgresql.syncobj-admin",
+                "-conn", "127.0.0.1:2222",
+                "-pass", self.charm._patroni.raft_password,
+                "-add", watcher_raft_addr,
+            ]
+            result = subprocess.run(  # noqa: S603
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                logger.info(f"Successfully added watcher to Raft cluster: {result.stdout}")
+            else:
+                # Member might already exist, which is fine
+                logger.warning(f"Failed to add watcher to Raft: {result.stderr}")
+        except subprocess.TimeoutExpired:
+            logger.warning("Timeout adding watcher to Raft cluster")
+        except Exception as e:
+            logger.warning(f"Error adding watcher to Raft cluster: {e}")
 
     def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle watcher departing from the relation.
@@ -302,6 +346,67 @@ class PostgreSQLWatcherRelation(Object):
             "unit-address": unit_ip,
         })
         logger.info("Relation unit data updated")
+
+    def update_endpoints(self) -> None:
+        """Update the watcher with current cluster endpoints.
+
+        Called when cluster membership changes (peer joins/departs).
+        Also dynamically adds new PostgreSQL peers to the running Raft cluster.
+        """
+        if not self.charm.unit.is_leader():
+            return
+
+        if not (relation := self._relation):
+            return
+
+        # Add any new PostgreSQL peers to the Raft cluster
+        self._add_peers_to_raft()
+
+        self._update_relation_data(relation)
+
+    def _add_peers_to_raft(self) -> None:
+        """Dynamically add new PostgreSQL peers to the running Raft cluster.
+
+        When a new PostgreSQL unit joins, it needs to be added to the existing
+        Raft cluster via syncobj_admin. Simply updating partner_addrs in the
+        config file is not enough for a running cluster.
+        """
+        if not self.charm.is_cluster_initialised:
+            logger.debug("Cluster not initialized, skipping Raft peer addition")
+            return
+
+        # Get all peer IPs
+        peer_ips = list(self.charm._patroni.peers_ips)
+        if not peer_ips:
+            return
+
+        for peer_ip in peer_ips:
+            peer_raft_addr = f"{peer_ip}:{RAFT_PORT}"
+            logger.info(f"Adding peer to Raft cluster: {peer_raft_addr}")
+
+            try:
+                # Use syncobj_admin to add the peer to the Raft cluster
+                cmd = [
+                    "charmed-postgresql.syncobj-admin",
+                    "-conn", "127.0.0.1:2222",
+                    "-pass", self.charm._patroni.raft_password,
+                    "-add", peer_raft_addr,
+                ]
+                result = subprocess.run(  # noqa: S603
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0:
+                    logger.info(f"Successfully added peer to Raft cluster: {result.stdout}")
+                else:
+                    # Member might already exist, which is fine
+                    logger.debug(f"Peer may already be in Raft cluster: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timeout adding peer {peer_ip} to Raft cluster")
+            except Exception as e:
+                logger.warning(f"Error adding peer {peer_ip} to Raft cluster: {e}")
 
     def update_watcher_secret(self) -> None:
         """Update the watcher secret with current Raft password.

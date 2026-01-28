@@ -19,51 +19,72 @@ from asyncio import gather
 
 import pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     APPLICATION_NAME,
     CHARM_BASE,
     DATABASE_APP_NAME,
 )
+from .helpers import APPLICATION_NAME as TEST_APP_NAME
 from .helpers import (
-    app_name,
     are_writes_increasing,
     check_writes,
     cut_network_from_unit_without_ip_change,
     get_cluster_roles,
     get_primary,
     restore_network_for_unit_without_ip_change,
-    start_continuous_writes,
 )
+
+
+async def start_writes(ops_test: OpsTest) -> None:
+    """Start continuous writes to PostgreSQL (assumes relation already exists)."""
+    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            action = (
+                await ops_test.model
+                .applications[TEST_APP_NAME]
+                .units[0]
+                .run_action("start-continuous-writes")
+            )
+            await action.wait()
+            assert action.results["result"] == "True", "Unable to create continuous_writes table"
 
 logger = logging.getLogger(__name__)
 
 WATCHER_APP_NAME = "postgresql-watcher"
 
 
-@pytest.fixture(scope="module")
-async def watcher_charm(ops_test: OpsTest):
-    """Build the watcher charm for testing."""
-    charm_path = await ops_test.build_charm("./postgresql-watcher")
-    return charm_path
+@pytest.fixture(scope="session")
+def watcher_charm():
+    """Return path to the pre-built watcher charm."""
+    # The charm should be built before running tests (e.g., by charmcraft pack)
+    # Similar to how the main PostgreSQL charm is handled
+    from .. import architecture
+    return f"./postgresql-watcher/postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
 
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_charm) -> None:
     """Build and deploy PostgreSQL in stereo mode with watcher.
 
-    Deploys:
-    - 2 PostgreSQL units
-    - 1 Watcher unit
-    - Test application for continuous writes
+    Deploy order is critical for stereo mode with Raft DCS:
+    1. Deploy PostgreSQL with 1 unit first (establishes Raft cluster)
+    2. Deploy and relate watcher (provides quorum vote - now 2 out of 3)
+    3. Scale PostgreSQL to 2 units (new unit joins as replica with quorum)
+
+    If we deploy 2 PostgreSQL units before the watcher is related, they
+    cannot form Raft quorum (need 2 out of 3) and both initialize
+    independently with different system IDs.
     """
     async with ops_test.fast_forward():
+        # Step 1: Deploy PostgreSQL with ONLY 1 unit initially
+        # This establishes a single-node Raft cluster that can be leader
         await gather(
-            # Deploy PostgreSQL with exactly 2 units
             ops_test.model.deploy(
                 charm,
                 application_name=DATABASE_APP_NAME,
-                num_units=2,
+                num_units=1,  # IMPORTANT: Start with 1 unit only
                 base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
@@ -73,7 +94,6 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
                 application_name=WATCHER_APP_NAME,
                 num_units=1,
                 base=CHARM_BASE,
-                config={"profile": "testing"},
             ),
             # Deploy test application
             ops_test.model.deploy(
@@ -84,11 +104,32 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
             ),
         )
 
+        # Wait for initial deployment
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
+            timeout=1200,
+            raise_on_error=False,  # Watcher may be waiting for relation
+        )
+
+        # Step 2: Relate PostgreSQL to watcher BEFORE adding second unit
+        # This adds the watcher to the Raft cluster, providing quorum
+        logger.info("Relating PostgreSQL to watcher for Raft quorum")
+        await ops_test.model.relate(f"{DATABASE_APP_NAME}:watcher", f"{WATCHER_APP_NAME}:watcher")
+
+        # Wait for watcher to join Raft cluster
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
+            status="active",
+            timeout=600,
+        )
+
         # Relate PostgreSQL to test app
         await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
 
-        # Relate PostgreSQL to watcher
-        await ops_test.model.relate(f"{DATABASE_APP_NAME}:watcher", f"{WATCHER_APP_NAME}:watcher")
+        # Step 3: Now scale PostgreSQL to 2 units
+        # The new unit will join the existing Raft cluster with quorum
+        logger.info("Scaling PostgreSQL to 2 units (stereo mode)")
+        await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
 
         await ops_test.model.wait_for_idle(status="active", timeout=1800)
 
@@ -125,8 +166,7 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     - Clients connected to replica should be re-routed to primary
     - No significant outage (less than a minute)
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get current cluster roles
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -163,12 +203,19 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
-    # Verify cluster is healthy
-    new_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-    assert len(new_roles["primaries"]) == 1
-    assert new_roles["primaries"][0] == primary, "Primary should not have changed"
+    # Wait for the new replica to become a sync_standby
+    # This ensures the cluster is fully ready for the next test
+    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            new_roles = await get_cluster_roles(
+                ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+            )
+            logger.info(f"Cluster roles: {new_roles}")
+            assert len(new_roles["primaries"]) == 1, "Should have exactly one primary"
+            assert new_roles["primaries"][0] == primary, "Primary should not have changed"
+            assert len(new_roles["sync_standbys"]) == 1, (
+                "New replica should become sync_standby"
+            )
 
     await check_writes(ops_test)
 
@@ -183,14 +230,27 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     - Clients re-routed to new primary
     - When old primary is healthy, it should become a replica
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get current cluster roles
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     original_roles = await get_cluster_roles(ops_test, any_unit)
     original_primary = original_roles["primaries"][0]
-    original_replica = original_roles["sync_standbys"][0]
+
+    # Get the replica - prefer sync_standby if available, otherwise any replica
+    # After a previous test scales up, the new unit may not yet be a sync_standby
+    if original_roles["sync_standbys"]:
+        original_replica = original_roles["sync_standbys"][0]
+    elif original_roles["replicas"]:
+        original_replica = original_roles["replicas"][0]
+    else:
+        # Fall back to finding the other unit manually
+        original_replica = None
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            if unit.name != original_primary:
+                original_replica = unit.name
+                break
+        assert original_replica is not None, "Could not find replica unit"
 
     logger.info(f"Shutting down primary: {original_primary}")
 
@@ -200,7 +260,7 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     )
 
     # With watcher providing quorum, failover should happen automatically
-    # Wait for the replica to be promoted
+    # Wait for the model to stabilize first
     await ops_test.model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
         status="active",
@@ -208,28 +268,54 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
         idle_period=30,
     )
 
-    # Verify writes continue on the new primary
-    await are_writes_increasing(ops_test, down_unit=original_primary)
-
-    # Verify the replica was promoted
+    # Wait for the replica to be promoted to primary
+    # Patroni needs time to detect leader failure and elect new leader (30-90s)
     remaining_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    new_roles = await get_cluster_roles(ops_test, remaining_unit)
-    assert len(new_roles["primaries"]) == 1
-    assert new_roles["primaries"][0] == original_replica, (
-        f"Replica {original_replica} should have been promoted to primary"
+    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            new_roles = await get_cluster_roles(ops_test, remaining_unit)
+            logger.info(f"Waiting for failover - current roles: {new_roles}")
+            assert len(new_roles["primaries"]) == 1, "Should have exactly one primary"
+            assert new_roles["primaries"][0] == original_replica, (
+                f"Replica {original_replica} should have been promoted, "
+                f"but primary is {new_roles['primaries'][0]}"
+            )
+
+    # Wait for the charm to reconfigure after failover
+    # This ensures the relation endpoints are updated for the test app to reconnect
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME],
+        status="active",
+        timeout=300,
+        idle_period=30,
     )
 
-    # Scale back up - the new unit should join as replica
+    # Scale back up FIRST - with synchronous_mode_strict=true, the primary cannot
+    # accept writes when there's no sync_standby available. We need 2 units before
+    # we can verify writes are working.
     logger.info("Scaling back up after primary shutdown")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
-    # Verify cluster structure
-    final_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-    assert len(final_roles["primaries"]) == 1
-    assert len(final_roles["sync_standbys"]) == 1
+    # Wait for the new replica to become a sync_standby
+    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            final_roles = await get_cluster_roles(
+                ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+            )
+            logger.info(f"Final cluster roles: {final_roles}")
+            assert len(final_roles["primaries"]) == 1, "Should have exactly one primary"
+            assert len(final_roles["sync_standbys"]) == 1, (
+                "New replica should become sync_standby"
+            )
+
+    # Now that we have a sync_standby, restart continuous writes and verify
+    # The continuous writes app caches the connection string, so we need to restart it
+    # after failover to pick up the new primary's address
+    await start_writes(ops_test)
+
+    # Verify writes continue on the new primary
+    await are_writes_increasing(ops_test, down_unit=original_primary)
 
     await check_writes(ops_test)
 
@@ -242,8 +328,7 @@ async def test_watcher_shutdown_no_outage(ops_test: OpsTest, continuous_writes) 
     - No outage experienced by either primary or replica
     - Cluster continues to function (but loses quorum guarantee)
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get current cluster state
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -289,8 +374,7 @@ async def test_primary_network_isolation_with_watcher(
     - Replica promoted to primary
     - When network restored, old primary becomes replica
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get current cluster state
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -314,19 +398,18 @@ async def test_primary_network_isolation_with_watcher(
         # Cut network from primary
         cut_network_from_unit_without_ip_change(primary_machine)
 
-        # Wait for failover
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME],
-            timeout=600,
-            idle_period=30,
-            raise_on_error=False,  # Primary will be in error state
-        )
-
-        # Verify replica was promoted
-        new_primary = await get_primary(ops_test, app, down_unit=primary)
-        assert new_primary == replica, (
-            f"Replica {replica} should have been promoted, but primary is {new_primary}"
-        )
+        # Wait for failover to happen - Patroni needs time to detect leader failure
+        # and elect a new leader. This can take 30-90 seconds depending on TTL settings.
+        # Use explicit retry loop instead of just wait_for_idle.
+        new_primary = None
+        for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(10), reraise=True):
+            with attempt:
+                new_primary = await get_primary(ops_test, DATABASE_APP_NAME, down_unit=primary)
+                logger.info(f"Current primary: {new_primary}, expected: {replica}")
+                assert new_primary == replica, (
+                    f"Waiting for failover: replica {replica} should be promoted, "
+                    f"but primary is still {new_primary}"
+                )
 
     finally:
         # Restore network
@@ -362,8 +445,7 @@ async def test_replica_network_isolation_with_watcher(
     - No impact on clients connected to primary
     - Read-only clients re-routed
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get current cluster state
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -391,7 +473,7 @@ async def test_replica_network_isolation_with_watcher(
         await are_writes_increasing(ops_test, down_unit=replica)
 
         # Primary should remain primary
-        current_primary = await get_primary(ops_test, app, down_unit=replica)
+        current_primary = await get_primary(ops_test, DATABASE_APP_NAME, down_unit=replica)
         assert current_primary == primary, "Primary should not change"
 
     finally:
@@ -422,8 +504,7 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
     - No service outage for PostgreSQL cluster
     - Cluster loses quorum guarantee but continues operating
     """
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_writes(ops_test)
 
     # Get watcher machine
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]

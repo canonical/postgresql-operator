@@ -1,6 +1,5 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import contextlib
 import json
 import logging
 import os
@@ -134,9 +133,11 @@ async def app_name(
         model = ops_test.model
     status = await model.get_status()
     for app in model.applications:
+        charm_name = status["applications"][app]["charm"]
         if (
-            application_name in status["applications"][app]["charm"]
-            and APPLICATION_NAME not in status["applications"][app]["charm"]
+            application_name in charm_name
+            and APPLICATION_NAME not in charm_name
+            and "postgresql-watcher" not in charm_name
         ):
             return app
 
@@ -357,19 +358,22 @@ def cut_network_from_unit(machine_name: str) -> None:
 def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     """Cut network from a lxc container (without causing the change of the unit IP address).
 
+    Uses iptables inside the container to drop all non-localhost traffic, which provides
+    network isolation while preserving the IP address and allowing local services to
+    communicate. This is critical for Raft-based DCS to properly detect quorum loss.
+
     Args:
         machine_name: lxc container hostname
     """
-    override_command = f"lxc config device override {machine_name} eth0"
-    # Ignore if the interface was already overridden.
-    with contextlib.suppress(subprocess.CalledProcessError):
-        subprocess.check_call(override_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.egress=0kbit"
-    subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
-    subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority=10"
-    subprocess.check_call(limit_set_command.split())
+    # Use iptables to drop all non-localhost INPUT and OUTPUT traffic inside the container
+    # We allow localhost traffic so local services (like Patroni talking to its local Raft node)
+    # continue to work, but external network is blocked
+    subprocess.check_call(
+        ["lxc", "exec", machine_name, "--", "iptables", "-I", "INPUT", "!", "-i", "lo", "-j", "DROP"]
+    )
+    subprocess.check_call(
+        ["lxc", "exec", machine_name, "--", "iptables", "-I", "OUTPUT", "!", "-o", "lo", "-j", "DROP"]
+    )
 
 
 async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = False):
@@ -748,15 +752,18 @@ def restore_network_for_unit(machine_name: str) -> None:
 def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     """Restore network from a lxc container (without causing the change of the unit IP address).
 
+    Removes the iptables rules that were added to drop all non-localhost traffic.
+
     Args:
         machine_name: lxc container hostname
     """
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.egress="
-    subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress="
-    subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority="
-    subprocess.check_call(limit_set_command.split())
+    # Remove the iptables DROP rules we added (matching the rules with lo interface exception)
+    subprocess.check_call(
+        ["lxc", "exec", machine_name, "--", "iptables", "-D", "INPUT", "!", "-i", "lo", "-j", "DROP"]
+    )
+    subprocess.check_call(
+        ["lxc", "exec", machine_name, "--", "iptables", "-D", "OUTPUT", "!", "-o", "lo", "-j", "DROP"]
+    )
 
 
 async def is_secondary_up_to_date(

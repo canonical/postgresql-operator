@@ -9,6 +9,11 @@ Implements the health check requirements from the acceptance criteria:
 - 3 retries with 7-second intervals
 - TCP keepalive settings
 - Only participates in failover with even number of PostgreSQL instances
+
+NOTE: Health checks are currently only available via the trigger-health-check action
+and require manual configuration of a 'watcher' user in PostgreSQL with appropriate
+pg_hba.conf entries. The core stereo mode functionality (Raft consensus) works
+without health checks - Patroni handles actual failover decisions.
 """
 
 import logging

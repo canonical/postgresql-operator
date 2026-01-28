@@ -10,6 +10,7 @@ Participates in Raft consensus to provide quorum without running PostgreSQL.
 
 import json
 import logging
+import os
 import subprocess
 from typing import Any
 
@@ -154,22 +155,52 @@ class PostgreSQLWatcherCharm(ops.CharmBase):
         """Handle install event."""
         self.unit.status = MaintenanceStatus("Installing watcher components")
 
-        # Install charmed-postgresql snap to get patroni_raft_controller
+        # Install pysyncobj system-wide for the Raft service
+        # The Raft service runs as a systemd service with system Python,
+        # so we need pysyncobj installed system-wide.
+        # Use --break-system-packages for Ubuntu 24.04+ (PEP 668)
+        # IMPORTANT: Use /usr/bin/python3 -m pip to ensure we use system Python's pip,
+        # not any venv pip that the charm framework might inject via PATH.
         try:
-            self.unit.status = MaintenanceStatus("Installing charmed-postgresql snap")
+            self.unit.status = MaintenanceStatus("Installing pysyncobj")
+            # First ensure pip is installed
             subprocess.run(
-                ["snap", "install", "charmed-postgresql", "--channel=16/edge"],  # noqa: S607
+                ["apt-get", "update"],  # noqa: S607
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+            subprocess.run(
+                ["apt-get", "install", "-y", "python3-pip"],  # noqa: S607
                 check=True,
                 capture_output=True,
                 timeout=300,
             )
-            logger.info("charmed-postgresql snap installed successfully")
+            # Use /usr/bin/python3 -m pip to install to system Python
+            # Clear PYTHONPATH to ensure pip installs to system site-packages
+            env = os.environ.copy()
+            env.pop("PYTHONPATH", None)
+            result = subprocess.run(
+                ["/usr/bin/python3", "-m", "pip", "install", "--break-system-packages", "pysyncobj"],  # noqa: S607
+                check=True,
+                capture_output=True,
+                timeout=120,
+                env=env,
+            )
+            logger.info(f"pysyncobj installed successfully: {result.stdout.decode()}")
         except subprocess.CalledProcessError as e:
-            logger.warning(f"Failed to install charmed-postgresql snap: {e.stderr}")
+            logger.error(f"Failed to install pysyncobj: {e.stderr}")
+            # This is critical - defer the event to retry
+            event.defer()
+            return
         except subprocess.TimeoutExpired:
-            logger.warning("Timeout installing charmed-postgresql snap")
+            logger.error("Timeout installing pysyncobj")
+            event.defer()
+            return
         except FileNotFoundError:
-            logger.warning("snap command not found")
+            logger.error("pip3 command not found")
+            event.defer()
+            return
 
         logger.info("PostgreSQL Watcher charm installed")
 
@@ -202,35 +233,19 @@ class PostgreSQLWatcherCharm(ops.CharmBase):
             self.unit.status = WaitingStatus("Connecting to Raft cluster")
             return
 
-        # Run health checks (optional - doesn't block on failures)
+        # Get PostgreSQL endpoints count for status message
         pg_endpoints = self._get_pg_endpoints()
-        if not pg_endpoints:
-            # Still active if Raft is connected but endpoints aren't available yet
+        endpoint_count = len(pg_endpoints)
+
+        # Note: Health checks are only run on-demand via the trigger-health-check action
+        # because the watcher doesn't have PostgreSQL credentials. The Raft consensus
+        # is what matters for stereo mode - Patroni handles actual failover decisions.
+        if endpoint_count > 0:
+            self.unit.status = ActiveStatus(
+                f"Raft connected, monitoring {endpoint_count} PostgreSQL endpoints"
+            )
+        else:
             self.unit.status = ActiveStatus("Raft connected, waiting for PostgreSQL endpoints")
-            return
-
-        # Perform health check (non-blocking - just for monitoring)
-        try:
-            health_results = self.health_checker.check_all_endpoints(pg_endpoints)
-            healthy_count = sum(1 for healthy in health_results.values() if healthy)
-
-            if healthy_count == len(pg_endpoints):
-                self.unit.status = ActiveStatus(
-                    f"Monitoring {len(pg_endpoints)} PostgreSQL endpoints"
-                )
-            elif healthy_count > 0:
-                self.unit.status = ActiveStatus(
-                    f"Monitoring {healthy_count}/{len(pg_endpoints)} healthy endpoints"
-                )
-            else:
-                # Even if health checks fail, remain active since Raft is working
-                # Health check failures are logged but don't block the watcher
-                self.unit.status = ActiveStatus(
-                    f"Raft connected, health checks failing for {len(pg_endpoints)} endpoints"
-                )
-        except Exception as e:
-            logger.warning(f"Health check exception: {e}")
-            self.unit.status = ActiveStatus("Raft connected")
 
     def _on_watcher_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle watcher relation joined event."""
@@ -256,14 +271,21 @@ class PostgreSQLWatcherCharm(ops.CharmBase):
             event.defer()
             return
 
-        # Configure and start Raft controller
+        # Configure and start Raft controller (as a systemd service)
+        # The configure() method writes config and installs the service
         self.raft_controller.configure(
             self_addr=f"{self.unit_ip}:{RAFT_PORT}",
             partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
             password=raft_password,
         )
 
-        if not self.raft_controller.is_running():
+        # Start the service if not running, or restart if config changed
+        if self.raft_controller.is_running():
+            # Restart to pick up any config changes
+            logger.info("Restarting Raft controller to apply config changes")
+            self.raft_controller.restart()
+        else:
+            logger.info("Starting Raft controller service")
             self.raft_controller.start()
 
         # Update unit data
