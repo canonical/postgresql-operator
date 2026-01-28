@@ -1,3 +1,4 @@
+(manage-passwords)=
 # How to manage passwords
 
 Charmed PostgreSQL 16 uses [Juju secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/#secret) to manage passwords.
@@ -10,13 +11,13 @@ Charmed PostgreSQL 16 uses [Juju secrets](https://documentation.ubuntu.com/juju/
 
 To create a secret in Juju containing one or more user passwords:
 
-```text
+```shell
 juju add-secret <secret_name> <user_a>=<password_a> <user_b>=<password_b>
 ```
 
 The command above will output a secret URI similar to the example below, which you'll need for configuring `system-users`:
 
-```text
+```shell
 secret:a2whj30el0fco390bt9f
 ```
 
@@ -24,15 +25,16 @@ Admin users that were not included in the secret will use an automatically creat
 
 To grant the secret to the `postgresql` charm:
 
-```text
+```shell
 juju grant-secret <secret_name> postgresql
 ```
 
+(configure-system-users)=
 ## Configure `system-users`
 
 To set the `system-users` config option to the secret URI:
 
-```text
+```shell
 juju config postgresql system-users=<secret_URI>
 ```
 
@@ -52,7 +54,7 @@ To retrieve the password of an internal system-user, run the `juju show-secret` 
 
 To update an existing secret:
 
-```text
+```shell
 juju update-secret <secret_name> <user_a>=<new_password_a> <user_c>=<password_c>
 ```
 
@@ -61,4 +63,4 @@ In this example,
 * `user_c`'s password was updated from an auto-generated password to `password_c`
 * `user_b`'s password remains as it was when the secret was added, but **`user_b` is no longer part of the secret**.
 
-See also: [Explanation > Users](/explanation/users)
+See also: {ref}`users`
