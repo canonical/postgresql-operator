@@ -26,10 +26,9 @@ Learn about what's in the charm, how to set up your environment, and perform the
 
 ### Production deployments
 
-More complex operations focused on production deployments and high availability.
+Advanced deployments and operations focused on production scenarios and high availability.
 
-* **Advanced deployment scenarios**: {ref}`Terraform <terraform>` • {ref}`Air-gapped deployments <air-gapped>`
-* **High availability**: {ref}`Multiple availability zones <multi-az>` • {ref}`Cluster-cluster replication <cross-regional-async-replication>` • {ref}`Logical replication <logical-replication>`
+* **Advanced deployment scenarios**: {ref}`Terraform <terraform>` • {ref}`Air-gapped deployments <air-gapped>` • {ref}`Multiple availability zones <multi-az>` • {ref}`Cluster-cluster replication <cross-regional-async-replication>` • {ref}`Logical replication <logical-replication>`
 * **Networking**: {ref}`Juju spaces <juju-spaces>` • {ref}`Enable TLS encryption <enable-tls>` • {ref}`External network access <external-network-access>`
 * **Upgrades and data migration**: {ref}`In-place refresh (upgrade) <refresh>` • {ref}`Cluster and data migration <data-migration>`
 * **Troubleshooting**: {ref}`Overview and tools <troubleshooting>` • {ref}`Manual switchover/failover <switchover-failover>` • {ref}`Logs<logs>` • {ref}`sos-report`
@@ -37,7 +36,7 @@ More complex operations focused on production deployments and high availability.
 ### Charm developers
 
 * **Make your charm compatible with PostgreSQL**: {ref}`Interfaces and enpoints <interfaces-and-endpoints>` • {ref}`How to integrate with your charm with PostgreSQL <integrate-with-your-charm>`
-* **Learn more about Charmed PostgreSQL**: {ref}`Internal users <users>` • {ref}`Roles <roles>` • {ref}`Charm versions <charm-versions>`
+* **Learn more about the charm**: {ref}`Internal users <users>` • {ref}`Roles <roles>` • {ref}`Charm versions <charm-versions>`
 * **Juju properties**: [Configuration parameters](https://charmhub.io/postgresql/configurations?channel=16/stable) • [Actions](https://charmhub.io/postgresql/actions?channel=16/stable)
 
 ## How this documentation is organised

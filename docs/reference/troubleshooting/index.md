@@ -5,14 +5,6 @@ This page goes over some recommended tools and approaches to troubleshooting the
 
 Before anything, always run `juju status` to check the [list of charm statuses](/reference/statuses) and the recommended fixes. This alone may already solve your issue. 
 
-Otherwise, this reference goes over how to troubleshoot this charm via:
-- [Troubleshooting](#troubleshooting)
-  - [Summary](#summary)
-  - [Juju logs](#juju-logs)
-  - [Snap-based charm](#snap-based-charm)
-  - [Install extra software](#install-extra-software)
-
-
 ```{caution}
 At the moment, there is no support for [pausing an operator](https://warthogs.atlassian.net/browse/DPE-2545).
 
