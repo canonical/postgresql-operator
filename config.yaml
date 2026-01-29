@@ -7,6 +7,12 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
+  synchronous-mode-strict:
+    description: |
+      Enforce transactions to be committed on Primary and at least one more synchronous node.
+      Default is true.
+    type: boolean
+    default: true
   connection-authentication-timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -72,6 +78,12 @@ options:
       Default is on (true).
     type: boolean
     default: true
+  durability-maximum-lag-on-failover:
+    description: |
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
+    default: 1048576
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -687,6 +699,14 @@ options:
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
+  storage-hot-standby-feedback:
+    description: |
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is false.
+    type: boolean
+    default: false
   storage-old-snapshot-threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.

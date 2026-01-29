@@ -44,6 +44,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "durability_synchronous_commit": [test_string, "on"]
         },  # config option is one of `on`, `remote_apply` or `remote_write`
+        {"durability-maximum-lag-on-failover": ["-1", "1024"]},  # config option is integer
         {
             "instance_default_text_search_config": [test_string, "pg_catalog.simple"]
         },  # config option is validated against the db

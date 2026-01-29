@@ -230,9 +230,6 @@ def test_on_config_changed(harness):
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
-        ) as _updated_synchronous_node_count,
-        patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
         patch(
@@ -261,7 +258,6 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         assert not _update_config.called
         _validate_config_options.side_effect = None
-        _updated_synchronous_node_count.assert_called_once_with()
 
         # Test after the cluster was initialised.
         with harness.hooks_disabled():
@@ -1838,18 +1834,21 @@ def test_config_validation_invalid_worker_values(harness):
     # Pydantic should reject this
     assert "validation error" in str(e.value).lower()
 
-    # Test negative number - should be accepted at config level but fail during calculation
+    # Test negative number
     with harness.hooks_disabled():
         harness.update_config({"cpu-max-worker-processes": "-5"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
-    # The config should accept it (as it gets validated later in the calculation method)
-    assert harness.charm.config.cpu_max_worker_processes == -5
+    with pytest.raises(ValueError) as e:
+        _ = harness.charm.config
+
+    # Pydantic should reject this
+    assert "validation error" in str(e.value).lower()
 
     # Test value less than 2 - should be accepted at config level but fail during calculation
     with harness.hooks_disabled():
-        harness.update_config({"cpu-max-parallel-workers": "7"})
+        harness.update_config({"cpu-max-worker-processes": "2", "cpu-max-parallel-workers": "7"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
