@@ -4,7 +4,7 @@ relatedlinks: "[Charmhub](https://charmhub.io/postgresql?channel=16/stable)"
 
 # Charmed PostgreSQL documentation
 
-Charmed PostgreSQL is an open-source operator designed to deploy and operate PostgreSQL on IAAS/VM. It packages the relational database management system [PostgreSQL](https://www.postgresql.org/) with the [Patroni](https://patroni.readthedocs.io/en/latest/) high-availability replication system into an operator for deployment with [Juju](https://juju.is/docs/juju).
+Charmed PostgreSQL is an open-source operator designed to deploy and operate PostgreSQL on virtual machines and cloud services. It packages the relational database management system [PostgreSQL](https://www.postgresql.org/) with the [Patroni](https://patroni.readthedocs.io/en/latest/) high-availability replication system into an operator for deployment with [Juju](https://juju.is/docs/juju).
 
 This charmed operator simplifies deployment, scaling, configuration and management of PostgreSQL databases in large-scale production environments reliably. It is equipped with several features to securely store and scale complicated data workloads, including easy integration with client applications.
  
@@ -20,8 +20,8 @@ This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL
 
 Learn about what's in the charm, how to set up your environment, and perform the most common operations.
 
-* **Overview**: {ref}`architecture` • {ref}`system-requirements`
-* **Deploy**: {ref}`Guided tutorial <tutorial>` • {ref}`deploy-quickstart` • {ref}`Set up a cloud <deploy-clouds>`
+* **Charm overview**: {ref}`architecture` • {ref}`system-requirements` • {ref}`Charm versions <charm-versions>`
+* **Deploy PostgreSQL**: {ref}`Guided tutorial <tutorial>` • {ref}`deploy-quickstart` • {ref}`Set up a cloud <deploy-clouds>`
 * **Key operations**: {ref}`Scale your cluster <scale-replicas>` • {ref}`Manage user credentials <manage-passwords>` • {ref}`Create a backup <create-a-backup>`
 
 ### Production deployments
@@ -35,7 +35,7 @@ Advanced deployments and operations focused on production scenarios and high ava
 
 ### Charm developers
 
-* **Make your charm compatible with PostgreSQL**: {ref}`Interfaces and enpoints <interfaces-and-endpoints>` • {ref}`How to integrate with your charm with PostgreSQL <integrate-with-your-charm>`
+* **Make your charm compatible with PostgreSQL**: {ref}`Interfaces and endpoints <interfaces-and-endpoints>` • {ref}`How to integrate with your charm with PostgreSQL <integrate-with-your-charm>`
 * **Learn more about the charm**: {ref}`Internal users <users>` • {ref}`Roles <roles>` • {ref}`Charm versions <charm-versions>`
 * **Juju properties**: [Configuration parameters](https://charmhub.io/postgresql/configurations?channel=16/stable) • [Actions](https://charmhub.io/postgresql/actions?channel=16/stable)
 
