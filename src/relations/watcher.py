@@ -167,6 +167,35 @@ class PostgreSQLWatcherRelation(Object):
         if self.charm.unit.is_leader():
             self._update_relation_data(event.relation)
 
+    def _is_watcher_in_raft(self, watcher_address: str) -> bool:
+        """Check if the watcher is a member of the Raft cluster.
+
+        Args:
+            watcher_address: The watcher's IP address.
+
+        Returns:
+            True if the watcher is in the Raft cluster, False otherwise.
+        """
+        try:
+            from pysyncobj.utility import TcpUtility, UtilityException
+        except ImportError:
+            logger.warning("pysyncobj not available, cannot check Raft membership")
+            return False
+
+        watcher_raft_addr = f"{watcher_address}:{RAFT_PORT}"
+        try:
+            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            raft_status = syncobj_util.executeCommand("127.0.0.1:2222", ["status"])
+            if raft_status:
+                # Check if watcher is in the partner_node_status entries
+                member_key = f"partner_node_status_server_{watcher_raft_addr}"
+                return member_key in raft_status
+        except UtilityException as e:
+            logger.debug(f"Failed to check Raft membership: {e}")
+        except Exception as e:
+            logger.debug(f"Error checking Raft membership: {e}")
+        return False
+
     def _add_watcher_to_raft(self, watcher_address: str) -> None:
         """Dynamically add the watcher to the running Raft cluster.
 
@@ -182,6 +211,12 @@ class PostgreSQLWatcherRelation(Object):
             return
 
         watcher_raft_addr = f"{watcher_address}:{RAFT_PORT}"
+
+        # Check if watcher is already in the Raft cluster
+        if self._is_watcher_in_raft(watcher_address):
+            logger.info(f"Watcher {watcher_raft_addr} already in Raft cluster")
+            return
+
         logger.info(f"Adding watcher to Raft cluster: {watcher_raft_addr}")
 
         try:
@@ -204,7 +239,6 @@ class PostgreSQLWatcherRelation(Object):
             if result.returncode == 0:
                 logger.info(f"Successfully added watcher to Raft cluster: {result.stdout}")
             else:
-                # Member might already exist, which is fine
                 logger.warning(f"Failed to add watcher to Raft: {result.stderr}")
         except subprocess.TimeoutExpired:
             logger.warning("Timeout adding watcher to Raft cluster")
@@ -214,10 +248,62 @@ class PostgreSQLWatcherRelation(Object):
     def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle watcher departing from the relation.
 
+        Removes the departing watcher from the Raft cluster to maintain correct
+        quorum calculations. Without this, the dead watcher would still count
+        as a cluster member, making quorum harder to achieve.
+
         Args:
             event: The relation departed event.
         """
         logger.info("Watcher unit departed from relation")
+
+        if not self.charm.is_cluster_initialised:
+            return
+
+        # Get the departing watcher's address from the event
+        if event.departing_unit:
+            watcher_address = event.relation.data[event.departing_unit].get("unit-address")
+            if watcher_address:
+                self._remove_watcher_from_raft(watcher_address)
+
+    def _remove_watcher_from_raft(self, watcher_address: str) -> None:
+        """Remove the watcher from the Raft cluster.
+
+        This is critical for maintaining correct quorum calculations. If a dead
+        watcher remains in the cluster membership, it counts toward the total
+        node count, making it harder to achieve quorum.
+
+        Args:
+            watcher_address: The watcher's IP address.
+        """
+        watcher_raft_addr = f"{watcher_address}:{RAFT_PORT}"
+        logger.info(f"Removing watcher from Raft cluster: {watcher_raft_addr}")
+
+        try:
+            cmd = [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-pass",
+                self.charm._patroni.raft_password,
+                "-remove",
+                watcher_raft_addr,
+            ]
+            result = subprocess.run(  # noqa: S603
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                logger.info(f"Successfully removed watcher from Raft cluster: {result.stdout}")
+            else:
+                # Member might not exist, which is fine
+                logger.warning(f"Failed to remove watcher from Raft: {result.stderr}")
+        except subprocess.TimeoutExpired:
+            logger.warning("Timeout removing watcher from Raft cluster")
+        except Exception as e:
+            logger.warning(f"Error removing watcher from Raft cluster: {e}")
 
     def _on_watcher_relation_broken(self, event) -> None:
         """Handle watcher relation being broken.
@@ -378,8 +464,10 @@ class PostgreSQLWatcherRelation(Object):
             logger.debug("Cluster not initialized, skipping Raft peer addition")
             return
 
-        # Get all peer IPs
-        peer_ips = list(self.charm._patroni.peers_ips)
+        # Get all peer IPs from the fresh property (not from cached _patroni)
+        # This ensures we get the latest peer IPs after members have been added
+        peer_ips = list(self.charm._peer_members_ips)
+        logger.info(f"Found {len(peer_ips)} peer IPs for Raft addition: {peer_ips}")
         if not peer_ips:
             return
 

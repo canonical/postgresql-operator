@@ -989,7 +989,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
         # A new member may be running but not registered if it was added to Raft after starting.
-        if self.watcher.is_watcher_connected and not self._patroni.is_member_registered_in_cluster():
+        if (
+            self.watcher.is_watcher_connected
+            and not self._patroni.is_member_registered_in_cluster()
+        ):
             logger.info("Member running but not registered in Raft cluster - restarting Patroni")
             self._patroni.restart_patroni()
             event.defer()
@@ -1071,6 +1074,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and (ip_to_remove := event.relation.data[event.unit].get("ip-to-remove"))
         ):
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
+            # Get the new IP before removing the old one - we need to add it to Raft
+            # to ensure the member can rejoin when it restarts Patroni
+            new_ip = event.relation.data[event.unit].get("ip")
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
@@ -1078,6 +1084,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return False
             if ip_to_remove in self.members_ips:
                 self._remove_from_members_ips(ip_to_remove)
+            # Add the new IP to Raft cluster immediately after removing the old one
+            # This prevents a race condition where the member restarts Patroni before
+            # being added to Raft, causing quorum issues
+            if new_ip and new_ip != ip_to_remove:
+                logger.info("Adding new IP %s to Raft cluster after IP change", new_ip)
+                self._patroni.add_raft_member(new_ip)
         try:
             self._add_members(event)
         except Exception:
