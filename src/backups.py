@@ -560,7 +560,8 @@ class PostgreSQLBackups(Object):
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
             "repo-ls",
-            "--recurse",
+            f"archive/{self.stanza_name}",
+            "--filter=\\.history$",
             "--output=json",
         ])
         if return_code != 0:
@@ -1106,12 +1107,11 @@ Stderr:
             elif is_backup_id_timeline:
                 restore_stanza_timeline = timelines[backup_id]
             else:
-                backups_list = list(self._list_backups(show_failed=False).values())
-                timelines_list = self._list_timelines()
+                backups_list = list(backups.values())
                 if (
                     restore_to_time == "latest"
-                    and timelines_list is not None
-                    and max(timelines_list.values() or [backups_list[0]]) not in backups_list
+                    and timelines is not None
+                    and max(timelines.values() or [backups_list[0]]) not in backups_list
                 ):
                     error_message = "There is no base backup created from the latest timeline"
                     logger.error(f"Restore failed: {error_message}")
