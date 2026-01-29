@@ -1,3 +1,4 @@
+(refresh)=
 # Refresh (upgrade)
 
 ```{admonition} Emergency stop button
