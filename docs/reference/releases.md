@@ -16,9 +16,9 @@ For more details about all new PostgreSQL 16 features, see the complete [release
 
 | Charmhub revision</br>(amd, arm) | Snap revision</br>(amd, arm) | PostgreSQL version | Minimum Juju version |
 |:----------------------------:|:------------------------:|:------------------:|:--------------------:|
-|           [843, 844]         |         218, 219         |        16.9        |         3.6        | 
-|           [951, 952]         |         239, 202         |        16.10       |         3.6.1      | 
 |           [989, 990]         |         244, 242         |        16.11       |         3.6.1      | 
+|           [951, 952]         |         239, 202         |        16.10       |         3.6.1      | 
+|           [843, 844]         |         218, 219         |        16.9        |         3.6        | 
 
 ```{seealso}
 * [Information about all major versions](/explanation/charm-versions/index) 
