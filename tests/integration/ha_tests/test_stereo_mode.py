@@ -16,12 +16,14 @@ Test scenarios from acceptance criteria:
 
 import asyncio
 import logging
-from asyncio import gather
+import subprocess
+from pathlib import Path
 
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from .. import architecture
 from ..helpers import (
     APPLICATION_NAME,
     CHARM_BASE,
@@ -155,14 +157,23 @@ WATCHER_APP_NAME = "postgresql-watcher"
 
 @pytest.fixture(scope="session")
 def watcher_charm():
-    """Return path to the pre-built watcher charm."""
-    # The charm should be built before running tests (e.g., by charmcraft pack)
-    # Similar to how the main PostgreSQL charm is handled
-    from .. import architecture
+    """Return path to the watcher charm, building it if necessary."""
+    watcher_dir = Path("./postgresql-watcher")
+    charm_path = watcher_dir / f"postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
 
-    return (
-        f"./postgresql-watcher/postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
-    )
+    if not charm_path.exists():
+        logger.info(f"Watcher charm not found at {charm_path}, building...")
+        subprocess.run(
+            ["charmcraft", "pack", "-v"],
+            cwd=watcher_dir,
+            check=True,
+        )
+
+    if not charm_path.exists():
+        raise FileNotFoundError(f"Failed to build watcher charm at {charm_path}")
+
+    # Return path with "./" prefix so python-libjuju recognizes it as a local charm
+    return f"./{charm_path}"
 
 
 @pytest.mark.abort_on_fail
@@ -178,31 +189,33 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
     cannot form Raft quorum (need 2 out of 3) and both initialize
     independently with different system IDs.
     """
+    logger.info(f"DEBUG: charm={charm!r}, watcher_charm={watcher_charm!r}")
     async with ops_test.fast_forward():
         # Step 1: Deploy PostgreSQL with ONLY 1 unit initially
         # This establishes a single-node Raft cluster that can be leader
-        await gather(
-            ops_test.model.deploy(
-                charm,
-                application_name=DATABASE_APP_NAME,
-                num_units=1,  # IMPORTANT: Start with 1 unit only
-                base=CHARM_BASE,
-                config={"profile": "testing"},
-            ),
-            # Deploy the watcher charm
-            ops_test.model.deploy(
-                watcher_charm,
-                application_name=WATCHER_APP_NAME,
-                num_units=1,
-                base=CHARM_BASE,
-            ),
-            # Deploy test application
-            ops_test.model.deploy(
-                APPLICATION_NAME,
-                application_name=APPLICATION_NAME,
-                base=CHARM_BASE,
-                channel="edge",
-            ),
+        logger.info("Deploying PostgreSQL charm...")
+        await ops_test.model.deploy(
+            charm,
+            application_name=DATABASE_APP_NAME,
+            num_units=1,  # IMPORTANT: Start with 1 unit only
+            base=CHARM_BASE,
+            config={"profile": "testing"},
+        )
+        logger.info("Deploying watcher charm...")
+        # Deploy the watcher charm
+        await ops_test.model.deploy(
+            watcher_charm,
+            application_name=WATCHER_APP_NAME,
+            num_units=1,
+            base=CHARM_BASE,
+        )
+        logger.info("Deploying test application...")
+        # Deploy test application
+        await ops_test.model.deploy(
+            APPLICATION_NAME,
+            application_name=APPLICATION_NAME,
+            base=CHARM_BASE,
+            channel="edge",
         )
 
         # Wait for initial deployment
