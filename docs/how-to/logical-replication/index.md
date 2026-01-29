@@ -1,3 +1,4 @@
+(logical-replication)=
 # Logical replication
 
 Logical replication is a feature that allows replicating a subset of one PostgreSQL cluster data to another PostgreSQL cluster.

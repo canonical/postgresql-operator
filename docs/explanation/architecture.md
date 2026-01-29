@@ -1,3 +1,4 @@
+(architecture)=
 # Architecture
 
 [Charmed PostgreSQL](https://charmhub.io/postgresql) is a Juju-based operator to deploy and operate [PostgreSQL](https://www.postgresql.org/).It is based on [PostgreSQL Community Edition](https://www.postgresql.org/community/), and uses [Patroni](https://github.com/zalando/patroni) to manage PostgreSQL cluster via [synchronous replication](https://patroni.readthedocs.io/en/latest/replication_modes.html#postgresql-synchronous-replication).
