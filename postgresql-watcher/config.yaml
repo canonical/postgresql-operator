@@ -1,0 +1,35 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  health-check-interval:
+    description: |
+      Interval in seconds between health checks of PostgreSQL endpoints.
+      The watcher periodically tests connectivity to all PostgreSQL units.
+    type: int
+    default: 10
+  health-check-timeout:
+    description: |
+      Timeout in seconds for each health check query (SELECT 1).
+      If the query doesn't complete within this time, it's considered failed.
+    type: int
+    default: 5
+  health-check-retries:
+    description: |
+      Number of retries before marking an endpoint as unhealthy.
+      The watcher will attempt this many times before considering the endpoint down.
+    type: int
+    default: 3
+  retry-interval:
+    description: |
+      Wait time in seconds between health check retries.
+      This helps accommodate transient network issues.
+    type: int
+    default: 7
+  profile:
+    description: |
+      Deployment profile that affects validation strictness.
+      - testing: Warnings for AZ misconfigurations
+      - production: Errors for AZ misconfigurations
+    type: string
+    default: production
