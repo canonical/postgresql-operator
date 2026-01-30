@@ -745,5 +745,5 @@ async def test_health_check_action(ops_test: OpsTest) -> None:
 
             assert action.status == "completed", f"Action failed: {action.results}"
             assert "endpoints" in action.results
-            assert int(action.results["healthy_count"]) == 2
-            assert int(action.results["total_count"]) == 2
+            assert int(action.results["healthy-count"]) == 2
+            assert int(action.results["total-count"]) == 2

@@ -355,8 +355,8 @@ class PostgreSQLWatcherCharm(ops.CharmBase):
                  for endpoint, healthy in health_results.items()},
                 indent=2
             ),
-            "healthy_count": sum(1 for h in health_results.values() if h),
-            "total_count": len(health_results),
+            "healthy-count": sum(1 for h in health_results.values() if h),
+            "total-count": len(health_results),
         }
 
         event.set_results(results)
