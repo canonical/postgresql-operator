@@ -553,8 +553,10 @@ class PostgreSQLBackups(Object):
             PGBACKREST_CONFIGURATION_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
-            f"archive/{self.stanza_name}",
+            "archive",
             "--recurse",
+            "--filter",
+            "\\.history$",
             "--output=json",
         ])
         if return_code != 0:
@@ -562,20 +564,18 @@ class PostgreSQLBackups(Object):
             raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
-        if repository is None:
-            return dict[str, tuple[str, str]]()
-
-        return dict[str, tuple[str, str]]({
-            datetime.strftime(
-                datetime.fromtimestamp(timeline_object["time"], UTC),
-                BACKUP_ID_FORMAT,
-            ): (
-                timeline.split("/")[1],
-                timeline.split("/")[-1].split(".")[0].lstrip("0"),
-            )
-            for timeline, timeline_object in repository
-            if timeline.endswith(".history") and not timeline.endswith("backup.history")
-        })
+        output = dict[str, tuple[str, str]]()
+        if repository:
+            for timeline, timeline_object in repository:
+                if not timeline.endswith("backup.history"):
+                    # 0 is the stanza -1 is thee timeline file
+                    path = timeline.split("/")
+                    output[
+                        datetime.strftime(
+                            datetime.fromtimestamp(timeline_object["time"], UTC), BACKUP_ID_FORMAT
+                        )
+                    ] = (path[0], path[-1].split(".")[0].lstrip("0"))
+        return output
 
     def _get_nearest_timeline(self, timestamp: str) -> tuple[str, str] | None:
         """Finds the nearest timeline or backup prior to the specified timeline.
