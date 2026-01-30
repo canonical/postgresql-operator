@@ -1,3 +1,4 @@
+(juju-spaces)=
 # Deploy on Juju spaces
 
 The Charmed PostgreSQL operator supports [Juju spaces](https://documentation.ubuntu.com/juju/latest/reference/space/index.html) to separate network traffic for:
