@@ -42,6 +42,11 @@ class WatcherKVStoreTTL(SyncObj):
 
     The methods must have the same signatures as Patroni's KVStoreTTL for
     the Raft log entries to be applied correctly.
+
+    IMPORTANT: This class also implements _onTick with __expire_keys logic,
+    which is critical for failover. When the watcher becomes the Raft leader
+    (e.g., when the PostgreSQL primary is network-isolated), it must expire
+    stale leader keys so that a replica can acquire leadership.
     """
 
     def __init__(self, self_addr: str, partner_addrs: list[str], password: str, data_dir: str = ""):
@@ -66,8 +71,10 @@ class WatcherKVStoreTTL(SyncObj):
             journalFile=f"{file_template}.journal" if file_template else None,
         )
         super().__init__(self_addr, partner_addrs, conf=conf)
-        # Storage for replicated data (we don't use it, but need it for compatibility)
+        # Storage for replicated data - needed for TTL expiry logic
         self.__data: Dict[str, Dict[str, Any]] = {}
+        # Track keys being expired to avoid duplicate expiration calls
+        self.__limb: Dict[str, bool] = {}
         logger.info(f"WatcherKVStoreTTL initialized: self={self_addr}, partners={partner_addrs}")
 
     @replicated
@@ -104,6 +111,48 @@ class WatcherKVStoreTTL(SyncObj):
         to be compatible with the Raft cluster.
         """
         self.__data.pop(key, None)
+
+    def __expire_keys(self) -> None:
+        """Expire keys that have exceeded their TTL.
+
+        This method is called by _onTick when this node is the Raft leader.
+        It checks all stored keys for expired TTL values and triggers the
+        replicated _expire operation for them.
+
+        This is critical for failover: when the PostgreSQL primary is isolated,
+        its leader key TTL will expire, and this method ensures that expiry
+        is processed so a replica can acquire leadership.
+        """
+        current_time = time.time()
+        for key, value in list(self.__data.items()):
+            if 'expire' in value and value['expire'] <= current_time:
+                # Check if we're already processing this key's expiration
+                if key not in self.__limb:
+                    self.__limb[key] = True
+                    logger.info(f"Expiring key {key} (TTL expired)")
+                    # Call the replicated _expire method to remove the key
+                    # across all nodes in the Raft cluster
+                    self._expire(key, value)
+
+    def _onTick(self, timeToWait: float = 0.0) -> None:
+        """Called periodically by pysyncobj's auto-tick mechanism.
+
+        When this node is the Raft leader, it runs __expire_keys to check
+        for and remove expired TTL entries. This is essential for Patroni
+        failover to work correctly.
+
+        Args:
+            timeToWait: Time to wait before next tick (passed to parent).
+        """
+        # Call parent's _onTick first
+        super()._onTick(timeToWait)
+
+        # If we're the leader, expire any keys that have exceeded their TTL
+        if self._isLeader():
+            self.__expire_keys()
+        else:
+            # Clear limb tracking when not leader
+            self.__limb.clear()
 
 
 class WatcherRaftNode:
