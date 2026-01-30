@@ -554,7 +554,7 @@ class PostgreSQLBackups(Object):
             PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
             f"archive/{self.stanza_name}",
-            "--filter=\\.history$",
+            "--recurse",
             "--output=json",
         ])
         if return_code != 0:
