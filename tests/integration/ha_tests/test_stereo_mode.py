@@ -687,9 +687,10 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
     watcher_machine = watcher_unit.machine.hostname
 
-    # Get current cluster state
+    # Get current cluster state - use use_ip_from_inside=True because previous tests
+    # may have left units with stale IPs in Juju's cache after network manipulation
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    original_roles = await get_cluster_roles(ops_test, any_unit)
+    original_roles = await get_cluster_roles(ops_test, any_unit, use_ip_from_inside=True)
 
     logger.info(f"Isolating watcher network: {watcher_machine}")
 
@@ -698,10 +699,10 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
         cut_network_from_unit(watcher_machine)
 
         # Verify writes continue without interruption
-        await are_writes_increasing(ops_test)
+        await are_writes_increasing(ops_test, use_ip_from_inside=True)
 
         # Cluster roles should remain unchanged
-        current_roles = await get_cluster_roles(ops_test, any_unit)
+        current_roles = await get_cluster_roles(ops_test, any_unit, use_ip_from_inside=True)
         assert current_roles["primaries"] == original_roles["primaries"]
 
     finally:
@@ -719,12 +720,30 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
 @pytest.mark.abort_on_fail
 async def test_health_check_action(ops_test: OpsTest) -> None:
     """Test the trigger-health-check action on the watcher."""
+    # Wait for the cluster to fully stabilize after previous network tests
+    # The watcher may need time to reconnect and receive endpoint data after network manipulation
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # Also verify Raft cluster health to ensure watcher is fully connected
+    await verify_raft_cluster_health(
+        ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME, expected_members=3
+    )
+
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
 
-    action = await watcher_unit.run_action("trigger-health-check")
-    action = await action.wait()
+    # Retry the action a few times as the watcher may need time to receive endpoint data
+    # from the relation after reconnecting
+    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            action = await watcher_unit.run_action("trigger-health-check")
+            action = await action.wait()
 
-    assert action.status == "completed"
-    assert "endpoints" in action.results
-    assert int(action.results["healthy_count"]) == 2
-    assert int(action.results["total_count"]) == 2
+            assert action.status == "completed", f"Action failed: {action.results}"
+            assert "endpoints" in action.results
+            assert int(action.results["healthy_count"]) == 2
+            assert int(action.results["total_count"]) == 2
