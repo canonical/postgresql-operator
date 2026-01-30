@@ -6,8 +6,6 @@ import logging
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
-from backups import CANNOT_RESTORE_PITR
-
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -19,25 +17,24 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
+CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
+
 
 async def backup_deploy(
     ops_test: OpsTest,
     s3_integrator_app_name: str,
     tls_certificates_app_name: str | None,
-    tls_config,
     tls_channel,
     credentials,
     cloud,
     config,
     charm,
 ) -> str:
-    use_tls = all([tls_certificates_app_name, tls_config, tls_channel])
+    use_tls = all([tls_certificates_app_name, tls_channel])
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(s3_integrator_app_name)
     if use_tls:
-        await ops_test.model.deploy(
-            tls_certificates_app_name, config=tls_config, channel=tls_channel
-        )
+        await ops_test.model.deploy(tls_certificates_app_name, channel=tls_channel)
 
     # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
     # as archive_mode is disabled after restoring the backup) and to TLS Certificates Operator
@@ -75,13 +72,13 @@ async def backup_deploy(
         await ops_test.model.wait_for_idle(
             apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1500
         )
+    return database_app_name
 
 
 async def backup_operations(
     ops_test: OpsTest,
     s3_integrator_app_name: str,
     tls_certificates_app_name: str | None,
-    tls_config,
     tls_channel,
     credentials,
     cloud,
@@ -93,7 +90,6 @@ async def backup_operations(
         ops_test,
         s3_integrator_app_name,
         tls_certificates_app_name,
-        tls_config,
         tls_channel,
         credentials,
         cloud,
@@ -278,7 +274,6 @@ async def pitr_backup_operations(
     ops_test: OpsTest,
     s3_integrator_app_name: str,
     tls_certificates_app_name: str | None,
-    tls_config,
     tls_channel,
     credentials,
     cloud,
@@ -293,11 +288,11 @@ async def pitr_backup_operations(
     3: check_td1 -> check_td2 -> check_not_td3 -> test_data_td4 -> restore_t2_latest => 4
     4: check_td1 -> check_not_td2 -> check_td3 -> check_not_td4
     """
+    use_tls = all([tls_certificates_app_name, tls_channel])
     database_app_name = await backup_deploy(
         ops_test,
         s3_integrator_app_name,
         tls_certificates_app_name,
-        tls_config,
         tls_channel,
         credentials,
         cloud,
@@ -537,8 +532,9 @@ async def pitr_backup_operations(
 
     # Remove the database app.
     await ops_test.model.remove_application(database_app_name, block_until_done=True)
-    # Remove the TLS operator.
-    await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
+    if use_tls:
+        # Remove the TLS operator.
+        await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
 def _create_table(host: str, password: str):
