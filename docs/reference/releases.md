@@ -12,6 +12,7 @@ The table below shows information for all minor releases of Charmed PostgreSQL 1
 
 | Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [986], [987] | 14.20 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [935], [936] | 14.19 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [552], [553] | 14.15 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [467], [468] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |
@@ -40,12 +41,12 @@ If you deploy with the `--revision` flag, **you must make sure the revision matc
 Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
 ```
 
-### Latest release: 935, 936
+### Latest release: 986, 987
 
 | Revision | amd64 | arm64 |  Snap revision |
 |:--------:|:-----:|:-----:|:-----:|
-| [935]      |         |![check] | 230 |
-| [936]      | ![check]|         | 229 |
+| [986]    |         |![check] | 243 |
+| [987]    | ![check]|         | 245 |
 
 
 <details>
@@ -53,6 +54,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 | Revision | amd64 | arm64 |  Snap revision |
 |:--------:|:-----:|:-----:|:--------------:|
+|[935] |          |![check]  | 230 |
+|[936] | ![check] |          | 229 |
 |[553] | ![check] |          | 143 |
 |[552] |          | ![check] | 142 |
 |[468] |![check]  |          | 120 |    
@@ -71,6 +74,10 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
 
 <!-- LINKS-->
+
+[986]: https://github.com/canonical/postgresql-operator/releases/tag/rev986
+[987]: https://github.com/canonical/postgresql-operator/releases/tag/rev986
+
 [936]: https://github.com/canonical/postgresql-operator/releases/tag/rev935
 [935]: https://github.com/canonical/postgresql-operator/releases/tag/rev935
 
