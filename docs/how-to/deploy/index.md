@@ -7,6 +7,7 @@ For more details, see {ref}`system-requirements`.
 
 If you are not sure where to start, or would like a more guided walkthrough for setting up your environment, see the {ref}`tutorial`.
 
+(deploy-quickstart)=
 ## Quickstart
 
 First, [bootstrap](https://juju.is/docs/juju/juju-bootstrap) the cloud controller and create a [model](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/model/): 
