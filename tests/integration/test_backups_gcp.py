@@ -8,11 +8,11 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from .backup_helpers import backup_operations
 from .conftest import GCP
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
-    backup_operations,
     db_connect,
     get_password,
     get_unit_address,

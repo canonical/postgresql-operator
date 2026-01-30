@@ -6,8 +6,8 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
+from .backup_helpers import pitr_backup_operations
 from .conftest import AWS
-from .helpers import pitr_backup_operations
 
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"

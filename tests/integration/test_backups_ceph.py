@@ -6,8 +6,8 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
+from .backup_helpers import backup_operations
 from .conftest import ConnectionInformation
-from .helpers import backup_operations
 
 logger = logging.getLogger(__name__)
 
