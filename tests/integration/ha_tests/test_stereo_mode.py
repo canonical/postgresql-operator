@@ -190,6 +190,26 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
     independently with different system IDs.
     """
     logger.info(f"DEBUG: charm={charm!r}, watcher_charm={watcher_charm!r}")
+
+    # Check if PostgreSQL is already deployed (e.g., from a previous test run)
+    # If so, verify it's in the expected state or skip deployment
+    if DATABASE_APP_NAME in ops_test.model.applications:
+        logger.info("PostgreSQL already deployed, checking state...")
+        pg_units = len(ops_test.model.applications[DATABASE_APP_NAME].units)
+        watcher_deployed = WATCHER_APP_NAME in ops_test.model.applications
+        test_app_deployed = APPLICATION_NAME in ops_test.model.applications
+
+        if pg_units == 2 and watcher_deployed and test_app_deployed:
+            logger.info("Stereo mode already deployed with expected state, verifying...")
+            await ops_test.model.wait_for_idle(status="active", timeout=300)
+            return
+
+        # If state is incorrect, we need to clean up and redeploy
+        logger.info(f"Unexpected state (pg_units={pg_units}), cleaning up...")
+        for app in [DATABASE_APP_NAME, WATCHER_APP_NAME, APPLICATION_NAME]:
+            if app in ops_test.model.applications:
+                await ops_test.model.remove_application(app, block_until_done=True)
+
     async with ops_test.fast_forward():
         # Step 1: Deploy PostgreSQL with ONLY 1 unit initially
         # This establishes a single-node Raft cluster that can be leader
@@ -299,6 +319,15 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
 
     # Shutdown the replica
     await ops_test.model.destroy_unit(replica, force=True, destroy_storage=False, max_wait=1500)
+
+    # Wait for the cluster to stabilize after unit removal
+    # The primary needs time to reconfigure the cluster and update secrets
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
 
     # Verify writes continue (primary should still be available)
     # With watcher, we should maintain quorum
