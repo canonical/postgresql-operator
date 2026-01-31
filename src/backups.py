@@ -575,7 +575,7 @@ class PostgreSQLBackups(Object):
         if repository:
             for timeline, timeline_object in repository:
                 if not timeline.endswith("backup.history"):
-                    # 0 is the stanza -1 is thee timeline file
+                    # 0 is the stanza -1 is the timeline file
                     path = timeline.split("/")
                     output[
                         datetime.strftime(
