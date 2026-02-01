@@ -5,7 +5,6 @@
 import logging
 
 import pytest
-from juju import tag
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
@@ -143,7 +142,6 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.skip(reason="Unstable")
 async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
     """Test application deploy in dirty environment with garbage storage from another application."""
     async with ops_test.fast_forward():
@@ -156,14 +154,17 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
                 logger.info(f"Collected storages: {garbage_storages}")
 
         logger.info("deploying duplicate application with attached storage")
-        await ops_test.model.deploy(
-            charm,
-            application_name=DUP_DATABASE_APP_NAME,
-            num_units=1,
-            base=CHARM_BASE,
-            attach_storage=[tag.storage(storage) for storage in garbage_storages],
-            config={"profile": "testing"},
-        )
+        deploy_cmd = [
+            "deploy",
+            f"./{charm}",
+            DUP_DATABASE_APP_NAME,
+            "--model={ops_test.model.info.name}",
+            "--config profile=testing",
+            f"--attach-storage={','.join(garbage_storages)}",
+        ]
+        logger.info(deploy_cmd)
+        return_code, _, _ = await ops_test.juju(*deploy_cmd)
+        assert return_code == 0, "Failed to add unit with storage"
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
         await ops_test.model.set_config({"update-status-hook-interval": "10s"})
