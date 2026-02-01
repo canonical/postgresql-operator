@@ -1,0 +1,60 @@
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:100 starting continuous writes to the database
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:104 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 7, 'testing.postgresql-1': 7, 'testing.postgresql-2': 7}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 9, 'testing.postgresql-1': 9, 'testing.postgresql-2': 9}
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:113 Refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:116 Wait for upgrade to start
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:125 Wait for upgrade to complete
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:132 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 168, 'testing.postgresql-1': 168, 'testing.postgresql-2': 168}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 170, 'testing.postgresql-1': 171, 'testing.postgresql-2': 171}
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:137 checking whether no writes were lost
+[32mINFO    [0m integration.ha_tests.test_upgrade_from_stable:test_upgrade_from_stable.py:142 checking the number of switchovers
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:13:44Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.20    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  434  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.134.59.105             received database credentials of the first database
+postgresql/0*           active    idle   0        10.134.59.214   5432/tcp  
+postgresql/1            active    idle   1        10.134.59.217   5432/tcp  
+postgresql/2            active    idle   2        10.134.59.202   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.134.59.214  juju-4a01f5-0  ubuntu@22.04  runnervmkj6or  Running
+1        started  10.134.59.217  juju-4a01f5-1  ubuntu@22.04  runnervmkj6or  Running
+2        started  10.134.59.202  juju-4a01f5-2  ubuntu@22.04  runnervmkj6or  Running
+3        started  10.134.59.105  juju-4a01f5-3  ubuntu@22.04  runnervmkj6or  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:07:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:07:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:08:56 ERROR unit.postgresql/0.juju-log database-peers:2: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 00:09:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:09:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:09:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:09:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:10:41 ERROR unit.postgresql/1.juju-log database-peers:2: Failed to list PostgreSQL database users: connection to server at "10.134.59.217", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
