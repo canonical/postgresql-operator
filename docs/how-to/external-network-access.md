@@ -1,3 +1,4 @@
+(external-network-access)=
 # How to connect from outside the local network
 
 This page summarises resources for setting up deployments where an external application must connect to a PostgreSQL database from outside the local area network. 
