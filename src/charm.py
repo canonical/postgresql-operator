@@ -66,6 +66,7 @@ from single_kernel_postgresql.config.literals import (
     USER,
     Substrates,
 )
+from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -133,7 +134,6 @@ from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
-from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
