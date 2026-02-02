@@ -150,7 +150,7 @@ class RaftController:
         # Reload systemd to pick up the new service
         try:
             subprocess.run(
-                ["systemctl", "daemon-reload"],  # noqa: S603, S607
+                ["/usr/bin/systemctl", "daemon-reload"],
                 check=True,
                 capture_output=True,
                 timeout=30,
@@ -177,14 +177,14 @@ class RaftController:
 
         try:
             # Enable and start the service
-            subprocess.run(
-                ["systemctl", "enable", SERVICE_NAME],  # noqa: S603, S607
+            subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "enable", SERVICE_NAME],
                 check=True,
                 capture_output=True,
                 timeout=30,
             )
-            subprocess.run(
-                ["systemctl", "start", SERVICE_NAME],  # noqa: S603, S607
+            subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "start", SERVICE_NAME],
                 check=True,
                 capture_output=True,
                 timeout=30,
@@ -209,8 +209,8 @@ class RaftController:
             return True
 
         try:
-            subprocess.run(
-                ["systemctl", "stop", SERVICE_NAME],  # noqa: S603, S607
+            subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "stop", SERVICE_NAME],
                 check=True,
                 capture_output=True,
                 timeout=30,
@@ -231,8 +231,8 @@ class RaftController:
             True if restarted successfully, False otherwise.
         """
         try:
-            subprocess.run(
-                ["systemctl", "restart", SERVICE_NAME],  # noqa: S603, S607
+            subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "restart", SERVICE_NAME],
                 check=True,
                 capture_output=True,
                 timeout=30,
@@ -253,8 +253,8 @@ class RaftController:
             True if running, False otherwise.
         """
         try:
-            result = subprocess.run(
-                ["systemctl", "is-active", SERVICE_NAME],  # noqa: S603, S607
+            result = subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "is-active", SERVICE_NAME],
                 capture_output=True,
                 text=True,
                 timeout=10,

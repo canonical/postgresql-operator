@@ -28,9 +28,12 @@ from ops import (
 from constants import (
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
+    WATCHER_PASSWORD_KEY,
     WATCHER_RELATION,
     WATCHER_SECRET_LABEL,
+    WATCHER_USER,
 )
+from utils import new_password
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -158,6 +161,12 @@ class PostgreSQLWatcherRelation(Object):
 
         if watcher_address:
             logger.info(f"Watcher address updated: {watcher_address}")
+            # Check if watcher IP changed (e.g., watcher unit was replaced)
+            # Remove any old watcher IPs from Raft before adding the new one
+            self._cleanup_old_watcher_from_raft(watcher_address)
+            # Ensure watcher user exists for health checks
+            if self.charm.unit.is_leader():
+                self._ensure_watcher_user()
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
             # Dynamically add watcher to the running Raft cluster
@@ -166,6 +175,58 @@ class PostgreSQLWatcherRelation(Object):
         # Update relation data for the watcher
         if self.charm.unit.is_leader():
             self._update_relation_data(event.relation)
+
+    def _cleanup_old_watcher_from_raft(self, current_watcher_address: str) -> None:
+        """Remove any old watcher IPs from Raft that differ from the current watcher.
+
+        When a watcher unit is replaced (e.g., destroyed and re-deployed), it gets
+        a new IP address. The old IP remains in the Raft cluster membership, which
+        prevents the new watcher from being recognized as a valid cluster member.
+        This method finds and removes any such stale watcher entries.
+
+        Args:
+            current_watcher_address: The current watcher's IP address.
+        """
+        # Get all PostgreSQL unit IPs (these should stay in the cluster)
+        # Use _units_ips for fresh IPs from unit relation data
+        pg_ips = set(self.charm._units_ips)
+
+        current_watcher_raft_addr = f"{current_watcher_address}:{RAFT_PORT}"
+
+        # Get Raft cluster status to find all members
+        try:
+            from pysyncobj.utility import TcpUtility, UtilityException
+        except ImportError:
+            logger.warning("pysyncobj not available, cannot cleanup old watcher")
+            return
+
+        try:
+            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            raft_status = syncobj_util.executeCommand("127.0.0.1:2222", ["status"])
+            if raft_status:
+                # Find all partner nodes in the Raft cluster
+                # Keys look like: partner_node_status_server_10.131.50.142:2222
+                stale_members: list[str] = []
+                prefix = "partner_node_status_server_"
+                for key in list(raft_status):
+                    if isinstance(key, str) and key.startswith(prefix):
+                        member_addr = key.replace(prefix, "")
+                        member_ip = member_addr.split(":")[0]
+
+                        # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
+                        if member_ip not in pg_ips and member_addr != current_watcher_raft_addr:
+                            stale_members.append(member_addr)
+
+                # Remove stale watcher members
+                for stale_addr in stale_members:
+                    logger.info(f"Removing stale watcher from Raft cluster: {stale_addr}")
+                    stale_ip = stale_addr.split(":")[0]
+                    self._remove_watcher_from_raft(stale_ip)
+
+        except UtilityException as e:
+            logger.debug(f"Failed to get Raft status for cleanup: {e}")
+        except Exception as e:
+            logger.debug(f"Error during Raft cleanup: {e}")
 
     def _is_watcher_in_raft(self, watcher_address: str) -> bool:
         """Check if the watcher is a member of the Raft cluster.
@@ -321,6 +382,77 @@ class PostgreSQLWatcherRelation(Object):
         # Update Patroni configuration without the watcher
         self.charm.update_config()
 
+    def _ensure_watcher_user(self) -> str | None:
+        """Ensure the watcher PostgreSQL user exists for health checks.
+
+        Creates the watcher user if it doesn't exist, and updates the watcher
+        secret with the password so the watcher charm can authenticate.
+
+        Returns:
+            The watcher password, or None if user creation failed.
+        """
+        if not self.charm.is_cluster_initialised:
+            logger.debug("Cluster not initialized, cannot create watcher user")
+            return None
+
+        try:
+            users = self.charm.postgresql.list_users()
+            if WATCHER_USER in users:
+                logger.debug(f"User {WATCHER_USER} already exists")
+                # Get existing password from secret
+                try:
+                    secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
+                    content = secret.get_content(refresh=True)
+                    return content.get(WATCHER_PASSWORD_KEY)
+                except SecretNotFoundError:
+                    # Secret doesn't exist yet, will be created below with new password
+                    pass
+
+            # Generate a password for the watcher user
+            watcher_password = new_password()
+
+            # Create the watcher user (minimal privileges - only needs to connect and run SELECT 1)
+            if WATCHER_USER not in users:
+                logger.info(f"Creating PostgreSQL user: {WATCHER_USER}")
+                self.charm.postgresql.create_user(WATCHER_USER, watcher_password)
+            else:
+                # User exists but we don't have the password, update it
+                logger.info(f"Updating password for PostgreSQL user: {WATCHER_USER}")
+                self.charm.postgresql.update_user_password(WATCHER_USER, watcher_password)
+
+            # Grant connect privilege on postgres database (for health checks)
+            self.charm.postgresql.grant_database_privileges_to_user(
+                WATCHER_USER, "postgres", ["connect"]
+            )
+
+            # Update the secret to include the watcher password
+            self._update_watcher_secret_with_password(watcher_password)
+
+            return watcher_password
+
+        except Exception as e:
+            logger.error(f"Failed to ensure watcher user: {e}")
+            return None
+
+    def _update_watcher_secret_with_password(self, watcher_password: str) -> None:
+        """Update the watcher secret to include the watcher password.
+
+        Args:
+            watcher_password: The password for the watcher PostgreSQL user.
+        """
+        try:
+            secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
+            content = secret.get_content(refresh=True)
+            content[WATCHER_PASSWORD_KEY] = watcher_password
+            secret.set_content(content)
+            logger.info("Updated watcher secret with watcher password")
+        except SecretNotFoundError:
+            # Secret will be created later in _get_or_create_watcher_secret
+            # Store the password temporarily so it can be included
+            logger.debug("Watcher secret not found, password will be added when secret is created")
+        except Exception as e:
+            logger.error(f"Failed to update watcher secret with password: {e}")
+
     def _get_or_create_watcher_secret(self) -> Secret | None:
         """Get or create the secret for sharing Raft credentials with the watcher.
 
@@ -404,16 +536,15 @@ class PostgreSQLWatcherRelation(Object):
             logger.error(f"Error getting secret: {e}")
             return
 
-        # Collect PostgreSQL unit endpoints
-        unit_ip = self.charm._patroni.unit_ip
-        logger.info(f"Unit IP: {unit_ip}")
-        if unit_ip is None:
-            logger.warning("Unit IP not available")
+        # Collect PostgreSQL unit endpoints using fresh IPs from unit relation data
+        # We use _units_ips instead of _peer_members_ips because _units_ips reads directly
+        # from unit relation data (which is always fresh), while _peer_members_ips reads
+        # from members_ips in app peer data (which may be stale after network disruptions)
+        pg_endpoints: list[str] = list(self.charm._units_ips)
+        logger.info(f"PG endpoints from _units_ips: {pg_endpoints}")
+        if not pg_endpoints:
+            logger.warning("No PostgreSQL endpoints available")
             return
-
-        pg_endpoints: list[str] = [unit_ip]
-        pg_endpoints.extend(list(self.charm._patroni.peers_ips))
-        logger.info(f"PG endpoints: {pg_endpoints}")
 
         # Collect Raft partner addresses (all PostgreSQL units)
         raft_partner_addrs: list[str] = list(pg_endpoints)
@@ -431,10 +562,33 @@ class PostgreSQLWatcherRelation(Object):
         logger.info("Relation app data updated successfully")
 
         # Also share unit-specific data
-        relation.data[self.charm.unit].update({
-            "unit-address": unit_ip,
-        })
-        logger.info("Relation unit data updated")
+        unit_ip = self.charm._unit_ip
+        if unit_ip:
+            relation.data[self.charm.unit].update({
+                "unit-address": unit_ip,
+            })
+            logger.info("Relation unit data updated")
+
+    def update_unit_address(self) -> None:
+        """Update this unit's address in the watcher relation.
+
+        Called when the unit's IP changes (e.g., after network isolation).
+        This updates the unit-specific data in the relation, not the application data.
+        Can be called by any unit, not just the leader.
+        """
+        if not (relation := self._relation):
+            return
+
+        unit_ip = self.charm._unit_ip
+        if unit_ip is None:
+            return
+
+        current_address = relation.data[self.charm.unit].get("unit-address")
+        if current_address != unit_ip:
+            logger.info(
+                f"Updating unit-address in watcher relation from {current_address} to {unit_ip}"
+            )
+            relation.data[self.charm.unit]["unit-address"] = unit_ip
 
     def update_endpoints(self) -> None:
         """Update the watcher with current cluster endpoints.
@@ -520,3 +674,37 @@ class PostgreSQLWatcherRelation(Object):
                 logger.info("Updated watcher secret with new Raft password")
         except SecretNotFoundError:
             logger.debug("Watcher secret not found, nothing to update")
+
+    def ensure_watcher_in_raft(self) -> None:
+        """Ensure the connected watcher is in the Raft cluster and has fresh endpoint data.
+
+        Called periodically from update_status to handle cases where Juju
+        relation events weren't delivered (e.g., when a watcher unit is replaced).
+        This method:
+        1. Cleans up any stale watcher IPs from the Raft cluster
+        2. Adds the current watcher to Raft if not present
+        3. Updates the watcher relation data with fresh PostgreSQL IPs
+
+        The last point is critical because after network disruptions that cause IP
+        changes, the watcher may have stale pg-endpoints and be unable to health
+        check the PostgreSQL nodes properly.
+        """
+        if not self.charm.is_cluster_initialised:
+            return
+
+        watcher_address = self.watcher_address
+        if not watcher_address:
+            return
+
+        # First clean up any stale watcher entries
+        self._cleanup_old_watcher_from_raft(watcher_address)
+
+        # Then ensure the current watcher is in the cluster
+        if not self._is_watcher_in_raft(watcher_address):
+            logger.info(f"Watcher {watcher_address} not in Raft cluster, adding it")
+            self._add_watcher_to_raft(watcher_address)
+
+        # Update watcher relation data with fresh PostgreSQL IPs (leader only)
+        # This ensures the watcher has the correct endpoints after IP changes
+        if self.charm.unit.is_leader() and (relation := self._relation):
+            self._update_relation_data(relation)

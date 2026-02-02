@@ -223,6 +223,8 @@ class TestWatcherRelation:
     def test_update_relation_data_leader(self):
         """Test _update_relation_data populates relation data correctly."""
         mock_charm = create_mock_charm()
+        mock_charm._units_ips = ["10.0.0.1", "10.0.0.2"]  # Mock PostgreSQL endpoints
+        mock_charm._unit_ip = "10.0.0.1"
         mock_relation = MagicMock()
         mock_relation.data = {
             mock_charm.app: {},

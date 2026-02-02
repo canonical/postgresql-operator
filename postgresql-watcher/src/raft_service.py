@@ -22,7 +22,8 @@ import os
 import signal
 import sys
 import time
-from typing import Any, Callable, Dict, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 from pysyncobj import SyncObj, SyncObjConf, replicated
 
@@ -72,13 +73,13 @@ class WatcherKVStoreTTL(SyncObj):
         )
         super().__init__(self_addr, partner_addrs, conf=conf)
         # Storage for replicated data - needed for TTL expiry logic
-        self.__data: Dict[str, Dict[str, Any]] = {}
+        self.__data: dict[str, dict[str, Any]] = {}
         # Track keys being expired to avoid duplicate expiration calls
-        self.__limb: Dict[str, bool] = {}
+        self.__limb: dict[str, bool] = {}
         logger.info(f"WatcherKVStoreTTL initialized: self={self_addr}, partners={partner_addrs}")
 
     @replicated
-    def _set(self, key: str, value: Dict[str, Any], **kwargs: Any) -> Union[bool, Dict[str, Any]]:
+    def _set(self, key: str, value: dict[str, Any], **kwargs: Any) -> bool | dict[str, Any]:
         """Replicated set operation - compatible with Patroni's KVStoreTTL._set.
 
         The watcher doesn't actually use this data, but must implement the method
@@ -104,7 +105,7 @@ class WatcherKVStoreTTL(SyncObj):
         return True
 
     @replicated
-    def _expire(self, key: str, value: Dict[str, Any], callback: Optional[Callable[..., Any]] = None) -> None:
+    def _expire(self, key: str, value: dict[str, Any], callback: Callable[..., Any] | None = None) -> None:
         """Replicated expire operation - compatible with Patroni's KVStoreTTL._expire.
 
         The watcher doesn't actually use this data, but must implement the method
@@ -125,16 +126,15 @@ class WatcherKVStoreTTL(SyncObj):
         """
         current_time = time.time()
         for key, value in list(self.__data.items()):
-            if 'expire' in value and value['expire'] <= current_time:
-                # Check if we're already processing this key's expiration
-                if key not in self.__limb:
-                    self.__limb[key] = True
-                    logger.info(f"Expiring key {key} (TTL expired)")
-                    # Call the replicated _expire method to remove the key
-                    # across all nodes in the Raft cluster
-                    self._expire(key, value)
+            # Check if TTL expired and we're not already processing this key
+            if 'expire' in value and value['expire'] <= current_time and key not in self.__limb:
+                self.__limb[key] = True
+                logger.info(f"Expiring key {key} (TTL expired)")
+                # Call the replicated _expire method to remove the key
+                # across all nodes in the Raft cluster
+                self._expire(key, value)
 
-    def _onTick(self, timeToWait: float = 0.0) -> None:
+    def _onTick(self, timeToWait: float = 0.0) -> None:  # noqa: N802, N803
         """Called periodically by pysyncobj's auto-tick mechanism.
 
         When this node is the Raft leader, it runs __expire_keys to check
@@ -220,7 +220,7 @@ def main() -> int:
     logger.info(f"Starting Watcher Raft node: {args.self_addr}")
     logger.info(f"Partners: {partner_addrs}")
 
-    node: Optional[WatcherRaftNode] = None
+    node: WatcherRaftNode | None = None
     shutdown_requested = False
 
     def signal_handler(signum, frame):

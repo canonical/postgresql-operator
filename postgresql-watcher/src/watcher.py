@@ -10,10 +10,8 @@ Implements the health check requirements from the acceptance criteria:
 - TCP keepalive settings
 - Only participates in failover with even number of PostgreSQL instances
 
-NOTE: Health checks are currently only available via the trigger-health-check action
-and require manual configuration of a 'watcher' user in PostgreSQL with appropriate
-pg_hba.conf entries. The core stereo mode functionality (Raft consensus) works
-without health checks - Patroni handles actual failover decisions.
+The watcher user and password are automatically provisioned by the PostgreSQL charm
+when the watcher relation is established. The password is shared via a Juju secret.
 """
 
 import logging
@@ -155,13 +153,13 @@ class HealthChecker:
         try:
             # Connect directly to PostgreSQL port 5432 (not pgbouncer 6432)
             # Using the 'postgres' database which always exists
+            watcher_password = self.charm.get_watcher_password()
             connection = psycopg2.connect(
                 host=endpoint,
                 port=5432,
                 dbname="postgres",
                 user="watcher",
-                # Note: password would come from relation secret
-                # For health checks, we might use trust auth or a dedicated user
+                password=watcher_password,
                 connect_timeout=self._query_timeout,
                 # TCP keepalive settings per acceptance criteria
                 keepalives=1,

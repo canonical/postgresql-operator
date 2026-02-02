@@ -1000,23 +1000,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._start_stop_pgbackrest_service(event)
 
-        # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
-        if (
-            "s3-initialization-start" in self.app_peer_data
-            and "s3-initialization-done" not in self.unit_peer_data
-            and self.is_primary
-            and not self.backup._on_s3_credential_changed_primary(event)
-        ):
+        if not self._handle_s3_initialization(event):
             return
 
-        # Clean-up unit initialization data after successful sync to the leader.
-        if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
-            self.unit_peer_data.update({
-                "stanza": "",
-                "s3-initialization-block-message": "",
-                "s3-initialization-done": "",
-                "s3-initialization-start": "",
-            })
+        # Update watcher relation with fresh peer IPs when peer data changes
+        # This ensures pg-endpoints stay current when unit IPs change
+        if self.unit.is_leader():
+            self.watcher.update_endpoints()
 
         self._update_new_unit_status()
 
@@ -1030,6 +1020,34 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._update_admin_password(admin_secret_id)
             except PostgreSQLUpdateUserPasswordError:
                 event.defer()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _handle_s3_initialization(self, event: HookEvent) -> bool:
+        """Handle S3 initialization during peer relation changes.
+
+        Returns:
+            True if processing should continue, False if we should return early.
+        """
+        # This is intended to be executed only when leader is reinitializing S3 connection
+        # due to the leader change.
+        if (
+            "s3-initialization-start" in self.app_peer_data
+            and "s3-initialization-done" not in self.unit_peer_data
+            and self.is_primary
+            and not self.backup._on_s3_credential_changed_primary(event)
+        ):
+            return False
+
+        # Clean-up unit initialization data after successful sync to the leader.
+        if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
+            self.unit_peer_data.update({
+                "stanza": "",
+                "s3-initialization-block-message": "",
+                "s3-initialization-done": "",
+                "s3-initialization-start": "",
+            })
+
+        return True
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
@@ -1117,8 +1135,27 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
+            # Update peer relation endpoint address so other units see the new IP
+            # This is critical because _get_unit_ip() reads from {PEER}-address key
+            self.update_endpoint_addresses()
             self._patroni.stop_patroni()
+            # Invalidate the cached _patroni property so it will be recreated with the new IP
+            # when next accessed. This is critical for update_config() to use the correct IP
+            # when rendering the Patroni configuration file (especially for Raft self_addr).
+            if "_patroni" in self.__dict__:
+                del self.__dict__["_patroni"]
             self._update_certificate()
+            # Regenerate patroni.yml immediately with the new IP.
+            # This is critical because the Raft self_addr must be correct before Patroni restarts.
+            # Without this, Patroni might restart with the old IP in its config file.
+            try:
+                self.update_config()
+            except Exception as e:
+                logger.warning(f"Failed to update config after IP change: {e}")
+            # Update watcher relation - unit address for all units, endpoints only for leader
+            self.watcher.update_unit_address()
+            if self.unit.is_leader():
+                self.watcher.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -2038,6 +2075,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        # Ensure watcher is in Raft cluster (handles cases where relation events weren't delivered)
+        self.watcher.ensure_watcher_in_raft()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()

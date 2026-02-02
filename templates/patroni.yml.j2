@@ -201,6 +201,10 @@ postgresql:
     {%-     endif %}
     {%-   endfor %}
     {%- endif %}
+    {%- if watcher_addr %}
+    # Allow watcher to connect for health checks
+    - {{ 'hostssl' if enable_tls else 'host' }} postgres watcher {{ watcher_addr }}/32 scram-sha-256
+    {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 scram-sha-256
     # Allow replications connections from other cluster members.
     {%- for endpoint in extra_replication_endpoints %}
