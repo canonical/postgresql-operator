@@ -190,14 +190,8 @@ def watcher_charm():
 async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_charm) -> None:
     """Build and deploy PostgreSQL in stereo mode with watcher.
 
-    Deploy order is critical for stereo mode with Raft DCS:
-    1. Deploy PostgreSQL with 1 unit first (establishes Raft cluster)
-    2. Deploy and relate watcher (provides quorum vote - now 2 out of 3)
-    3. Scale PostgreSQL to 2 units (new unit joins as replica with quorum)
-
-    If we deploy 2 PostgreSQL units before the watcher is related, they
-    cannot form Raft quorum (need 2 out of 3) and both initialize
-    independently with different system IDs.
+    Deploys 2 PostgreSQL units simultaneously along with the watcher,
+    then relates them to form a 3-node Raft cluster for quorum.
     """
     logger.info(f"DEBUG: charm={charm!r}, watcher_charm={watcher_charm!r}")
 
@@ -221,18 +215,16 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
                 await ops_test.model.remove_application(app, block_until_done=True)
 
     async with ops_test.fast_forward():
-        # Step 1: Deploy PostgreSQL with ONLY 1 unit initially
-        # This establishes a single-node Raft cluster that can be leader
-        logger.info("Deploying PostgreSQL charm...")
+        # Deploy PostgreSQL with 2 units from the start
+        logger.info("Deploying PostgreSQL charm with 2 units...")
         await ops_test.model.deploy(
             charm,
             application_name=DATABASE_APP_NAME,
-            num_units=1,  # IMPORTANT: Start with 1 unit only
+            num_units=2,
             base=CHARM_BASE,
             config={"profile": "testing"},
         )
         logger.info("Deploying watcher charm...")
-        # Deploy the watcher charm
         await ops_test.model.deploy(
             watcher_charm,
             application_name=WATCHER_APP_NAME,
@@ -240,7 +232,6 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
             base=CHARM_BASE,
         )
         logger.info("Deploying test application...")
-        # Deploy test application
         await ops_test.model.deploy(
             APPLICATION_NAME,
             application_name=APPLICATION_NAME,
@@ -255,10 +246,11 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
             raise_on_error=False,  # Watcher may be waiting for relation
         )
 
-        # Step 2: Relate PostgreSQL to watcher BEFORE adding second unit
-        # This adds the watcher to the Raft cluster, providing quorum
-        logger.info("Relating PostgreSQL to watcher for Raft quorum")
-        await ops_test.model.relate(f"{DATABASE_APP_NAME}:watcher", f"{WATCHER_APP_NAME}:watcher")
+        # Relate PostgreSQL to watcher
+        logger.info("Relating PostgreSQL to watcher")
+        await ops_test.model.integrate(
+            f"{DATABASE_APP_NAME}:watcher", f"{WATCHER_APP_NAME}:watcher"
+        )
 
         # Wait for watcher to join Raft cluster
         await ops_test.model.wait_for_idle(
@@ -268,12 +260,7 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
         )
 
         # Relate PostgreSQL to test app
-        await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
-
-        # Step 3: Now scale PostgreSQL to 2 units
-        # The new unit will join the existing Raft cluster with quorum
-        logger.info("Scaling PostgreSQL to 2 units (stereo mode)")
-        await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
+        await ops_test.model.integrate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
 
         await ops_test.model.wait_for_idle(status="active", timeout=1800)
 
