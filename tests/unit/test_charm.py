@@ -794,6 +794,7 @@ def test_on_get_password(harness):
             {
                 "operator-password": "test-password",
                 "replication-password": "replication-test-password",
+                "ldap-password": "ldap-test-password",
             },
         )
 
@@ -809,11 +810,17 @@ def test_on_get_password(harness):
         harness.charm._on_get_password(mock_event)
         mock_event.set_results.assert_called_once_with({"password": "test-password"})
 
-        # Also test providing the username option.
+        # Test providing the replication username option.
         mock_event.reset_mock()
         mock_event.params["username"] = "replication"
         harness.charm._on_get_password(mock_event)
         mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
+
+        # Test providing the ldap username option.
+        mock_event.reset_mock()
+        mock_event.params["username"] = "ldap"
+        harness.charm._on_get_password(mock_event)
+        mock_event.set_results.assert_called_once_with({"password": "ldap-test-password"})
 
 
 def test_on_set_password(harness):
@@ -869,14 +876,21 @@ def test_on_set_password(harness):
         mock_event.fail.assert_called_once()
         _set_secret.assert_not_called()
 
-        # Also test providing the username option.
+        # Test providing the replication username option.
         _set_secret.reset_mock()
         mock_event.params["username"] = "replication"
         harness.charm._on_set_password(mock_event)
         _set_secret.assert_called_once_with("app", "replication-password", "newpass")
 
+        # Test providing the ldap username option.
+        _set_secret.reset_mock()
+        mock_event.params["username"] = "ldap"
+        harness.charm._on_set_password(mock_event)
+        _set_secret.assert_called_once_with("app", "ldap-password", "newpass")
+
         # And test providing both the username and password options.
         _set_secret.reset_mock()
+        mock_event.params["username"] = "replication"
         mock_event.params["password"] = "replication-test-password"
         harness.charm._on_set_password(mock_event)
         _set_secret.assert_called_once_with(
