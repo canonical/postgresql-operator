@@ -7,10 +7,10 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from .backup_helpers import backup_operations
 from .conftest import AWS
 from .helpers import (
     DATABASE_APP_NAME,
-    backup_operations,
     db_connect,
     get_password,
     get_primary,
@@ -26,7 +26,6 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 tls_certificates_app_name = "self-signed-certificates"
 tls_channel = "1/stable"
-tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,6 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         tls_certificates_app_name,
-        tls_config,
         tls_channel,
         credentials,
         AWS,
