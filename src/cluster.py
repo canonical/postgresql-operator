@@ -586,6 +586,57 @@ class Patroni:
 
         return len(r.json()["members"]) == 0
 
+    def is_member_registered_in_cluster(self) -> bool:
+        """Check if this member is registered in the Raft DCS cluster.
+
+        In Raft mode, a new member may be running and replicating but not yet
+        registered in the DCS if it hasn't been added to the Raft cluster.
+
+        Returns:
+            True if this member appears in the /cluster endpoint, False otherwise.
+        """
+        try:
+            cluster_status = self.cluster_status()
+        except RetryError:
+            logger.debug("Could not get cluster status to check member registration")
+            return False
+
+        if not cluster_status:
+            return False
+
+        # Check if this member's name appears in the cluster members list
+        member_name = self.member_name
+        return any(member.get("name") == member_name for member in cluster_status)
+
+    def ensure_member_registered(self) -> bool:
+        """Ensure this member is properly registered in the Raft DCS cluster.
+
+        If the member is running but not registered (which can happen when a new
+        unit joins a Raft cluster), restart Patroni to trigger re-registration.
+
+        Returns:
+            True if member is registered or restart was triggered, False if check failed.
+        """
+        if not self.is_patroni_running():
+            return False
+
+        # Check if we're running but not in the cluster
+        try:
+            health = self.cached_patroni_health
+            if health.get("state") not in RUNNING_STATES:
+                # Not running yet, nothing to do
+                return True
+        except RetryError:
+            return False
+
+        # If we're running, check if we're registered in the cluster
+        if self.is_member_registered_in_cluster():
+            return True
+
+        # We're running but not registered - need to restart Patroni
+        logger.warning("Member is running but not registered in cluster - restarting Patroni")
+        return self.restart_patroni()
+
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
         try:
@@ -749,6 +800,9 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
+            watcher_addr=self.charm.watcher.watcher_address
+            if hasattr(self.charm, "watcher")
+            else None,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -1011,6 +1065,57 @@ class Patroni:
         if not result or not result.startswith("SUCCESS"):
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
             raise RemoveRaftMemberFailedError()
+
+    def add_raft_member(self, member_ip: str) -> bool:
+        """Add a member to the Raft cluster.
+
+        This is used when a unit's IP changes (e.g., after network isolation/restore)
+        to add the new IP to the Raft cluster so the member can participate in quorum.
+
+        Args:
+            member_ip: The IP address of the member to add.
+
+        Returns:
+            True if the member was added successfully, False otherwise.
+        """
+        if not member_ip:
+            return False
+
+        if self.charm.has_raft_keys():
+            logger.debug("Add raft member: Raft in recovery mode")
+            return False
+
+        raft_host = "127.0.0.1:2222"
+        member_raft_addr = f"{member_ip}:2222"
+
+        try:
+            syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Add raft member: Cannot connect to raft cluster")
+            return False
+        if not raft_status:
+            logger.warning("Add raft member: No raft status")
+            return False
+
+        # Check if member is already in the cluster
+        if f"partner_node_status_server_{member_raft_addr}" in raft_status:
+            logger.debug(f"Add raft member: {member_raft_addr} already in cluster")
+            return True
+
+        # Add the member
+        try:
+            result = syncobj_util.executeCommand(raft_host, ["add", member_raft_addr])
+        except UtilityException as e:
+            logger.warning(f"Add raft member: Failed to add {member_raft_addr}: {e}")
+            return False
+
+        if result and result.startswith("SUCCESS"):
+            logger.info(f"Add raft member: Successfully added {member_raft_addr}")
+            return True
+        else:
+            logger.warning(f"Add raft member: Add call not successful with {result}")
+            return False
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):

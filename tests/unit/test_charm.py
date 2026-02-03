@@ -2139,6 +2139,10 @@ def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(harness.charm.watcher, "update_unit_address"),
+        patch.object(harness.charm.watcher, "update_endpoints"),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test when the IP address of the unit hasn't changed.

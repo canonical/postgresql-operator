@@ -37,12 +37,15 @@ raft:
   data_dir: {{ conf_path }}/raft
   self_addr: '{{ self_ip }}:2222'
   password: {{ raft_password }}
-  {% if partner_addrs -%}
+  {% if partner_addrs or watcher_addr -%}
   partner_addrs:
   {% endif -%}
   {% for partner_addr in partner_addrs -%}
   - {{ partner_addr }}:2222
   {% endfor %}
+  {%- if watcher_addr %}
+  - {{ watcher_addr }}:2222
+  {% endif %}
 
 bootstrap:
   dcs:
@@ -197,6 +200,10 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 {{ instance_password_encryption }}
     {%-     endif %}
     {%-   endfor %}
+    {%- endif %}
+    {%- if watcher_addr %}
+    # Allow watcher to connect for health checks
+    - {{ 'hostssl' if enable_tls else 'host' }} postgres watcher {{ watcher_addr }}/32 scram-sha-256
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 scram-sha-256
     # Allow replications connections from other cluster members.

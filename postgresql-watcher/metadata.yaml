@@ -1,0 +1,46 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: postgresql-watcher
+display-name: Charmed PostgreSQL Watcher
+summary: Watcher/Witness node for PostgreSQL stereo mode
+description: |
+  PostgreSQL Watcher provides a lightweight witness/voter node for PostgreSQL
+  clusters running in stereo mode (2-node configuration). It participates in
+  Raft consensus to ensure quorum without storing any PostgreSQL data.
+
+  The watcher enables automatic failover in 2-node PostgreSQL clusters by
+  providing the necessary third vote for Raft consensus. When one PostgreSQL
+  node becomes unavailable, the remaining PostgreSQL node and the watcher
+  can still form a quorum, allowing the cluster to continue operating.
+
+  Key features:
+  - Participates in Raft voting without running PostgreSQL
+  - Monitors PostgreSQL health via direct database connections
+  - Provides cluster topology visibility via actions
+  - Should be deployed in a different availability zone than PostgreSQL nodes
+
+docs: https://canonical-charmed-postgresql.readthedocs-hosted.com/16/
+source: https://github.com/canonical/postgresql-operator
+issues: https://github.com/canonical/postgresql-operator/issues
+website:
+  - https://canonical.com/data/postgresql
+  - https://github.com/canonical/postgresql-operator
+maintainers:
+  - Canonical Data Platform <data-platform@lists.launchpad.net>
+contact: https://matrix.to/#/#charmhub-data-platform:ubuntu.com
+
+requires:
+  watcher:
+    interface: postgresql_watcher
+    limit: 1
+
+assumes:
+  - juju
+  - any-of:
+      - all-of:
+          - juju >= 3.4.3
+          - juju < 3.5
+      - all-of:
+          - juju >= 3.5.1
+          - juju < 4
