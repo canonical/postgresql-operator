@@ -83,7 +83,7 @@ $ juju add-secret myusername mylogin=mypassword
 secret:d5l3do605d8c4b1gn9a0
 
 $ juju deploy data-integrator --channel latest/edge --config database-name=mydbname --config requested-entities-secret=d5l3do605d8c4b1gn9a0
-Deployed "diedge" from charm-hub charm "data-integrator", revision 307 in channel latest/edge on ubuntu@24.04/stable
+Deployed "data-integrator" from charm-hub charm "data-integrator", revision 307 in channel latest/edge on ubuntu@24.04/stable
 
 $ juju grant-secret d5l3do605d8c4b1gn9a0 data-integrator
 
