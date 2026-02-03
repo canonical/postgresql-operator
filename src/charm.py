@@ -55,7 +55,6 @@ from ops import (
     WaitingStatus,
     main,
 )
-from pydantic import ValidationError
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -241,7 +240,6 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Update the configuration.
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
-        self._charm.updated_synchronous_node_count()
 
         # TODO add graceful shutdown before refreshing snap?
         # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
@@ -1516,11 +1514,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
-        if not self.updated_synchronous_node_count():
-            logger.debug("Defer on_config_changed: unable to set synchronous node count")
-            event.defer()
-            return
-
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
 
@@ -2392,20 +2385,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return str(min(8, 2 * self.cpu_count))
         elif self.config.cpu_max_worker_processes is not None:
             value = self.config.cpu_max_worker_processes
-            if value < 2:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 2},
-                            input=value,
-                            loc=("cpu_max_worker_processes",),
-                        )
-                    ],
-                )
             cap = 10 * self.cpu_count
             if value > cap:
                 raise ValueError(
@@ -2429,20 +2408,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ValidationError: If value is less than 2
             ValueError: If value exceeds 10 * vCores
         """
-        if value < 2:
-            from pydantic_core import InitErrorDetails
-
-            raise ValidationError.from_exception_data(
-                "ValidationError",
-                [
-                    InitErrorDetails(
-                        type="greater_than_equal",
-                        ctx={"ge": 2},
-                        input=value,
-                        loc=(param_name,),
-                    )
-                ],
-            )
         cap = 10 * self.cpu_count
         if value > cap:
             raise ValueError(
@@ -2587,7 +2552,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "max_logical_replication_workers"
             ]
 
-        base_patch = {}
+        base_patch = {
+            **self._patroni.synchronous_configuration,
+            "maximum_lag_on_failover": self.config.durability_maximum_lag_on_failover,
+        }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
         self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
@@ -2624,6 +2592,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             pg_parameters = dict(worker_configs)
             pg_parameters["wal_compression"] = cpu_wal_compression
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
+        pg_parameters.pop("maximum_lag_on_failover", None)
 
         return pg_parameters
 
