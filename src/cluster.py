@@ -739,6 +739,7 @@ class Patroni:
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             synchronous_node_count=self._synchronous_node_count,
+            maximum_lag_on_failover=self.charm.config.durability_maximum_lag_on_failover,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
@@ -1163,19 +1164,25 @@ class Patroni:
             else planned_units - 1
         )
 
-    def update_synchronous_node_count(self) -> None:
-        """Update synchronous_node_count to the minority of the planned cluster."""
+    @cached_property
+    def synchronous_configuration(self) -> dict[str, Any]:
+        """Synchronous mode configuration."""
         # Try to update synchronous_node_count.
         member_units = json.loads(self.charm.app_peer_data.get("members_ips", "[]"))
+        return {
+            "synchronous_node_count": self._synchronous_node_count,
+            "synchronous_mode_strict": len(member_units) > 1
+            and self.charm.config.synchronous_mode_strict
+            and self._synchronous_node_count > 0,
+        }
+
+    def update_synchronous_node_count(self) -> None:
+        """Update synchronous_node_count to the minority of the planned cluster."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={
-                        "synchronous_node_count": self._synchronous_node_count,
-                        "synchronous_mode_strict": len(member_units) > 1
-                        and self._synchronous_node_count > 0,
-                    },
+                    json=self.synchronous_configuration,
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
