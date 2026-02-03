@@ -7,17 +7,17 @@ The following are the minimum software and hardware requirements to run Charmed 
 
 ### Juju
 
-The charm supports several Juju releases from [2.9 LTS](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-2-9) onwards. The table below shows which minor versions of each major Juju release are supported by the stable Charmhub releases of PostgreSQL.
+The charm supports several Juju releases from [2.9 LTS](https://documentation.ubuntu.com/juju/3.6/releasenotes/juju_2.9.x/) onwards. The table below shows which minor versions of each major Juju release are supported by the stable Charmhub releases of PostgreSQL.
 
 | Juju major release | Supported minor versions | Compatible charm revisions |Comment |
 |:--------|:-----|:-----|:-----|
 | ![3.6 LTS] | `3.6.1+` | [552]+ | `3.6.0` is not recommended, while `3.6.1+` works excellent. Recommended for production!  |
-| [![3.5]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-5) | `3.5.1+` | [363]+  | [Known Juju issue](https://bugs.launchpad.net/juju/+bug/2066517) in `3.5.0` |
-| [![3.4]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-4) | `3.4.3+` | [363]+ | Know Juju issues with previous minor versions |
-| [![3.3]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-3) | `3.3.0+` | from [363] to [430] | No known issues |
-| [![3.2]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-2) | `3.2.0+` | from [363] to [430]  | No known issues |
-| [![3.1]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-1) | `3.1.7+` | from [336] to [430] | Juju secrets were stabilised in `3.1.7` |
-| [![2.9 LTS]](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-2-9)  | `2.9.49+` | [288]+ | |
+| [![3.5]](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x//#juju-3-5) | `3.5.1+` | [363]+  | [Known Juju issue](https://bugs.launchpad.net/juju/+bug/2066517) in `3.5.0` |
+| [![3.4]](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x//#juju-3-4) | `3.4.3+` | [363]+ | Know Juju issues with previous minor versions |
+| [![3.3]](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x//#juju-3-3) | `3.3.0+` | from [363] to [430] | No known issues |
+| [![3.2]](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x//#juju-3-2) | `3.2.0+` | from [363] to [430]  | No known issues |
+| [![3.1]](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x/#juju-3-1) | `3.1.7+` | from [336] to [430] | Juju secrets were stabilised in `3.1.7` |
+| [![2.9 LTS]](https://documentation.ubuntu.com/juju/3.6/releasenotes/juju_2.9.x/)  | `2.9.49+` | [288]+ | |
 |  | `2.9.32+` | from [288] to [430] | No tests for older Juju versions. |
 
 ## Hardware

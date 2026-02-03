@@ -22,8 +22,8 @@ from botocore.client import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
 from botocore.loaders import create_loader
 from botocore.regions import EndpointResolver
+from charmlibs import snap
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
-from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
@@ -560,28 +560,30 @@ class PostgreSQLBackups(Object):
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
             "repo-ls",
+            "archive",
             "--recurse",
+            "--filter",
+            "\\.history$",
             "--output=json",
         ])
         if return_code != 0:
-            extracted_error = self._extract_error_message(output, stderr)
+            extracted_error = self._extract_error_message(stderr)
             raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
-        if repository is None:
-            return dict[str, tuple[str, str]]()
-
-        return dict[str, tuple[str, str]]({
-            datetime.strftime(
-                datetime.fromtimestamp(timeline_object["time"], timezone.utc),
-                BACKUP_ID_FORMAT,
-            ): (
-                timeline.split("/")[1],
-                timeline.split("/")[-1].split(".")[0].lstrip("0"),
-            )
-            for timeline, timeline_object in repository
-            if timeline.endswith(".history") and not timeline.endswith("backup.history")
-        })
+        output = dict[str, tuple[str, str]]()
+        if repository:
+            for timeline, timeline_object in repository:
+                if not timeline.endswith("backup.history"):
+                    # 0 is the stanza -1 is the timeline file
+                    path = timeline.split("/")
+                    output[
+                        datetime.strftime(
+                            datetime.fromtimestamp(timeline_object["time"], timezone.utc),
+                            BACKUP_ID_FORMAT,
+                        )
+                    ] = (path[0], path[-1].split(".")[0].lstrip("0"))
+        return output
 
     def _get_nearest_timeline(self, timestamp: str) -> tuple[str, str] | None:
         """Finds the nearest timeline or backup prior to the specified timeline.
@@ -1106,12 +1108,11 @@ Stderr:
             elif is_backup_id_timeline:
                 restore_stanza_timeline = timelines[backup_id]
             else:
-                backups_list = list(self._list_backups(show_failed=False).values())
-                timelines_list = self._list_timelines()
+                backups_list = list(backups.values())
                 if (
                     restore_to_time == "latest"
-                    and timelines_list is not None
-                    and max(timelines_list.values() or [backups_list[0]]) not in backups_list
+                    and timelines is not None
+                    and max(timelines.values() or [backups_list[0]]) not in backups_list
                 ):
                     error_message = "There is no base backup created from the latest timeline"
                     logger.error(f"Restore failed: {error_message}")

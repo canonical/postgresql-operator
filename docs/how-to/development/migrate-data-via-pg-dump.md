@@ -35,7 +35,7 @@ Always test migration in a safe environment before performing it in production!
 
 - **[Your application is compatible](/explanation/charm-versions/index) with Charmed PostgreSQL VM**
 - A client machine with access to the deployed legacy charm
-- `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022) for more information about key differences)
+- `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/releasenotes/unsupported/juju_3.x.x/#juju-3-0) for more information about key differences)
 - Enough storage in the cluster to support backup/restore of the databases.
 
 ## Obtain existing database credentials
