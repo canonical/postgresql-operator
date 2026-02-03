@@ -6,14 +6,14 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from .backup_helpers import backup_operations
+from .backup_helpers import pitr_backup_operations
 from .conftest import ConnectionInformation
 
-logger = logging.getLogger(__name__)
-
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
+TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
+TLS_CHANNEL = "1/stable"
 
-backup_id, value_before_backup, value_after_backup = "", None, None
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
@@ -37,9 +37,12 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
-    """Build and deploy two units of PostgreSQL in microceph, test backup and restore actions."""
-    await backup_operations(
+@pytest.mark.abort_on_fail
+async def test_pitr_backup_ceph(
+    ops_test: OpsTest, cloud_configs, cloud_credentials, charm
+) -> None:
+    """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
+    await pitr_backup_operations(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
         None,
