@@ -236,14 +236,16 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_multixact_failsafe_age: int | None = Field(ge=0, le=2100000000, default=None)
     vacuum_vacuum_multixact_freeze_min_age: int | None = Field(ge=0, le=1000000000, default=None)
     vacuum_vacuum_multixact_freeze_table_age: int | None = Field(ge=0, le=2000000000, default=None)
-    pg_stat_statements_max: PositiveInt | None
-    pg_stat_statements_track: Literal["none", "top", "all"] | None
+
+    # TODO use proper names
+    pg_stat_statements_max: PositiveInt
+    pg_stat_statements_track: Literal["none", "top", "all"]
     pg_stat_statements_track_utility: bool
     pg_stat_statements_save: bool
-    track_activity_query_size: Annotated[int, Field(ge=100, le=1048576)] | None
+    track_activity_query_size: Annotated[int, Field(ge=100, le=1048576)]
     track_io_timing: bool
     track_wal_io_timing: bool
-    track_functions: Literal["none", "pl", "all"] | None
+    track_functions: Literal["none", "pl", "all"]
 
     @classmethod
     def keys(cls) -> list[str]:

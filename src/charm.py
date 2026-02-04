@@ -2594,6 +2594,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
         pg_parameters.pop("maximum_lag_on_failover", None)
 
+        # TODO shouldn't be needed with a prefix
+        pg_parameters["pg_stat_statements.max"] = self.config.pg_stat_statements_max  # type: ignore
+        pg_parameters["pg_stat_statements.track"] = self.config.pg_stat_statements_track  # type: ignore
+        pg_parameters["pg_stat_statements.track_utility"] = (  # type: ignore
+            self.config.pg_stat_statements_track_utility
+        )
+        pg_parameters["pg_stat_statements.save"] = self.config.pg_stat_statements_save  # type: ignore
+        pg_parameters["track_activity_query_size"] = self.config.track_activity_query_size  # type: ignore
+        pg_parameters["track_io_timing"] = self.config.track_io_timing  # type: ignore
+        pg_parameters["track_wal_io_timing"] = self.config.track_wal_io_timing  # type: ignore
+        pg_parameters["track_functions"] = self.config.track_functions  # type: ignore
+
         return pg_parameters
 
     def update_config(
