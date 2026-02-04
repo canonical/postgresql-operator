@@ -1189,26 +1189,26 @@ def test_check_detached_storage(harness):
 
 def test_restart(harness):
     with (
-        patch("charm.Patroni.restart_postgresql") as _restart_postgresql,
+        patch("charm.Patroni.restart_patroni", return_value=True) as _restart_patroni,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._can_connect_to_postgresql", return_value=True),
     ):
-        _are_all_members_ready.side_effect = [False, True, True]
-
         # Test when not all members are ready.
+        _are_all_members_ready.return_value = False
         mock_event = MagicMock()
         harness.charm._restart(mock_event)
         mock_event.defer.assert_called_once()
-        _restart_postgresql.assert_not_called()
+        _restart_patroni.assert_not_called()
 
         # Test a successful restart.
+        _are_all_members_ready.return_value = True
         mock_event.defer.reset_mock()
         harness.charm._restart(mock_event)
         assert not (isinstance(harness.charm.unit.status, BlockedStatus))
         mock_event.defer.assert_not_called()
 
         # Test a failed restart.
-        _restart_postgresql.side_effect = RetryError(last_attempt=1)
+        _restart_patroni.return_value = False
         harness.charm._restart(mock_event)
         assert isinstance(harness.charm.unit.status, BlockedStatus)
         mock_event.defer.assert_not_called()

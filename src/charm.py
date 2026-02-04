@@ -1957,10 +1957,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        try:
-            self._patroni.restart_postgresql()
+        if self._patroni.restart_patroni():
             self._peers.data[self.unit]["postgresql_restarted"] = "True"
-        except RetryError:
+        else:
             error_message = "failed to restart PostgreSQL"
             logger.exception(error_message)
             self.unit.status = BlockedStatus(error_message)
