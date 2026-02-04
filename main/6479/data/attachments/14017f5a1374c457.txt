@@ -1,0 +1,113 @@
+[1m[31mERROR   [0m integration.helpers:helpers.py:946 
+[1m[31mERROR   [0m integration.helpers:helpers.py:946
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:16:02Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.20    active      3  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.71.77.128    5432/tcp  Primary
+postgresql/1   active    idle   1        10.71.77.153    5432/tcp  
+postgresql/2   active    idle   2        10.71.77.179    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.71.77.128  juju-240221-0  ubuntu@22.04  runnervmkj6or  Running
+1        started  10.71.77.153  juju-240221-1  ubuntu@22.04  runnervmkj6or  Running
+2        started  10.71.77.179  juju-240221-2  ubuntu@22.04  runnervmkj6or  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:09:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:09:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:10:04 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd82136e170 state=finished raised Exception>]
+machine-2: 00:10:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:10:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:10:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:10:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:11:50 ERROR unit.postgresql/2.juju-log restart:1: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+unit-postgresql-0: 00:13:02 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  password authentication failed for user "operator"
+
+unit-postgresql-0: 00:15:59 ERROR unit.postgresql/0.juju-log Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3637, in _run
+    result = subprocess.run(args, **kwargs)  # type: ignore
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/var/lib/juju/tools/unit-postgresql-0/secret-set', 'secret://6c84b4ea-f69e-48cf-81bb-9d364c240221/d618slnh98pd9rhnegdg', 'backup-password#file=/tmp/tmp53qj9w_o/backup-password', 'monitoring-password#file=/tmp/tmp53qj9w_o/monitoring-password', 'operator-password#file=/tmp/tmp53qj9w_o/operator-password', 'patroni-password#file=/tmp/tmp53qj9w_o/patroni-password', 'raft-password#file=/tmp/tmp53qj9w_o/raft-password', 'replication-password#file=/tmp/tmp53qj9w_o/replication-password', 'rewind-password#file=/tmp/tmp53qj9w_o/rewind-password')' returned non-zero exit status 2.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 2607, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/__init__.py", line 356, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 502, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 486, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 421, in _emit
+    self._emit_charm_event(self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 465, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 924, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 1030, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 1619, in _on_set_password
+    self.set_secret(APP_SCOPE, f"{username}-password", password)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 367, in set_secret
+    self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 649, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2517, in set_secret
+    self.update_relation_data(relation_id, {full_field: value})
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 624, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1782, in update_relation_data
+    return self._update_relation_data(relation, data)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 664, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2853, in _update_relation_data
+    _, normal_fields = self._process_secret_fields(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1558, in _process_secret_fields
+    if group_result := operation(relation, group, secret_fields, *args, **kwargs):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1272, in _add_or_update_relation_secrets
+    return self._update_relation_secret(relation, group, secret_fields, data)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 636, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1326, in _update_relation_secret
+    secret.set_content(full_content)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 935, in set_content
+    self.meta.set_content(content)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/model.py", line 1549, in set_content
+    self._backend.secret_set(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/model.py", line 4079, in secret_set
+    self._run_for_secret('secret-set', *args)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/model.py", line 4034, in _run_for_secret
+    return self._run(*args, return_output=return_output, use_json=use_json)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3639, in _run
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR secret content in file "/tmp/tmp53qj9w_o/replication-password" too large: 2000000 bytes
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
