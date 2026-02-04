@@ -994,16 +994,6 @@ class Patroni:
             return False
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def restart_postgresql(self) -> None:
-        """Restart PostgreSQL."""
-        requests.post(
-            f"{self._patroni_url}/restart",
-            verify=self.verify,
-            auth=self._patroni_auth,
-            timeout=PATRONI_TIMEOUT,
-        )
-
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         requests.post(
