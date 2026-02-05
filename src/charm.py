@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import charm_refresh
 import ops.log
 import psycopg2
+import psycopg2.errors
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -288,7 +289,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         config = {
             config_option: value for config_option, value in config.items() if value is not None
         }
-        return self.config_type(**config)  # type: ignore
+        return self.config_type(**config)
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -1567,7 +1568,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(WaitingStatus("Updating extensions"))
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
-        except psycopg2.errors.DependentObjectsStillExist as e:
+        except psycopg2.errors.DependentObjectsStillExist as e:  # type: ignore
             logger.error(
                 "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql plugin-<plugin_name>-enable=True`",
                 str(e),
