@@ -46,7 +46,7 @@ optional = true
 
 [tool.poetry.group.lint.dependencies]
 codespell = "^2.4.1"
-pyright = "^1.1.408"
+ty = "^0.0.15"
 
 [tool.poetry.group.unit]
 optional = true
@@ -98,11 +98,6 @@ log_cli_level = "INFO"
 asyncio_mode = "auto"
 markers = ["juju3", "juju_secrets"]
 addopts = "--exitfirst"
-
-# Formatting tools configuration
-[tool.black]
-line-length = 99
-target-version = ["py38"]
 
 # Linting tools configuration
 [tool.ruff]
@@ -174,13 +169,10 @@ max-complexity = 10
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.pyright]
+[tool.ty.environment]
+python = ".tox/lint/"
+extra-paths = ["./lib"]
+
+[tool.ty.src]
 include = ["src", "scripts"]
-extraPaths = ["./lib"]
-pythonVersion = "3.12"
-pythonPlatform = "All"
-typeCheckingMode = "basic"
-reportIncompatibleMethodOverride = false
-reportImportCycles = false
-reportMissingModuleSource = true
-stubPath = ""
+exclude = ["tests"]

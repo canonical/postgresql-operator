@@ -108,8 +108,8 @@ TODO: add description after specification is accepted.
 #         )
 #         secret.grant(event.relation)
 #
-#         self._save_published_resources_info(str(event.relation.id), secret.id, {})  # type: ignore
-#         event.relation.data[self.model.app]["secret-id"] = secret.id  # type: ignore
+#         self._save_published_resources_info(str(event.relation.id), secret.id, {})
+#         event.relation.data[self.model.app]["secret-id"] = secret.id
 #
 #     def _on_offer_relation_changed(self, event: RelationChangedEvent) -> None:
 #         if not self.charm.unit.is_leader():
@@ -401,7 +401,7 @@ TODO: add description after specification is accepted.
 #             self.charm.config.logical_replication_subscription_request or "{}"
 #         )
 #         subscriptions = self._subscriptions_info()
-#         relation.data[self.model.app]["subscription-request"] = (  # type: ignore
+#         relation.data[self.model.app]["subscription-request"] = (
 #             self.charm.config.logical_replication_subscription_request
 #         )
 #         for database, subscription in subscriptions.copy().items():
@@ -583,10 +583,10 @@ TODO: add description after specification is accepted.
 #                 )
 #                 self.charm.postgresql.alter_publication(database, publication_name, tables)
 #                 publications[database]["tables"] = tables
-#             self._save_published_resources_info(str(relation.id), secret.id, publications)  # type: ignore
+#             self._save_published_resources_info(str(relation.id), secret.id, publications)
 #             relation.data[self.model.app]["publications"] = json.dumps(publications)
 #
-#         self._save_published_resources_info(str(relation.id), secret.id, publications)  # type: ignore
+#         self._save_published_resources_info(str(relation.id), secret.id, publications)
 #         relation.data[self.model.app].update({
 #             "errors": json.dumps(errors),
 #             "publications": json.dumps(publications),
@@ -653,7 +653,7 @@ TODO: add description after specification is accepted.
 #                 logger.debug(
 #                     f"Updating secret for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation_id}"
 #                 )
-#                 content["primary"] = primary  # type: ignore
+#                 content["primary"] = primary
 #                 secret.set_content(content)
 #             return secret
 #         except SecretNotFoundError:
@@ -663,7 +663,7 @@ TODO: add description after specification is accepted.
 #         username, password = self._create_user(relation_id)
 #         return self.charm.model.app.add_secret(
 #             content={
-#                 "primary": primary,  # type: ignore
+#                 "primary": primary,
 #                 "username": username,
 #                 "password": password,
 #             },
