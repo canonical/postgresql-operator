@@ -1,0 +1,126 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:82 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:31:14Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active       1  data-integrator      latest/edge  343  no       
+postgresql           14.20    blocked      3  postgresql                          0  no       Standalone read-only cluster
+postgresql-test-app           blocked      1  postgresql-test-app  latest/edge  434  no       No database integration available
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+data-integrator/0*      active    idle       3        10.38.240.188             
+postgresql-test-app/0*  blocked   idle       4        10.38.240.134             No database integration available
+postgresql/0*           active    executing  0        10.38.240.45    5432/tcp  Standby
+postgresql/1            active    executing  1        10.38.240.82    5432/tcp  
+postgresql/2            active    executing  2        10.38.240.195   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.38.240.45   juju-ed36cc-0  ubuntu@22.04  runnervmkj6or  Running
+1        started  10.38.240.82   juju-ed36cc-1  ubuntu@22.04  runnervmkj6or  Running
+2        started  10.38.240.195  juju-ed36cc-2  ubuntu@22.04  runnervmkj6or  Running
+3        started  10.38.240.188  juju-ed36cc-3  ubuntu@24.04  runnervmkj6or  Running
+4        started  10.38.240.134  juju-ed36cc-4  ubuntu@22.04  runnervmkj6or  Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    0/0        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:10:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:10:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:10:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:10:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:13:06 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:13:06 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:13:13 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f76ca4d9e70 state=finished raised Exception>]
+machine-1: 00:13:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:13:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:17:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:17:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:17:18 ERROR unit.postgresql/1.juju-log database-peers:1: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+unit-postgresql-0: 00:26:21 ERROR unit.postgresql/0.juju-log database-peers:1: Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3c52dbdab0 state=finished raised Exception>]
+unit-postgresql-2: 00:31:08 ERROR unit.postgresql/2.juju-log database-peers:1: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3637, in _run
+    result = subprocess.run(args, **kwargs)  # type: ignore
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/var/lib/juju/tools/unit-postgresql-2/goal-state', '--format=json')' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2607, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/__init__.py", line 356, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 502, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 486, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 421, in _emit
+    self._emit_charm_event(self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 465, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 924, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 1030, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 723, in _on_peer_relation_changed
+    self.update_config()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2208, in update_config
+    pg_parameters = self._build_postgresql_parameters()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2181, in _build_postgresql_parameters
+    pg_parameters = self.postgresql.build_postgresql_parameters(
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 409, in postgresql
+    primary_host=self.primary_endpoint,
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 425, in primary_endpoint
+    primary = self._patroni.get_primary()
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 947, in _patroni
+    self.app.planned_units(),
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 486, in planned_units
+    return self._backend.planned_units()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3986, in planned_units
+    app_state = self._run('goal-state', return_output=True, use_json=True)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3639, in _run
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR getting relation status: cannot get status: relation not found
+
+unit-postgresql-2: 00:31:08 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
