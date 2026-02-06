@@ -14,44 +14,17 @@ platforms:
 #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L290-L293
 #   https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L156-L157)
 parts:
-  # "poetry-deps" part name is a magic constant
-  # https://github.com/canonical/craft-parts/pull/901
-  poetry-deps:
-    plugin: nil
-    build-packages:
-      - curl
-    override-build: |
-      # Use environment variable instead of `--break-system-packages` to avoid failing on older
-      # versions of pip that do not recognize `--break-system-packages`
-      # `--user` needed (in addition to `--break-system-packages`) for Ubuntu >=24.04
-      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==26.0  # renovate: charmcraft-pip-latest
-
-      # Use uv to install poetry so that a newer version of Python can be installed if needed by poetry
-      curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/uv/releases/download/0.9.28/uv-installer.sh | sh  # renovate: charmcraft-uv-latest
-      # poetry 2.0.0 requires Python >=3.9
-      if ! "$HOME/.local/bin/uv" python find '>=3.9'
-      then
-        # Use first Python version that is >=3.9 and available in an Ubuntu LTS
-        # (to reduce the number of Python versions we use)
-        "$HOME/.local/bin/uv" python install 3.10.12  # renovate: charmcraft-python-ubuntu-22.04
-      fi
-      "$HOME/.local/bin/uv" tool install --no-python-downloads --python '>=3.9' poetry==2.3.2 --with poetry-plugin-export==1.10.0  # renovate: charmcraft-poetry-latest
-
-      ln -sf "$HOME/.local/bin/poetry" /usr/local/bin/poetry
-  # "charm-poetry" part name is arbitrary; use for consistency
+  # "charm-uv" part name is arbitrary; use for consistency
   # Avoid using "charm" part name since that has special meaning to charmcraft
-  charm-poetry:
+  charm-uv:
     # By default, the `poetry` plugin creates/stages these directories:
     # - lib, src
     #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/parts/plugins/_poetry.py#L76-L78)
     # - venv
     #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/parts/plugins/_poetry.py#L95
     #   https://github.com/canonical/craft-parts/blob/afb0d652eb330b6aaad4f40fbd6e5357d358de47/craft_parts/plugins/base.py#L270)
-    plugin: poetry
+    plugin: uv
     source: .
-    after:
-      - poetry-deps
-    poetry-export-extra-args: ['--only', 'main,charm-libs']
     build-packages:
       - libffi-dev  # Needed to build Python dependencies with Rust from source
       - libssl-dev  # Needed to build Python dependencies with Rust from source
@@ -84,17 +57,15 @@ parts:
   files:
     plugin: dump
     source: .
-    after:
-      - poetry-deps  # Ensure poetry is installed
     build-packages:
       - git
     override-build: |
       # Set `charm_version` in refresh_versions.toml from git tag
       # Create venv in `..` so that git working tree is not dirty
-      python3 -m venv ../refresh-version-venv
-      source ../refresh-version-venv/bin/activate
-      poetry install --only build-refresh-version
-      write-charm-version
+      #python3 -m venv ../refresh-version-venv
+      #source ../refresh-version-venv/bin/activate
+      #poetry install --only build-refresh-version
+      #write-charm-version
 
       craftctl default
     stage:
