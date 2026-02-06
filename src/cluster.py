@@ -334,7 +334,7 @@ class Patroni:
             auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
         ) as client:
             try:
-                return (await client.get(url)).json()
+                return (await client.get(url)).raise_for_status().json()
             except (HTTPError, ValueError):
                 return None
 
@@ -1101,7 +1101,7 @@ class Patroni:
         )
         logger.debug(
             "API bulk_update_parameters_controller_by_patroni: %s (%s)",
-            r,
+            r.raise_for_status(),
             r.elapsed.total_seconds(),
         )
 
