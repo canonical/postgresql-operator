@@ -2247,11 +2247,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        self._api_update_config()
-
         self._handle_postgresql_restart_need(
             self.unit_peer_data.get("config_hash") != self.generate_config_hash
         )
+
+        self._api_update_config()
 
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
