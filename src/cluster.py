@@ -1039,7 +1039,7 @@ class Patroni:
         )
         logger.debug(
             "API bulk_update_parameters_controller_by_patroni: %s (%s)",
-            r,
+            r.raise_for_status(),
             r.elapsed.total_seconds(),
         )
 
