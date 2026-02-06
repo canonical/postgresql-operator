@@ -4,7 +4,7 @@
 [project]
 name = "unused"  # Charms are not packed as standard Python packages; this information is not used
 version = "0.0.0"  # Charms are not packed as standard Python packages; this information is not used
-requires-python = ">=3.12"
+requires-python = ">=3.12"  # Match to the lowest Python version of Ubuntu bases in charmcraft.yaml `platforms` TODO renovate config
 dependencies = [
     "boto3>=1.42.43",
     "charm-refresh>=3.1.1.2",
@@ -47,8 +47,15 @@ unit = [
 ]
 
 [tool.uv]
-package = false
 default-groups = ["charm-libs", "unit"]
+environments = ["implementation_name =='cpython' and sys_platform == 'linux'"]
+package = false
+required-version = ">=0.10.0"
+
+[tool.uv.dependency-groups]
+# Match to the Python version in the latest Ubuntu LTS TODO renovate config
+format = {requires-python = ">=3.12"}
+unit = {requires-python = ">=3.12"}
 
 [tool.poetry.group.lint]
 optional = true
