@@ -1899,7 +1899,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 alternative_endpoints=other_cluster_endpoints
             )
             other_cluster_primary_ip = next(
-                replication_offer_relation.data[unit].get("private-address")
+                replication_offer_relation.data[unit].get("ip")
+                or replication_offer_relation.data[unit].get("private-address")
                 for unit in replication_offer_relation.units
                 if unit.name.replace("/", "-") == other_cluster_primary
             )
