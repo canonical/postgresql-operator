@@ -25,6 +25,11 @@ parts:
     #   https://github.com/canonical/craft-parts/blob/afb0d652eb330b6aaad4f40fbd6e5357d358de47/craft_parts/plugins/base.py#L270)
     plugin: uv
     source: .
+    build-environment:
+      # Default groups are used for the IDE/development venv (e.g. includes `unit`) & should not be
+      # included
+      - UV_NO_DEFAULT_GROUPS: true
+    uv-groups: ['charm-libs']
     build-snaps:
       - astral-uv
     build-packages:
