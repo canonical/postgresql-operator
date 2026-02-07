@@ -1,0 +1,33 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  01:36:46Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  16.11    active      1  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.148.74.126   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.148.74.126  juju-39b581-0  ubuntu@24.04  runnervmwffz4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:33:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:35:05 ERROR unit.postgresql/0.juju-log __main__:Invalid configuration: 2 validation errors for CharmConfig
+synchronous_node_count.literal['all','majority']
+  Input should be 'all' or 'majority' [type=literal_error, input_value='0', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/literal_error
+synchronous_node_count.constrained-int
+  Input should be greater than 0 [type=greater_than, input_value='0', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/greater_than
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
