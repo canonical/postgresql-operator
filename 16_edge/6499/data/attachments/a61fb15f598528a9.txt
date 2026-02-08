@@ -1,0 +1,12 @@
+[32mINFO    [0m root:test_async_replication.py:46 Creating model: testing-other
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-model --no-switch testing-other
+[32mINFO    [0m root:test_async_replication.py:90 Deploying postgresql clusters
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju deploy --model testing /root/snap/juju/common/tmpu27mxnae/_temp.charm db1 --base ubuntu@24.04 --config profile=testing --constraints arch=amd64 --num-units 3
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju deploy --model testing-other /root/snap/juju/common/tmpifom3rwt/_temp.charm db2 --base ubuntu@24.04 --config profile=testing --constraints arch=amd64 --num-units 3
+[32mINFO    [0m root:test_async_replication.py:110 Deploying test application
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju deploy --model testing postgresql-test-app test-app1 --base ubuntu@22.04 --channel latest/edge --constraints arch=amd64
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju deploy --model testing-other postgresql-test-app test-app2 --base ubuntu@22.04 --channel latest/edge --constraints arch=amd64
+[32mINFO    [0m root:test_async_replication.py:130 Relating test application
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju integrate --model testing test-app1:database db1:database
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju integrate --model testing-other test-app2:database db2:database
+[32mINFO    [0m root:test_async_replication.py:134 Waiting for the applications to settle
