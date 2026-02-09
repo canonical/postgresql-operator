@@ -1039,9 +1039,10 @@ class Patroni:
         )
         logger.debug(
             "API bulk_update_parameters_controller_by_patroni: %s (%s)",
-            r.raise_for_status(),
+            r,
             r.elapsed.total_seconds(),
         )
+        r.raise_for_status()
 
     @cached_property
     def _synchronous_node_count(self) -> int:
