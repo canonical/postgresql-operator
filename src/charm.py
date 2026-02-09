@@ -2134,7 +2134,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return result
 
-    def _api_update_config(self) -> None:
+    def _api_update_config(self) -> bool:
         # Use config value if set, calculate otherwise
         max_connections = (
             self.config.experimental_max_connections
@@ -2165,7 +2165,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
-        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        try:
+            self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        except RetryError:
+            return False
+        return True
 
     def _build_postgresql_parameters(self) -> dict[str, str] | None:
         """Build PostgreSQL configuration parameters.
@@ -2239,6 +2243,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._patroni.member_started:
             # Potentially expired cert reloading and deferring
             self._patroni.reload_patroni_configuration()
+            self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
@@ -2247,7 +2252,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        self._api_update_config()
+        if not self._api_update_config():
+            logger.warning("Early exit update_config: Unable to patch Patroni API")
+            return False
 
         self._handle_postgresql_restart_need(
             self.unit_peer_data.get("config_hash") != self.generate_config_hash

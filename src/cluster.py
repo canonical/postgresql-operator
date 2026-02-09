@@ -1042,6 +1042,7 @@ class Patroni:
             r,
             r.elapsed.total_seconds(),
         )
+        r.raise_for_status()
 
     @cached_property
     def _synchronous_node_count(self) -> int:
