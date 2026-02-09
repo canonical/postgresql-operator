@@ -1101,9 +1101,10 @@ class Patroni:
         )
         logger.debug(
             "API bulk_update_parameters_controller_by_patroni: %s (%s)",
-            r.raise_for_status(),
+            r,
             r.elapsed.total_seconds(),
         )
+        r.raise_for_status()
 
     def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
         """Synchronises slots controlled by Patroni with the provided state by removing unneeded slots and creating new ones.
