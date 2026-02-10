@@ -1,0 +1,41 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:17:19Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.20    active      1  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.251.133.202  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.251.133.202  juju-49d7a3-0  ubuntu@22.04  runnervmwffz4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:14:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:14:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:14:54 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4544e5fb50 state=finished raised Exception>]
+unit-postgresql-0: 00:15:42 ERROR unit.postgresql/0.juju-log Invalid configuration: 2 validation errors for CharmConfig
+synchronous_node_count
+  unexpected value; permitted: 'all', 'majority' (type=value_error.const; given=0; permitted=('all', 'majority'))
+synchronous_node_count
+  ensure this value is greater than 0 (type=value_error.number.not_gt; limit_value=0)
+unit-postgresql-0: 00:15:43 ERROR unit.postgresql/0.juju-log Invalid configuration: 1 validation error for CharmConfig
+vacuum_vacuum_freeze_min_age
+  Value is not between 0 and 1000000000 (type=value_error)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
