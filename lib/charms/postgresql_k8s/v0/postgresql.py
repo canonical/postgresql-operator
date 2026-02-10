@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 55
+LIBPATCH = 56
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -305,6 +305,10 @@ class PostgreSQL:
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
                 ]
+                if "relation_access" in invalid_privileges:
+                    logger.warning("Extra user role relation_access not available. Skipping role.")
+                    invalid_privileges.remove("relation_access")
+                    privileges.remove("relation_access")
                 if len(invalid_privileges) > 0:
                     logger.error(f"Invalid extra user roles: {', '.join(privileges)}")
                     raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
