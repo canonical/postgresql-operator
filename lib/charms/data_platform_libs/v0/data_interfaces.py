@@ -453,7 +453,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 56
+LIBPATCH = 58
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -842,6 +842,11 @@ class CachedSecret:
                 self._secret_meta = self._model.get_secret(label=label)
             except SecretNotFoundError:
                 pass
+            except ModelError as e:
+                # Permission denied can be raised if the secret exists but is not yet granted to us.
+                if "permission denied" in str(e):
+                    return
+                raise
             else:
                 if label != self.label:
                     self.current_label = label
@@ -875,6 +880,8 @@ class CachedSecret:
             self._secret_meta = self.add_secret(content, label=self.label)
         except ModelError as err:
             if MODEL_ERRORS["not_leader"] not in str(err):
+                raise
+            if "permission denied" not in str(err):
                 raise
         self.current_label = None
 
@@ -4268,6 +4275,14 @@ class KafkaProviderEventHandlers(ProviderEventHandlers):
         if relation.app == self.charm.app:
             logging.info("Secret changed event ignored for Secret Owner")
 
+        if relation.name != self.relation_data.relation_name:
+            logger.debug(
+                "Ignoring secret-changed from endpoint %s (expected %s)",
+                relation.name,
+                self.relation_data.relation_name,
+            )
+            return
+
         remote_unit = None
         for unit in relation.units:
             if unit.app != self.charm.app:
@@ -5294,6 +5309,14 @@ class OpenSearchRequiresEventHandlers(RequirerEventHandlers):
             )
             return
 
+        if relation.name != self.relation_data.relation_name:
+            logger.debug(
+                "Ignoring secret-changed from endpoint %s (expected %s)",
+                relation.name,
+                self.relation_data.relation_name,
+            )
+            return
+
         if relation.app == self.charm.app:
             logging.info("Secret changed event ignored for Secret Owner")
 
@@ -5556,6 +5579,14 @@ class EtcdProviderEventHandlers(ProviderEventHandlers):
             )
             return
 
+        if relation.name != self.relation_data.relation_name:
+            logger.debug(
+                "Ignoring secret-changed from endpoint %s (expected %s)",
+                relation.name,
+                self.relation_data.relation_name,
+            )
+            return
+
         if relation.app == self.charm.app:
             logging.info("Secret changed event ignored for Secret Owner")
 
@@ -5700,6 +5731,14 @@ class EtcdRequirerEventHandlers(RequirerEventHandlers):
 
         if relation.app == self.charm.app:
             logging.info("Secret changed event ignored for Secret Owner")
+
+        if relation.name != self.relation_data.relation_name:
+            logger.debug(
+                "Ignoring secret-changed from endpoint %s (expected %s)",
+                relation.name,
+                self.relation_data.relation_name,
+            )
+            return
 
         remote_unit = None
         for unit in relation.units:

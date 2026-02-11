@@ -147,7 +147,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 11
+LIBPATCH = 13
 
 PYDEPS = ["pydantic"]
 
@@ -373,7 +373,35 @@ class LdapRequirerEvents(ObjectEvents):
     ldap_unavailable = EventSource(LdapUnavailableEvent)
 
 
-class LdapProvider(Object):
+class _LdapInterface(Object):
+    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME) -> None:
+        super().__init__(charm, relation_name)
+
+        self.charm = charm
+        self.app = charm.app
+        self.unit = charm.unit
+        self._relation_name = relation_name
+
+    @property
+    def relations(self) -> List[Relation]:
+        """The list of Relation instances associated with this relation_name."""
+        return [
+            relation
+            for relation in self.charm.model.relations[self._relation_name]
+            if self._is_relation_active(relation)
+        ]
+
+    @staticmethod
+    def _is_relation_active(relation: Relation) -> bool:
+        """Whether the relation is active based on contained data."""
+        try:
+            _ = repr(relation.data)
+            return True
+        except (RuntimeError, ops.ModelError):
+            return False
+
+
+class LdapProvider(_LdapInterface):
     on = LdapProviderEvents()
 
     def __init__(
@@ -382,11 +410,6 @@ class LdapProvider(Object):
         relation_name: str = DEFAULT_RELATION_NAME,
     ) -> None:
         super().__init__(charm, relation_name)
-
-        self.charm = charm
-        self.app = charm.app
-        self.unit = charm.unit
-        self._relation_name = relation_name
 
         self.framework.observe(
             self.charm.on[self._relation_name].relation_changed,
@@ -446,7 +469,7 @@ class LdapProvider(Object):
             _update_relation_app_databag(self.charm, relation, data.model_dump())
 
 
-class LdapRequirer(Object):
+class LdapRequirer(_LdapInterface):
     """An LDAP requirer to consume data delivered by an LDAP provider charm."""
 
     on = LdapRequirerEvents()
@@ -460,10 +483,6 @@ class LdapRequirer(Object):
     ) -> None:
         super().__init__(charm, relation_name)
 
-        self.charm = charm
-        self.app = charm.app
-        self.unit = charm.unit
-        self._relation_name = relation_name
         self._data = data
 
         self.framework.observe(
@@ -501,13 +520,12 @@ class LdapRequirer(Object):
         self.on.ldap_unavailable.emit(event.relation)
 
     def _load_provider_data(self, provider_data: dict) -> Optional[LdapProviderData]:
-        if secret_id := provider_data.get("bind_password_secret"):
+        try:
+            secret_id = provider_data.get("bind_password_secret")
             secret = self.charm.model.get_secret(id=secret_id)
             provider_data["bind_password"] = secret.get_content().get("password")
-
-        try:
             return LdapProviderData(**provider_data)
-        except ValidationError:
+        except (ops.ModelError, ops.SecretNotFoundError, TypeError, ValidationError):
             return None
 
     def consume_ldap_relation_data(
@@ -528,23 +546,6 @@ class LdapRequirer(Object):
             return None
 
         return self._load_provider_data(provider_data)
-
-    def _is_relation_active(self, relation: Relation) -> bool:
-        """Whether the relation is active based on contained data."""
-        try:
-            _ = repr(relation.data)
-            return True
-        except (RuntimeError, ops.ModelError):
-            return False
-
-    @property
-    def relations(self) -> List[Relation]:
-        """The list of Relation instances associated with this relation_name."""
-        return [
-            relation
-            for relation in self.charm.model.relations[self._relation_name]
-            if self._is_relation_active(relation)
-        ]
 
     def _ready_for_relation(self, relation: Relation) -> bool:
         if not relation.app:
