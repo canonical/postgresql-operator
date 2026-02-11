@@ -202,6 +202,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                         self._charm.async_replication.get_primary_cluster_endpoint()
                     ),
                 )
+                self._charm._update_relation_endpoints()
             except SwitchoverFailedError as e:
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
