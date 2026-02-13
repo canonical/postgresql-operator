@@ -22,7 +22,11 @@ from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidatio
 from botocore.loaders import create_loader
 from botocore.regions import EndpointResolver
 from charmlibs import snap
-from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
+from charms.data_platform_libs.v0.object_storage import (
+    S3Requirer,
+    StorageConnectionInfoChangedEvent,
+    StorageConnectionInfoGoneEvent,
+)
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
@@ -79,12 +83,14 @@ class PostgreSQLBackups(Object):
         # s3 relation handles the config options for s3 backups
         self.s3_client = S3Requirer(self.charm, self.relation_name)
         self.framework.observe(
-            self.s3_client.on.credentials_changed, self._on_s3_credential_changed
+            self.s3_client.on.storage_connection_info_changed, self._on_s3_credential_changed
         )
-        # When the leader unit is being removed, s3_client.on.credentials_gone is performed on it (and only on it).
+        # When the leader unit is being removed, s3_client.on.storage_connection_info_gone is performed on it (and only on it).
         # After a new leader is elected, the S3 connection must be reinitialized.
         self.framework.observe(self.charm.on.leader_elected, self._on_s3_credential_changed)
-        self.framework.observe(self.s3_client.on.credentials_gone, self._on_s3_credential_gone)
+        self.framework.observe(
+            self.s3_client.on.storage_connection_info_gone, self._on_s3_credential_gone
+        )
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
@@ -808,7 +814,7 @@ class PostgreSQLBackups(Object):
             )
         return return_code == 0
 
-    def _credential_changed_checks(self, event: CredentialsChangedEvent) -> bool:
+    def _credential_changed_checks(self, event: StorageConnectionInfoChangedEvent) -> bool:
         if not self.charm.is_cluster_initialised or not self.charm.get_secret(
             UNIT_SCOPE, "internal-cert"
         ):
@@ -838,7 +844,7 @@ class PostgreSQLBackups(Object):
             return False
         return True
 
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent) -> None:
+    def _on_s3_credential_changed(self, event: StorageConnectionInfoChangedEvent) -> None:
         """Call the stanza initialization when the credentials or the connection info change."""
         if not self._credential_changed_checks(event):
             return
@@ -899,7 +905,7 @@ class PostgreSQLBackups(Object):
 
         return True
 
-    def _on_s3_credential_gone(self, _) -> None:
+    def _on_s3_credential_gone(self, event: StorageConnectionInfoGoneEvent) -> None:
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
                 "stanza": "",
@@ -1378,7 +1384,7 @@ Stderr:
 
     def _retrieve_s3_parameters(self) -> tuple[dict, list[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
-        s3_parameters = self.s3_client.get_s3_connection_info()
+        s3_parameters = self.s3_client.get_storage_connection_info()
         required_parameters = [
             "bucket",
             "access-key",
