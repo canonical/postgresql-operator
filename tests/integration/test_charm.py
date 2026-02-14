@@ -13,14 +13,24 @@ import pytest
 import requests
 from jubilant import Juju
 from psycopg2 import sql
+from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from locales import SNAP_LOCALES
 
+from .ha_tests.helpers import get_cluster_roles
 from .helpers import (
     DATABASE_APP_NAME,
     STORAGE_PATH,
+    check_cluster_members,
     convert_records_to_dict,
     db_connect,
+    find_unit,
+    get_password,
+    get_primary,
+    get_unit_address,
+    scale_application,
+    switchover,
 )
 from .high_availability.high_availability_helpers_new import (
     get_unit_ip,
@@ -215,3 +225,145 @@ def test_postgresql_parameters_change(juju: Juju) -> None:
                 assert settings["max_connections"] == "200"
         finally:
             connection.close()
+
+
+async def test_scale_down_and_up(ops_test: OpsTest):
+    """Test data is replicated to new units after a scale up."""
+    # Ensure the initial number of units in the application.
+    initial_scale = len(UNIT_IDS)
+    await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
+
+    # Scale down the application.
+    await scale_application(ops_test, DATABASE_APP_NAME, initial_scale - 1)
+
+    # Ensure the member was correctly removed from the cluster
+    # (by comparing the cluster members and the current units).
+    await check_cluster_members(ops_test, DATABASE_APP_NAME)
+
+    # Scale up the application (2 more units than the current scale).
+    await scale_application(ops_test, DATABASE_APP_NAME, initial_scale + 1)
+
+    # Assert the correct members are part of the cluster.
+    await check_cluster_members(ops_test, DATABASE_APP_NAME)
+
+    # Test the deletion of the unit that is both the leader and the primary.
+    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    primary = await get_primary(ops_test, any_unit_name)
+    leader_unit = await find_unit(ops_test, leader=True, application=DATABASE_APP_NAME)
+
+    # Trigger a switchover if the primary and the leader are not the same unit.
+    patroni_password = await get_password(ops_test, "patroni")
+
+    if primary != leader_unit.name:
+        switchover(ops_test, primary, patroni_password, leader_unit.name)
+
+        # Get the new primary unit.
+        primary = await get_primary(ops_test, any_unit_name)
+        # Check that the primary changed.
+        for attempt in Retrying(
+            stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                assert primary == leader_unit.name
+
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=initial_scale
+    )
+
+    # Assert the correct members are part of the cluster.
+    await check_cluster_members(ops_test, DATABASE_APP_NAME)
+
+    # Scale up the application (2 more units than the current scale).
+    await scale_application(ops_test, DATABASE_APP_NAME, initial_scale + 2)
+
+    # Test the deletion of both the unit that is the leader and the unit that is the primary.
+    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    primary = await get_primary(ops_test, any_unit_name)
+    leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
+
+    # Trigger a switchover if the primary and the leader are the same unit.
+    if primary == leader_unit.name:
+        switchover(ops_test, primary, patroni_password)
+
+        # Get the new primary unit.
+        primary = await get_primary(ops_test, any_unit_name)
+        # Check that the primary changed.
+        for attempt in Retrying(
+            stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                assert primary != leader_unit.name
+
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(primary, leader_unit.name)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME],
+        status="active",
+        timeout=2000,
+        idle_period=30,
+        wait_for_exact_units=initial_scale,
+    )
+
+    # Wait some time to elect a new primary.
+    sleep(30)
+
+    # Assert the correct members are part of the cluster.
+    await check_cluster_members(ops_test, DATABASE_APP_NAME)
+
+    # End with the cluster having the initial number of units.
+    await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
+
+
+async def test_switchover_sync_standby(ops_test: OpsTest):
+    original_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    run_action = await ops_test.model.units[original_roles["sync_standbys"][0]].run_action(
+        "promote-to-primary", scope="unit"
+    )
+    await run_action.wait()
+
+    await ops_test.model.wait_for_idle(status="active", timeout=200)
+
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
+
+
+async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
+    """Test data persists through a primary deletion."""
+    # Set a composite application name in order to test in more than one series at the same time.
+    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            primary = await get_primary(ops_test, any_unit_name)
+            password = await get_password(ops_test)
+
+    # Write data to primary IP.
+    host = get_unit_address(ops_test, primary)
+    logging.info(f"connecting to primary {primary} on {host}")
+    with db_connect(host, password) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE primarydeletiontest (testcol INT);")
+    connection.close()
+
+    # Remove one unit.
+    await ops_test.model.destroy_units(
+        primary,
+    )
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+
+    # Add the unit again.
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
+
+    # Testing write occurred to every postgres instance by reading from them
+    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+        host = unit.public_address
+        logging.info("connecting to the database host: %s", host)
+        with db_connect(host, password) as connection, connection.cursor() as cursor:
+            # Ensure we can read from "primarydeletiontest" table
+            cursor.execute("SELECT * FROM primarydeletiontest;")
+        connection.close()
