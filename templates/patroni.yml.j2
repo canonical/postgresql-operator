@@ -51,7 +51,7 @@ bootstrap:
     ttl: 30
     loop_wait: 10
     retry_timeout: 10
-    maximum_lag_on_failover: 1048576
+    maximum_lag_on_failover: {{ maximum_lag_on_failover }}
     synchronous_mode: true
     synchronous_mode_strict: false
     synchronous_node_count: {{ synchronous_node_count }}
@@ -180,7 +180,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_admin 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_databases_owner 0.0.0.0/0 scram-sha-256
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} {{ instance_password_encryption }}
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }}/32 {{ instance_password_encryption }}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}

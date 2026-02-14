@@ -7,6 +7,12 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
+  synchronous-mode-strict:
+    description: |
+      Enforce transactions to be committed on Primary and at least one more synchronous node.
+      Default is true.
+    type: boolean
+    default: true
   connection-authentication-timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -21,6 +27,63 @@ options:
     description: |
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
+  cpu-max-logical-replication-workers:
+    description: |
+      Sets the maximum number of logical replication workers. Should be either "auto"
+      or a positive integer value. Restart is required when changed.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-apply-workers-per-subscription:
+    description: |
+      Sets the maximum number of parallel apply workers per subscription.
+      Should be either "auto" or a positive integer value.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-maintenance-workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel maintenance operations
+      like CREATE INDEX. Should be either "auto" or a positive integer value.
+      Cannot exceed max_parallel_workers.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-parallel-workers:
+    description: |
+      Sets the maximum number of workers that can be used for parallel operations.
+      Should be either "auto" or a positive integer value. Cannot exceed max_worker_processes.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-sync-workers-per-subscription:
+    description: |
+      Sets the maximum number of synchronization workers per subscription.
+      Should be either "auto" or a positive integer value.
+      auto = max_worker_processes.
+    type: string
+    default: "auto"
+  cpu-max-worker-processes:
+    description: |
+      Sets the maximum number of background processes that the system can support.
+      Should be either "auto" or a positive integer value.
+      auto = minimum(8, 2 * vCores). Value will be capped at 10 * vCores if exceeded.
+      Restart is required when changed.
+    type: string
+    default: "auto"
+  cpu-wal-compression:
+    description: |
+      Enable compression of full-page writes written in WAL. Compression reduces
+      the I/O needed for local storage and replication.
+      Default is on (true).
+    type: boolean
+    default: true
+  durability-maximum-lag-on-failover:
+    description: |
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
+    default: 1048576
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -636,6 +699,14 @@ options:
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
+  storage-hot-standby-feedback:
+    description: |
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is false.
+    type: boolean
+    default: false
   storage-old-snapshot-threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
@@ -757,6 +828,7 @@ options:
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
+
 
   # Deprecated options
   synchronous_node_count:

@@ -120,7 +120,7 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
         charm="self-signed-certificates",
         channel="1/stable",
         constraints=constraints,
-        base="ubuntu@22.04",
+        base="ubuntu@24.04",
     )
 
     model_1.offer(f"{first_model}.self-signed-certificates", endpoint="certificates")

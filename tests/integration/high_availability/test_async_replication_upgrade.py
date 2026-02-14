@@ -92,8 +92,9 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
         charm=DB_APP_NAME,
         app=DB_APP_1,
         base="ubuntu@24.04",
-        channel="16/edge",
+        channel="16/stable",
         config=configuration,
+        constraints=constraints,
         num_units=3,
     )
     model_2 = Juju(model=second_model)
@@ -101,8 +102,9 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
         charm=DB_APP_NAME,
         app=DB_APP_2,
         base="ubuntu@24.04",
-        channel="16/edge",
+        channel="16/stable",
         config=configuration,
+        constraints=constraints,
         num_units=3,
     )
 

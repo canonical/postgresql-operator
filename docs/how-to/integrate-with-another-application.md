@@ -14,37 +14,16 @@ Integrations with charmed applications are supported via the modern [`postgresql
 You can see which existing charms are compatible with PostgreSQL in the [Integrations](https://charmhub.io/postgresql/integrations) tab.
 ```
 
-### Modern `postgresql_client` interface
-
 To integrate with a charmed application that supports the `postgresql_client` interface, run
 
-```text
+```shell
 juju integrate postgresql:database <charm>
 ```
 
 To remove the integration, run
 
-```text
+```shell
 juju remove-relation postgresql <charm>
-```
-
-### Legacy `pgsql` interface
-
-```{caution}
-Note that this interface is **deprecated**.
-See the [legacy charm explanation page](/explanation/charm-versions/legacy-charm).
-```
-
-To integrate via the legacy interface, run
-
- ```text
-juju integrate postgresql:db <charm>
-```
-
-Extended permissions can be requested using the `db-admin` endpoint:
-
-```text
-juju integrate postgresql:db-admin <charm>
 ```
 
 ## Integrate with a non-charmed application
@@ -52,24 +31,28 @@ juju integrate postgresql:db-admin <charm>
 To integrate with an application outside of Juju, you must use the [`data-integrator` charm](https://charmhub.io/data-integrator) to create the required credentials and endpoints.
 
 Deploy `data-integrator`:
-```text
+
+```shell
 juju deploy data-integrator --config database-name=<name>
 ```
 
 Integrate with PostgreSQL:
-```text
+
+```shell
 juju integrate data-integrator postgresql
 ```
 
 Use the `get-credentials` action to retrieve credentials from `data-integrator`:
-```text
+
+```shell
 juju run data-integrator/leader get-credentials
 ```
 
 ## Rotate application passwords
+
 To rotate the passwords of users created for integrated applications, the integration should be removed and integrated again. This process will generate a new user and password for the application.
 
-```text
+```shell
 juju remove-relation <charm> postgresql
 juju integrate <charm> postgresql
 ```
@@ -77,15 +60,51 @@ juju integrate <charm> postgresql
 `<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
 
 ### Internal operator user
-The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.
 
-To set a specific password for the operator user, run
-```text
-juju run postgresql/leader set-password password=<password>
+The `operator` user is used internally by the Charmed PostgreSQL application. All user credentials are managed with Juju secrets.
+
+```{seealso}
+* {ref}`manage-passwords`
+* [Juju | How to update a secret](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#update-a-secret)
 ```
 
-To randomly generate a password for the `operator` user, run
-```text
-juju run postgresql/leader set-password
-```
+## Request a custom username
 
+Charms can request a custom username to be used in their relation with PostgreSQL 16.
+
+The simplest way to test it is to use `requested-entities-secret` field via the [`data-integrator` charm](https://charmhub.io/data-integrator).
+
+````{dropdown} Example
+
+```shell
+$ juju deploy postgresql --channel 16/stable
+
+$ juju add-secret myusername mylogin=mypassword
+secret:d5l3do605d8c4b1gn9a0
+
+$ juju deploy data-integrator --channel latest/edge --config database-name=mydbname --config requested-entities-secret=d5l3do605d8c4b1gn9a0
+Deployed "data-integrator" from charm-hub charm "data-integrator", revision 307 in channel latest/edge on ubuntu@24.04/stable
+
+$ juju grant-secret d5l3do605d8c4b1gn9a0 data-integrator
+
+$ juju relate postgresql data-integrator
+
+$ juju run data-integrator/leader get-credentials
+...
+postgresql:
+  database: mydbname
+  username: mylogin
+  password: mypassword
+  uris: postgresql://mylogin:mypassword@10.218.34.199:5432/mydbname
+  version: "16.11"
+  ...
+
+$ psql postgresql://mylogin:mypassword@10.218.34.199:5432/mydbname -c "SELECT SESSION_USER, CURRENT_USER"
+ session_user |       current_user        
+--------------+---------------------------
+ mylogin      | charmed_mydbname_owner
+(1 row)
+```
+````
+
+For more technical details, see the [description of the `postgresql_client` interface](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/postgresql_client/v0)

@@ -4,233 +4,11 @@
 
 """This charm library contains utilities to instrument your Charm with opentelemetry tracing data collection.
 
-(yes! charm code, not workload code!)
+WARNING this library is deprecated and will be discontinued in 27.04.
+Instead, please use the new `ops[tracing]` library.
 
-This means that, if your charm is related to, for example, COS' Tempo charm, you will be able to inspect
-in real time from the Grafana dashboard the execution flow of your charm.
-
-# Quickstart
-Fetch the following charm libs:
-
-    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.tracing
-    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.charm_tracing
-
-Then edit your charm code to include:
-
-```python
-# import the necessary charm libs
-from charms.tempo_coordinator_k8s.v0.tracing import (
-    TracingEndpointRequirer,
-    charm_tracing_config,
-)
-from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing
-
-
-# decorate your charm class with charm_tracing:
-@charm_tracing(
-    # forward-declare the instance attributes that the instrumentor will look up to obtain the
-    # tempo endpoint and server certificate
-    tracing_endpoint="tracing_endpoint",
-    server_cert="server_cert",
-)
-class MyCharm(CharmBase):
-    _path_to_cert = "/path/to/cert.crt"
-    # path to cert file **in the charm container**. Its presence will be used to determine whether
-    # the charm is ready to use tls for encrypting charm traces. If your charm does not support tls,
-    # you can ignore this and pass None to charm_tracing_config.
-    # If you do support TLS, you'll need to make sure that the server cert is copied to this location
-    # and kept up to date so the instrumentor can use it.
-
-    def __init__(self, framework):
-        # ...
-        self.tracing = TracingEndpointRequirer(self)
-        self.tracing_endpoint, self.server_cert = charm_tracing_config(
-            self.tracing, self._path_to_cert
-        )
-```
-
-# Detailed usage
-To use this library, you need to do two things:
-1) decorate your charm class with
-
-`@trace_charm(tracing_endpoint="my_tracing_endpoint")`
-
-2) add to your charm a "my_tracing_endpoint" (you can name this attribute whatever you like)
-**property**, **method** or **instance attribute** that returns an otlp http/https endpoint url.
-If you are using the ``charms.tempo_coordinator_k8s.v0.tracing.TracingEndpointRequirer`` as
-``self.tracing = TracingEndpointRequirer(self)``, the implementation could be:
-
-```
-    @property
-    def my_tracing_endpoint(self) -> Optional[str]:
-        '''Tempo endpoint for charm tracing'''
-        if self.tracing.is_ready():
-            return self.tracing.get_endpoint("otlp_http")
-        else:
-            return None
-```
-
-At this point your charm will be automatically instrumented so that:
-- charm execution starts a trace, containing
-    - every event as a span (including custom events)
-    - every charm method call (except dunders) as a span
-
-We recommend that you scale up your tracing provider and relate it to an ingress so that your tracing requests
-go through the ingress and get load balanced across all units. Otherwise, if the provider's leader goes down, your tracing goes down.
-
-
-## TLS support
-If your charm integrates with a TLS provider which is also trusted by the tracing provider (the Tempo charm),
-you can configure ``charm_tracing`` to use TLS by passing a ``server_cert`` parameter to the decorator.
-
-If your charm is not trusting the same CA as the Tempo endpoint it is sending traces to,
-you'll need to implement a cert-transfer relation to obtain the CA certificate from the same
-CA that Tempo is using.
-
-For example:
-```
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert"
-)
-class MyCharm(CharmBase):
-    self._server_cert = "/path/to/server.crt"
-    ...
-
-    def on_tls_changed(self, e) -> Optional[str]:
-        # update the server cert on the charm container for charm tracing
-        Path(self._server_cert).write_text(self.get_server_cert())
-
-    def on_tls_broken(self, e) -> Optional[str]:
-        # remove the server cert so charm_tracing won't try to use tls anymore
-        Path(self._server_cert).unlink()
-```
-
-
-## More fine-grained manual instrumentation
-if you wish to add more spans to the trace, you can do so by getting a hold of the tracer like so:
-```
-import opentelemetry
-...
-def get_tracer(self) -> opentelemetry.trace.Tracer:
-    return opentelemetry.trace.get_tracer(type(self).__name__)
-```
-
-By default, the tracer is named after the charm type. If you wish to override that, you can pass
-a different ``service_name`` argument to ``trace_charm``.
-
-See the official opentelemetry Python SDK documentation for usage:
-https://opentelemetry-python.readthedocs.io/en/latest/
-
-
-## Caching traces
-The `trace_charm` machinery will buffer any traces collected during charm execution and store them
-to a file on the charm container until a tracing backend becomes available. At that point, it will
-flush them to the tracing receiver.
-
-By default, the buffer is configured to start dropping old traces if any of these conditions apply:
-
-- the storage size exceeds 10 MiB
-- the number of buffered events exceeds 100
-
-You can configure this by, for example:
-
-```python
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert",
-    # only cache up to 42 events
-    buffer_max_events=42,
-    # only cache up to 42 MiB
-    buffer_max_size_mib=42,  # minimum 10!
-)
-class MyCharm(CharmBase):
-    ...
-```
-
-Note that setting `buffer_max_events` to 0 will effectively disable the buffer.
-
-The path of the buffer file is by default in the charm's execution root, which for k8s charms means
-that in case of pod churn, the cache will be lost. The recommended solution is to use an existing storage
-(or add a new one) such as:
-
-```yaml
-storage:
-  data:
-    type: filesystem
-    location: /charm-traces
-```
-
-and then configure the `@trace_charm` decorator to use it as path for storing the buffer:
-```python
-@trace_charm(
-    tracing_endpoint="my_tracing_endpoint",
-    server_cert="_server_cert",
-    # store traces to a PVC so they're not lost on pod restart.
-    buffer_path="/charm-traces/buffer.file",
-)
-class MyCharm(CharmBase):
-    ...
-```
-
-## Upgrading from `tempo_k8s.v0`
-
-If you are upgrading from `tempo_k8s.v0.charm_tracing` (note that since then, the charm library moved to
-`tempo_coordinator_k8s.v0.charm_tracing`), you need to take the following steps (assuming you already
-have the newest version of the library in your charm):
-1) If you need the dependency for your tests, add the following dependency to your charm project
-(or, if your project had a dependency on `opentelemetry-exporter-otlp-proto-grpc` only because
-of `charm_tracing` v0, you can replace it with):
-
-`opentelemetry-exporter-otlp-proto-http>=1.21.0`.
-
-2) Update the charm method referenced to from ``@trace`` and ``@trace_charm``,
-to return from ``TracingEndpointRequirer.get_endpoint("otlp_http")`` instead of ``grpc_http``.
-For example:
-
-```
-    from charms.tempo_k8s.v0.charm_tracing import trace_charm
-
-    @trace_charm(
-        tracing_endpoint="my_tracing_endpoint",
-    )
-    class MyCharm(CharmBase):
-
-    ...
-
-        @property
-        def my_tracing_endpoint(self) -> Optional[str]:
-            '''Tempo endpoint for charm tracing'''
-            if self.tracing.is_ready():
-                return self.tracing.otlp_grpc_endpoint() #  OLD API, DEPRECATED.
-            else:
-                return None
-```
-
-needs to be replaced with:
-
-```
-    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-
-    @trace_charm(
-        tracing_endpoint="my_tracing_endpoint",
-    )
-    class MyCharm(CharmBase):
-
-    ...
-
-        @property
-        def my_tracing_endpoint(self) -> Optional[str]:
-            '''Tempo endpoint for charm tracing'''
-            if self.tracing.is_ready():
-                return self.tracing.get_endpoint("otlp_http")  # NEW API, use this.
-            else:
-                return None
-```
-
-3) If you were passing a certificate (str) using `server_cert`, you need to change it to
-provide an *absolute* path to the certificate file instead.
+See this migration guide: https://discourse.charmhub.io/t/18076
+See this deprecation announcement: https://discourse.charmhub.io/t/19669
 """
 
 
@@ -341,6 +119,21 @@ from opentelemetry.trace import (
 from ops.charm import CharmBase
 from ops.framework import Framework
 
+
+if os.getenv("CHARM_TRACING_DEPRECATION_NOTICE_DISABLED"):
+    import warnings
+
+    warnings.warn(
+        "The `charm_tracing` library is deprecated and will be discontinued in 27.04. "
+        "Please migrate to the new `ops[tracing]` library. "
+        "See this migration guide: https://discourse.charmhub.io/t/18076 "
+        "See this deprecation announcement: https://discourse.charmhub.io/t/19669 "
+        "To disable this warning, set the CHARM_TRACING_DEPRECATION_NOTICE_DISABLED "
+        "environment variable. ",
+        DeprecationWarning,
+    )
+
+
 # The unique Charmhub library identifier, never change it
 LIBID = "01780f1e588c42c3976d26780fdf9b89"
 
@@ -350,7 +143,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 11
+LIBPATCH = 12
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 

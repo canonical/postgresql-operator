@@ -169,7 +169,7 @@ html_theme_options = {
 # Syntax highlighting settings
 
 highlight_language = "none" # default
-pygments_style = "autumn" # see https://pygments.org/styles for more
+pygments_style = "tango" # see https://pygments.org/styles for more
 
 # Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
 #
@@ -214,7 +214,8 @@ linkcheck_ignore = [
     "http://127.0.0.1:8000",
     "https://github.com/canonical/ACME/*",
     "https://matrix.to/*",
-    "https://portal.azure.com/#browse/Microsoft.Compute/VirtualMachines",
+    "https://portal.azure.com/*",
+    "https://microsoft.com/*",
     "https://developer.hashicorp.com/*",
     "https://www.terraform.io/*"
     ]
@@ -227,7 +228,7 @@ linkcheck_anchors_ignore_for_url = [
     ]
 
 # give linkcheck multiple tries on failure
-# linkcheck_timeout = 30
+linkcheck_timeout = 90
 linkcheck_retries = 3
 
 ########################
@@ -267,8 +268,11 @@ extensions = [
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
-    "sphinxext.rediraffe"
+    "sphinxext.rediraffe",
+    "sphinx_new_tab_link"
 ]
+
+new_tab_link_show_external_link_icon = True
 
 # Excludes files or directories from processing
 

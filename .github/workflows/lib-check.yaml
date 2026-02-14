@@ -24,7 +24,7 @@ jobs:
     if: ${{ github.event.pull_request.head.repo.full_name == 'canonical/postgresql-operator' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Check libs
@@ -32,4 +32,6 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-
+    permissions:
+      # Add label to prs
+      pull-requests: write

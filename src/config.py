@@ -5,23 +5,43 @@
 """Structured configuration for the PostgreSQL charm."""
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
 from charms.data_platform_libs.v1.data_models import BaseConfigModel
-from pydantic import Field, PositiveInt
+from pydantic import Field, NonNegativeInt, PositiveInt
 
 from locales import SNAP_LOCALES
 
 logger = logging.getLogger(__name__)
+
+# Type for worker process parameters that must be >= 2
+WorkerProcessInt = Annotated[int, Field(ge=2)]
 
 
 class CharmConfig(BaseConfigModel):
     """Manager for the structured configuration."""
 
     synchronous_node_count: Literal["all", "majority"] | PositiveInt = Field(default="all")
+    synchronous_mode_strict: bool = Field(default=True)
     connection_authentication_timeout: int | None = Field(ge=1, le=600, default=None)
     connection_statement_timeout: int | None = Field(ge=0, le=2147483647, default=None)
+    cpu_max_logical_replication_workers: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    cpu_max_parallel_apply_workers_per_subscription: Literal["auto"] | WorkerProcessInt | None = (
+        Field(default="auto")
+    )
+    cpu_max_parallel_maintenance_workers: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    cpu_max_parallel_workers: Literal["auto"] | WorkerProcessInt | None = Field(default="auto")
+    cpu_max_sync_workers_per_subscription: Literal["auto"] | WorkerProcessInt | None = Field(
+        default="auto"
+    )
+    cpu_max_worker_processes: Literal["auto"] | WorkerProcessInt | None = Field(default="auto")
     cpu_parallel_leader_participation: bool | None = Field(default=None)
+    cpu_wal_compression: bool | None = Field(default=None)
+    durability_maximum_lag_on_failover: NonNegativeInt | None = Field(default=None)
     durability_synchronous_commit: Literal["on", "remote_apply", "remote_write"] | None = Field(
         default=None
     )
@@ -189,6 +209,7 @@ class CharmConfig(BaseConfigModel):
         | None
     ) = Field(default=None)
     storage_gin_pending_list_limit: int | None = Field(ge=64, le=2147483647, default=None)
+    storage_hot_standby_feedback: bool | None = Field(default=None)
     storage_old_snapshot_threshold: int | None = Field(ge=-1, le=86400, default=None)
     system_users: str | None = Field(default=None)
     vacuum_autovacuum_analyze_scale_factor: float | None = Field(ge=0, le=100, default=None)
@@ -218,7 +239,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def keys(cls) -> list[str]:
         """Return config as list items."""
-        return list(cls.__fields__.keys())
+        return list(cls.model_fields.keys())
 
     @classmethod
     def plugin_keys(cls) -> filter:
