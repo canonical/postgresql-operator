@@ -6,6 +6,7 @@ import logging
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from .architecture import architecture
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -14,6 +15,7 @@ from .helpers import (
     get_primary,
     get_unit_address,
 )
+from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,41 @@ async def backup_deploy(
 ) -> str:
     use_tls = all([tls_certificates_app_name, tls_channel])
     # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(s3_integrator_app_name)
+    if juju_major_version >= 3:
+        revision = 337 if architecture == "amd64" else 338
+        await ops_test.model.deploy(
+            s3_integrator_app_name,
+            revision=revision,
+            channel="2/edge",
+            series="noble",
+            base="ubuntu@24.04",
+        )
+        # Configure and set access and secret keys.
+        logger.info(f"configuring S3 integrator for {cloud}")
+        rc, stdout, stderr = await ops_test.juju(
+            "add-secret",
+            "s3keys",
+            "access-key=" + credentials["access-key"],
+            "secret-key=" + credentials["secret-key"],
+        )
+        assert rc == 0, f"Failed to add secret: {stderr}"
+        secret_id = stdout.strip()
+        rc, stdout, stderr = await ops_test.juju("grant-secret", secret_id, s3_integrator_app_name)
+        assert rc == 0, "Failed to grant secret"
+        config["credentials"] = secret_id
+        await ops_test.model.applications[s3_integrator_app_name].set_config(config)
+    else:
+        await ops_test.model.deploy(s3_integrator_app_name)
+        await ops_test.model.applications[s3_integrator_app_name].set_config(config)
+        action = await ops_test.model.units.get(f"{s3_integrator_app_name}/0").run_action(
+            "sync-s3-credentials",
+            **credentials,
+        )
+        await action.wait()
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[s3_integrator_app_name], status="active", timeout=1000, raise_on_error=False
+        )
     if use_tls:
         await ops_test.model.deploy(tls_certificates_app_name, channel=tls_channel)
 
@@ -57,15 +93,6 @@ async def backup_deploy(
         )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
-
-    # Configure and set access and secret keys.
-    logger.info(f"configuring S3 integrator for {cloud}")
-    await ops_test.model.applications[s3_integrator_app_name].set_config(config)
-    action = await ops_test.model.units.get(f"{s3_integrator_app_name}/0").run_action(
-        "sync-s3-credentials",
-        **credentials,
-    )
-    await action.wait()
 
     await ops_test.model.relate(database_app_name, s3_integrator_app_name)
     async with ops_test.fast_forward(fast_interval="60s"):
