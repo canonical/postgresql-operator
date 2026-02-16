@@ -1,0 +1,50 @@
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:72 removing primaries, replicas
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.31.191.105:8008/patroni', 'host': '10.31.191.105', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.31.191.77:8008/patroni', 'host': '10.31.191.77', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-5', 'role': 'replica', 'state': 'streaming', 'api_url': 'http://10.31.191.98:8008/patroni', 'host': '10.31.191.98', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:82 Stopping unit postgresql/0
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:82 Stopping unit postgresql/5
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:86 Deleting unit postgresql/0
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:86 Deleting unit postgresql/5
+[33mWARNING [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:117 Patroni self-healed without raft reinitialisation for roles ['primaries', 'replicas']
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:121 Scaling back up
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/3 [idle] active: Primary
+  postgresql/6 [allocating] waiting: waiting for machine
+  postgresql/7 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/6 [allocating] waiting: waiting for machine
+  postgresql/7 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/6 [allocating] waiting: waiting for machine
+  postgresql/7 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/6 [executing] maintenance: installing PostgreSQL
+  postgresql/7 [executing] maintenance: installing charm software
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [executing] active: received database credentials of the first database
+  postgresql/3 [executing] active: Primary
+  postgresql/6 [executing] waiting: waiting to start PostgreSQL
+  postgresql/7 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/3 [executing] maintenance: reconfiguring cluster
+  postgresql/6 [executing] waiting: awaiting for member to start
+  postgresql/7 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/3 [executing] active: Primary
+  postgresql/6 [executing] waiting: waiting for primary to be reachable from this unit
+  postgresql/7 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [idle] active: Primary
+  postgresql/6 [idle] active: 
+  postgresql/7 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-3': 1560, 'testing.postgresql-6': 1560}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-3': 1562, 'testing.postgresql-6': 1562}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-3', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.31.191.77:8008/patroni', 'host': '10.31.191.77', 'port': 5432, 'timeline': 4}, {'name': 'postgresql-6', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.31.191.193:8008/patroni', 'host': '10.31.191.193', 'port': 5432, 'timeline': 4, 'lag': 0}, {'name': 'postgresql-7', 'role': 'replica', 'state': 'streaming', 'api_url': 'http://10.31.191.131:8008/patroni', 'host': '10.31.191.131', 'port': 5432, 'timeline': 4, 'lag': 0}]
