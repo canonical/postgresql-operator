@@ -816,7 +816,7 @@ class PostgreSQLAsyncReplication(Object):
         async_relation = self._relation
 
         if promoted_cluster_counter is not None:
-            for relation in [async_relation, self.charm._peers]:  # type: ignore
+            for relation in [async_relation, self.charm._peers]:
                 relation.data[self.charm.app].update({  # type: ignore
                     "promoted-cluster-counter": str(promoted_cluster_counter)
                 })

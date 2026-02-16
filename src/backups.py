@@ -280,8 +280,7 @@ class PostgreSQLBackups(Object):
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
-        # Boto3 doesn't have typedefs
-        bucket = s3.Bucket(bucket_name)  # type: ignore
+        bucket = s3.Bucket(bucket_name)
         try:
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
@@ -1472,8 +1471,7 @@ Stderr:
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            # Boto3 doesn't have typedefs
-            bucket = s3.Bucket(bucket_name)  # type: ignore
+            bucket = s3.Bucket(bucket_name)
 
             with tempfile.NamedTemporaryFile() as temp_file:
                 temp_file.write(content.encode("utf-8"))
@@ -1506,8 +1504,7 @@ Stderr:
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            # Boto3 doesn't have typedefs
-            bucket = s3.Bucket(bucket_name)  # type: ignore
+            bucket = s3.Bucket(bucket_name)
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")

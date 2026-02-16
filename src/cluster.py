@@ -18,7 +18,7 @@ from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import psutil
 import requests
@@ -334,7 +334,7 @@ class Patroni:
             auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
         ) as client:
             try:
-                return (await client.get(url)).json()
+                return (await client.get(url)).raise_for_status().json()
             except (HTTPError, ValueError):
                 return None
 
@@ -769,7 +769,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def patroni_logs(self, num_lines: int | str | None = 10) -> str:
+    def patroni_logs(self, num_lines: int | Literal["all"] = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
 
         Args:
@@ -1104,6 +1104,7 @@ class Patroni:
             r,
             r.elapsed.total_seconds(),
         )
+        r.raise_for_status()
 
     def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
         """Synchronises slots controlled by Patroni with the provided state by removing unneeded slots and creating new ones.

@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import charm_refresh
 import ops.log
 import psycopg2
+import psycopg2.errors
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -65,6 +66,7 @@ from single_kernel_postgresql.config.literals import (
     USER,
     Substrates,
 )
+from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -132,7 +134,6 @@ from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
-from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -288,7 +289,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         config = {
             config_option: value for config_option, value in config.items() if value is not None
         }
-        return self.config_type(**config)  # type: ignore
+        return self.config_type(**config)
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -1567,7 +1568,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(WaitingStatus("Updating extensions"))
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
-        except psycopg2.errors.DependentObjectsStillExist as e:
+        except psycopg2.errors.DependentObjectsStillExist as e:  # type: ignore
             logger.error(
                 "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql plugin-<plugin_name>-enable=True`",
                 str(e),
@@ -1898,7 +1899,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 alternative_endpoints=other_cluster_endpoints
             )
             other_cluster_primary_ip = next(
-                replication_offer_relation.data[unit].get("private-address")
+                replication_offer_relation.data[unit].get("ip")
+                or replication_offer_relation.data[unit].get("private-address")
                 for unit in replication_offer_relation.units
                 if unit.name.replace("/", "-") == other_cluster_primary
             )
@@ -2527,7 +2529,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return result
 
-    def _api_update_config(self) -> None:
+    def _api_update_config(self) -> bool:
         # Use config value if set, calculate otherwise
         max_connections = (
             self.config.experimental_max_connections
@@ -2558,7 +2560,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
-        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        try:
+            self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        except RetryError:
+            return False
+        return True
 
     def _build_postgresql_parameters(self) -> dict[str, str] | None:
         """Build PostgreSQL configuration parameters.
@@ -2672,7 +2678,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        self._api_update_config()
+        if not self._api_update_config():
+            logger.warning("Early exit update_config: Unable to patch Patroni API")
+            return False
 
         # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
