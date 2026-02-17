@@ -46,6 +46,7 @@ This page contains a markdown version of the alert rules described in the `postg
 | Alert | Severity | Notes |
 |------|----------|-------|
 | PatroniPostgresqlDown | ![critical] | Patroni PostgreSQL instance is down.<br>Check for errors in the Loki logs. |
+| PatroniMultipleLeaders | ![critical] | Patroni cluster has multiple leader nodes.<br>More than one leader node (primary or standby) is detected inside a cluster.<br>This may indicate split-brain; check Patroni/Loki logs and network/quorum state. |
 | PatroniHasNoLeader | ![critical] | Patroni instance has no leader node.<br>A leader node (neither primary nor standby) cannot be found inside a cluster.<br>Check for errors in the Loki logs. |
 
 ## `PgbackrestExporter`
