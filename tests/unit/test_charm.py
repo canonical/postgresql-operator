@@ -122,6 +122,7 @@ def test_patroni_scrape_config(harness):
 
     assert result == [
         {
+            "job_name": f"{harness.charm.app.name}_{harness.charm.unit.name.split('/')[1]}_patroni_metrics",
             "metrics_path": "/metrics",
             "scheme": "https",
             "static_configs": [{"targets": ["192.0.2.0:8008"]}],
