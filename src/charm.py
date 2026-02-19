@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -279,7 +279,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Override data_models.py TypedCharmBase config
     @cached_property
-    def config(self):
+    def config(self) -> CharmConfig:
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
             # Prefer value of option name with dash (-) and fallback to name with underscore (_)
@@ -288,7 +288,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             for config_option in self.config_type.keys()  # noqa: SIM118
         }
-        config = {
+        config: dict[str, Any] = {
             config_option: value for config_option, value in config.items() if value is not None
         }
         return self.config_type(**config)
@@ -2986,7 +2986,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def generate_config_hash(self) -> str:
         """Generate current configuration hash."""
-        return shake_128(str(self.config.dict()).encode()).hexdigest(16)
+        return shake_128(str(self.config.model_dump()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
