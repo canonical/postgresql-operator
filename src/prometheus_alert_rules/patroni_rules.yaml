@@ -29,6 +29,18 @@ groups:
           Check for errors in the Loki logs.
           LABELS = {{ $labels }}
 
+    - alert: PatroniPrimaryAndStandbyLeader
+      expr: 'sum by (scope) (patroni_master) == 1 and sum by (scope) (patroni_standby_leader) == 1'
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Patroni cluster {{ $labels.scope }} has both primary and standby leaders.
+        description: |
+          A primary leader and a standby leader are simultaneously detected inside the cluster {{ $labels.scope }}.
+          Check for errors in the Loki logs.
+          LABELS = {{ $labels }}
+
     # 2.4.1
     - alert: PatroniHasNoLeader
       expr: '(max by (scope) (patroni_master) < 1) and (max by (scope) (patroni_standby_leader) < 1)'
