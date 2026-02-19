@@ -66,7 +66,7 @@ from single_kernel_postgresql.config.literals import (
     USER,
     Substrates,
 )
-from single_kernel_postgresql.events.tls_transfer import TLS_TRANSFER_RELATION, TLSTransfer
+from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -126,6 +126,7 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_RELATION_NAME,
+    TRACING_TRANSFER_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER_PASSWORD_KEY,
@@ -379,7 +380,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(
             self,
             tracing_relation_name=TRACING_RELATION_NAME,
-            ca_relation_name=TLS_TRANSFER_RELATION,
+            ca_relation_name=TRACING_TRANSFER_RELATION_NAME,
         )
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
