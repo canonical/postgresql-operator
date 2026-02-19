@@ -87,7 +87,8 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
 
-TRACING_PROTOCOL = "otlp_http"
+TRACING_RELATION_NAME = "tracing"
+TRACING_TRANSFER_RELATION_NAME = "tracing-receive-ca-cert"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
