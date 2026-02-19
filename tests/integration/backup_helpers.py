@@ -33,7 +33,7 @@ async def backup_deploy(
     charm,
 ) -> str:
     # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(s3_integrator_app_name)
+    await ops_test.model.deploy(s3_integrator_app_name, channel="1/candidate")
     await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
 
     # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
