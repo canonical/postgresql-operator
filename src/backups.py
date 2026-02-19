@@ -1472,7 +1472,9 @@ Stderr:
             a string with the content if object is successfully downloaded and None if file is not existing or error
             occurred during download.
         """
-        bucket_name = s3_parameters["bucket"]
+        if not (bucket_name := s3_parameters.get("bucket")):
+            logger.info("No bucket set")
+            return
         processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
