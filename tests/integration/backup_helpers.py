@@ -32,7 +32,7 @@ async def backup_deploy(
 ) -> str:
     use_tls = all([tls_certificates_app_name, tls_channel])
     # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(s3_integrator_app_name)
+    await ops_test.model.deploy(s3_integrator_app_name, channel="1/candidate")
     if use_tls:
         await ops_test.model.deploy(tls_certificates_app_name, channel=tls_channel)
 
