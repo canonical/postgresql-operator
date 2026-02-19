@@ -29,9 +29,8 @@ import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 from ops import (
@@ -56,6 +55,7 @@ from ops import (
     WaitingStatus,
     main,
 )
+from ops_tracing import Tracing
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -66,7 +66,7 @@ from single_kernel_postgresql.config.literals import (
     USER,
     Substrates,
 )
-from single_kernel_postgresql.events.tls_transfer import TLSTransfer
+from single_kernel_postgresql.events.tls_transfer import TLS_TRANSFER_RELATION, TLSTransfer
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -125,7 +125,7 @@ from constants import (
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
-    TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER_PASSWORD_KEY,
@@ -252,22 +252,6 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         self._charm._post_snap_refresh(refresh)
 
 
-@trace_charm(
-    tracing_endpoint="tracing_endpoint",
-    extra_types=(
-        ClusterTopologyObserver,
-        COSAgentProvider,
-        Patroni,
-        PostgreSQL,
-        PostgreSQLAsyncReplication,
-        PostgreSQLBackups,
-        PostgreSQLLDAP,
-        PostgreSQLProvider,
-        TLS,
-        TLSTransfer,
-        RollingOpsManager,
-    ),
-)
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -391,9 +375,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.on.secret_remove,
             ],
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
-            tracing_protocols=[TRACING_PROTOCOL],
         )
-        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing = Tracing(
+            self,
+            tracing_relation_name=TRACING_RELATION_NAME,
+            ca_relation_name=TLS_TRANSFER_RELATION,
+        )
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
