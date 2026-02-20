@@ -505,10 +505,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
-        unit_id = self.unit.name.split("/")[1]
         return [
             {
-                "job_name": f"{self.app.name}_{unit_id}_patroni_metrics",
                 "metrics_path": "/metrics",
                 "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
