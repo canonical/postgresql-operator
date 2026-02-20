@@ -130,7 +130,6 @@ def test_patroni_scrape_config_no_tls(harness):
 
     assert result == [
         {
-            "job_name": f"{harness.charm.app.name}_{harness.charm.unit.name.split('/')[1]}_patroni_metrics",
             "metrics_path": "/metrics",
             "scheme": "http",
             "static_configs": [{"targets": ["192.0.2.0:8008"]}],
@@ -149,7 +148,6 @@ def test_patroni_scrape_config_tls(harness):
 
         assert result == [
             {
-                "job_name": f"{harness.charm.app.name}_{harness.charm.unit.name.split('/')[1]}_patroni_metrics",
                 "metrics_path": "/metrics",
                 "scheme": "https",
                 "static_configs": [{"targets": ["192.0.2.0:8008"]}],
