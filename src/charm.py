@@ -126,7 +126,6 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_RELATION_NAME,
-    TRACING_TRANSFER_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER_PASSWORD_KEY,
@@ -377,11 +376,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ],
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
         )
-        self.tracing = Tracing(
-            self,
-            tracing_relation_name=TRACING_RELATION_NAME,
-            ca_relation_name=TRACING_TRANSFER_RELATION_NAME,
-        )
+        self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
