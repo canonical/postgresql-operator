@@ -103,7 +103,6 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_RELATION_NAME,
-    TRACING_TRANSFER_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER,
@@ -236,11 +235,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
         )
-        self.tracing = Tracing(
-            self,
-            tracing_relation_name=TRACING_RELATION_NAME,
-            ca_relation_name=TRACING_TRANSFER_RELATION_NAME,
-        )
+        self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
 
     def _on_databases_change(self, _):
         """Handle databases change event."""

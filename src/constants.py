@@ -88,7 +88,6 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
 )
 
 TRACING_RELATION_NAME = "tracing"
-TRACING_TRANSFER_RELATION_NAME = "tracing-receive-ca-cert"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
