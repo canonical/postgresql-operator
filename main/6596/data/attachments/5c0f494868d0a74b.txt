@@ -1,0 +1,186 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:25:13Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.20    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  442  no       received database credentials of the first database
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    executing  3        10.236.78.132             received database credentials of the first database
+postgresql/0*           waiting   idle       0        10.236.78.214   5432/tcp  other units upgrading first...
+postgresql/1            waiting   executing  1        10.236.78.157   5432/tcp  waiting for database initialisation
+postgresql/2            waiting   idle       2        10.236.78.133   5432/tcp  other units upgrading first...
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.236.78.214  juju-1fe86f-0  ubuntu@22.04  runnervmwffz4  Running
+1        started  10.236.78.157  juju-1fe86f-1  ubuntu@22.04  runnervmwffz4  Running
+2        started  10.236.78.133  juju-1fe86f-2  ubuntu@22.04  runnervmwffz4  Running
+3        started  10.236.78.132  juju-1fe86f-3  ubuntu@22.04  runnervmwffz4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:09:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:09:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:10:58 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 946, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd0fee0a410 state=finished raised Exception>]
+machine-3: 00:11:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:11:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:12:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:12:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:12:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:12:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:16:17 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a7538880 state=finished raised Exception>]
+unit-postgresql-1: 00:17:28 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a7471f60 state=finished raised Exception>]
+unit-postgresql-1: 00:18:40 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a750c4c0 state=finished raised Exception>]
+unit-postgresql-1: 00:19:51 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a738cf70 state=finished raised Exception>]
+unit-postgresql-1: 00:21:03 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a728b670 state=finished raised Exception>]
+unit-postgresql-1: 00:22:14 ERROR unit.postgresql/1.juju-log upgrade:1: replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f19a753a680 state=finished raised Exception>]
+unit-postgresql-1: 00:23:20 ERROR unit.postgresql/1.juju-log replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f8f2f3f2c80 state=finished raised Exception>]
+unit-postgresql-1: 00:24:32 ERROR unit.postgresql/1.juju-log replication is not healthy
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 503, in is_replication_healthy
+    raise Exception
+Exception
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 478, in is_replication_healthy
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 438, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.10/site-packages/tenacity/__init__.py", line 414, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f8f2f2c8d30 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
