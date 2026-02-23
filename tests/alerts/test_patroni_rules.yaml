@@ -78,3 +78,125 @@ tests:
       - alertname: PatroniHasNoLeader
         eval_time: 1m
         exp_alerts: []
+
+  - name: PatroniMultipleLeaders does not fire if master=1 and standby_leader=0
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PatroniMultipleLeaders
+        eval_time: 1m
+        exp_alerts: []
+    
+  - name: PatroniMultipleLeaders does not fire if master=0 and standby_leader=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '0'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniMultipleLeaders
+        eval_time: 1m
+        exp_alerts: []
+    
+  - name: PatroniMultipleLeaders does not fire if master=1 and standby_leader=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniMultipleLeaders
+        eval_time: 1m
+        exp_alerts: []
+
+  - name: PatroniMultipleLeaders fires if two masters exist in one scope
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1",instance="pg1"}'
+        values: '1'
+      - series: 'patroni_master{scope="cluster1",instance="pg2"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1",instance="pg1"}'
+        values: '0'
+      - series: 'patroni_standby_leader{scope="cluster1",instance="pg2"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PatroniMultipleLeaders
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PatroniMultipleLeaders
+              severity: critical
+              scope: cluster1
+            exp_annotations:
+              summary: Patroni cluster cluster1 has multiple leader nodes.
+              description: |
+                More than one leader node (primary or standby) is detected inside the cluster cluster1.
+                Check for errors in the Loki logs.
+                LABELS = map[scope:cluster1]
+
+  - name: PatroniMultipleLeaders fires if two standby leaders exist in one scope
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1",instance="pg1"}'
+        values: '0'
+      - series: 'patroni_master{scope="cluster1",instance="pg2"}'
+        values: '0'
+      - series: 'patroni_standby_leader{scope="cluster1",instance="pg1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1",instance="pg2"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniMultipleLeaders
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PatroniMultipleLeaders
+              severity: critical
+              scope: cluster1
+            exp_annotations:
+              summary: Patroni cluster cluster1 has multiple leader nodes.
+              description: |
+                More than one leader node (primary or standby) is detected inside the cluster cluster1.
+                Check for errors in the Loki logs.
+                LABELS = map[scope:cluster1]
+
+  - name: PatroniPrimaryAndStandbyLeader does not fire if master=1 and standby_leader=0
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PatroniPrimaryAndStandbyLeader
+        eval_time: 1m
+        exp_alerts: []
+
+  - name: PatroniPrimaryAndStandbyLeader fires if master=1 and standby_leader=1
+    interval: 1m
+    input_series:
+      - series: 'patroni_master{scope="cluster1"}'
+        values: '1'
+      - series: 'patroni_standby_leader{scope="cluster1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PatroniPrimaryAndStandbyLeader
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PatroniPrimaryAndStandbyLeader
+              severity: critical
+              scope: cluster1
+            exp_annotations:
+              summary: Patroni cluster cluster1 has both primary and standby leaders.
+              description: |
+                A primary leader and a standby leader are simultaneously detected inside the cluster cluster1.
+                Check for errors in the Loki logs.
+                LABELS = map[scope:cluster1]
