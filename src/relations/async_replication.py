@@ -46,11 +46,15 @@ from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay,
 from cluster import ClusterNotPromotedError, NotReadyError, StandbyClusterAlreadyPromotedError
 from constants import (
     APP_SCOPE,
+    ARCHIVE_STORAGE_PATH,
+    DATA_STORAGE_PATH,
+    LOGS_STORAGE_PATH,
     PATRONI_CONF_PATH,
     PEER,
     POSTGRESQL_DATA_PATH,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
+    TEMP_STORAGE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -682,10 +686,10 @@ class PostgreSQLAsyncReplication(Object):
     def _reinitialise_pgdata(self) -> None:
         """Reinitialise the data folder."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
-            POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            ARCHIVE_STORAGE_PATH,
+            DATA_STORAGE_PATH,
+            LOGS_STORAGE_PATH,
+            TEMP_STORAGE_PATH,
         ]
         path = None
         try:
@@ -759,6 +763,7 @@ class PostgreSQLAsyncReplication(Object):
             # primary cluster.
             logger.info("Removing and recreating data folder")
             self._reinitialise_pgdata()
+            self.charm._patroni._create_pgdata()
 
             # Remove previous cluster information to make it possible to initialise a new cluster.
             logger.info("Removing previous cluster information")

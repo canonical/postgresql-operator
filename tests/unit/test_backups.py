@@ -523,7 +523,9 @@ def test_empty_data_files(harness):
         assert harness.charm.backup._empty_data_files()
         _rmtree.assert_has_calls([
             call("/var/snap/charmed-postgresql/common/data/archive/test_file.txt"),
-            call("/var/snap/charmed-postgresql/common/var/lib/postgresql/test_file.txt"),
+            call(
+                "/var/snap/charmed-postgresql/common/var/lib/postgresql/test_file.txt"
+            ),  # DATA_STORAGE_PATH
             call("/var/snap/charmed-postgresql/common/data/logs/test_file.txt"),
             call("/var/snap/charmed-postgresql/common/data/temp/test_file.txt"),
         ])
@@ -1793,7 +1795,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
-            data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main",
             log_path="/var/snap/charmed-postgresql/common/var/log/pgbackrest",
             region="us-east-1",
             endpoint="https://storage.googleapis.com",
@@ -1803,7 +1805,6 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             access_key="test-access-key",
             secret_key="test-secret-key",
             stanza=harness.charm.backup.stanza_name,
-            storage_path=harness.charm._storage_path,
             user="backup",
             retention_full=30,
             process_max=max(cpu_count() - 2, 1),

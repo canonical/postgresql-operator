@@ -121,6 +121,7 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
+    TEMP_PATH,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -1791,9 +1792,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
+        self.postgresql.set_up_database(temp_location=TEMP_PATH)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
