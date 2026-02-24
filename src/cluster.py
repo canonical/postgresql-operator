@@ -256,8 +256,23 @@ class Patroni:
         For existing deployments, creates symlinks so the code always references
         the 16/main path while data stays at the mount root.
         """
+        # Archive and temp: always ensure these exist (e.g. tmpfs is wiped on reboot).
+        self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+        is_existing_cluster = os.path.exists(POSTGRESQL_DATA_PATH)
+        if is_existing_cluster:
+            # Existing cluster (e.g. reboot): create temp dir without fixing ownership.
+            # The library's set_up_database() detects wrong ownership to trigger the
+            # tablespace fix after tmpfs reboot. If we set _daemon_ ownership here,
+            # it would mask the reboot signal and the stale tablespace would never
+            # be recreated. For persistent storage reboots, the directory already
+            # exists with correct ownership, so makedirs is a no-op.
+            os.makedirs(TEMP_PATH, exist_ok=True)
+        else:
+            # Fresh deployment: set correct ownership so PostgreSQL can use it.
+            self._create_directory(TEMP_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
         # Skip if the target data directory already exists (already set up).
-        if os.path.exists(POSTGRESQL_DATA_PATH):
+        if is_existing_cluster:
             return
 
         is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
@@ -275,10 +290,6 @@ class Patroni:
             self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
             os.makedirs(os.path.dirname(LOGS_PATH), exist_ok=True)
             self._create_directory(LOGS_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-
-        # Archive and temp: always create actual subdirectories (no symlinks needed).
-        self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-        self._create_directory(TEMP_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
     @cached_property
     def cluster_members(self) -> set:

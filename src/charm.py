@@ -1672,6 +1672,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._unit_ip in self.members_ips:
             self._patroni.start_patroni()
             self.backup.start_stop_pgbackrest_service()
+            # Re-run database setup to fix temp tablespace after tmpfs wipe.
+            if self._can_connect_to_postgresql:
+                try:
+                    self.postgresql.set_up_database(temp_location=TEMP_PATH)
+                except Exception:
+                    logger.debug("Could not run set_up_database after reboot, will retry later")
 
     def _restart_metrics_service(self, postgres_snap: snap.Snap) -> None:
         """Restart the monitoring service if the password was rotated."""
