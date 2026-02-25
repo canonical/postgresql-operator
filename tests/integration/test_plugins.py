@@ -88,6 +88,9 @@ VECTOR_EXTENSION_STATEMENT = (
     "CREATE TABLE vector_test (id bigserial PRIMARY KEY, embedding vector(3));"
 )
 TIMESCALEDB_EXTENSION_STATEMENT = "CREATE TABLE test_timescaledb (time TIMESTAMPTZ NOT NULL); SELECT create_hypertable('test_timescaledb', 'time');"
+PG_STAT_STATEMENTS_STATEMENT = (
+    "SELECT query, calls, total_exec_time, rows FROM pg_stat_statements LIMIT 5;"
+)
 
 
 @pytest.mark.abort_on_fail
@@ -160,6 +163,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
+        "plugin-pg-stat-statements-enable": PG_STAT_STATEMENTS_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
