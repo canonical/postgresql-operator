@@ -23,7 +23,7 @@ import psycopg2
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, ProtocolNotFoundError
 from charms.postgresql_k8s.v0.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -37,7 +37,6 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import JujuVersion, main
 from ops.charm import (
     ActionEvent,
@@ -57,6 +56,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
+from ops_tracing import Tracing, set_destination
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
@@ -103,6 +103,7 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER,
@@ -144,24 +145,30 @@ class StorageUnavailableError(Exception):
     """Cannot find storage mountpoint."""
 
 
-@trace_charm(
-    tracing_endpoint="tracing_endpoint",
-    extra_types=(
-        ClusterTopologyObserver,
-        COSAgentProvider,
-        DbProvides,
-        Patroni,
-        PostgreSQL,
-        PostgreSQLAsyncReplication,
-        PostgreSQLBackups,
-        PostgreSQLLDAP,
-        PostgreSQLProvider,
-        PostgreSQLTLS,
-        TLSTransfer,
-        PostgreSQLUpgrade,
-        RollingOpsManager,
-    ),
-)
+def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
+    """Utility function to set tracing destination."""
+    if not endpoint_requirer.is_ready():
+        return
+
+    try:
+        if not (endpoint := endpoint_requirer.get_tracing_endpoint(TRACING_PROTOCOL)):
+            return
+    except ProtocolNotFoundError:
+        logger.warning(
+            "Endpoint for tracing wasn't provided as tracing backend isn't ready yet. If grafana-agent isn't connected to a tracing backend, integrate it. Otherwise this issue should resolve itself in a few events."
+        )
+        return
+
+    endpoint = f"{endpoint}/v1/traces"
+
+    if endpoint.startswith("https://"):
+        # if endpoint is https BUT we don't have a server_cert yet:
+        # disable charm tracing until we do to prevent tls errors
+        logger.warning("Cannot send traces to an https endpoint without a certificate.")
+        return
+    set_destination(endpoint, None)
+
+
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -254,7 +261,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
+        charm_tracing_config(self._grafana_agent)
 
     def _on_databases_change(self, _):
         """Handle databases change event."""

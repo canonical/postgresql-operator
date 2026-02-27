@@ -88,6 +88,7 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
 )
 
 TRACING_PROTOCOL = "otlp_http"
+TRACING_RELATION_NAME = "tracing"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
