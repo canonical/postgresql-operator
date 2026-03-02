@@ -1074,7 +1074,11 @@ def switchover(
             logger.info(f"Cluster status: {cluster}")
             assert response.status_code == 200
             standbys = len([
-                member for member in cluster["members"] if member["role"] == "sync_standby"
+                member
+                for member in cluster["members"]
+                if member["role"] == "sync_standby"
+                # Old primary hasn't caught up yet
+                or (member["role"] == "replica" and member["state"] == "starting")
             ])
             assert standbys == len(ops_test.model.applications[app_name].units) - 1
 
