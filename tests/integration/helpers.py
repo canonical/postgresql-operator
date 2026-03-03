@@ -1070,9 +1070,15 @@ def switchover(
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
+            cluster = response.json()
+            logger.info(f"Cluster status: {cluster}")
             assert response.status_code == 200
             standbys = len([
-                member for member in response.json()["members"] if member["role"] == "sync_standby"
+                member
+                for member in cluster["members"]
+                if member["role"] == "sync_standby"
+                # Old primary hasn't caught up yet
+                or (member["role"] == "replica" and member["state"] == "starting")
             ])
             assert standbys == len(ops_test.model.applications[app_name].units) - 1
 
