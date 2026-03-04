@@ -47,7 +47,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
                 base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
             )
 
     if wait_for_apps:
