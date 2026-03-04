@@ -10,12 +10,13 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 The table below shows information for all minor releases of Charmed PostgreSQL 14.
 
-| Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
+| Revision</br>(`amd`,`arm`) | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| [986], [987] | 14.20 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
-| [935], [936] | 14.19 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
-| [552], [553] | 14.15 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
-| [467], [468] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [1045], [1044] | 14.20 | `3.6.14+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [987], [986] | 14.20 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [936], [935] | 14.19 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [553], [552] | 14.15 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [468], [467] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [429], [430] | 14.11 | `3.4.2+` | ![check] | ![check] | ![check] | ![check] |  |
 | [363] | 14.10 | `3.4.2+` | ![check] | ![check] | ![check] | ![check] |  |
 | [351] | 14.9 | `3.1.6+` |  | ![check] | ![check] |  |  |
@@ -41,19 +42,13 @@ If you deploy with the `--revision` flag, **you must make sure the revision matc
 Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
 ```
 
-### Latest release: 986, 987
-
-| Revision | amd64 | arm64 |  Snap revision |
-|:--------:|:-----:|:-----:|:-----:|
-| [986]    |         |![check] | 243 |
-| [987]    | ![check]|         | 245 |
-
-
 <details>
 <summary>Older releases</summary>
 
 | Revision | amd64 | arm64 |  Snap revision |
 |:--------:|:-----:|:-----:|:--------------:|
+|[986] |          |![check]  | 243 |
+|[987] | ![check] |          | 245 |
 |[935] |          |![check]  | 230 |
 |[936] | ![check] |          | 229 |
 |[553] | ![check] |          | 143 |
@@ -74,6 +69,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
 
 <!-- LINKS-->
+[1044]: https://github.com/canonical/postgresql-operator/releases/tag/rev1044
+[1045]: https://github.com/canonical/postgresql-operator/releases/tag/rev1044
 
 [986]: https://github.com/canonical/postgresql-operator/releases/tag/rev986
 [987]: https://github.com/canonical/postgresql-operator/releases/tag/rev986
