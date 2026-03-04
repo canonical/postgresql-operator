@@ -737,6 +737,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
+        # Update the async replication data with the current unit IP.
+        self.async_replication.update_async_replication_data()
+
         # Should not override a blocked status
         if isinstance(self.unit.status, BlockedStatus):
             logger.debug("on_peer_relation_changed early exit: Unit in blocked status")
@@ -857,6 +860,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
+            # Update the async replication data with the new unit IP.
+            self.async_replication.update_async_replication_data()
             self._patroni.stop_patroni()
             self._update_certificate()
             return True
@@ -953,7 +958,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
-            self._peer_members_ips,
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
@@ -1331,6 +1335,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        # Update the async replication data with the current unit IP.
+        self.async_replication.update_async_replication_data()
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 

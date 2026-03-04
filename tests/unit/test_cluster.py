@@ -75,20 +75,24 @@ def harness():
 
 @pytest.fixture(autouse=True)
 def patroni(harness, peers_ips):
-    patroni = Patroni(
-        harness.charm,
-        "1.1.1.1",
-        "postgresql",
-        "postgresql-0",
-        1,
-        peers_ips,
-        "fake-superuser-password",
-        "fake-replication-password",
-        "fake-rewind-password",
-        "fake-raft-password",
-        "fake-patroni-password",
-    )
-    yield patroni
+    with patch(
+        "charm.PostgresqlOperatorCharm._peer_members_ips",
+        new_callable=PropertyMock,
+        return_value=peers_ips,
+    ):
+        patroni = Patroni(
+            harness.charm,
+            "1.1.1.1",
+            "postgresql",
+            "postgresql-0",
+            1,
+            "fake-superuser-password",
+            "fake-replication-password",
+            "fake-rewind-password",
+            "fake-raft-password",
+            "fake-patroni-password",
+        )
+        yield patroni
 
 
 def test_get_member_ip(peers_ips, patroni):
