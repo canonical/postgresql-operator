@@ -98,4 +98,6 @@ PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
 
 SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
 
+TRACING_RELATION_NAME = "tracing"
+
 PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"

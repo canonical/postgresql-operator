@@ -9,7 +9,6 @@ from unittest.mock import PropertyMock
 import pytest
 import tomli
 import tomli_w
-from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 
 
 # This causes every test defined in this file to run 2 times, each with
@@ -17,12 +16,6 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 @pytest.fixture(autouse=True)
 def _has_secrets(request, monkeypatch):
     monkeypatch.setattr("ops.JujuVersion.has_secrets", PropertyMock(return_value=True))
-
-
-@pytest.fixture(autouse=True)
-def disable_charm_tracing():
-    with charm_tracing_disabled():
-        yield
 
 
 class _MockRefresh:
