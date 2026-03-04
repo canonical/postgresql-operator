@@ -57,8 +57,8 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
-                base=CHARM_BASE,
                 channel="latest/edge",
+                series="jammy",
                 config={"extra_user_roles": "CREATEDB,CREATEROLE"},
             ),
             ops_test.model.deploy(
