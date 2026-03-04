@@ -36,7 +36,7 @@ def test_deploy_stable(juju: Juju) -> None:
     juju.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_NAME,
-        base="ubuntu@22.04",
+        base="ubuntu@24.04",
         channel="latest/edge",
         num_units=1,
     )

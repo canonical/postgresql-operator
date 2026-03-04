@@ -54,7 +54,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
-                base=CHARM_BASE,
+                base="ubuntu@24.04",
                 channel="latest/edge",
             ),
             ops_test.model.deploy(
