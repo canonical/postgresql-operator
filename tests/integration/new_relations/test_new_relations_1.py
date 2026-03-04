@@ -22,10 +22,7 @@ from ..helpers import (
     start_machine,
     stop_machine,
 )
-from .helpers import (
-    build_connection_string,
-    get_application_relation_data,
-)
+from .helpers import build_connection_string, get_application_relation_data
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +51,8 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
-                base="ubuntu@24.04",
                 channel="latest/edge",
+                series="noble",
             ),
             ops_test.model.deploy(
                 charm,
