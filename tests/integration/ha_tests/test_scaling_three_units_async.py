@@ -47,8 +47,8 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
-                base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
+                series="noble",
             ),
         )
 

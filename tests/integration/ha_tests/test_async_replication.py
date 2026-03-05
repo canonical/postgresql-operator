@@ -127,10 +127,18 @@ async def test_deploy_async_replication_setup(
             config={"profile": "testing"},
         )
     await ops_test.model.deploy(
-        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+        APPLICATION_NAME,
+        channel="latest/edge",
+        num_units=1,
+        series="jammy",
+        config={"sleep_interval": 1000},
     )
     await second_model.deploy(
-        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+        APPLICATION_NAME,
+        channel="latest/edge",
+        num_units=1,
+        series="jammy",
+        config={"sleep_interval": 1000},
     )
 
     async with ops_test.fast_forward(), fast_forward(second_model):
