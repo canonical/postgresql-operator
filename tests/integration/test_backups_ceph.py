@@ -4,8 +4,8 @@
 import logging
 
 import pytest
-from pytest_operator.plugin import OpsTest
 
+from .adapters import JujuFixture
 from .backup_helpers import backup_operations
 from .conftest import ConnectionInformation
 
@@ -37,10 +37,10 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
+def test_backup_ceph(juju: JujuFixture, cloud_configs, cloud_credentials, charm) -> None:
     """Build and deploy two units of PostgreSQL in microceph, test backup and restore actions."""
-    await backup_operations(
-        ops_test,
+    backup_operations(
+        juju,
         S3_INTEGRATOR_APP_NAME,
         None,
         None,

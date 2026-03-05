@@ -9,11 +9,11 @@ import subprocess
 import uuid
 
 import boto3
-import jubilant
 import pytest
 from pytest_operator.plugin import OpsTest
 
 from . import architecture
+from .adapters import JujuFixture, temp_model_fixture
 from .helpers import construct_endpoint
 from .jubilant_helpers import RoleAttributeValue
 
@@ -74,7 +74,7 @@ def cleanup_cloud(config: dict[str, str], credentials: dict[str, str]) -> None:
 
 
 @pytest.fixture(scope="module")
-async def aws_cloud_configs(ops_test: OpsTest) -> None:
+def aws_cloud_configs(ops_test: OpsTest):
     if (
         not os.environ.get("AWS_ACCESS_KEY", "").strip()
         or not os.environ.get("AWS_SECRET_KEY", "").strip()
@@ -89,7 +89,7 @@ async def aws_cloud_configs(ops_test: OpsTest) -> None:
 
 
 @pytest.fixture(scope="module")
-async def gcp_cloud_configs(ops_test: OpsTest) -> None:
+def gcp_cloud_configs(ops_test: OpsTest):
     if (
         not os.environ.get("GCP_ACCESS_KEY", "").strip()
         or not os.environ.get("GCP_SECRET_KEY", "").strip()
@@ -113,10 +113,10 @@ def juju(request: pytest.FixtureRequest):
     keep_models = bool(request.config.getoption("--keep-models"))
 
     if model:
-        juju = jubilant.Juju(model=model)
+        juju = JujuFixture(model=model)
         yield juju
     else:
-        with jubilant.temp_model(keep=keep_models) as juju:
+        with temp_model_fixture(keep=keep_models) as juju:
             yield juju
 
 
