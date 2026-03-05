@@ -400,9 +400,10 @@ class ModelAdapter:
 
         error_func = any_error if raise_on_error else None
         delay = check_freq if check_freq else self._delay
+        _apps = apps if apps else list(self._juju.status().apps)
 
         self._juju.wait(
-            lambda juju_status: wait_func(juju_status, *apps),
+            lambda juju_status: wait_func(juju_status, *_apps),
             error=error_func,
             delay=delay,
             timeout=timeout,
