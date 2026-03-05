@@ -137,7 +137,7 @@ async def app_name(
         if (
             application_name in charm_name
             and APPLICATION_NAME not in charm_name
-            and "postgresql-watcher" not in charm_name
+            and "watcher" not in app
         ):
             return app
 

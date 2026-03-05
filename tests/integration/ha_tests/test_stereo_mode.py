@@ -162,38 +162,17 @@ async def verify_raft_cluster_health(
     logger.info("Raft cluster health verified successfully")
 
 
-WATCHER_APP_NAME = "postgresql-watcher"
-
-
-@pytest.fixture(scope="session")
-def watcher_charm():
-    """Return path to the watcher charm, building it if necessary."""
-    watcher_dir = Path("./postgresql-watcher")
-    charm_path = watcher_dir / f"postgresql-watcher_ubuntu@24.04-{architecture.architecture}.charm"
-
-    if not charm_path.exists():
-        logger.info(f"Watcher charm not found at {charm_path}, building...")
-        subprocess.run(
-            ["charmcraft", "pack", "-v"],
-            cwd=watcher_dir,
-            check=True,
-        )
-
-    if not charm_path.exists():
-        raise FileNotFoundError(f"Failed to build watcher charm at {charm_path}")
-
-    # Return path with "./" prefix so python-libjuju recognizes it as a local charm
-    return f"./{charm_path}"
+WATCHER_APP_NAME = "pg-watcher"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_charm) -> None:
+async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
     """Build and deploy PostgreSQL in stereo mode with watcher.
 
-    Deploys 2 PostgreSQL units simultaneously along with the watcher,
+    Deploys 2 PostgreSQL units and a watcher (same charm, role=watcher),
     then relates them to form a 3-node Raft cluster for quorum.
     """
-    logger.info(f"DEBUG: charm={charm!r}, watcher_charm={watcher_charm!r}")
+    logger.info(f"DEBUG: charm={charm!r}")
 
     # Check if PostgreSQL is already deployed (e.g., from a previous test run)
     # If so, verify it's in the expected state or skip deployment
@@ -224,12 +203,14 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
             base=CHARM_BASE,
             config={"profile": "testing"},
         )
-        logger.info("Deploying watcher charm...")
+        # Deploy watcher using the same charm with role=watcher
+        logger.info("Deploying watcher (same charm, role=watcher)...")
         await ops_test.model.deploy(
-            watcher_charm,
+            charm,
             application_name=WATCHER_APP_NAME,
             num_units=1,
             base=CHARM_BASE,
+            config={"role": "watcher"},
         )
         logger.info("Deploying test application...")
         await ops_test.model.deploy(
@@ -246,10 +227,10 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm, watcher_ch
             raise_on_error=False,  # Watcher may be waiting for relation
         )
 
-        # Relate PostgreSQL to watcher
+        # Relate PostgreSQL (watcher-offer) to watcher (watcher)
         logger.info("Relating PostgreSQL to watcher")
         await ops_test.model.integrate(
-            f"{DATABASE_APP_NAME}:watcher", f"{WATCHER_APP_NAME}:watcher"
+            f"{DATABASE_APP_NAME}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
         )
 
         # Wait for watcher to join Raft cluster

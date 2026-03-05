@@ -44,12 +44,16 @@ provides:
   cos-agent:
     interface: cos_agent
     limit: 1
-  watcher:
+  watcher-offer:
     interface: postgresql_watcher
     limit: 1
     optional: true
 
 requires:
+  watcher:
+    interface: postgresql_watcher
+    limit: 1
+    optional: true
   replication:
     interface: postgresql_async
     limit: 1

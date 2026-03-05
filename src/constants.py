@@ -83,6 +83,7 @@ SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 TRACING_PROTOCOL = "otlp_http"
 
 # Watcher constants
+WATCHER_OFFER_RELATION = "watcher-offer"
 WATCHER_RELATION = "watcher"
 WATCHER_USER = "watcher"
 WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105

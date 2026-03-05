@@ -135,6 +135,7 @@ from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.tls_transfer import TLSTransfer
 from relations.watcher import PostgreSQLWatcherRelation
+from relations.watcher_requirer import WatcherRequirerHandler
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -299,6 +300,64 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
+        self._role = self.model.config.get("role", "postgresql")
+
+        # Watcher mode: lightweight Raft witness, no PostgreSQL
+        if self._role == "watcher":
+            self._init_watcher_mode()
+            return
+
+        # PostgreSQL mode: full database server
+        self._init_postgresql_mode()
+
+    @property
+    def is_watcher_role(self) -> bool:
+        """Return True if this charm is deployed in watcher mode."""
+        return self._role == "watcher"
+
+    def _validate_role_unchanged(self) -> bool:
+        """Validate that the role has not changed since initial deployment.
+
+        Persists the role to the peer databag on first leader election and checks
+        for changes on config-changed. Returns True if valid, False if blocked.
+        """
+        if not self._peers:
+            return True
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None:
+            # First time — persist the role (leader only)
+            if self.unit.is_leader():
+                self._peers.data[self.app]["role"] = self._role
+            return True
+        if stored_role != self._role:
+            logger.error(
+                f"Role change is not supported. Deployed as '{stored_role}', "
+                f"but config now says '{self._role}'."
+            )
+            self.unit.status = BlockedStatus(
+                f"role change not supported (deployed as '{stored_role}')"
+            )
+            return False
+        return True
+
+    def _init_watcher_mode(self):
+        """Initialize the charm in watcher mode (lightweight Raft witness)."""
+        self.watcher_requirer = WatcherRequirerHandler(self)
+        # Watcher mode delegates all event handling to WatcherRequirerHandler.
+        # We still observe leader_elected to persist the role in peer data.
+        self.framework.observe(self.on.leader_elected, self._on_watcher_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_watcher_config_changed)
+
+    def _on_watcher_leader_elected(self, event):
+        """Persist the role in peer data on first leader election (watcher mode)."""
+        self._validate_role_unchanged()
+
+    def _on_watcher_config_changed(self, event):
+        """Block if role was changed after deployment (watcher mode)."""
+        self._validate_role_unchanged()
+
+    def _init_postgresql_mode(self):
+        """Initialize the charm in postgresql mode (full database server)."""
         self.peer_relation_app = DataPeerData(
             self.model,
             relation_name=PEER,
@@ -344,7 +403,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.watcher = PostgreSQLWatcherRelation(self)
+        self.watcher_offer = PostgreSQLWatcherRelation(self)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -990,7 +1049,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
         # A new member may be running but not registered if it was added to Raft after starting.
         if (
-            self.watcher.is_watcher_connected
+            self.watcher_offer.is_watcher_connected
             and not self._patroni.is_member_registered_in_cluster()
         ):
             logger.info("Member running but not registered in Raft cluster - restarting Patroni")
@@ -1006,7 +1065,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update watcher relation with fresh peer IPs when peer data changes
         # This ensures pg-endpoints stay current when unit IPs change
         if self.unit.is_leader():
-            self.watcher.update_endpoints()
+            self.watcher_offer.update_endpoints()
 
         self._update_new_unit_status()
 
@@ -1075,7 +1134,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
             # Update watcher relation with current cluster endpoints
-            self.watcher.update_endpoints()
+            self.watcher_offer.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
@@ -1153,9 +1212,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except Exception as e:
                 logger.warning(f"Failed to update config after IP change: {e}")
             # Update watcher relation - unit address for all units, endpoints only for leader
-            self.watcher.update_unit_address()
+            self.watcher_offer.update_unit_address()
             if self.unit.is_leader():
-                self.watcher.update_endpoints()
+                self.watcher_offer.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -1473,6 +1532,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:  # noqa: C901
         """Handle the leader-elected event."""
+        # Persist and validate role
+        if not self._validate_role_unchanged():
+            return
+
         # consider configured system user passwords
         system_user_passwords = {}
         if admin_secret_id := self.config.system_users:
@@ -1538,6 +1601,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_config_changed(self, event) -> None:  # noqa: C901
         """Handle configuration changes, like enabling plugins."""
+        # Block if role was changed after deployment
+        if not self._validate_role_unchanged():
+            return
+
         if not self._peers:
             # update endpoint addresses
             logger.debug("Defer on_config_changed: no peer relation")
@@ -2077,7 +2144,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.start_observer()
 
         # Ensure watcher is in Raft cluster (handles cases where relation events weren't delivered)
-        self.watcher.ensure_watcher_in_raft()
+        self.watcher_offer.ensure_watcher_in_raft()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()

@@ -29,7 +29,7 @@ from constants import (
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
     WATCHER_PASSWORD_KEY,
-    WATCHER_RELATION,
+    WATCHER_OFFER_RELATION,
     WATCHER_SECRET_LABEL,
     WATCHER_USER,
 )
@@ -50,30 +50,30 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             charm: The PostgreSQL operator charm instance.
         """
-        super().__init__(charm, WATCHER_RELATION)
+        super().__init__(charm, WATCHER_OFFER_RELATION)
         self.charm = charm
 
         self.framework.observe(
-            self.charm.on[WATCHER_RELATION].relation_joined,
+            self.charm.on[WATCHER_OFFER_RELATION].relation_joined,
             self._on_watcher_relation_joined,
         )
         self.framework.observe(
-            self.charm.on[WATCHER_RELATION].relation_changed,
+            self.charm.on[WATCHER_OFFER_RELATION].relation_changed,
             self._on_watcher_relation_changed,
         )
         self.framework.observe(
-            self.charm.on[WATCHER_RELATION].relation_departed,
+            self.charm.on[WATCHER_OFFER_RELATION].relation_departed,
             self._on_watcher_relation_departed,
         )
         self.framework.observe(
-            self.charm.on[WATCHER_RELATION].relation_broken,
+            self.charm.on[WATCHER_OFFER_RELATION].relation_broken,
             self._on_watcher_relation_broken,
         )
 
     @property
     def _relation(self) -> Relation | None:
         """Return the watcher relation if it exists."""
-        return self.model.get_relation(WATCHER_RELATION)
+        return self.model.get_relation(WATCHER_OFFER_RELATION)
 
     @property
     def watcher_address(self) -> str | None:
