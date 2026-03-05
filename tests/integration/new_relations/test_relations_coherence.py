@@ -18,7 +18,6 @@ from .test_new_relations_1 import DATA_INTEGRATOR_APP_NAME
 
 logger = logging.getLogger(__name__)
 
-APPLICATION_APP_NAME = "postgresql-test-app"
 APP_NAMES = [DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME]
 FIRST_DATABASE_RELATION_NAME = "database"
 

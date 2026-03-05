@@ -39,9 +39,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         config={"profile": "testing"},
     )
     await ops_test.model.deploy(
-        APPLICATION_NAME,
-        num_units=1,
-        channel="latest/edge",
+        APPLICATION_NAME, num_units=1, channel="latest/edge", series="jammy"
     )
     await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
     logger.info("Wait for applications to become active")

@@ -63,9 +63,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
             channel="14/stable",
         )
     await ops_test.model.deploy(
-        APPLICATION_NAME,
-        num_units=1,
-        channel="latest/edge",
+        APPLICATION_NAME, num_units=1, channel="latest/edge", series="jammy"
     )
     await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
     logger.info("Wait for applications to become active")
