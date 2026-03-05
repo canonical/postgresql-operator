@@ -305,6 +305,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Watcher mode: lightweight Raft witness, no PostgreSQL
         if self._role == "watcher":
             self._init_watcher_mode()
+            # Set tracing_endpoint for @trace_charm decorator compatibility
+            self.tracing_endpoint = None
             return
 
         # PostgreSQL mode: full database server
