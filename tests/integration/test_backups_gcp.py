@@ -11,7 +11,6 @@ from .adapters import JujuFixture
 from .backup_helpers import backup_operations
 from .conftest import GCP
 from .jubilant_helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     db_connect,
     get_password,
@@ -65,13 +64,11 @@ def test_restore_on_new_cluster(
     juju.ext.model.deploy(
         charm,
         application_name=previous_database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
     juju.ext.model.deploy(
         charm,
         application_name=database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
     juju.ext.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)

@@ -8,7 +8,16 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
-from jubilant import ConfigValue, Juju, Status, Task, all_active, all_agents_idle, any_error
+from jubilant import (
+    ConfigValue,
+    Juju,
+    Status,
+    Task,
+    TaskError,
+    all_active,
+    all_agents_idle,
+    any_error,
+)
 from jubilant.statustypes import UnitStatus
 
 TDevices = Any
@@ -65,8 +74,9 @@ def all_active_idle(status: Status, *apps: str):
 class ActionAdapter:
     """Action model adapter for libjuju."""
 
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, failed: bool = False):
         self.task = task
+        self.status = "failed" if failed else "succeeded"
         self.results = task.results
 
     def wait(self):
@@ -89,8 +99,13 @@ class UnitAdapter:
 
     def run_action(self, action_name: str, **params):
         """Run an action on this unit."""
-        task = self._juju.run(self.name, action=action_name, params=dict(params))
-        return ActionAdapter(task)
+        failed = False
+        try:
+            task = self._juju.run(self.name, action=action_name, params=dict(params))
+        except TaskError as e:
+            task = e.task
+            failed = True
+        return ActionAdapter(task, failed=failed)
 
     def show(self) -> ShowUnitOutput:
         """Return the parsed `show-unit` command."""
