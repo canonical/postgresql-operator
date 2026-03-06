@@ -33,7 +33,7 @@ from tenacity import (
 
 from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
-CHARM_BASE = "ubuntu@22.04"
+CHARM_BASE = "ubuntu@24.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]

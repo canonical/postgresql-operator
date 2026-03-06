@@ -228,10 +228,17 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
         )
 
         # Relate PostgreSQL (watcher-offer) to watcher (watcher)
+        # The relation may already exist if deploying into a model with prior state
         logger.info("Relating PostgreSQL to watcher")
-        await ops_test.model.integrate(
-            f"{DATABASE_APP_NAME}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
-        )
+        try:
+            await ops_test.model.integrate(
+                f"{DATABASE_APP_NAME}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
+            )
+        except Exception as e:
+            if "already exists" in str(e) or "relation" in str(e).lower():
+                logger.info(f"Watcher relation already exists: {e}")
+            else:
+                raise
 
         # Wait for watcher to join Raft cluster
         await ops_test.model.wait_for_idle(
@@ -241,7 +248,13 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
         )
 
         # Relate PostgreSQL to test app
-        await ops_test.model.integrate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
+        try:
+            await ops_test.model.integrate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
+        except Exception as e:
+            if "already exists" in str(e) or "relation" in str(e).lower():
+                logger.info(f"Database relation already exists: {e}")
+            else:
+                raise
 
         await ops_test.model.wait_for_idle(status="active", timeout=1800)
 
