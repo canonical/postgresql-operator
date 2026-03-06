@@ -933,6 +933,15 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
 
+        # Test early exit when IP change is detected.
+        harness.charm.unit.status = ActiveStatus()
+        with patch(
+            "charm.PostgresqlOperatorCharm._update_member_ip", return_value=True
+        ) as _update_member_ip:
+            harness.charm.on.update_status.emit()
+            _update_member_ip.assert_called_once()
+            _set_primary_status_message.assert_not_called()
+
         # Test the point-in-time-recovery fail.
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -1716,6 +1725,7 @@ def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
             "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
         ) as _update_async_replication_data,
@@ -1736,6 +1746,7 @@ def test_update_member_ip(harness):
         _stop_patroni.assert_not_called()
         _update_certificate.assert_not_called()
         _update_async_replication_data.assert_not_called()
+        _update_config.assert_not_called()
 
         # Test when the IP address of the unit has changed.
         with harness.hooks_disabled():
@@ -1753,6 +1764,30 @@ def test_update_member_ip(harness):
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
         _update_async_replication_data.assert_called_once()
+        _update_config.assert_called_once()
+
+        # Test that ip-to-remove is preserved while the old IP is still in members_ips
+        # (prevents race where the leader hasn't processed the removal yet).
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"members_ips": '["192.0.2.0", "2.2.2.2"]'},
+            )
+        assert not harness.charm._update_member_ip()
+        relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert relation_data.get("ip-to-remove") == "2.2.2.2"
+
+        # Test that ip-to-remove is cleared once the leader has removed the old IP.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"members_ips": '["192.0.2.0"]'},
+            )
+        assert not harness.charm._update_member_ip()
+        relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert relation_data.get("ip-to-remove") is None
 
 
 def test_push_tls_files_to_workload(harness, only_without_juju_secrets):

@@ -9,6 +9,7 @@ import logging
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -863,10 +864,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Update the async replication data with the new unit IP.
             self.async_replication.update_async_replication_data()
             self._patroni.stop_patroni()
+            # Clear stale Raft data so the unit can rejoin the Raft cluster
+            # with its new IP. Without this, local Raft state references the
+            # old IP and Patroni fails with "Updating member state failed".
+            raft_path = Path(f"{PATRONI_CONF_PATH}/raft")
+            if raft_path.exists() and raft_path.is_dir():
+                shutil.rmtree(raft_path)
             self._update_certificate()
+            # Re-render config with the new IP so that when Patroni restarts
+            # (by any hook), it binds to the correct address. Without this,
+            # an update-status hook could restart Patroni with the stale config.
+            self.update_config()
             return True
         else:
-            self.unit_peer_data.update({"ip-to-remove": ""})
+            # Only clear ip-to-remove after the leader has processed it
+            # (removed the old IP from members_ips). This prevents a race
+            # where the leader sees an empty ip-to-remove and skips cleanup.
+            ip_to_remove = self.unit_peer_data.get("ip-to-remove")
+            if not ip_to_remove or ip_to_remove not in self.members_ips:
+                self.unit_peer_data.update({"ip-to-remove": ""})
             return False
 
     def _add_members(self, event):
@@ -1669,6 +1685,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
         if not self._can_run_on_update_status():
+            return
+
+        # Safety net: detect IP changes in case config-changed didn't process them
+        # (e.g., if the hook errored before reaching _update_member_ip).
+        if self._update_member_ip():
             return
 
         if (
