@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -29,9 +29,8 @@ import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, ProtocolNotFoundError
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 from ops import (
@@ -56,6 +55,7 @@ from ops import (
     WaitingStatus,
     main,
 )
+from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -126,6 +126,7 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER_PASSWORD_KEY,
@@ -252,22 +253,30 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         self._charm._post_snap_refresh(refresh)
 
 
-@trace_charm(
-    tracing_endpoint="tracing_endpoint",
-    extra_types=(
-        ClusterTopologyObserver,
-        COSAgentProvider,
-        Patroni,
-        PostgreSQL,
-        PostgreSQLAsyncReplication,
-        PostgreSQLBackups,
-        PostgreSQLLDAP,
-        PostgreSQLProvider,
-        TLS,
-        TLSTransfer,
-        RollingOpsManager,
-    ),
-)
+def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
+    """Utility function to set tracing destination."""
+    if not endpoint_requirer.is_ready():
+        return
+
+    try:
+        if not (endpoint := endpoint_requirer.get_tracing_endpoint(TRACING_PROTOCOL)):
+            return
+    except ProtocolNotFoundError:
+        logger.warning(
+            "Endpoint for tracing wasn't provided as tracing backend isn't ready yet. If grafana-agent isn't connected to a tracing backend, integrate it. Otherwise this issue should resolve itself in a few events."
+        )
+        return
+
+    endpoint = f"{endpoint}/v1/traces"
+
+    if endpoint.startswith("https://"):
+        # if endpoint is https BUT we don't have a server_cert yet:
+        # disable charm tracing until we do to prevent tls errors
+        logger.warning("Cannot send traces to an https endpoint without a certificate.")
+        return
+    set_destination(endpoint, None)
+
+
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -277,7 +286,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Override data_models.py TypedCharmBase config
     @cached_property
-    def config(self):
+    def config(self) -> CharmConfig:
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
             # Prefer value of option name with dash (-) and fallback to name with underscore (_)
@@ -286,7 +295,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             for config_option in self.config_type.keys()  # noqa: SIM118
         }
-        config = {
+        config: dict[str, Any] = {
             config_option: value for config_option, value in config.items() if value is not None
         }
         return self.config_type(**config)
@@ -393,7 +402,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
+        charm_tracing_config(self._grafana_agent)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
@@ -2853,7 +2863,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def generate_config_hash(self) -> str:
         """Generate current configuration hash."""
-        return shake_128(str(self.config.dict()).encode()).hexdigest(16)
+        return shake_128(str(self.config.model_dump()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
