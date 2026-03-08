@@ -494,6 +494,8 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     primary = self.get_primary()
+                    if primary is None and (standby_leader := self.get_standby_leader()):
+                        primary = standby_leader
                     if not primary:
                         logger.debug("Failed replication check no primary reported")
                         raise Exception
