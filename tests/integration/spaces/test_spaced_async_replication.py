@@ -137,7 +137,7 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     model_1.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_1,
-        base="ubuntu@22.04",
+        base="ubuntu@24.04",
         channel="latest/edge",
         num_units=1,
         constraints=constraints,
@@ -146,7 +146,7 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     model_2.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_2,
-        base="ubuntu@22.04",
+        base="ubuntu@24.04",
         channel="latest/edge",
         num_units=1,
         constraints=constraints,
