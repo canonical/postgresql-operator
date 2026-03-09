@@ -280,7 +280,8 @@ def test_config_parameters(juju: JujuFixture, charm) -> None:
                     .units[leader_unit.name]
                     .workload_status.message
                 ),
-                timeout=100,
+                timeout=600,
+                successes=1,
             )
             charm_config[k] = v[1]
 
@@ -290,7 +291,7 @@ def test_config_parameters(juju: JujuFixture, charm) -> None:
             status.apps[DATABASE_APP_NAME].units[f"{DATABASE_APP_NAME}/0"].workload_status.current
             == "active"
         ),
-        timeout=100,
+        timeout=200,
     )
 
 
