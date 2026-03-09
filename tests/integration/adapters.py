@@ -311,6 +311,10 @@ class ModelAdapter:
             (not available on k8s models)
         """
         _overlays = list(overlays) if overlays else []
+        # For compatibility with libjuju num_units=0 for subordinate charms
+        kwargs = {}
+        if num_units > 0:
+            kwargs = {"num_units": num_units}
         self._juju.deploy(
             entity_url,
             app=application_name,
@@ -321,13 +325,13 @@ class ModelAdapter:
             config=config,
             constraints=constraints,
             force=force,
-            num_units=num_units,
             overlays=_overlays,
             resources=resources,
             revision=revision,
             storage=storage,
             to=to,
             trust=trust,
+            **kwargs,
         )
 
     def destroy_unit(

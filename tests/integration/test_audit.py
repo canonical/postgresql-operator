@@ -13,7 +13,7 @@ from .jubilant_helpers import (
     DATABASE_APP_NAME,
     run_command_on_unit,
 )
-from .new_relations.helpers import build_connection_string
+from .new_relations.jubilant_helpers import build_connection_string
 
 logger = logging.getLogger(__name__)
 
