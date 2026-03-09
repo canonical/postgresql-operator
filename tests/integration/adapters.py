@@ -6,7 +6,7 @@ from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any
+from typing import Any, TypedDict
 
 from jubilant import (
     ConfigValue,
@@ -20,17 +20,30 @@ from jubilant import (
 )
 from jubilant.statustypes import UnitStatus
 
-TDevices = Any
-TConstraints = Any
-ShowUnitOutput = dict
-
-
 logger = logging.getLogger(__name__)
 
 
-def _unit_name_to_app(name: str) -> str:
-    """Convert unit name to app name."""
-    return name.split("/")[0]
+TConstraints = Any
+TDevices = Any
+ShowUnitOutput = dict
+
+
+class TStorageInfo(TypedDict):
+    """JSON type of Storage returned by `juju list-storage`."""
+
+    key: str
+    attachments: dict[str, dict]
+    kind: str
+    life: str
+    persistent: bool
+
+
+@dataclass
+class RequiresInfo:
+    """Data model for requires info of a relation."""
+
+    application_name: str
+    name: str
 
 
 @dataclass
@@ -44,9 +57,24 @@ class RelationInfo:
 
     @property
     def is_peer(self) -> bool:
-        """..."""
+        """Is this a peer relation?"""
         apps = {_unit_name_to_app(unit_name) for unit_name in self.raw["related-units"]}
-        return not bool({apps} - {self.app})
+        return not bool(apps - {self.app})
+
+    @property
+    def requires(self) -> RequiresInfo:
+        """Return the requires side info of the relation."""
+        name = self.raw.get("related-endpoint", "")
+        app = ""
+        if related_units := self.raw.get("related-units", {}):
+            app = _unit_name_to_app(next(iter(related_units)))
+
+        return RequiresInfo(name=name, application_name=app)
+
+
+def _unit_name_to_app(name: str) -> str:
+    """Convert unit name to app name."""
+    return name.split("/")[0]
 
 
 def all_statuses_are(expected: str, status: Status, apps: Iterable[str]) -> bool:
@@ -133,6 +161,11 @@ class UnitAdapter:
         """Unit public address."""
         return self.status.public_address
 
+    @property
+    def workload_status(self) -> str:
+        """Return workload status."""
+        return self.status.workload_status.current
+
 
 class ApplicationAdapter:
     """Application model adapter for libjuju."""
@@ -170,9 +203,9 @@ class ApplicationAdapter:
         self._juju.config(self.name, values=config)
 
     @property
-    def relations(self) -> dict[int, RelationInfo]:
+    def relations(self) -> list[RelationInfo]:
         """Application relations."""
-        return ModelAdapter.get_relations(self.units.values())
+        return ModelAdapter.get_relations(self.units).values()
 
     @property
     def units(self) -> list[UnitAdapter]:
@@ -185,7 +218,7 @@ class ApplicationAdapter:
 
 
 class ModelAdapter:
-    """..."""
+    """Adapter for libjuju `Model` objects."""
 
     def __init__(self, juju: Juju, wait_delay: float = 3.0):
         self._juju = juju
@@ -303,6 +336,16 @@ class ModelAdapter:
         """Destroy units by name."""
         self._juju.remove_unit(unit_id, destroy_storage=destroy_storage, force=force)
 
+    def list_storage(self, filesystem: bool = False, volume: bool = False) -> list[TStorageInfo]:
+        """Lists storage details."""
+        raw = self._juju.cli("list-storage", "--format", "json")
+        json_ = json.loads(raw)
+        ret = []
+        for storage_key, storage_details in json_.get("storage", {}).items():
+            ret.append({"key": storage_key, **storage_details})
+
+        return ret
+
     def relate(self, relation1: str, relation2: str):
         """The relate function is deprecated in favor of integrate.
 
@@ -342,6 +385,10 @@ class ModelAdapter:
             delay=self._delay,
             timeout=timeout,
         )
+
+    def set_config(self, config: Mapping[str, ConfigValue]):
+        """Set configuration options for this application."""
+        self._juju.model_config(values=config)
 
     # TODO: add support for wait_for_... args
     def wait_for_idle(
@@ -427,7 +474,7 @@ class ModelAdapter:
 
     @property
     def applications(self) -> dict[str, ApplicationAdapter]:
-        """..."""
+        """Return a mapping of application name: Application objects."""
         apps = self._juju.status().apps
         return {app: ApplicationAdapter(app, self._juju) for app in apps}
 
@@ -449,7 +496,7 @@ class ModelAdapter:
         """Return a map of relation-id: RelationInfo for all relations currently in the model."""
         ret = {}
         for unit in units:
-            for rel_id, rel_info in unit.relation_info():
+            for rel_id, rel_info in unit.relation_info().items():
                 ret[rel_id] = rel_info
 
         return ret

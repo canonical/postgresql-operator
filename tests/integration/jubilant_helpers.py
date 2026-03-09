@@ -494,7 +494,7 @@ def build_connection_string(
         a PostgreSQL connection string
     """
     unit_name = f"{application_name}/0"
-    raw_data = (juju.cli("show-unit", unit_name))[1]
+    raw_data = juju.cli("show-unit", unit_name)
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
@@ -570,7 +570,7 @@ def check_database_users_existence(
     """
     unit = juju.ext.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = unit.get_public_address()
-    password = get_password(juju)
+    password = get_password()
 
     # Retrieve all users in the database.
     users_in_db = execute_query_on_unit(
@@ -595,7 +595,7 @@ def check_databases_creation(juju: JujuFixture, databases: list[str]) -> None:
         juju: The ops test framework
         databases: List of database names that should have been created
     """
-    password = get_password(juju)
+    password = get_password()
 
     for unit in juju.ext.model.applications[DATABASE_APP_NAME].units:
         unit_address = unit.public_address
@@ -1008,7 +1008,7 @@ def get_landscape_api_credentials(juju: JujuFixture) -> list[str]:
         juju: The ops test framework
     """
     unit = juju.ext.model.applications[DATABASE_APP_NAME].units[0]
-    password = get_password(juju)
+    password = get_password()
     unit_address = unit.get_public_address()
 
     output = execute_query_on_unit(
@@ -1061,7 +1061,7 @@ def get_tls_ca(juju: JujuFixture, unit_name: str, relation: str = "client") -> s
     Returns:
         TLS CA or an empty string if there is no CA.
     """
-    raw_data = (juju.cli("show-unit", unit_name))[1]
+    raw_data = juju.cli("show-unit", unit_name)
     endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
@@ -1162,7 +1162,7 @@ def check_tls(juju: JujuFixture, unit_name: str, enabled: bool) -> bool:
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(juju, unit_name)
-    password = get_password(juju)
+    password = get_password()
     # Get the IP addresses of the other units to check that they
     # are connecting to the primary unit (if unit_name is the
     # primary unit name) using encrypted connections.
@@ -1227,7 +1227,7 @@ def check_tls_replication(juju: JujuFixture, unit_name: str, enabled: bool) -> b
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(juju, unit_name)
-    password = get_password(juju)
+    password = get_password()
 
     # Check for the all replicas using encrypted connection
     output = execute_query_on_unit(
@@ -1346,7 +1346,7 @@ def run_command_on_unit(juju: JujuFixture, unit_name: str, command: str) -> str:
     Returns:
         the command output if it succeeds, otherwise raises an exception.
     """
-    complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
+    complete_command = ["juju", "exec", "--unit", unit_name, "--", *command.split()]
     try:
         stdout = subprocess.check_output(
             " ".join(complete_command), shell=True, universal_newlines=True, stderr=subprocess.PIPE

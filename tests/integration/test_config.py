@@ -4,10 +4,9 @@
 import logging
 
 import pytest as pytest
-from pytest_operator.plugin import OpsTest
 
-from .helpers import (
-    CHARM_BASE,
+from .adapters import JujuFixture
+from .jubilant_helpers import (
     DATABASE_APP_NAME,
     execute_query_on_unit,
     get_leader_unit,
@@ -19,19 +18,18 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_config_parameters(ops_test: OpsTest, charm) -> None:
+def test_config_parameters(juju: JujuFixture, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test config with wrong parameters."""
     # Build and deploy the PostgreSQL charm.
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
+    with juju.ext.fast_forward():
+        juju.ext.model.deploy(
             charm,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
-    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit = get_leader_unit(juju, DATABASE_APP_NAME)
     test_string = "abcXYZ123"
 
     configs = [
@@ -268,30 +266,30 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         for k, v in config.items():
             logger.info(k)
             charm_config[k] = v[0]
-            await ops_test.model.applications[DATABASE_APP_NAME].set_config(charm_config)
-            await ops_test.model.block_until(
+            juju.ext.model.applications[DATABASE_APP_NAME].set_config(charm_config)
+            juju.ext.model.block_until(
                 lambda: (
-                    ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "blocked"
+                    juju.ext.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "blocked"
                 ),
                 timeout=100,
             )
             assert "Configuration Error" in leader_unit.workload_status_message
             charm_config[k] = v[1]
 
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(charm_config)
-    await ops_test.model.block_until(
-        lambda: ops_test.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config(charm_config)
+    juju.ext.model.block_until(
+        lambda: juju.ext.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
         timeout=100,
     )
 
 
 @pytest.mark.abort_on_fail
-async def test_worker_process_configs(ops_test: OpsTest) -> None:
+def test_worker_process_configs(juju: JujuFixture) -> None:
     """Test worker process configuration parameters are applied correctly."""
-    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit = get_leader_unit(juju, DATABASE_APP_NAME)
     leader_unit_name = leader_unit.name
-    password = await get_password(ops_test)
-    unit_address = get_unit_address(ops_test, leader_unit_name)
+    password = get_password()
+    unit_address = get_unit_address(juju, leader_unit_name)
 
     # Test setting explicit numeric values (all values must be >= 2 per validation)
     worker_configs = {
@@ -303,8 +301,8 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
         "cpu-max-parallel-apply-workers-per-subscription": "8",
     }
 
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config(worker_configs)
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     # Verify the configs are applied in PostgreSQL
     # Map charm config names to PostgreSQL parameter names
@@ -319,7 +317,7 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
 
     for config_name, expected_value in worker_configs.items():
         pg_param = config_to_pg_param.get(config_name, config_name.replace("-", "_"))
-        result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
+        result = execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value == expected_value, (
             f"{pg_param}: expected {expected_value}, got {actual_value}"
@@ -335,33 +333,31 @@ async def test_worker_process_configs(ops_test: OpsTest) -> None:
         "cpu-max-parallel-apply-workers-per-subscription": "auto",
     }
 
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config(auto_configs)
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
     # Verify "auto" values are resolved to integers (not the string "auto")
     for config_name in auto_configs:
         pg_param = config_to_pg_param.get(config_name, config_name.replace("-", "_"))
-        result = await execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
+        result = execute_query_on_unit(unit_address, password, f"SHOW {pg_param}")
         actual_value = str(result[0]) if result else ""
         assert actual_value != "auto", f"{pg_param} should be resolved to a number, not 'auto'"
         assert actual_value.isdigit(), f"{pg_param} should be a number, got '{actual_value}'"
 
 
 @pytest.mark.abort_on_fail
-async def test_wal_compression_config(ops_test: OpsTest) -> None:
+def test_wal_compression_config(juju: JujuFixture) -> None:
     """Test wal_compression configuration parameter."""
-    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    leader_unit = get_leader_unit(juju, DATABASE_APP_NAME)
     leader_unit_name = leader_unit.name
-    password = await get_password(ops_test)
-    unit_address = get_unit_address(ops_test, leader_unit_name)
+    password = get_password()
+    unit_address = get_unit_address(juju, leader_unit_name)
 
     # Test enabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "cpu-wal-compression": "true"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"cpu-wal-compression": "true"})
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
-    result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
+    result = execute_query_on_unit(unit_address, password, "SHOW wal_compression")
     # Verify it's a known compression algorithm
     known_algorithms = ["pglz", "lz4", "zstd"]
     assert result[0] in known_algorithms, (
@@ -369,10 +365,8 @@ async def test_wal_compression_config(ops_test: OpsTest) -> None:
     )
 
     # Test disabling WAL compression
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "cpu-wal-compression": "false"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"cpu-wal-compression": "false"})
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=300)
 
-    result = await execute_query_on_unit(unit_address, password, "SHOW wal_compression")
+    result = execute_query_on_unit(unit_address, password, "SHOW wal_compression")
     assert result[0] == "off"
