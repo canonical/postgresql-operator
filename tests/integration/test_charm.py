@@ -161,7 +161,7 @@ def test_settings_are_correct(juju: JujuFixture, unit_id: int):
     logger.warning("Asserting port ranges")
     unit = juju.ext.model.applications[DATABASE_APP_NAME].units[unit_id]
     assert unit.status.open_ports
-    assert unit.status.open_ports[0] == "tcp/5432"
+    assert unit.status.open_ports[0] == "5432/tcp"
 
 
 def test_postgresql_locales(juju: JujuFixture) -> None:

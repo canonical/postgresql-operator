@@ -166,6 +166,11 @@ class UnitAdapter:
         """Return workload status."""
         return self.status.workload_status.current
 
+    @property
+    def workload_status_message(self) -> str:
+        """Return workload status message."""
+        return self.status.workload_status.message
+
 
 class ApplicationAdapter:
     """Application model adapter for libjuju."""
