@@ -15,17 +15,10 @@ from ..helpers import (
 
 logger = logging.getLogger(__name__)
 
-APPLICATION_APP_NAME = "postgresql-test-app"
 DATABASE_APP_NAME = "database"
 ANOTHER_DATABASE_APP_NAME = "another-database"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
-APP_NAMES = [APPLICATION_APP_NAME, DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME]
 DATABASE_APP_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-FIRST_DATABASE_RELATION_NAME = "database"
-SECOND_DATABASE_RELATION_NAME = "second-database"
-MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "multiple-database-clusters"
-ALIASED_MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "aliased-multiple-database-clusters"
-NO_DATABASE_RELATION_NAME = "no-database"
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
