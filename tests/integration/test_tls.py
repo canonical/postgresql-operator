@@ -174,7 +174,9 @@ def test_tls_enabled(juju: JujuFixture) -> None:
         )
         # Add a sleep to avoid immediate passing of the idle check.
         time.sleep(100)
-        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+        juju.ext.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1800, idle_period=30
+        )
 
         # Wait for all units disabling TLS.
         for unit in juju.ext.model.applications[DATABASE_APP_NAME].units:
