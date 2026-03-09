@@ -267,18 +267,29 @@ def test_config_parameters(juju: JujuFixture, charm) -> None:
             logger.info(k)
             charm_config[k] = v[0]
             juju.ext.model.applications[DATABASE_APP_NAME].set_config(charm_config)
-            juju.ext.model.block_until(
-                lambda: (
-                    juju.ext.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "blocked"
+            juju.wait(
+                lambda status: (
+                    status
+                    .apps[DATABASE_APP_NAME]
+                    .units[f"{DATABASE_APP_NAME}/0"]
+                    .workload_status.current
+                    == "blocked"
+                    and "Configuration Error"
+                    in status
+                    .apps[DATABASE_APP_NAME]
+                    .units[leader_unit.name]
+                    .workload_status.message
                 ),
                 timeout=100,
             )
-            assert "Configuration Error" in leader_unit.workload_status_message
             charm_config[k] = v[1]
 
     juju.ext.model.applications[DATABASE_APP_NAME].set_config(charm_config)
-    juju.ext.model.block_until(
-        lambda: juju.ext.model.units[f"{DATABASE_APP_NAME}/0"].workload_status == "active",
+    juju.wait(
+        lambda status: (
+            status.apps[DATABASE_APP_NAME].units[f"{DATABASE_APP_NAME}/0"].workload_status.current
+            == "active"
+        ),
         timeout=100,
     )
 
