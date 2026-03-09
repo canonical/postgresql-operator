@@ -206,7 +206,8 @@ def test_is_creating_backup(peers_ips, patroni):
 def test_is_replication_healthy(peers_ips, patroni):
     with (
         patch("requests.get") as _get,
-        patch("charm.Patroni.get_primary"),
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.Patroni.get_standby_leader") as _get_standby_leader,
         patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
@@ -221,6 +222,17 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=503),
         ]
         assert not patroni.is_replication_healthy()
+
+        # Test no primary
+        _get.side_effect = None
+        _get.return_value.status_code = 200
+        _get_primary.return_value = None
+        _get_standby_leader.return_value = None
+        assert not patroni.is_replication_healthy()
+
+        # Standby leader
+        _get_standby_leader.return_value = "standby"
+        assert patroni.is_replication_healthy()
 
 
 def test_is_member_isolated(peers_ips, patroni):
