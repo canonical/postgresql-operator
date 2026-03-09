@@ -48,7 +48,7 @@ def second_model(juju: Juju, lxd_spaces, request: pytest.FixtureRequest) -> Gene
     model_2.cli("add-space", "client", "10.0.0.1/24")
     model_2.cli("add-space", "peers", "10.10.10.1/24")
     model_2.cli("add-space", "isolated", "10.20.20.1/24")
-    model_2.cli("set-model-constraints", f"arch={architecture.architecture}")
+    model_2.cli("set-model-constraints", f"arch={architecture}")
 
     yield model_name
     if request.config.getoption("--keep-models"):
