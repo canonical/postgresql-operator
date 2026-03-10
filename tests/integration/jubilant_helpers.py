@@ -5,6 +5,7 @@ import itertools
 import json
 import logging
 import os
+import random
 import subprocess
 import tempfile
 import time
@@ -33,6 +34,7 @@ from tenacity import (
 from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
+from .ha_tests.helpers import ProcessError
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -1563,3 +1565,154 @@ def execute_queries_on_unit(
         output = list(itertools.chain(*cursor.fetchall()))
 
     return output
+
+
+##########################################
+#                                        #
+#      Partially Ported HA Helpers       #
+#                                        #
+##########################################
+
+
+def app_name(
+    juju: JujuFixture, application_name: str = "postgresql", model: ModelAdapter | None = None
+) -> str | None:
+    """Returns the name of the cluster running PostgreSQL.
+
+    This is important since not all deployments of the PostgreSQL charm have the application name
+    "postgresql".
+
+    Note: if multiple clusters are running PostgreSQL this will return the one first found.
+    """
+    if model is None:
+        model = juju.ext.model
+    status = juju.status()
+    for app in status.apps:
+        if (
+            application_name in status.apps[app].charm
+            and APPLICATION_NAME not in status.apps[app].charm
+        ):
+            return app
+
+    return None
+
+
+def change_patroni_setting(
+    juju: JujuFixture,
+    setting: str,
+    value: int | bool,
+    password: str,
+    use_random_unit: bool = False,
+    tls: bool = False,
+) -> None:
+    """Change the value of one of the Patroni settings.
+
+    Args:
+        juju: Juju fixture.
+        setting: the name of the setting.
+        value: the value to assign to the setting.
+        password: Patroni password.
+        use_random_unit: whether to use a random unit (default is False,
+            so it uses the primary).
+        tls: if Patroni is serving using tls.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            app = app_name(juju)
+            if use_random_unit:
+                unit = random.choice(juju.ext.model.applications[app].units).name
+                unit_ip = get_unit_address(juju, unit)
+            else:
+                primary_name = get_primary(juju, app)
+                unit_ip = get_unit_address(juju, primary_name)
+            requests.patch(
+                f"https://{unit_ip}:8008/config",
+                json={setting: value},
+                verify=False,
+                auth=requests.auth.HTTPBasicAuth("patroni", password),
+            )
+
+
+def get_cluster_roles(
+    juju: JujuFixture, unit_name: str, use_ip_from_inside: bool = False
+) -> dict[str, str | list[str] | None]:
+    """Returns whether the unit a replica in the cluster."""
+    unit_ip = (
+        get_ip_from_inside_the_unit(juju, unit_name)
+        if use_ip_from_inside
+        else get_unit_ip(juju, unit_name)
+    )
+
+    members = {"replicas": [], "primaries": [], "sync_standbys": []}
+    cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
+    member_list = cluster_info.json()["members"]
+    logger.info(f"Cluster members are: {member_list}")
+    for member in member_list:
+        role = member["role"]
+        name = "/".join(member["name"].rsplit("-", 1))
+        if role == "leader":
+            members["primaries"].append(name)
+        elif role == "sync_standby":
+            members["sync_standbys"].append(name)
+        else:
+            members["replicas"].append(name)
+
+    return members
+
+
+def get_ip_from_inside_the_unit(juju: JujuFixture, unit_name: str) -> str:
+    command = f"exec --unit {unit_name} -- hostname -I"
+    try:
+        stdout = juju.cli(*command.split())
+    except jubilant.CLIError as e:
+        raise ProcessError(
+            "Expected command %s to succeed instead it failed: %s %s",
+            command,
+            e.returncode,
+            e.stderr,
+        )
+    return stdout.splitlines()[0].strip()
+
+
+def get_unit_ip(juju: JujuFixture, unit_name: str, model: ModelAdapter | None = None) -> str:
+    """Wrapper for getting unit ip.
+
+    Args:
+        juju: Juju fixture.
+        unit_name: The name of the unit to get the address
+        model: Optional model instance to use
+    Returns:
+        The (str) ip of the unit
+    """
+    if model is None:
+        application = unit_name.split("/")[0]
+        for unit in juju.ext.model.applications[application].units:
+            if unit.name == unit_name:
+                break
+        machine = next(
+            iter(
+                machine
+                for id_, machine in juju.status().machines.items()
+                if id_ == unit.status.machine
+            )
+        )
+        return instance_ip(juju, machine.hostname)
+    else:
+        return get_unit_address(juju, unit_name)
+
+
+def instance_ip(juju: JujuFixture, instance: str) -> str:
+    """Translate juju instance name to IP.
+
+    Args:
+        juju: Juju fixture.
+        instance: The name of the instance
+
+    Returns:
+        The (str) IP address of the instance
+    """
+    output = juju.cli("machines")
+
+    for line in output.splitlines():
+        if instance in line:
+            return line.split()[2]

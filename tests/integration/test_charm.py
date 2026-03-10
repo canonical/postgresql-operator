@@ -16,7 +16,6 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 from locales import SNAP_LOCALES
 
 from .adapters import JujuFixture
-from .ha_tests.helpers import get_cluster_roles
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
     STORAGE_PATH,
@@ -24,6 +23,7 @@ from .jubilant_helpers import (
     convert_records_to_dict,
     db_connect,
     find_unit,
+    get_cluster_roles,
     get_password,
     get_primary,
     get_unit_address,
@@ -313,8 +313,6 @@ def test_scale_down_and_up(juju: JujuFixture):
     scale_application(juju, DATABASE_APP_NAME, initial_scale)
 
 
-# FIXME: async helper
-@pytest.mark.skip
 def test_switchover_sync_standby(juju: JujuFixture):
     original_roles = get_cluster_roles(
         juju, juju.ext.model.applications[DATABASE_APP_NAME].units[0].name

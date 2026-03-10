@@ -8,12 +8,10 @@ import pytest as pytest
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
 
 from .adapters import JujuFixture
-from .ha_tests.helpers import (
-    change_patroni_setting,
-)
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
     METADATA,
+    change_patroni_setting,
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
