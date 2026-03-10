@@ -1,0 +1,55 @@
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:221 waiting for the database charm to become blocked
+[32mINFO    [0m integration.conftest:conftest.py:61 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  02:03:24Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  16.13    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable  145  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   idle   5        10.215.16.191   5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle   0        10.215.16.169             
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.215.16.169  juju-3cfa03-0  ubuntu@22.04  runnervm0kj6c  Running
+5        started  10.215.16.191  juju-3cfa03-5  ubuntu@24.04  runnervm0kj6c  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 01:33:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:33:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:33:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-1: 01:55:55 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-gcp-1: 01:55:55 ERROR unit.postgresql-gcp/1.juju-log __main__:Host not set
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/charm.py", line 2047, in _was_restore_successful
+    self._setup_users()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/charm.py", line 1780, in _setup_users
+    self.postgresql.create_predefined_instance_roles()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 553, in create_predefined_instance_roles
+    for database in self._get_existing_databases():
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 1099, in _get_existing_databases
+    with self._connect_to_database() as connection, connection.cursor() as cursor:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 298, in _connect_to_database
+    raise PostgreSQLUndefinedHostError("Host not set")
+single_kernel_postgresql.utils.postgresql.PostgreSQLUndefinedHostError: Host not set
+unit-self-signed-certificates-0: 01:55:57 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-s3-integrator-0: 01:55:58 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-3: 01:56:35 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-0: 01:57:28 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 01:58:10 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:58:10 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
