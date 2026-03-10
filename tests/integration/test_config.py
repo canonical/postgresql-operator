@@ -118,7 +118,6 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         },  # config option is between 0 and 1.80E+308
         {"optimizer-pg-stat-statements-max": ["-1", "1000"]},
         {"optimizer-pg-stat-statements-track": [test_string, "top"]},
-        {"optimizer-track-activity-query-size": ["99", "1000"]},
         {"optimizer-track-functions": [test_string, "all"]},
         {"profile": [test_string, "testing"]},  # config option is one of `testing` or `production`
         {"profile_limit_memory": ["127", "128"]},  # config option is between 128 and 9999999

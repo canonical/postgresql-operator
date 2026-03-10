@@ -125,7 +125,6 @@ class CharmConfig(BaseConfigModel):
     optimizer_pg_stat_statements_track: Literal["none", "top", "all"]
     optimizer_pg_stat_statements_track_utility: bool
     optimizer_pg_stat_statements_save: bool
-    optimizer_track_activity_query_size: Annotated[int, Field(ge=100, le=1048576)]
     optimizer_track_io_timing: bool
     optimizer_track_wal_io_timing: bool
     optimizer_track_functions: Literal["none", "pl", "all"]
