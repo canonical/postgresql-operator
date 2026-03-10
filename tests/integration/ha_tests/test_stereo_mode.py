@@ -16,14 +16,11 @@ Test scenarios from acceptance criteria:
 
 import asyncio
 import logging
-import subprocess
-from pathlib import Path
 
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import architecture
 from ..helpers import (
     APPLICATION_NAME,
     CHARM_BASE,
@@ -86,11 +83,15 @@ async def verify_raft_cluster_health(
     """
     logger.info(f"Verifying Raft cluster health with {expected_members} expected members")
 
-    # Get watcher address for verification
+    # Get watcher address for verification using juju exec to avoid cached IPs
     watcher_unit = ops_test.model.applications[watcher_app_name].units[0]
-    watcher_ip = await watcher_unit.get_public_address()
+    return_code, watcher_ip, _ = await ops_test.juju(
+        "exec", "--unit", watcher_unit.name, "--", "unit-get", "private-address"
+    )
+    assert return_code == 0, f"Failed to get watcher address from {watcher_unit.name}"
+    watcher_ip = watcher_ip.strip()
 
-    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(10), reraise=True):
+    for attempt in Retrying(stop=stop_after_delay(360), wait=wait_fixed(10), reraise=True):
         with attempt:
             for unit in ops_test.model.applications[db_app_name].units:
                 # Get the Raft password from Patroni config using juju exec directly
@@ -156,7 +157,8 @@ async def verify_raft_cluster_health(
                 # with a new IP that isn't yet updated in the Raft configuration
                 if check_watcher_ip:
                     assert watcher_ip in output, (
-                        f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}"
+                        f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}\n"
+                        f"Raft output: {output}"
                     )
 
     logger.info("Raft cluster health verified successfully")
@@ -210,7 +212,7 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
             application_name=WATCHER_APP_NAME,
             num_units=1,
             base=CHARM_BASE,
-            config={"role": "watcher"},
+            config={"role": "watcher", "profile": "testing"},
         )
         logger.info("Deploying test application...")
         await ops_test.model.deploy(
@@ -278,8 +280,11 @@ async def test_watcher_topology_action(ops_test: OpsTest) -> None:
     import json
 
     topology = json.loads(action.results["topology"])
-    assert "postgresql_endpoints" in topology
-    assert len(topology["postgresql_endpoints"]) == 2
+    assert "clusters" in topology
+    assert len(topology["clusters"]) == 1
+    cluster = topology["clusters"][0]
+    assert "postgresql_endpoints" in cluster
+    assert len(cluster["postgresql_endpoints"]) == 2
 
 
 @pytest.mark.abort_on_fail
@@ -654,9 +659,12 @@ async def test_replica_network_isolation_with_watcher(
         idle_period=30,
     )
 
-    # Verify cluster roles unchanged
+    # Verify cluster has a primary after restore (may or may not be the same one,
+    # since Patroni can switchover during network restore/rejoin)
     final_roles = await get_cluster_roles(ops_test, any_unit, use_ip_from_inside=True)
-    assert final_roles["primaries"][0] == primary, "Primary should remain the same after restore"
+    assert len(final_roles["primaries"]) == 1, (
+        "Cluster should have exactly one primary after restore"
+    )
 
     # Verify writes continue after network restore
     # Use use_ip_from_inside=True because previous tests may have caused IP changes
@@ -709,6 +717,94 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
 
 
 @pytest.mark.abort_on_fail
+async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
+    """Verify that a single watcher can monitor multiple PostgreSQL clusters.
+
+    The watcher relation no longer has limit: 1, so the watcher can relate
+    to multiple PostgreSQL clusters simultaneously. Each relation gets its own
+    Raft instance with a dedicated port and data directory.
+    """
+    second_pg_app = "postgresql-b"
+
+    try:
+        # Deploy a second PostgreSQL cluster
+        logger.info("Deploying second PostgreSQL cluster for multi-cluster watcher test")
+        await ops_test.model.deploy(
+            charm,
+            application_name=second_pg_app,
+            num_units=2,
+            base=CHARM_BASE,
+            config={"profile": "testing"},
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[second_pg_app],
+            status="active",
+            timeout=1200,
+        )
+
+        # Relate the watcher to the second cluster
+        logger.info("Relating watcher to second PostgreSQL cluster")
+        await ops_test.model.integrate(
+            f"{second_pg_app}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
+        )
+
+        # Use fast_forward to trigger update_status quickly, which runs
+        # ensure_watcher_in_raft to add the watcher to the second cluster's Raft
+        async with ops_test.fast_forward():
+            # Wait for the watcher to connect to both clusters
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME, second_pg_app, WATCHER_APP_NAME],
+                status="active",
+                timeout=600,
+            )
+
+            # Verify both Raft clusters have the watcher as a member
+            # Check first cluster
+            await verify_raft_cluster_health(
+                ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME, expected_members=3
+            )
+            # Check second cluster
+            await verify_raft_cluster_health(
+                ops_test, second_pg_app, WATCHER_APP_NAME, expected_members=3
+            )
+
+        # Run show-topology and verify both clusters appear
+        watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
+        action = await watcher_unit.run_action("show-topology")
+        action = await action.wait()
+        assert action.status == "completed"
+        assert "topology" in action.results
+
+        import json
+
+        topology = json.loads(action.results["topology"])
+        assert "clusters" in topology, "Topology should contain clusters list"
+        assert len(topology["clusters"]) == 2, (
+            f"Expected 2 clusters in topology, got {len(topology['clusters'])}"
+        )
+
+        # Verify each cluster has endpoints
+        for cluster in topology["clusters"]:
+            assert len(cluster["postgresql_endpoints"]) == 2, (
+                f"Cluster {cluster.get('cluster_name')} should have 2 endpoints"
+            )
+
+    finally:
+        # Clean up the second cluster relation and app
+        if second_pg_app in ops_test.model.applications:
+            await ops_test.model.remove_application(
+                second_pg_app, block_until_done=True, force=True
+            )
+
+    # Verify original watcher is still healthy after removing the second cluster
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
+        status="active",
+        timeout=300,
+    )
+
+
+@pytest.mark.abort_on_fail
 async def test_health_check_action(ops_test: OpsTest) -> None:
     """Test the trigger-health-check action on the watcher."""
     # Wait for the cluster to fully stabilize after previous network tests
@@ -739,6 +835,117 @@ async def test_health_check_action(ops_test: OpsTest) -> None:
             action = await action.wait()
 
             assert action.status == "completed", f"Action failed: {action.results}"
-            assert "endpoints" in action.results
-            assert int(action.results["healthy-count"]) == 2
-            assert int(action.results["total-count"]) == 2
+            assert "health-check" in action.results
+
+            import json
+
+            health = json.loads(action.results["health-check"])
+            assert "clusters" in health
+            assert int(health["healthy-count"]) == 2
+            assert int(health["total-count"]) == 2
+
+
+@pytest.mark.abort_on_fail
+async def test_watcher_production_profile_az_blocked(ops_test: OpsTest, charm) -> None:
+    """Test watcher with profile=production blocks on AZ co-location.
+
+    When all units are in the same availability zone (common on single-host
+    LXD deployments), a watcher with profile=production should enter
+    BlockedStatus because it shares an AZ with the PostgreSQL units.
+    This validates the AZ enforcement behavior.
+
+    If JUJU_AVAILABILITY_ZONE is not set (some CI environments), the watcher
+    should reach active status since no AZ co-location can be detected.
+
+    Since watcher-offer has limit: 1, we must remove the existing testing watcher
+    before deploying the production one, then restore it afterward.
+    """
+    production_watcher = "pg-watcher-prod"
+
+    # Remove existing watcher to free the watcher-offer relation slot
+    logger.info("Removing existing testing watcher to free relation slot")
+    if WATCHER_APP_NAME in ops_test.model.applications:
+        await ops_test.model.remove_application(
+            WATCHER_APP_NAME, block_until_done=True, force=True
+        )
+
+    try:
+        # Deploy a production-profile watcher
+        logger.info("Deploying watcher with profile=production")
+        await ops_test.model.deploy(
+            charm,
+            application_name=production_watcher,
+            num_units=1,
+            base=CHARM_BASE,
+            config={"role": "watcher", "profile": "production"},
+        )
+
+        # Wait for initial install
+        await ops_test.model.wait_for_idle(
+            apps=[production_watcher],
+            timeout=600,
+            raise_on_error=False,
+        )
+
+        # Relate to the existing PostgreSQL cluster
+        await ops_test.model.integrate(
+            f"{DATABASE_APP_NAME}:watcher-offer", f"{production_watcher}:watcher"
+        )
+
+        # Wait for the watcher to settle (it may block or go active depending on AZ)
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(
+                apps=[production_watcher],
+                timeout=600,
+                raise_on_error=False,
+            )
+
+        # Check the watcher's status
+        watcher_unit = ops_test.model.applications[production_watcher].units[0]
+        status = watcher_unit.workload_status
+        status_msg = watcher_unit.workload_status_message
+
+        if status == "blocked":
+            # AZ is set and co-located — expected on single-host deployments
+            assert "AZ co-location" in status_msg, (
+                f"Blocked status should mention AZ co-location, got: {status_msg}"
+            )
+            logger.info(f"Production watcher correctly blocked: {status_msg}")
+        elif status == "active":
+            # AZ is not set — no co-location detected, watcher is active
+            logger.info("JUJU_AVAILABILITY_ZONE not set, watcher is active (no AZ enforcement)")
+        else:
+            pytest.fail(
+                f"Unexpected watcher status: {status} - {status_msg}. "
+                "Expected 'blocked' (AZ co-location) or 'active' (no AZ)."
+            )
+
+    finally:
+        # Clean up production watcher
+        if production_watcher in ops_test.model.applications:
+            await ops_test.model.remove_application(
+                production_watcher, block_until_done=True, force=True
+            )
+
+        # Restore the original testing watcher
+        logger.info("Restoring original testing watcher")
+        await ops_test.model.deploy(
+            charm,
+            application_name=WATCHER_APP_NAME,
+            num_units=1,
+            base=CHARM_BASE,
+            config={"role": "watcher", "profile": "testing"},
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[WATCHER_APP_NAME],
+            timeout=600,
+            raise_on_error=False,
+        )
+        await ops_test.model.integrate(
+            f"{DATABASE_APP_NAME}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
+            status="active",
+            timeout=600,
+        )

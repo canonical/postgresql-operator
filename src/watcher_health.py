@@ -1,4 +1,4 @@
-# Copyright 2024 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Health monitoring logic for PostgreSQL watcher.
@@ -8,8 +8,6 @@ Implements the health check requirements from the acceptance criteria:
 - SELECT 1 query with timeout
 - 3 retries with 7-second intervals
 - TCP keepalive settings
-- Only participates in failover with even number of PostgreSQL instances
-
 The watcher user and password are automatically provisioned by the PostgreSQL charm
 when the watcher relation is established. The password is shared via a Juju secret.
 """
@@ -88,6 +86,10 @@ class HealthChecker:
     def check_all_endpoints(self, endpoints: list[str]) -> dict[str, bool]:
         """Test connectivity to all PostgreSQL endpoints.
 
+        WARNING: This method uses blocking time.sleep() for retry intervals
+        (up to ~38s worst case with 2 endpoints). Only call from Juju actions,
+        never from hook handlers.
+
         Args:
             endpoints: List of PostgreSQL unit IP addresses.
 
@@ -120,20 +122,14 @@ class HealthChecker:
                     logger.debug(f"Health check passed for {endpoint} on attempt {attempt + 1}")
                     return True
             except Exception as e:
-                logger.warning(
-                    f"Health check failed for {endpoint} on attempt {attempt + 1}: {e}"
-                )
+                logger.warning(f"Health check failed for {endpoint} on attempt {attempt + 1}: {e}")
 
             # Wait before retry (unless this is the last attempt)
             if attempt < self._retry_count - 1:
-                logger.debug(
-                    f"Waiting {self._retry_interval}s before retry for {endpoint}"
-                )
+                logger.debug(f"Waiting {self._retry_interval}s before retry for {endpoint}")
                 time.sleep(self._retry_interval)
 
-        logger.error(
-            f"Endpoint {endpoint} unhealthy after {self._retry_count} attempts"
-        )
+        logger.error(f"Endpoint {endpoint} unhealthy after {self._retry_count} attempts")
         return False
 
     def _execute_health_query(self, endpoint: str) -> bool:
@@ -202,25 +198,6 @@ class HealthChecker:
                     connection.close()
                 except Exception:
                     logger.debug(f"Failed to close connection to {endpoint}")
-
-    def should_participate_in_failover(self, pg_endpoint_count: int) -> bool:
-        """Determine if watcher should participate in failover decision.
-
-        Per acceptance criteria: Only contributing to the failover decision
-        if there is an even number of PostgreSQL instances.
-
-        Args:
-            pg_endpoint_count: Number of PostgreSQL endpoints.
-
-        Returns:
-            True if watcher should participate in failover, False otherwise.
-        """
-        should_participate = pg_endpoint_count % 2 == 0
-        logger.debug(
-            f"Failover participation: {should_participate} "
-            f"(PostgreSQL endpoints: {pg_endpoint_count})"
-        )
-        return should_participate
 
     def get_last_health_results(self) -> dict[str, bool]:
         """Get the last health check results.

@@ -57,6 +57,7 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -803,6 +804,9 @@ class Patroni:
             watcher_addr=self.charm.watcher_offer.watcher_address
             if hasattr(self.charm, "watcher_offer")
             else None,
+            watcher_port=self.charm.watcher_offer.watcher_raft_port
+            if hasattr(self.charm, "watcher_offer")
+            else RAFT_PORT,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

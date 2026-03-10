@@ -312,6 +312,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._role = self.model.config.get("role", "postgresql")
 
+        if self._role not in ("postgresql", "watcher"):
+            self.unit.status = BlockedStatus(
+                f"invalid role '{self._role}' (must be 'postgresql' or 'watcher')"
+            )
+            return
+
         # Watcher mode: lightweight Raft witness, no PostgreSQL
         if self._role == "watcher":
             self._init_watcher_mode()
@@ -339,7 +345,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if stored_role is None:
             # First time — persist the role (leader only)
             if self.unit.is_leader():
-                self._peers.data[self.app]["role"] = self._role
+                self._peers.data[self.app]["role"] = self._role  # type: ignore[assignment]
             return True
         if stored_role != self._role:
             logger.error(

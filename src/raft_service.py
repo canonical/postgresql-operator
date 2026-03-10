@@ -13,7 +13,7 @@ the same Raft cluster as Patroni's DCS. The watcher doesn't actually use the
 replicated data - it only provides a vote for quorum in 2-node clusters.
 
 Usage:
-    python3 raft_service.py --self-addr IP:PORT --partners IP1:PORT,IP2:PORT --password PASSWORD
+    python3 raft_service.py --self-addr IP:PORT --partners IP1:PORT,IP2:PORT --password-file /path
 """
 
 import argparse
@@ -21,15 +21,16 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from pysyncobj import SyncObj, SyncObjConf, replicated
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ class WatcherKVStoreTTL(SyncObj):
     stale leader keys so that a replica can acquire leadership.
     """
 
-    def __init__(self, self_addr: str, partner_addrs: list[str], password: str, data_dir: str = ""):
+    def __init__(
+        self, self_addr: str, partner_addrs: list[str], password: str, data_dir: str = ""
+    ):
         """Initialize the Raft node.
 
         Args:
@@ -85,7 +88,7 @@ class WatcherKVStoreTTL(SyncObj):
         The watcher doesn't actually use this data, but must implement the method
         to be compatible with the Raft cluster.
         """
-        value['index'] = self.raftLastApplied + 1
+        value["index"] = self.raftLastApplied + 1
         self.__data[key] = value
         return value
 
@@ -105,13 +108,17 @@ class WatcherKVStoreTTL(SyncObj):
         return True
 
     @replicated
-    def _expire(self, key: str, value: dict[str, Any], callback: Callable[..., Any] | None = None) -> None:
+    def _expire(
+        self, key: str, value: dict[str, Any], callback: Callable[..., Any] | None = None
+    ) -> None:
         """Replicated expire operation - compatible with Patroni's KVStoreTTL._expire.
 
         The watcher doesn't actually use this data, but must implement the method
         to be compatible with the Raft cluster.
         """
         self.__data.pop(key, None)
+        # Allow future expiry of the same key (e.g., Patroni's leader key is reused)
+        self.__limb.pop(key, None)
 
     def __expire_keys(self) -> None:
         """Expire keys that have exceeded their TTL.
@@ -127,7 +134,7 @@ class WatcherKVStoreTTL(SyncObj):
         current_time = time.time()
         for key, value in list(self.__data.items()):
             # Check if TTL expired and we're not already processing this key
-            if 'expire' in value and value['expire'] <= current_time and key not in self.__limb:
+            if "expire" in value and value["expire"] <= current_time and key not in self.__limb:
                 self.__limb[key] = True
                 logger.info(f"Expiring key {key} (TTL expired)")
                 # Call the replicated _expire method to remove the key
@@ -162,7 +169,9 @@ class WatcherRaftNode:
     application data - it only provides a vote for quorum.
     """
 
-    def __init__(self, self_addr: str, partner_addrs: list[str], password: str, data_dir: str = ""):
+    def __init__(
+        self, self_addr: str, partner_addrs: list[str], password: str, data_dir: str = ""
+    ):
         """Initialize the Raft node.
 
         Args:
@@ -185,28 +194,18 @@ class WatcherRaftNode:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="PostgreSQL Watcher Raft Service"
-    )
-    parser.add_argument(
-        "--self-addr",
-        required=True,
-        help="This node's address (IP:PORT)"
-    )
+    parser = argparse.ArgumentParser(description="PostgreSQL Watcher Raft Service")
+    parser.add_argument("--self-addr", required=True, help="This node's address (IP:PORT)")
     parser.add_argument(
         "--partners",
         required=True,
-        help="Comma-separated list of partner addresses (IP1:PORT,IP2:PORT)"
+        help="Comma-separated list of partner addresses (IP1:PORT,IP2:PORT)",
     )
     parser.add_argument(
-        "--password",
-        required=True,
-        help="Raft cluster password"
+        "--password-file", required=True, help="Path to file containing Raft cluster password"
     )
     parser.add_argument(
-        "--data-dir",
-        default="/var/lib/watcher-raft",
-        help="Directory for Raft state files"
+        "--data-dir", default="/var/lib/watcher-raft", help="Directory for Raft state files"
     )
     return parser.parse_args()
 
@@ -215,18 +214,24 @@ def main() -> int:
     """Main entry point."""
     args = parse_args()
 
+    # Read password from file (not from command line to avoid /proc exposure)
+    try:
+        password = Path(args.password_file).read_text().strip()
+    except Exception as e:
+        logger.error(f"Failed to read password file {args.password_file}: {e}")
+        return 1
+
     partner_addrs = [addr.strip() for addr in args.partners.split(",") if addr.strip()]
 
     logger.info(f"Starting Watcher Raft node: {args.self_addr}")
     logger.info(f"Partners: {partner_addrs}")
 
     node: WatcherRaftNode | None = None
-    shutdown_requested = False
+    shutdown_event = threading.Event()
 
-    def signal_handler(signum, frame):
-        nonlocal shutdown_requested
+    def signal_handler(signum, _frame):
         logger.info(f"Received signal {signum}, shutting down...")
-        shutdown_requested = True
+        shutdown_event.set()
 
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
@@ -235,15 +240,15 @@ def main() -> int:
         node = WatcherRaftNode(
             self_addr=args.self_addr,
             partner_addrs=partner_addrs,
-            password=args.password,
+            password=password,
             data_dir=args.data_dir,
         )
 
         logger.info("Raft node started, entering main loop")
 
         # Main loop - just keep running until signaled
-        while not shutdown_requested:
-            time.sleep(1)
+        while not shutdown_event.is_set():
+            shutdown_event.wait(timeout=1)
             # Periodically log status
             try:
                 status = node.get_status()
