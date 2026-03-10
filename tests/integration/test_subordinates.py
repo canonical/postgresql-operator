@@ -58,9 +58,7 @@ def test_deploy(juju: JujuFixture, charm: str, check_subordinate_env_vars):
 
     juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
     juju.ext.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
-    juju.ext.model.relate(
-        f"{DATABASE_APP_NAME}:juju-info", f"{UBUNTU_PRO_APP_NAME}:juju-info"
-    )
+    juju.ext.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{UBUNTU_PRO_APP_NAME}:juju-info")
     juju.ext.model.wait_for_idle(
         apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active"
     )
