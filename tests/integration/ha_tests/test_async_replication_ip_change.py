@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-import contextlib
 import logging
 import subprocess
 from asyncio import gather
@@ -9,15 +8,15 @@ from asyncio import gather
 import pytest
 from juju.model import Model
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import architecture, markers
+from .. import markers
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
     get_leader_unit,
     get_machine_from_unit,
 )
+from .conftest import fast_forward
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -37,62 +36,6 @@ CLUSTER_SIZE = 3
 FAST_INTERVAL = "10s"
 IDLE_PERIOD = 5
 TIMEOUT = 2000
-
-
-@contextlib.asynccontextmanager
-async def fast_forward(model: Model, fast_interval: str = "10s", slow_interval: str | None = None):
-    """Adaptation of OpsTest.fast_forward to work with different models."""
-    update_interval_key = "update-status-hook-interval"
-    interval_after = (
-        slow_interval if slow_interval else (await model.get_config())[update_interval_key]
-    )
-
-    await model.set_config({update_interval_key: fast_interval})
-    yield
-    await model.set_config({update_interval_key: interval_after})
-
-
-@pytest.fixture(scope="module")
-def first_model(ops_test: OpsTest) -> Model:
-    """Return the first model."""
-    first_model = ops_test.model
-    return first_model
-
-
-@pytest.fixture(scope="module")
-async def second_model(ops_test: OpsTest, first_model, request) -> Model:
-    """Create and return the second model."""
-    second_model_name = f"{first_model.info.name}-other"
-    if second_model_name not in await ops_test._controller.list_models():
-        await ops_test._controller.add_model(second_model_name)
-        subprocess.run(["juju", "switch", second_model_name], check=True)
-        subprocess.run(
-            ["juju", "set-model-constraints", f"arch={architecture.architecture}"], check=True
-        )
-        subprocess.run(["juju", "switch", first_model.info.name], check=True)
-    second_model = Model()
-    await second_model.connect(model_name=second_model_name)
-    yield second_model
-    if request.config.getoption("--keep-models"):
-        return
-    logger.info("Destroying second model")
-    await ops_test._controller.destroy_model(second_model_name, destroy_storage=True)
-
-
-@pytest.fixture
-async def continuous_writes(ops_test: OpsTest) -> None:
-    """Cleans up continuous writes after a test run."""
-    yield
-    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
-        with attempt:
-            action = (
-                await ops_test.model
-                .applications[APPLICATION_NAME]
-                .units[0]
-                .run_action("clear-continuous-writes")
-            )
-            await action.wait()
-            assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
 @markers.juju3
