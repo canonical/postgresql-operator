@@ -215,7 +215,8 @@ def test_check_for_database_changes():
             assert result == sentinel.databases
             _subprocess.run.assert_not_called()
             _psycopg2.connect.assert_called_once_with(
-                "dbname='postgres' user='operator' host='test' password='test_password' connect_timeout=1"
+                "dbname='postgres' user='operator' host='/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/' "
+                "password='test_password' connect_timeout=1"
             )
             _cursor.execute.assert_called_once_with("SELECT datname, datacl FROM pg_database;")
 
