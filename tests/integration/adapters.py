@@ -246,8 +246,16 @@ class ModelAdapter:
         self, *conditions: Callable, timeout: float | None = None, wait_period: float = 0.5
     ):
         """Return only after all conditions are true."""
+        # set a large enough timeout if no timeout is provided
+        _timeout = timeout if timeout else 1800  # 30 min.
+        # Adjust delay proportional to timeout to restrict `juju status` calls to 180.
+        # Min. delay will be 5s.
+        _delay = max(5, _timeout // 180)
         self._juju.wait(
-            lambda status: all(c() for c in conditions), timeout=timeout, successes=1, delay=3
+            lambda status: all(c() for c in conditions),
+            timeout=_timeout,
+            successes=1,
+            delay=_delay,
         )
 
     def deploy(
