@@ -2544,7 +2544,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.config.experimental_max_connections
             else max(4 * self.cpu_count, 100)
         )
-        cfg_patch = {
+        cfg_patch: dict[str, int | str | None] = {
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "max_replication_slots": 25,
