@@ -1690,11 +1690,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
-        # Safety net: detect IP changes in case config-changed didn't process them
-        # (e.g., if the hook errored before reaching _update_member_ip).
-        if self._update_member_ip():
-            return
-
         if (
             self.is_cluster_restoring_backup or self.is_cluster_restoring_to_time
         ) and not self._was_restore_successful():

@@ -933,15 +933,6 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
 
-        # Test early exit when IP change is detected.
-        harness.charm.unit.status = ActiveStatus()
-        with patch(
-            "charm.PostgresqlOperatorCharm._update_member_ip", return_value=True
-        ) as _update_member_ip:
-            harness.charm.on.update_status.emit()
-            _update_member_ip.assert_called_once()
-            _set_primary_status_message.assert_not_called()
-
         # Test the point-in-time-recovery fail.
         with harness.hooks_disabled():
             harness.update_relation_data(
