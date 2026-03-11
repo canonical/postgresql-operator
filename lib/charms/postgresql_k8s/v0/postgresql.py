@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 56
+LIBPATCH = 57
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -938,6 +938,10 @@ END; $$;"""
             parameter = "_".join(config.split("_")[1:])
             if parameter in ["date_style", "time_zone"]:
                 parameter = "".join(x.capitalize() for x in parameter.split("_"))
+            elif parameter.startswith("pg_stat_statements"):
+                parameter = "pg_stat_statements." + parameter.removeprefix("pg_stat_statements_")
+            elif parameter == "maximum_lag_on_failover":
+                continue
             parameters[parameter] = value
         shared_buffers_max_value_in_mb = int(available_memory * 0.4 / 10**6)
         shared_buffers_max_value = int(shared_buffers_max_value_in_mb * 10**3 / 8)
