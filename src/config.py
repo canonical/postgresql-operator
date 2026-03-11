@@ -121,7 +121,6 @@ class CharmConfig(BaseConfigModel):
     optimizer_min_parallel_table_scan_size: int | None = Field(ge=0, le=715827882, default=None)
     optimizer_parallel_setup_cost: float | None = Field(ge=0, le=1.80e308, default=None)
     optimizer_parallel_tuple_cost: float | None = Field(ge=0, le=1.80e308, default=None)
-    optimizer_pg_stat_statements_max: PositiveInt
     optimizer_pg_stat_statements_track: Literal["none", "top", "all"]
     optimizer_pg_stat_statements_track_utility: bool
     optimizer_pg_stat_statements_save: bool

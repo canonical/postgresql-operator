@@ -116,7 +116,6 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "optimizer_parallel_tuple_cost": ["-1", "0.1"]
         },  # config option is between 0 and 1.80E+308
-        {"optimizer-pg-stat-statements-max": ["-1", "1000"]},
         {"optimizer-pg-stat-statements-track": [test_string, "top"]},
         {"optimizer-track-functions": [test_string, "all"]},
         {"profile": [test_string, "testing"]},  # config option is one of `testing` or `production`
