@@ -161,7 +161,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
-        "plugin-pg-stat-statements-enable": PG_STAT_STATEMENTS_STATEMENT,
+        "plugin_pg_stat_statements_enable": PG_STAT_STATEMENTS_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
