@@ -238,7 +238,7 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-    def _change_owner(self, path: str) -> None:
+    def _change_owner(self, path: Path | str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
 
         Args:
@@ -256,9 +256,12 @@ class Patroni:
         For existing deployments, creates symlinks so the code always references
         the 16/main path while data stays at the mount root.
         """
+        pgdata = Path(POSTGRESQL_DATA_PATH)
+        logs = Path(LOGS_PATH)
+
         # Archive and temp: always ensure these exist (e.g. tmpfs is wiped on reboot).
-        self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-        is_existing_cluster = os.path.exists(POSTGRESQL_DATA_PATH)
+        self._create_directory(Path(ARCHIVE_PATH), POSTGRESQL_STORAGE_PERMISSIONS)
+        is_existing_cluster = pgdata.exists()
         if is_existing_cluster:
             # Existing cluster (e.g. reboot): create temp dir without fixing ownership.
             # The library's set_up_database() detects wrong ownership to trigger the
@@ -266,30 +269,30 @@ class Patroni:
             # it would mask the reboot signal and the stale tablespace would never
             # be recreated. For persistent storage reboots, the directory already
             # exists with correct ownership, so makedirs is a no-op.
-            os.makedirs(TEMP_PATH, exist_ok=True)
+            Path(TEMP_PATH).mkdir(parents=True, exist_ok=True)
         else:
             # Fresh deployment: set correct ownership so PostgreSQL can use it.
-            self._create_directory(TEMP_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+            self._create_directory(Path(TEMP_PATH), POSTGRESQL_STORAGE_PERMISSIONS)
 
         # Skip if the target data directory already exists (already set up).
         if is_existing_cluster:
             return
 
-        is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
+        is_existing_deployment = Path(DATA_STORAGE_PATH, "PG_VERSION").exists()
 
         if is_existing_deployment:
             # Data storage: symlink 16/main -> mount root.
-            os.makedirs(os.path.join(DATA_STORAGE_PATH, "16"), exist_ok=True)
-            os.symlink(DATA_STORAGE_PATH, POSTGRESQL_DATA_PATH)
+            pgdata.parent.mkdir(parents=True, exist_ok=True)
+            pgdata.symlink_to(DATA_STORAGE_PATH)
 
             # Logs storage: symlink 16/main/pg_wal -> mount root.
-            os.makedirs(os.path.join(LOGS_STORAGE_PATH, "16", "main"), exist_ok=True)
-            os.symlink(LOGS_STORAGE_PATH, LOGS_PATH)
+            logs.parent.mkdir(parents=True, exist_ok=True)
+            logs.symlink_to(LOGS_STORAGE_PATH)
         else:
             # New deployment: create actual subdirectories.
-            self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-            os.makedirs(os.path.dirname(LOGS_PATH), exist_ok=True)
-            self._create_directory(LOGS_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+            self._create_directory(pgdata, POSTGRESQL_STORAGE_PERMISSIONS)
+            logs.parent.mkdir(parents=True, exist_ok=True)
+            self._create_directory(logs, POSTGRESQL_STORAGE_PERMISSIONS)
 
     @cached_property
     def cluster_members(self) -> set:
@@ -297,7 +300,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         return {member["name"] for member in self.cached_cluster_status}
 
-    def _create_directory(self, path: str, mode: int) -> None:
+    def _create_directory(self, path: Path, mode: int) -> None:
         """Creates a directory.
 
         Args:
@@ -305,7 +308,7 @@ class Patroni:
             mode: access permission mask applied to the
               directory using chmod (e.g. 0o640).
         """
-        os.makedirs(path, mode=mode, exist_ok=True)
+        path.mkdir(mode=mode, parents=True, exist_ok=True)
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
