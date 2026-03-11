@@ -2,7 +2,7 @@ import json
 import logging
 import secrets
 import subprocess
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
@@ -242,12 +242,12 @@ class ModelAdapter:
         """
         pass
 
-    def block_until(self, *conditions, timeout: float | None = None, wait_period: float = 0.5):
+    def block_until(
+        self, *conditions: Callable, timeout: float | None = None, wait_period: float = 0.5
+    ):
         """Return only after all conditions are true."""
         self._juju.wait(
-            lambda status: all(conditions),
-            timeout=timeout,
-            successes=10,
+            lambda status: all(c() for c in conditions), timeout=timeout, successes=1, delay=3
         )
 
     def deploy(
