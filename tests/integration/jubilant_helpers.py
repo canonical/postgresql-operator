@@ -484,7 +484,7 @@ def build_connection_string(
     """Returns a PostgreSQL connection string.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         application_name: The name of the application
         relation_name: name of the relation to get connection data from
         read_only_endpoint: whether to choose the read-only endpoint
@@ -566,7 +566,7 @@ def check_database_users_existence(
     """Checks that applications users exist in the database.
 
     Args:
-        juju: The ops test framework
+        juju: The Juju fixture
         users_that_should_exist: List of users that should exist in the database
         users_that_should_not_exist: List of users that should not exist in the database
     """
@@ -594,7 +594,7 @@ def check_databases_creation(juju: JujuFixture, databases: list[str]) -> None:
     """Checks that database and tables are successfully created for the application.
 
     Args:
-        juju: The ops test framework
+        juju: The Juju fixture
         databases: List of database names that should have been created
     """
     password = get_password()
@@ -630,7 +630,7 @@ def check_patroni(juju: JujuFixture, unit_name: str, restart_time: float) -> boo
     """Check if Patroni is running correctly on a specific unit.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture instance
         unit_name: The name of the unit
         restart_time: Point in time before the unit was restarted.
 
@@ -649,7 +649,7 @@ def check_cluster_members(juju: JujuFixture, application_name: str) -> None:
     """Check that the correct members are part of the cluster.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture instance
         application_name: The name of the application
     """
     for attempt in Retrying(
@@ -736,7 +736,7 @@ def deploy_and_relate_application_with_postgresql(
     """Helper function to deploy and relate application with PostgreSQL.
 
     Args:
-        juju: The ops test framework.
+        juju: The Juju fixture.
         charm: Charm identifier.
         application_name: The name of the application to deploy.
         number_of_units: The number of units to deploy.
@@ -791,7 +791,7 @@ def deploy_and_relate_bundle_with_postgresql(
     """Helper function to deploy and relate a bundle with PostgreSQL.
 
     Args:
-        juju: The ops test framework.
+        juju: The Juju fixture.
         bundle_name: The name of the bundle to deploy.
         main_application_name: The name of the application that should be
             related to PostgreSQL.
@@ -960,7 +960,7 @@ def find_unit(juju: JujuFixture, application: str, leader: bool) -> UnitAdapter:
     """Helper function that retrieves a unit, based on need for leader or non-leader.
 
     Args:
-        juju: The ops test framework instance.
+        juju: The Juju fixture.
         application: The name of the application.
         leader: Whether the unit is a leader or not.
 
@@ -979,7 +979,7 @@ def get_application_units(juju: JujuFixture, application_name: str) -> list[str]
     """List the unit names of an application.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         application_name: The name of the application
 
     Returns:
@@ -994,7 +994,7 @@ def get_application_units_ips(juju: JujuFixture, application_name: str) -> list[
     """List the unit IPs of an application.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         application_name: The name of the application
 
     Returns:
@@ -1007,7 +1007,7 @@ def get_landscape_api_credentials(juju: JujuFixture) -> list[str]:
     """Returns the key and secret to be used in the Landscape API.
 
     Args:
-        juju: The ops test framework
+        juju: The Juju fixture
     """
     unit = juju.ext.model.applications[DATABASE_APP_NAME].units[0]
     password = get_password()
@@ -1042,7 +1042,7 @@ def get_machine_from_unit(juju: JujuFixture, unit_name: str) -> str:
     """Get the name of the machine from a specific unit.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         unit_name: The name of the unit to get the machine
 
     Returns:
@@ -1056,7 +1056,7 @@ def get_tls_ca(juju: JujuFixture, unit_name: str, relation: str = "client") -> s
     """Returns the TLS CA used by the unit.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         unit_name: The name of the unit
         relation: TLS relation to get the CA from
 
@@ -1156,7 +1156,7 @@ def check_tls(juju: JujuFixture, unit_name: str, enabled: bool) -> bool:
     """Returns whether TLS is enabled on the specific PostgreSQL instance.
 
     Args:
-        juju: The ops test framework instance.
+        juju: The Juju fixture.
         unit_name: The name of the unit of the PostgreSQL instance.
         enabled: check if TLS is enabled/disabled
 
@@ -1221,7 +1221,7 @@ def check_tls_replication(juju: JujuFixture, unit_name: str, enabled: bool) -> b
     """Returns whether TLS is enabled on the replica PostgreSQL instance.
 
     Args:
-        juju: The ops test framework instance.
+        juju: The Juju fixture.
         unit_name: The name of the replica of the PostgreSQL instance.
         enabled: check if TLS is enabled/disabled
 
@@ -1246,7 +1246,7 @@ def check_tls_patroni_api(juju: JujuFixture, unit_name: str, enabled: bool) -> b
     """Returns whether TLS is enabled on Patroni REST API.
 
     Args:
-        juju: The ops test framework instance.
+        juju: The Juju fixture.
         unit_name: The name of the unit where Patroni is running.
         enabled: check if TLS is enabled/disabled
 
@@ -1304,7 +1304,7 @@ def primary_changed(juju: JujuFixture, old_primary: str) -> bool:
     """Checks whether the primary unit has changed.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         old_primary: The name of the unit that was the primary before.
     """
     other_unit = next(
@@ -1329,7 +1329,7 @@ def restart_machine(juju: JujuFixture, unit_name: str) -> None:
     """Restart the machine where a unit run on.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         unit_name: The name of the unit to restart the machine
     """
     raw_hostname = get_machine_from_unit(juju, unit_name)
@@ -1341,7 +1341,7 @@ def run_command_on_unit(juju: JujuFixture, unit_name: str, command: str) -> str:
     """Run a command on a specific unit.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         unit_name: The name of the unit to run the command on
         command: The command to run
 
@@ -1370,7 +1370,7 @@ def scale_application(
     """Scale a given application to a specific unit count.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         application_name: The name of the application
         count: The desired number of units to scale to
         model: The model to scale the application in
@@ -1398,7 +1398,7 @@ def restart_patroni(juju: JujuFixture, unit_name: str, password: str) -> None:
     """Restart Patroni on a specific unit.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         unit_name: The name of the unit
         password: patroni password
     """
@@ -1446,7 +1446,7 @@ def start_machine(juju: JujuFixture, machine_name: str) -> None:
     """Start the machine where a unit run on.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         machine_name: The name of the machine to start
     """
     start_machine_command = f"lxc start {machine_name}"
@@ -1457,7 +1457,7 @@ def stop_machine(juju: JujuFixture, machine_name: str) -> None:
     """Stop the machine where a unit run on.
 
     Args:
-        juju: The ops test framework instance
+        juju: The Juju fixture
         machine_name: The name of the machine to stop
     """
     stop_machine_command = f"lxc stop {machine_name}"
@@ -1470,7 +1470,7 @@ def switchover(
     """Trigger a switchover.
 
     Args:
-        juju: The ops test framework instance.
+        juju: The Juju fixture.
         current_primary: The current primary unit.
         password: Patroni password.
         candidate: The unit that should be elected the new primary.
