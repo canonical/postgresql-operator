@@ -9,7 +9,6 @@ import logging
 import os
 import platform
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -863,13 +862,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.update({"ip": current_ip})
             # Update the async replication data with the new unit IP.
             self.async_replication.update_async_replication_data()
+            # Remove the old IP from the Raft cluster while Patroni is still
+            # running. When Patroni restarts with the new self_addr, PySyncObj
+            # will create fresh journal files for the new IP — the orphaned
+            # old-IP files in the raft data_dir are harmless.
+            try:
+                self._patroni.remove_raft_member(stored_ip)
+            except RemoveRaftMemberFailedError:
+                logger.warning(
+                    "Failed to remove old IP %s from Raft cluster during IP change", stored_ip
+                )
             self._patroni.stop_patroni()
-            # Clear stale Raft data so the unit can rejoin the Raft cluster
-            # with its new IP. Without this, local Raft state references the
-            # old IP and Patroni fails with "Updating member state failed".
-            raft_path = Path(f"{PATRONI_CONF_PATH}/raft")
-            if raft_path.exists() and raft_path.is_dir():
-                shutil.rmtree(raft_path)
             self._update_certificate()
             # Re-render config with the new IP so that when Patroni restarts
             # (by any hook), it binds to the correct address. Without this,

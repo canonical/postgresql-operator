@@ -1725,6 +1725,7 @@ def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
             "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
@@ -1744,6 +1745,7 @@ def test_update_member_ip(harness):
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
         assert relation_data.get("ip-to-remove") is None
         _stop_patroni.assert_not_called()
+        _remove_raft_member.assert_not_called()
         _update_certificate.assert_not_called()
         _update_async_replication_data.assert_not_called()
         _update_config.assert_not_called()
@@ -1761,6 +1763,7 @@ def test_update_member_ip(harness):
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
         assert relation_data.get("ip") == "192.0.2.0"
         assert relation_data.get("ip-to-remove") == "2.2.2.2"
+        _remove_raft_member.assert_called_once_with("2.2.2.2")
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
         _update_async_replication_data.assert_called_once()
