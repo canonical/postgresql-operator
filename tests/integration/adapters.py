@@ -121,6 +121,10 @@ class UnitAdapter:
         self.status = status
         self._juju = juju
 
+    def _update_status(self) -> None:
+        """Update unit status."""
+        self.status = self._juju.status().apps[self.app].units[self.name]
+
     def is_leader_from_status(self) -> bool:
         """Check to see if this unit is the leader."""
         return self.status.leader
@@ -164,11 +168,13 @@ class UnitAdapter:
     @property
     def workload_status(self) -> str:
         """Return workload status."""
+        self._update_status()
         return self.status.workload_status.current
 
     @property
     def workload_status_message(self) -> str:
         """Return workload status message."""
+        self._update_status()
         return self.status.workload_status.message
 
 
