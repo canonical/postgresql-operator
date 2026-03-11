@@ -136,6 +136,7 @@ class CharmConfig(BaseConfigModel):
     plugin_pg_visibility_enable: bool
     plugin_pgrowlocks_enable: bool
     plugin_pgstattuple_enable: bool
+    plugin_pg_stat_statements_enable: bool
     plugin_plperl_enable: bool
     plugin_plpython3u_enable: bool
     plugin_pltcl_enable: bool

@@ -2208,7 +2208,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if pg_parameters is None:
                 pg_parameters = {}
             pg_parameters["wal_compression"] = "on" if self.config.cpu_wal_compression else "off"
-        pg_parameters.pop("maximum_lag_on_failover", None)
 
         return pg_parameters
 
