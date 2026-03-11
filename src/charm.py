@@ -672,9 +672,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            primary = self._patroni.get_primary()
-            if primary is None and (standby_leader := self._patroni.get_standby_leader()):
-                primary = standby_leader
+            primary = self._patroni.get_primary() or self._patroni.get_standby_leader()
             primary_endpoint = self._patroni.get_member_ip(primary) if primary else None
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
@@ -2551,7 +2549,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.config.experimental_max_connections
             else max(4 * self.cpu_count, 100)
         )
-        cfg_patch = {
+        cfg_patch: dict[str, int | str | None] = {
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "max_replication_slots": 25,
