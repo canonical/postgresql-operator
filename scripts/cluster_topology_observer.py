@@ -87,6 +87,10 @@ def check_for_database_changes(run_cmd, unit, charm_dir, previous_databases):
         ):
             cursor.execute("SELECT datname, datacl FROM pg_database;")
             current_databases = cursor.fetchall()
+            cursor.execute(
+                "SELECT oid, rolname FROM pg_roles WHERE pg_has_role(oid, 'relation_access', 'member');"
+            )
+            current_databases.append(cursor.fetchall())
     except psycopg2.Error as e:
         with open(LOG_FILE_PATH, "a") as log_file:
             log_file.write(f"Failed to retrieve databases: {e}\n")

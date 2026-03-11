@@ -208,22 +208,26 @@ def test_check_for_database_changes():
         )
         with patch("builtins.open", mock, create=True):
             _cursor = _psycopg2.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
-            _cursor.fetchall.return_value = sentinel.databases
+            _cursor.fetchall.side_effect = [[sentinel.databases], sentinel.relation_users]
 
             # Test the first time this function is called.
             result = check_for_database_changes(run_cmd, unit, charm_dir, None)
-            assert result == sentinel.databases
+            assert result == [sentinel.databases, sentinel.relation_users]
             _subprocess.run.assert_not_called()
             _psycopg2.connect.assert_called_once_with(
                 "dbname='postgres' user='operator' host='/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/' "
                 "password='test_password' connect_timeout=1"
             )
-            _cursor.execute.assert_called_once_with("SELECT datname, datacl FROM pg_database;")
+            assert _cursor.execute.call_count == 2
+            _cursor.execute.assert_any_call("SELECT datname, datacl FROM pg_database;")
+            _cursor.execute.assert_any_call(
+                "SELECT oid, rolname FROM pg_roles WHERE pg_has_role(oid, 'relation_access', 'member');"
+            )
 
             # Test when the databases changed.
-            _cursor.fetchall.return_value = sentinel.databases_changed
+            _cursor.fetchall.side_effect = [[sentinel.databases_changed], sentinel.relation_users]
             result = check_for_database_changes(run_cmd, unit, charm_dir, result)
-            assert result == sentinel.databases_changed
+            assert result == [sentinel.databases_changed, sentinel.relation_users]
 
             _subprocess.run.assert_called_once_with([
                 run_cmd,
@@ -234,6 +238,7 @@ def test_check_for_database_changes():
 
             # Test when the databases haven't changed.
             _subprocess.reset_mock()
+            _cursor.fetchall.side_effect = [[sentinel.databases_changed], sentinel.relation_users]
             check_for_database_changes(run_cmd, unit, charm_dir, result)
-            assert result == sentinel.databases_changed
+            assert result == [sentinel.databases_changed, sentinel.relation_users]
             _subprocess.run.assert_not_called()
