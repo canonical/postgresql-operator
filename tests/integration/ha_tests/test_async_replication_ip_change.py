@@ -135,7 +135,6 @@ async def test_establish_async_replication(
 
 
 @markers.juju3
-@markers.amd64_only
 @pytest.mark.abort_on_fail
 async def test_ip_change_during_async_replication(
     ops_test: OpsTest,
