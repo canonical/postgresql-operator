@@ -2606,7 +2606,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             pg_parameters = dict(worker_configs)
             pg_parameters["wal_compression"] = cpu_wal_compression
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
-        pg_parameters.pop("maximum_lag_on_failover", None)
 
         return pg_parameters
 
