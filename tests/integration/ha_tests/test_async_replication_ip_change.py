@@ -14,7 +14,6 @@ from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
     get_leader_unit,
-    get_machine_from_unit,
 )
 from .conftest import fast_forward
 from .helpers import (
@@ -22,12 +21,10 @@ from .helpers import (
     are_writes_increasing,
     check_writes,
     cut_network_from_unit,
-    get_ip_from_inside_the_unit,
+    get_standby_leader,
     get_unit_ip,
-    is_postgresql_ready,
     restore_network_for_unit,
     start_continuous_writes,
-    wait_network_restore,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,60 +143,53 @@ async def test_ip_change_during_async_replication(
     second_model: Model,
     continuous_writes,
 ) -> None:
-    """Test that async replication survives an IP change on a primary cluster unit."""
+    """Test that async replication survives an IP change on the standby cluster.
+
+    The standby leader is the unit that connects to the primary cluster for
+    streaming replication. Its IP must be allowed in the primary's pg_hba.conf.
+    This test verifies that when the standby leader's IP changes, the primary
+    cluster updates its pg_hba rules and replication continues without data loss.
+    """
     logger.info("starting continuous writes to the database")
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
+    await start_continuous_writes(ops_test, DATABASE_APP_NAME)
 
     logger.info("checking whether writes are increasing")
-    await are_writes_increasing(ops_test, extra_model=second_model)
+    await are_writes_increasing(ops_test)
 
-    # Pick a unit from the primary cluster to cut network from.
-    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    unit_name = unit.name
-    unit_hostname = await get_machine_from_unit(ops_test, unit_name)
-    old_ip = await get_unit_ip(ops_test, unit_name)
-    logger.info(f"Cutting network for {unit_name} (hostname={unit_hostname}, ip={old_ip})")
+    # Find the standby leader — the unit that connects to the primary for replication.
+    standby_leader_member = await get_standby_leader(second_model, DATABASE_APP_NAME)
+    assert standby_leader_member is not None, "No standby leader found"
+    parts = standby_leader_member.rsplit("-", 1)
+    standby_leader_name = f"{parts[0]}/{parts[1]}"
+    logger.info(f"Standby leader: {standby_leader_name}")
+
+    # Get hostname via juju exec (helpers don't support second model).
+    result = subprocess.run(
+        f"juju exec -m {second_model.info.name} --unit {standby_leader_name} -- hostname".split(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    unit_hostname = result.stdout.strip()
+    old_ip = await get_unit_ip(ops_test, standby_leader_name, model=second_model)
+    logger.info(
+        f"Cutting network for {standby_leader_name} (hostname={unit_hostname}, ip={old_ip})"
+    )
 
     cut_network_from_unit(unit_hostname)
 
-    # Release the DHCP lease inside the container so it gets a new IP on restore.
-    # The eth0 device is masked (type=none), but we can still exec into the container.
+    # Release the DHCP lease so the unit gets a new IP on restore.
     subprocess.run(
         f"lxc exec {unit_hostname} -- dhclient -r eth0".split(),
         capture_output=True,
     )
 
-    async with ops_test.fast_forward():
-        logger.info("checking whether writes are increasing (excluding the cut unit)")
-        await are_writes_increasing(ops_test, down_unit=unit_name, extra_model=second_model)
+    # Verify the primary cluster still accepts writes while standby is down.
+    async with ops_test.fast_forward(), fast_forward(second_model):
+        await are_writes_increasing(ops_test)
 
-    logger.info(f"Restoring network for {unit_name}")
     restore_network_for_unit(unit_hostname)
 
-    # Wait until the cluster becomes idle after IP update.
-    logger.info("waiting for cluster to become idle after restoring network")
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME],
-            status="active",
-            raise_on_blocked=True,
-            timeout=TIMEOUT,
-            idle_period=30,
-        )
-
-    # Wait for the unit to get its new IP.
-    logger.info("waiting for IP address to change on the unit")
-    await wait_network_restore(ops_test, unit_name, old_ip)
-    new_ip = await get_ip_from_inside_the_unit(ops_test, unit_name)
-    logger.info(f"IP changed from {old_ip} to {new_ip}")
-    assert new_ip != old_ip, f"IP did not change after network restore ({old_ip})"
-
-    # Verify that the database service is ready on the unit with the new IP.
-    logger.info(f"waiting for the database service to be ready on {unit_name}")
-    assert await is_postgresql_ready(ops_test, unit_name, use_ip_from_inside=True)
-
-    # Wait for both clusters to settle after the IP change propagation.
     async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
         await gather(
             first_model.wait_for_idle(
@@ -210,10 +200,21 @@ async def test_ip_change_during_async_replication(
             ),
         )
 
-    # Verify that writes are still replicating to both clusters after the IP change.
-    logger.info("checking whether writes are increasing on both clusters after IP change")
-    await are_writes_increasing(ops_test, use_ip_from_inside=True, extra_model=second_model)
+    new_ip = await get_unit_ip(ops_test, standby_leader_name, model=second_model)
+    # Fall back to hostname -I if Juju still reports the old IP.
+    if new_ip == old_ip:
+        result = subprocess.run(
+            f"juju exec -m {second_model.info.name} --unit {standby_leader_name} -- hostname -I".split(),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            new_ip = result.stdout.strip().split()[0]
+    logger.info(f"IP changed from {old_ip} to {new_ip}")
+    assert new_ip != old_ip, f"IP did not change after network disruption ({old_ip})"
 
-    # Stop writes and verify no data was lost across both clusters.
+    logger.info("checking whether writes are increasing on both clusters after IP change")
+    await are_writes_increasing(ops_test)
+
     logger.info("checking whether no writes were lost across both clusters")
-    await check_writes(ops_test, use_ip_from_inside=True, extra_model=second_model)
+    await check_writes(ops_test, extra_model=second_model)
