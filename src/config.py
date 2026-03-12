@@ -96,6 +96,12 @@ class CharmConfig(BaseConfigModel):
     optimizer_min_parallel_table_scan_size: int | None
     optimizer_parallel_setup_cost: float | None
     optimizer_parallel_tuple_cost: float | None
+    optimizer_pg_stat_statements_track: Literal["none", "top", "all"]
+    optimizer_pg_stat_statements_track_utility: bool
+    optimizer_pg_stat_statements_save: bool
+    optimizer_track_io_timing: bool
+    optimizer_track_wal_io_timing: bool
+    optimizer_track_functions: Literal["none", "pl", "all"]
     profile: str
     profile_limit_memory: int | None
     plugin_address_standardizer_data_us_enable: bool
@@ -130,6 +136,7 @@ class CharmConfig(BaseConfigModel):
     plugin_pg_visibility_enable: bool
     plugin_pgrowlocks_enable: bool
     plugin_pgstattuple_enable: bool
+    plugin_pg_stat_statements_enable: bool
     plugin_plperl_enable: bool
     plugin_plpython3u_enable: bool
     plugin_pltcl_enable: bool

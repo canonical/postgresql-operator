@@ -439,6 +439,38 @@ options:
       Allowed values are: from 0 to 1.80E+308.
     type: float
     default: 0.1
+  optimizer_pg_stat_statements_track:
+    description: |
+      Controls which statements are counted by the pg_stat_statements.
+      Allowed values are: none, top, all.
+    type: string
+    default: top
+  optimizer_pg_stat_statements_track_utility:
+    description: |
+      Controls whether utility commands are tracked by pg_stat_statements.
+    type: boolean
+    default: True
+  optimizer_pg_stat_statements_save:
+    description: |
+      Specifies whether to save statement statistics across server shutdowns.
+    type: boolean
+    default: False
+  optimizer_track_io_timing:
+    description: |
+      Enables timing of database I/O calls.
+    type: boolean
+    default: False
+  optimizer_track_wal_io_timing:
+    description: |
+      Enables timing of WAL I/O calls.
+    type: boolean
+    default: False
+  optimizer_track_functions:
+    description: |
+      Enables tracking of function call counts and time used.
+      Allowed values are: pl, all, none.
+    type: string
+    default: "none"
   plugin_address_standardizer_data_us_enable:
     default: false
     type: boolean
@@ -567,6 +599,10 @@ options:
     default: false
     type: boolean
     description: Enable pgstattuple extension
+  plugin_pg_stat_statements_enable:
+    type: boolean
+    description: Enable pg_stat_statements extension
+    default: False
   plugin_plperl_enable:
     default: false
     type: boolean
