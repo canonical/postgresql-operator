@@ -1717,7 +1717,6 @@ def test_update_member_ip(harness):
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
         patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
             "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
         ) as _update_async_replication_data,
@@ -1739,7 +1738,6 @@ def test_update_member_ip(harness):
         _remove_raft_member.assert_not_called()
         _update_certificate.assert_not_called()
         _update_async_replication_data.assert_not_called()
-        _update_config.assert_not_called()
 
         # Test when the IP address of the unit has changed.
         with harness.hooks_disabled():
@@ -1758,7 +1756,6 @@ def test_update_member_ip(harness):
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
         _update_async_replication_data.assert_called_once()
-        _update_config.assert_called_once()
 
         # Test that ip-to-remove is preserved while the old IP is still in members_ips
         # (prevents race where the leader hasn't processed the removal yet).

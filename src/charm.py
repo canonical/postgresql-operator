@@ -874,10 +874,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
             self._patroni.stop_patroni()
             self._update_certificate()
-            # Re-render config with the new IP so that when Patroni restarts
-            # (by any hook), it binds to the correct address. Without this,
-            # an update-status hook could restart Patroni with the stale config.
-            self.update_config()
             return True
         else:
             # Only clear ip-to-remove after the leader has processed it
@@ -977,6 +973,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
+            self._peer_members_ips,
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),

@@ -134,6 +134,7 @@ class Patroni:
         cluster_name: str,
         member_name: str,
         planned_units: int,
+        peers_ips: set[str],
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
@@ -148,6 +149,7 @@ class Patroni:
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             planned_units: number of units planned for the cluster
+            peers_ips: IP addresses of the peer units
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
@@ -159,16 +161,12 @@ class Patroni:
         self.cluster_name = cluster_name
         self.member_name = member_name
         self.planned_units = planned_units
+        self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
         self.rewind_password = rewind_password
         self.raft_password = raft_password
         self.patroni_password = patroni_password
-
-    @property
-    def peers_ips(self) -> set[str]:
-        """Fetch current peer member IPs from the charm (always fresh)."""
-        return self.charm._peer_members_ips
 
     @property
     def verify(self) -> str | bool:
