@@ -2,7 +2,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-import subprocess
 from asyncio import gather
 
 import pytest
@@ -21,8 +20,8 @@ from .helpers import (
     are_writes_increasing,
     check_writes,
     cut_network_from_unit,
+    get_ip_from_inside_the_unit,
     get_standby_leader,
-    get_unit_ip,
     restore_network_for_unit,
     start_continuous_writes,
 )
@@ -162,26 +161,14 @@ async def test_ip_change_during_async_replication(
     standby_leader_name = f"{parts[0]}/{parts[1]}"
     logger.info(f"Standby leader: {standby_leader_name}")
 
-    # Get hostname via juju exec (helpers don't support second model).
-    result = subprocess.run(
-        f"juju exec -m {second_model.info.name} --unit {standby_leader_name} -- hostname".split(),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    unit_hostname = result.stdout.strip()
-    old_ip = await get_unit_ip(ops_test, standby_leader_name, model=second_model)
+    standby_leader_unit = second_model.units[standby_leader_name]
+    unit_hostname = standby_leader_unit.machine.hostname
+    old_ip = await get_ip_from_inside_the_unit(ops_test, standby_leader_name, model=second_model)
     logger.info(
         f"Cutting network for {standby_leader_name} (hostname={unit_hostname}, ip={old_ip})"
     )
 
     cut_network_from_unit(unit_hostname)
-
-    # Release the DHCP lease so the unit gets a new IP on restore.
-    subprocess.run(
-        f"lxc exec {unit_hostname} -- dhclient -r eth0".split(),
-        capture_output=True,
-    )
 
     # Verify the primary cluster still accepts writes while standby is down.
     async with ops_test.fast_forward(), fast_forward(second_model):
@@ -199,16 +186,9 @@ async def test_ip_change_during_async_replication(
             ),
         )
 
-    new_ip = await get_unit_ip(ops_test, standby_leader_name, model=second_model)
-    # Fall back to hostname -I if Juju still reports the old IP.
-    if new_ip == old_ip:
-        result = subprocess.run(
-            f"juju exec -m {second_model.info.name} --unit {standby_leader_name} -- hostname -I".split(),
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            new_ip = result.stdout.strip().split()[0]
+    # Use hostname -I to get the real IP from inside the unit, because Juju's
+    # public_address cache may not update quickly after network disruption.
+    new_ip = await get_ip_from_inside_the_unit(ops_test, standby_leader_name, model=second_model)
     logger.info(f"IP changed from {old_ip} to {new_ip}")
     assert new_ip != old_ip, f"IP did not change after network disruption ({old_ip})"
 
