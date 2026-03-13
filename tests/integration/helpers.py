@@ -37,6 +37,7 @@ CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
+PGDATA_PATH = f"{STORAGE_PATH}/16/main"
 APPLICATION_NAME = "postgresql-test-app"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
 

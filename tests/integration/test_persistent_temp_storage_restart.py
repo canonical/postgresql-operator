@@ -10,7 +10,6 @@ import pytest
 
 from .helpers import DATABASE_APP_NAME
 from .jubilant_helpers import (
-    check_for_fix_log_message,
     force_leader_election,
     get_lxd_machine_name,
     verify_leader_active,
@@ -60,18 +59,17 @@ def test_deploy_with_persistent_temp_storage(juju: jubilant.Juju, charm) -> None
 
 
 def test_leader_change_and_restart(juju: jubilant.Juju) -> None:
-    """Force leader change and restart to trigger the library fix code path.
+    """Force leader change and restart to verify persistent temp storage survives reboot.
 
-    This test properly validates the fix from
-    https://github.com/canonical/postgresql-single-kernel-library/pull/54 by:
+    This test validates that persistent temp storage works correctly after reboot:
     1. Finding the current Juju leader
     2. Killing the leader's juju agent to force leader election
     3. Waiting for a new leader to be elected
     4. Restarting the new leader's LXD machine
-    5. Verifying the log message appears confirming the fix handled persistent temp storage
+    5. Verifying the unit comes back active and temp tables work
 
-    This scenario triggers set_up_database() on the new leader during the start event,
-    which should detect the persistent temp storage and log the appropriate message.
+    With persistent storage, the temp tablespace directory persists across reboots
+    with correct ownership, so no permissions fix is needed.
     """
     # Find the current Juju leader
     logger.info("Finding current Juju leader unit")
@@ -105,7 +103,6 @@ def test_leader_change_and_restart(juju: jubilant.Juju) -> None:
     )
 
     # Now restart the new leader's LXD machine
-    # This should trigger set_up_database() which will detect persistent temp storage
     new_leader_machine = get_lxd_machine_name(juju.status(), new_leader)
     logger.info(f"Restarting LXD machine {new_leader_machine} for new leader {new_leader}")
     subprocess.check_call(["lxc", "restart", new_leader_machine])
@@ -123,11 +120,6 @@ def test_leader_change_and_restart(juju: jubilant.Juju) -> None:
     status = juju.status()
     verify_leader_active(status, new_leader)
     logger.info(f"New leader {new_leader} is active after restart")
-
-    # Check for the log message that confirms the fix is working
-    assert check_for_fix_log_message(juju, new_leader), (
-        "Expected library fix log message not found in unit logs"
-    )
 
     # Test temporary table creation
     logger.info("Testing temporary table creation on database")

@@ -51,8 +51,19 @@ PGBACKREST_CONF_PATH = f"{SNAP_CONF_PATH}/pgbackrest"
 PGBACKREST_LOGS_PATH = f"{SNAP_LOGS_PATH}/pgbackrest"
 
 POSTGRESQL_CONF_PATH = f"{SNAP_CONF_PATH}/postgresql"
-POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
 POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
+
+# Storage mount paths (matching metadata.yaml locations).
+ARCHIVE_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/archive"
+DATA_STORAGE_PATH = f"{SNAP_DATA_PATH}/postgresql"
+LOGS_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/logs"
+TEMP_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/temp"
+
+# Target directories within storage mounts.
+POSTGRESQL_DATA_PATH = f"{DATA_STORAGE_PATH}/16/main"
+ARCHIVE_PATH = f"{ARCHIVE_STORAGE_PATH}/16/main"
+LOGS_PATH = f"{LOGS_STORAGE_PATH}/16/main/pg_wal"
+TEMP_PATH = f"{TEMP_STORAGE_PATH}/16/main/pgsql_tmp"
 
 UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 

@@ -49,6 +49,10 @@ from tenacity import (
 
 from constants import (
     API_REQUEST_TIMEOUT,
+    ARCHIVE_PATH,
+    DATA_STORAGE_PATH,
+    LOGS_PATH,
+    LOGS_STORAGE_PATH,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -57,6 +61,7 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    TEMP_PATH,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -223,6 +228,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
+        self._create_pgdata()
         self._change_owner(POSTGRESQL_DATA_PATH)
 
         # Create empty base config
@@ -242,6 +248,48 @@ class Patroni:
         user_database = pwd.getpwnam("_daemon_")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
+
+    def _create_pgdata(self) -> None:
+        """Create the PostgreSQL data directory structure.
+
+        For new deployments, creates actual subdirectories under each storage mount.
+        For existing deployments, creates symlinks so the code always references
+        the 16/main path while data stays at the mount root.
+        """
+        # Archive and temp: always ensure these exist (e.g. tmpfs is wiped on reboot).
+        self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+        is_existing_cluster = os.path.exists(POSTGRESQL_DATA_PATH)
+        if is_existing_cluster:
+            # Existing cluster (e.g. reboot): create temp dir without fixing ownership.
+            # The library's set_up_database() detects wrong ownership to trigger the
+            # tablespace fix after tmpfs reboot. If we set _daemon_ ownership here,
+            # it would mask the reboot signal and the stale tablespace would never
+            # be recreated. For persistent storage reboots, the directory already
+            # exists with correct ownership, so makedirs is a no-op.
+            os.makedirs(TEMP_PATH, exist_ok=True)
+        else:
+            # Fresh deployment: set correct ownership so PostgreSQL can use it.
+            self._create_directory(TEMP_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
+        # Skip if the target data directory already exists (already set up).
+        if is_existing_cluster:
+            return
+
+        is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
+
+        if is_existing_deployment:
+            # Data storage: symlink 16/main -> mount root.
+            os.makedirs(os.path.join(DATA_STORAGE_PATH, "16"), exist_ok=True)
+            os.symlink(DATA_STORAGE_PATH, POSTGRESQL_DATA_PATH)
+
+            # Logs storage: symlink 16/main/pg_wal -> mount root.
+            os.makedirs(os.path.join(LOGS_STORAGE_PATH, "16", "main"), exist_ok=True)
+            os.symlink(LOGS_STORAGE_PATH, LOGS_PATH)
+        else:
+            # New deployment: create actual subdirectories.
+            self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+            os.makedirs(os.path.dirname(LOGS_PATH), exist_ok=True)
+            self._create_directory(LOGS_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
     @cached_property
     def cluster_members(self) -> set:
@@ -712,6 +760,7 @@ class Patroni:
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
+            logs_path=LOGS_PATH,
             enable_ldap=enable_ldap,
             enable_tls=enable_tls,
             member_name=self.member_name,

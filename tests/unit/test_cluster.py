@@ -26,6 +26,7 @@ from cluster import (
     SwitchoverNotSyncError,
 )
 from constants import (
+    LOGS_PATH,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
@@ -333,6 +334,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         expected_content = template.render(
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
+            logs_path=LOGS_PATH,
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
@@ -500,23 +502,25 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         patch("builtins.open") as _open,
         patch("os.chown") as _chown,
         patch("pwd.getpwnam") as _getpwnam,
+        patch("cluster.Patroni._create_pgdata") as _create_pgdata,
     ):
         _getpwnam.return_value.pw_uid = sentinel.uid
         _getpwnam.return_value.pw_gid = sentinel.gid
 
         patroni.configure_patroni_on_unit()
 
+        _create_pgdata.assert_called_once()
         _getpwnam.assert_called_once_with("_daemon_")
 
         _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main",
             uid=sentinel.uid,
             gid=sentinel.gid,
         )
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
         _chmod.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 448
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main", 448
         )
 
 
