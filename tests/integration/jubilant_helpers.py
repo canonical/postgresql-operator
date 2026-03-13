@@ -1282,7 +1282,6 @@ def check_tls_patroni_api(juju: JujuFixture, unit_name: str, enabled: bool) -> b
     return False
 
 
-# FIXME
 def has_relation_exited(
     juju: JujuFixture, endpoint_one: str, endpoint_two: str, model: ModelAdapter = None
 ) -> bool:
@@ -1314,15 +1313,6 @@ def primary_changed(juju: JujuFixture, old_primary: str) -> bool:
     )
     primary = get_primary(juju, other_unit)
     return primary != old_primary
-
-
-# FIXME
-# def relations(juju: JujuFixture, provider_app: str, requirer_app: str) -> list:
-#     return [
-#         relation
-#         for relation in juju.ext.model.applications[provider_app].relations.values()
-#         if not relation.is_peer and relation.requires.application_name == requirer_app
-#     ]
 
 
 def restart_machine(juju: JujuFixture, unit_name: str) -> None:

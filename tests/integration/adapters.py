@@ -1,3 +1,8 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Adapters which use Jubilant to provide libjuju-compliant API."""
+
 import json
 import logging
 import secrets
@@ -39,6 +44,13 @@ class TStorageInfo(TypedDict):
 
 
 @dataclass
+class Endpoint:
+    """Data model for endpoint info of a relation."""
+
+    name: str
+
+
+@dataclass
 class RequiresInfo:
     """Data model for requires info of a relation."""
 
@@ -54,6 +66,11 @@ class RelationInfo:
     endpoint: str
     related_endpoint: str
     raw: dict[str, Any]
+
+    @property
+    def endpoints(self) -> list[Endpoint]:
+        """Relation endpoints."""
+        return [Endpoint(self.endpoint), Endpoint(self.related_endpoint)]
 
     @property
     def is_peer(self) -> bool:
@@ -502,9 +519,9 @@ class ModelAdapter:
         return {app: ApplicationAdapter(app, self._juju) for app in apps}
 
     @property
-    def relations(self) -> dict[int, RelationInfo]:
+    def relations(self) -> list[RelationInfo]:
         """Return a map of relation-id:Relation for all relations currently in the model."""
-        self.get_relations(self.units.values())
+        return self.get_relations(self.units.values()).values()
 
     @property
     def units(self) -> dict[str, UnitAdapter]:
