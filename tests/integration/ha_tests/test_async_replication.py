@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-import contextlib
 import logging
-import subprocess
 from asyncio import gather
 
 import psycopg2
@@ -12,7 +10,7 @@ from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import architecture, markers
+from .. import markers
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
@@ -23,6 +21,7 @@ from ..helpers import (
     scale_application,
     wait_for_relation_removed_between,
 )
+from .conftest import fast_forward
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -41,46 +40,6 @@ IDLE_PERIOD = 5
 TIMEOUT = 2000
 
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
-
-
-@contextlib.asynccontextmanager
-async def fast_forward(model: Model, fast_interval: str = "10s", slow_interval: str | None = None):
-    """Adaptation of OpsTest.fast_forward to work with different models."""
-    update_interval_key = "update-status-hook-interval"
-    interval_after = (
-        slow_interval if slow_interval else (await model.get_config())[update_interval_key]
-    )
-
-    await model.set_config({update_interval_key: fast_interval})
-    yield
-    await model.set_config({update_interval_key: interval_after})
-
-
-@pytest.fixture(scope="module")
-def first_model(ops_test: OpsTest) -> Model:
-    """Return the first model."""
-    first_model = ops_test.model
-    return first_model
-
-
-@pytest.fixture(scope="module")
-async def second_model(ops_test: OpsTest, first_model, request) -> Model:
-    """Create and return the second model."""
-    second_model_name = f"{first_model.info.name}-other"
-    if second_model_name not in await ops_test._controller.list_models():
-        await ops_test._controller.add_model(second_model_name)
-        subprocess.run(["juju", "switch", second_model_name], check=True)
-        subprocess.run(
-            ["juju", "set-model-constraints", f"arch={architecture.architecture}"], check=True
-        )
-        subprocess.run(["juju", "switch", first_model.info.name], check=True)
-    second_model = Model()
-    await second_model.connect(model_name=second_model_name)
-    yield second_model
-    if request.config.getoption("--keep-models"):
-        return
-    logger.info("Destroying second model")
-    await ops_test._controller.destroy_model(second_model_name, destroy_storage=True)
 
 
 @pytest.fixture
@@ -490,10 +449,13 @@ async def test_async_replication_failover_in_main_cluster(
             ),
         )
 
-    # Check that the sync-standby unit is not the same as before.
-    new_sync_standby = await get_sync_standby(ops_test, first_model, DATABASE_APP_NAME)
-    logger.info(f"New sync-standby: {new_sync_standby}")
-    assert new_sync_standby != sync_standby, "Sync-standby is the same as before"
+    # Check that the sync-standby unit is not the same as before (retry because
+    # Patroni may take some time to update its cluster state after unit removal).
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            new_sync_standby = await get_sync_standby(ops_test, first_model, DATABASE_APP_NAME)
+            logger.info(f"New sync-standby: {new_sync_standby}")
+            assert new_sync_standby != sync_standby, "Sync-standby is the same as before"
 
     logger.info("Ensure continuous_writes after the crashed unit")
     await are_writes_increasing(ops_test)
