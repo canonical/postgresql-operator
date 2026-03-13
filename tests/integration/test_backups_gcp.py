@@ -5,13 +5,12 @@ import logging
 import uuid
 
 import pytest as pytest
-from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from .adapters import JujuFixture
 from .backup_helpers import backup_operations
 from .conftest import GCP
-from .helpers import (
-    CHARM_BASE,
+from .jubilant_helpers import (
     DATABASE_APP_NAME,
     db_connect,
     get_password,
@@ -32,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_backup_gcp(ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict], charm) -> None:
+def test_backup_gcp(juju: JujuFixture, gcp_cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in GCP, test backup and restore actions."""
     config = gcp_cloud_configs[0]
     credentials = gcp_cloud_configs[1]
 
-    await backup_operations(
-        ops_test,
+    backup_operations(
+        juju,
         S3_INTEGRATOR_APP_NAME,
         tls_certificates_app_name,
         tls_channel,
@@ -50,38 +49,36 @@ async def test_backup_gcp(ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict
     database_app_name = f"{DATABASE_APP_NAME}-gcp"
 
     # Remove the database app.
-    await ops_test.model.remove_application(database_app_name, block_until_done=True)
+    juju.ext.model.remove_application(database_app_name, block_until_done=True)
 
     # Remove the TLS operator.
-    await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
+    juju.ext.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-async def test_restore_on_new_cluster(
-    ops_test: OpsTest, charm, gcp_cloud_configs: tuple[dict, dict]
+def test_restore_on_new_cluster(
+    juju: JujuFixture, charm, gcp_cloud_configs: tuple[dict, dict]
 ) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
-    await ops_test.model.deploy(
+    juju.ext.model.deploy(
         charm,
         application_name=previous_database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
-    await ops_test.model.deploy(
+    juju.ext.model.deploy(
         charm,
         application_name=database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
-    await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
-    await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
-    async with ops_test.fast_forward():
+    juju.ext.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
+    juju.ext.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+    with juju.ext.fast_forward():
         logger.info(
             "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
         )
-        await wait_for_idle_on_blocked(
-            ops_test,
+        wait_for_idle_on_blocked(
+            juju,
             previous_database_app_name,
             2,
             S3_INTEGRATOR_APP_NAME,
@@ -90,8 +87,8 @@ async def test_restore_on_new_cluster(
         logger.info(
             "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
         )
-        await wait_for_idle_on_blocked(
-            ops_test,
+        wait_for_idle_on_blocked(
+            juju,
             database_app_name,
             0,
             S3_INTEGRATOR_APP_NAME,
@@ -100,17 +97,17 @@ async def test_restore_on_new_cluster(
 
     # Remove the database app with the same name as the previous one (that was used only to test
     # that the cluster becomes blocked).
-    await ops_test.model.remove_application(previous_database_app_name, block_until_done=True)
+    juju.ext.model.remove_application(previous_database_app_name, block_until_done=True)
 
     # Run the "list backups" action.
     unit_name = f"{database_app_name}/0"
     logger.info("listing the available backups")
-    action = await ops_test.model.units.get(unit_name).run_action("list-backups")
-    await action.wait()
+    action = juju.ext.model.units.get(unit_name).run_action("list-backups")
+    action.wait()
     backups = action.results.get("backups")
     assert backups, "backups not outputted"
-    await wait_for_idle_on_blocked(
-        ops_test,
+    wait_for_idle_on_blocked(
+        juju,
         database_app_name,
         0,
         S3_INTEGRATOR_APP_NAME,
@@ -126,24 +123,27 @@ async def test_restore_on_new_cluster(
             # Last two entries are 'action: restore', that cannot be used without restore-to-time parameter
             most_recent_real_backup = backups.split("\n")[-3]
             backup_id = most_recent_real_backup.split()[0]
-            action = await ops_test.model.units.get(unit_name).run_action(
+            action = juju.ext.model.units.get(unit_name).run_action(
                 "restore", **{"backup-id": backup_id}
             )
-            await action.wait()
+            action.wait()
             restore_status = action.results.get("restore-status")
             assert restore_status, "restore hasn't succeeded"
 
     # Wait for the restore to complete.
-    async with ops_test.fast_forward():
-        unit = ops_test.model.units.get(f"{database_app_name}/0")
-        await ops_test.model.block_until(
-            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+    with juju.ext.fast_forward():
+        unit = f"{database_app_name}/0"
+        juju.wait(
+            lambda status: (
+                status.apps[database_app_name].units[unit].workload_status.message
+                == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+            )
         )
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
-    password = await get_password(ops_test, database_app_name=database_app_name)
-    address = get_unit_address(ops_test, unit_name)
+    password = get_password(database_app_name=database_app_name)
+    address = get_unit_address(juju, unit_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
@@ -155,47 +155,51 @@ async def test_restore_on_new_cluster(
     connection.close()
 
 
-async def test_invalid_config_and_recovery_after_fixing_it(
-    ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict]
+def test_invalid_config_and_recovery_after_fixing_it(
+    juju: JujuFixture, gcp_cloud_configs: tuple[dict, dict]
 ) -> None:
     """Test that the charm can handle invalid and valid backup configurations."""
     database_app_name = f"new-{DATABASE_APP_NAME}"
 
     # Provide invalid backup configurations.
     logger.info("configuring S3 integrator for an invalid cloud")
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config({
+    juju.ext.model.applications[S3_INTEGRATOR_APP_NAME].set_config({
         "endpoint": "endpoint",
         "bucket": "bucket",
         "path": "path",
         "region": "region",
     })
-    action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
+    action = juju.ext.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
         "sync-s3-credentials",
         **{
             "access-key": "access-key",
             "secret-key": "secret-key",
         },
     )
-    await action.wait()
+    action.wait()
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await ops_test.model.block_until(
-        lambda: unit.workload_status_message == FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE
+    unit = f"{database_app_name}/0"
+    juju.wait(
+        lambda status: (
+            status.apps[database_app_name].units[unit].workload_status.message
+            == FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE
+        )
     )
 
     # Provide valid backup configurations, but from another cluster repository.
     logger.info(
         "configuring S3 integrator for a valid cloud, but with the path of another cluster repository"
     )
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(gcp_cloud_configs[0])
-    action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
+    juju.ext.model.applications[S3_INTEGRATOR_APP_NAME].set_config(gcp_cloud_configs[0])
+    action = juju.ext.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
         "sync-s3-credentials",
         **gcp_cloud_configs[1],
     )
-    await action.wait()
+    action.wait()
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await ops_test.model.block_until(
+
+    unit = juju.ext.model.units.get(f"{database_app_name}/0")
+    juju.ext.model.block_until(
         lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
     )
 
@@ -203,23 +207,23 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     logger.info("configuring S3 integrator for a valid cloud")
     config = gcp_cloud_configs[0].copy()
     config["path"] = f"/postgresql/{uuid.uuid1()}"
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
+    juju.ext.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
     logger.info("waiting for the database charm to become active")
-    await ops_test.model.wait_for_idle(
-        apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active"
-    )
+    juju.ext.model.wait_for_idle(apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active")
 
 
-async def test_block_on_missing_region(
-    ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict]
-) -> None:
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config({
+def test_block_on_missing_region(juju: JujuFixture, gcp_cloud_configs: tuple[dict, dict]) -> None:
+    juju.ext.model.applications[S3_INTEGRATOR_APP_NAME].set_config({
         **gcp_cloud_configs[0],
         "region": "",
     })
     database_app_name = f"new-{DATABASE_APP_NAME}"
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await ops_test.model.block_until(
-        lambda: unit.workload_status_message == FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+    unit = juju.ext.model.units.get(f"{database_app_name}/0")
+    unit = f"{database_app_name}/0"
+    juju.wait(
+        lambda status: (
+            status.apps[database_app_name].units[unit].workload_status.message
+            == FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+        )
     )
