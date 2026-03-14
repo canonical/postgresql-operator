@@ -1,0 +1,32 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+type: charm
+platforms:
+  ubuntu@24.04:amd64:
+  ubuntu@24.04:arm64:
+
+parts:
+  charm:
+    plugin: charm
+    source: .
+    build-packages:
+      - libpq-dev
+    charm-requirements:
+      - requirements.txt
+  # Custom dispatch script to set LD_LIBRARY_PATH for libpq
+  dispatch-override:
+    plugin: dump
+    source: .
+    stage:
+      - dispatch
+  libpq:
+    build-packages:
+      - libpq-dev
+    plugin: dump
+    source: /usr/lib/
+    source-type: local
+    stage:
+      - lib/
+    organize:
+      "*-linux-gnu/libpq.so*": lib/
