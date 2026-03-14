@@ -49,6 +49,10 @@ from tenacity import (
 
 from constants import (
     API_REQUEST_TIMEOUT,
+    ARCHIVE_PATH,
+    DATA_STORAGE_PATH,
+    LOGS_PATH,
+    LOGS_STORAGE_PATH,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -57,6 +61,7 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    TEMP_PATH,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -223,6 +228,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
+        self._create_pgdata()
         self._change_owner(POSTGRESQL_DATA_PATH)
 
         # Create empty base config
@@ -232,7 +238,7 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-    def _change_owner(self, path: str) -> None:
+    def _change_owner(self, path: Path | str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
 
         Args:
@@ -243,13 +249,58 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
+    def _create_pgdata(self) -> None:
+        """Create the PostgreSQL data directory structure.
+
+        For new deployments, creates actual subdirectories under each storage mount.
+        For existing deployments, creates symlinks so the code always references
+        the 16/main path while data stays at the mount root.
+        """
+        pgdata = Path(POSTGRESQL_DATA_PATH)
+        logs = Path(LOGS_PATH)
+
+        # Archive and temp: always ensure these exist (e.g. tmpfs is wiped on reboot).
+        self._create_directory(Path(ARCHIVE_PATH), POSTGRESQL_STORAGE_PERMISSIONS)
+        is_existing_cluster = pgdata.exists()
+        if is_existing_cluster:
+            # Existing cluster (e.g. reboot): create temp dir without fixing ownership.
+            # The library's set_up_database() detects wrong ownership to trigger the
+            # tablespace fix after tmpfs reboot. If we set _daemon_ ownership here,
+            # it would mask the reboot signal and the stale tablespace would never
+            # be recreated. For persistent storage reboots, the directory already
+            # exists with correct ownership, so makedirs is a no-op.
+            Path(TEMP_PATH).mkdir(parents=True, exist_ok=True)
+        else:
+            # Fresh deployment: set correct ownership so PostgreSQL can use it.
+            self._create_directory(Path(TEMP_PATH), POSTGRESQL_STORAGE_PERMISSIONS)
+
+        # Skip if the target data directory already exists (already set up).
+        if is_existing_cluster:
+            return
+
+        is_existing_deployment = Path(DATA_STORAGE_PATH, "PG_VERSION").exists()
+
+        if is_existing_deployment:
+            # Data storage: symlink 16/main -> mount root.
+            pgdata.parent.mkdir(parents=True, exist_ok=True)
+            pgdata.symlink_to(DATA_STORAGE_PATH)
+
+            # Logs storage: symlink 16/main/pg_wal -> mount root.
+            logs.parent.mkdir(parents=True, exist_ok=True)
+            logs.symlink_to(LOGS_STORAGE_PATH)
+        else:
+            # New deployment: create actual subdirectories.
+            self._create_directory(pgdata, POSTGRESQL_STORAGE_PERMISSIONS)
+            logs.parent.mkdir(parents=True, exist_ok=True)
+            self._create_directory(logs, POSTGRESQL_STORAGE_PERMISSIONS)
+
     @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
         return {member["name"] for member in self.cached_cluster_status}
 
-    def _create_directory(self, path: str, mode: int) -> None:
+    def _create_directory(self, path: Path, mode: int) -> None:
         """Creates a directory.
 
         Args:
@@ -257,7 +308,7 @@ class Patroni:
             mode: access permission mask applied to the
               directory using chmod (e.g. 0o640).
         """
-        os.makedirs(path, mode=mode, exist_ok=True)
+        path.mkdir(mode=mode, parents=True, exist_ok=True)
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
@@ -712,6 +763,7 @@ class Patroni:
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
+            logs_path=LOGS_PATH,
             enable_ldap=enable_ldap,
             enable_tls=enable_tls,
             member_name=self.member_name,

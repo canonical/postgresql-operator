@@ -121,6 +121,7 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
+    TEMP_PATH,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -1679,6 +1680,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._unit_ip in self.members_ips:
             self._patroni.start_patroni()
             self.backup.start_stop_pgbackrest_service()
+            # Re-run database setup to fix temp tablespace after tmpfs wipe.
+            if self._can_connect_to_postgresql:
+                try:
+                    self.postgresql.set_up_database(temp_location=TEMP_PATH)
+                except Exception:
+                    logger.debug("Could not run set_up_database after reboot, will retry later")
 
     def _restart_metrics_service(self, postgres_snap: snap.Snap) -> None:
         """Restart the monitoring service if the password was rotated."""
@@ -1799,9 +1806,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
+        self.postgresql.set_up_database(temp_location=TEMP_PATH)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):

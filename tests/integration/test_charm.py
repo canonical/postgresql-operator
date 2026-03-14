@@ -20,7 +20,7 @@ from .ha_tests.helpers import get_cluster_roles
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
-    STORAGE_PATH,
+    PGDATA_PATH,
     check_cluster_members,
     convert_records_to_dict,
     db_connect,
@@ -134,7 +134,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["archive_mode"] == "on"
     assert settings["autovacuum"] == "on"
     assert settings["cluster_name"] == DATABASE_APP_NAME
-    assert settings["data_directory"] == STORAGE_PATH
+    assert settings["data_directory"] == PGDATA_PATH
     assert settings["data_checksums"] == "on"
     assert settings["fsync"] == "on"
     assert settings["full_page_writes"] == "on"

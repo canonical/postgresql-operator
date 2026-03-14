@@ -30,9 +30,12 @@ from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
+    ARCHIVE_STORAGE_PATH,
     BACKUP_ID_FORMAT,
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
+    DATA_STORAGE_PATH,
+    LOGS_STORAGE_PATH,
     PATRONI_CONF_PATH,
     PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
@@ -43,6 +46,7 @@ from constants import (
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    TEMP_STORAGE_PATH,
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
@@ -327,10 +331,10 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
-            POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            ARCHIVE_STORAGE_PATH,
+            DATA_STORAGE_PATH,
+            LOGS_STORAGE_PATH,
+            TEMP_STORAGE_PATH,
         ]
         path = None
         try:
@@ -1353,7 +1357,6 @@ Stderr:
             access_key=s3_parameters["access-key"],
             secret_key=s3_parameters["secret-key"],
             stanza=self.stanza_name,
-            storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
             process_max=max(self.charm.cpu_count - 2, 1),
