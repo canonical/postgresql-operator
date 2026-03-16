@@ -737,6 +737,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
+        # Update the async replication data with the current unit IP.
+        self.async_replication.update_async_replication_data()
+
         # Should not override a blocked status
         if isinstance(self.unit.status, BlockedStatus):
             logger.debug("on_peer_relation_changed early exit: Unit in blocked status")
@@ -857,11 +860,28 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
+            # Update the async replication data with the new unit IP.
+            self.async_replication.update_async_replication_data()
+            # Remove the old IP from the Raft cluster while Patroni is still
+            # running. When Patroni restarts with the new self_addr, PySyncObj
+            # will create fresh journal files for the new IP — the orphaned
+            # old-IP files in the raft data_dir are harmless.
+            try:
+                self._patroni.remove_raft_member(stored_ip)
+            except RemoveRaftMemberFailedError:
+                logger.warning(
+                    "Failed to remove old IP %s from Raft cluster during IP change", stored_ip
+                )
             self._patroni.stop_patroni()
             self._update_certificate()
             return True
         else:
-            self.unit_peer_data.update({"ip-to-remove": ""})
+            # Only clear ip-to-remove after the leader has processed it
+            # (removed the old IP from members_ips). This prevents a race
+            # where the leader sees an empty ip-to-remove and skips cleanup.
+            ip_to_remove = self.unit_peer_data.get("ip-to-remove")
+            if not ip_to_remove or ip_to_remove not in self.members_ips:
+                self.unit_peer_data.update({"ip-to-remove": ""})
             return False
 
     def _add_members(self, event):
@@ -1331,6 +1351,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        # Update the async replication data with the current unit IP.
+        self.async_replication.update_async_replication_data()
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 

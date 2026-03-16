@@ -176,12 +176,13 @@ postgresql:
     {%- endfor %}
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ self_ip }}/32 md5
     # Allow replications connections from other cluster members.
     {%- for endpoint in extra_replication_endpoints %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 md5
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
+    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/32    md5
     {% endfor %}
   pg_ident:
   - operator snap_daemon backup

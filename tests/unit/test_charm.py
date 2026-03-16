@@ -435,6 +435,9 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
+        patch(
+            "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
+        ) as _update_async_replication_data,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -486,12 +489,14 @@ def test_on_start(harness):
 
         # Then test the event of a correct cluster bootstrapping.
         _restart_services_after_reboot.reset_mock()
+        _update_async_replication_data.reset_mock()
         harness.charm.on.start.emit()
         assert _postgresql.create_user.call_count == 4  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
+        _update_async_replication_data.assert_called_once()
 
 
 def test_on_start_replica(harness):
@@ -1328,6 +1333,9 @@ def test_on_peer_relation_changed(harness):
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster") as _reconfigure_cluster,
         patch("ops.framework.EventBase.defer") as _defer,
+        patch(
+            "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
+        ) as _update_async_replication_data,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test an uninitialized cluster.
@@ -1364,12 +1372,14 @@ def test_on_peer_relation_changed(harness):
         _update_member_ip.return_value = False
         _member_started.return_value = True
         _primary_endpoint.return_value = "192.0.2.0"
+        _update_async_replication_data.reset_mock()
         harness.model.unit.status = WaitingStatus("awaiting for cluster to start")
         harness.charm._on_peer_relation_changed(mock_event)
         mock_event.defer.assert_not_called()
         _reconfigure_cluster.assert_called_once_with(mock_event)
         _update_member_ip.assert_called_once()
         _update_config.assert_called_once()
+        _update_async_replication_data.assert_called_once()
         _start_patroni.assert_called_once()
         _update_new_unit_status.assert_called_once()
 
@@ -1379,9 +1389,11 @@ def test_on_peer_relation_changed(harness):
         _start_patroni.reset_mock()
         _update_member_ip.return_value = True
         _update_new_unit_status.reset_mock()
+        _update_async_replication_data.reset_mock()
         harness.charm._on_peer_relation_changed(mock_event)
         _update_member_ip.assert_called_once()
         _update_config.assert_not_called()
+        _update_async_replication_data.assert_not_called()
         _start_patroni.assert_not_called()
         _update_new_unit_status.assert_not_called()
 
@@ -1535,6 +1547,10 @@ def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
+        patch(
+            "relations.async_replication.PostgreSQLAsyncReplication.update_async_replication_data"
+        ) as _update_async_replication_data,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test when the IP address of the unit hasn't changed.
@@ -1550,7 +1566,9 @@ def test_update_member_ip(harness):
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
         assert relation_data.get("ip-to-remove") is None
         _stop_patroni.assert_not_called()
+        _remove_raft_member.assert_not_called()
         _update_certificate.assert_not_called()
+        _update_async_replication_data.assert_not_called()
 
         # Test when the IP address of the unit has changed.
         with harness.hooks_disabled():
@@ -1565,8 +1583,33 @@ def test_update_member_ip(harness):
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
         assert relation_data.get("ip") == "192.0.2.0"
         assert relation_data.get("ip-to-remove") == "2.2.2.2"
+        _remove_raft_member.assert_called_once_with("2.2.2.2")
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
+        _update_async_replication_data.assert_called_once()
+
+        # Test that ip-to-remove is preserved while the old IP is still in members_ips
+        # (prevents race where the leader hasn't processed the removal yet).
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"members_ips": '["192.0.2.0", "2.2.2.2"]'},
+            )
+        assert not harness.charm._update_member_ip()
+        relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert relation_data.get("ip-to-remove") == "2.2.2.2"
+
+        # Test that ip-to-remove is cleared once the leader has removed the old IP.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"members_ips": '["192.0.2.0"]'},
+            )
+        assert not harness.charm._update_member_ip()
+        relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert relation_data.get("ip-to-remove") is None
 
 
 def test_push_tls_files_to_workload(harness, only_without_juju_secrets):

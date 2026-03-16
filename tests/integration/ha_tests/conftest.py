@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import contextlib
+import logging
+import subprocess
 from asyncio import gather
 
 import pytest as pytest
+from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from .. import architecture
 from ..helpers import get_password, run_command_on_unit
 from .helpers import (
     APPLICATION_NAME,
@@ -19,6 +24,48 @@ from .helpers import (
     get_postgresql_parameter,
     update_restart_condition,
 )
+
+logger = logging.getLogger(__name__)
+
+
+@contextlib.asynccontextmanager
+async def fast_forward(model: Model, fast_interval: str = "10s", slow_interval: str | None = None):
+    """Adaptation of OpsTest.fast_forward to work with different models."""
+    update_interval_key = "update-status-hook-interval"
+    interval_after = (
+        slow_interval if slow_interval else (await model.get_config())[update_interval_key]
+    )
+
+    await model.set_config({update_interval_key: fast_interval})
+    yield
+    await model.set_config({update_interval_key: interval_after})
+
+
+@pytest.fixture(scope="module")
+def first_model(ops_test: OpsTest) -> Model:
+    """Return the first model."""
+    first_model = ops_test.model
+    return first_model
+
+
+@pytest.fixture(scope="module")
+async def second_model(ops_test: OpsTest, first_model, request) -> Model:
+    """Create and return the second model."""
+    second_model_name = f"{first_model.info.name}-other"
+    if second_model_name not in await ops_test._controller.list_models():
+        await ops_test._controller.add_model(second_model_name)
+        subprocess.run(["juju", "switch", second_model_name], check=True)
+        subprocess.run(
+            ["juju", "set-model-constraints", f"arch={architecture.architecture}"], check=True
+        )
+        subprocess.run(["juju", "switch", first_model.info.name], check=True)
+    second_model = Model()
+    await second_model.connect(model_name=second_model_name)
+    yield second_model
+    if request.config.getoption("--keep-models"):
+        return
+    logger.info("Destroying second model")
+    await ops_test._controller.destroy_model(second_model_name, destroy_storage=True)
 
 
 @pytest.fixture()

@@ -415,8 +415,11 @@ async def get_controller_machine(ops_test: OpsTest) -> str:
     )
 
 
-async def get_ip_from_inside_the_unit(ops_test: OpsTest, unit_name: str) -> str:
-    command = f"exec --unit {unit_name} -- hostname -I"
+async def get_ip_from_inside_the_unit(
+    ops_test: OpsTest, unit_name: str, model: Model | None = None
+) -> str:
+    model = model or ops_test.model
+    command = f"exec -m {model.info.name} --unit {unit_name} -- hostname -I"
     return_code, stdout, stderr = await ops_test.juju(*command.split())
     if return_code != 0:
         raise ProcessError(
@@ -547,7 +550,7 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str, model: Model = None) ->
                 break
         return await instance_ip(ops_test, unit.machine.hostname)
     else:
-        return get_unit_address(ops_test, unit_name)
+        return get_unit_address(ops_test, unit_name, model)
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
