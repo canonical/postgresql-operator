@@ -2683,7 +2683,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.config.experimental_max_connections
             else max(4 * self.cpu_count, 100)
         )
-        cfg_patch = {
+        cfg_patch: dict[str, int | str | None] = {
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "max_replication_slots": 25,
@@ -2745,7 +2745,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             pg_parameters = dict(worker_configs)
             pg_parameters["wal_compression"] = cpu_wal_compression
             logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
-        pg_parameters.pop("maximum_lag_on_failover", None)
 
         return pg_parameters
 

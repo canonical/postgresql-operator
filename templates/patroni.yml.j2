@@ -100,7 +100,7 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
-        shared_preload_libraries: 'timescaledb,pgaudit,set_user'
+        shared_preload_libraries: 'timescaledb,pgaudit,set_user,pg_stat_statements'
         session_preload_libraries: 'login_hook'
         set_user.block_log_statement: 'on'
         set_user.exit_on_error: 'on'
@@ -147,7 +147,7 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
-    shared_preload_libraries: 'timescaledb,pgaudit,set_user'
+    shared_preload_libraries: 'timescaledb,pgaudit,set_user,pg_stat_statements'
     session_preload_libraries: 'login_hook'
     set_user.block_log_statement: 'on'
     set_user.exit_on_error: 'on'
@@ -165,6 +165,7 @@ postgresql:
     {%- endif %}
     temp_tablespaces: temp
     unix_socket_directories: /tmp
+    pg_stat_statements.max: 10000
     {%- if pg_parameters %}
     {%- for key, value in pg_parameters.items() %}
     {{key}}: {{value}}
