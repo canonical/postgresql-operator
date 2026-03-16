@@ -3,15 +3,19 @@
 
 """Raft controller management for PostgreSQL watcher.
 
-This module manages a native pysyncobj Raft node that participates in
+This module manages a Patroni raft_controller node that participates in
 consensus without running PostgreSQL, providing the necessary third vote
 for quorum in 2-node PostgreSQL clusters.
+
+Uses Patroni's own ``patroni_raft_controller`` from the charmed-postgresql
+snap, which is the same battle-tested Raft implementation used by the
+PostgreSQL nodes. This guarantees wire compatibility with Patroni's
+KVStoreTTL class.
 
 The Raft service runs as a systemd service to ensure it persists between
 charm hook invocations.
 """
 
-import json
 import logging
 import os
 import re
@@ -33,8 +37,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Base directory for all Raft instances
-RAFT_BASE_DIR = "/var/lib/watcher-raft"
+# Base directory for all Raft instances.
+# Must be under the snap's common path so that
+# charmed-postgresql.patroni-raft-controller can access it.
+RAFT_BASE_DIR = "/var/snap/charmed-postgresql/common/watcher-raft"
 
 SERVICE_TEMPLATE = """[Unit]
 Description=PostgreSQL Watcher Raft Service ({instance_id})
@@ -43,7 +49,7 @@ Wants=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 {script_path} --self-addr {self_addr} --partners {partners} --password-file {password_file} --data-dir {data_dir}
+ExecStart=/usr/bin/snap run charmed-postgresql.patroni-raft-controller {config_file}
 Restart=always
 RestartSec=5
 TimeoutStartSec=30
@@ -83,8 +89,7 @@ class RaftController:
 
         # Derive all paths from instance_id
         self.data_dir = f"{RAFT_BASE_DIR}/{instance_id}"
-        self.config_file = f"{RAFT_BASE_DIR}/{instance_id}/config.json"
-        self.password_file = f"{RAFT_BASE_DIR}/{instance_id}/password"
+        self.config_file = f"{RAFT_BASE_DIR}/{instance_id}/patroni-raft.yaml"
         self.service_name = f"watcher-raft-{instance_id}"
         self.service_file = f"/etc/systemd/system/watcher-raft-{instance_id}.service"
 
@@ -111,10 +116,7 @@ class RaftController:
         # Ensure data directory exists
         Path(self.data_dir).mkdir(parents=True, exist_ok=True)
 
-        # Write password to a file with restricted permissions (not in service file or cmdline)
-        self._write_password_file(password)
-
-        # Write config to a JSON file for recovery across hook invocations
+        # Write Patroni-compatible YAML config (includes password)
         self._write_config_file()
 
         # Install/update systemd service
@@ -123,26 +125,29 @@ class RaftController:
         logger.info(f"Raft controller configured: self={self_addr}, partners={partner_addrs}")
         return changed
 
-    def _get_script_path(self) -> str:
-        """Get the path to the raft_service.py script."""
-        return str(Path(self.charm.charm_dir) / "src" / "raft_service.py")
-
-    def _write_password_file(self, password: str) -> None:
-        """Write the Raft password to a file with restricted permissions."""
-        Path(self.password_file).parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(self.password_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(password)
-
     def _write_config_file(self) -> None:
-        """Write Raft configuration to a JSON file for recovery across hooks."""
-        config = {
-            "self_addr": self._self_addr,
-            "partner_addrs": self._partner_addrs,
-        }
+        """Write Raft configuration as a Patroni-compatible YAML file.
+
+        The patroni_raft_controller expects a YAML config with a ``raft:``
+        section containing self_addr, partner_addrs, password, and data_dir.
+        """
+        # Build YAML manually to avoid adding pyyaml as a dependency.
+        # The values are validated addresses and a password string, so
+        # simple formatting is safe.
+        partner_lines = ""
+        for addr in self._partner_addrs:
+            partner_lines += f"\n    - '{addr}'"
+
+        yaml_content = f"""raft:
+  self_addr: '{self._self_addr}'
+  partner_addrs:{partner_lines}
+  password: '{self._password}'
+  data_dir: '{self.data_dir}/raft'
+"""
+        Path(f"{self.data_dir}/raft").mkdir(parents=True, exist_ok=True)
         fd = os.open(self.config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            f.write(json.dumps(config))
+            f.write(yaml_content)
 
     def _install_service(self) -> bool:
         """Install the systemd service for the Raft controller.
@@ -164,16 +169,9 @@ class RaftController:
                 logger.error(f"Invalid partner address format: {addr}")
                 return False
 
-        script_path = self._get_script_path()
-        partners = ",".join(self._partner_addrs)
-
         service_content = SERVICE_TEMPLATE.format(
             instance_id=self.instance_id,
-            script_path=script_path,
-            self_addr=self._self_addr,
-            partners=partners,
-            password_file=self.password_file,
-            data_dir=self.data_dir,
+            config_file=self.config_file,
         )
 
         # Check if service file needs to be updated
@@ -312,7 +310,7 @@ class RaftController:
             return False
 
     def _load_config(self) -> None:
-        """Load configuration from persistent files if available.
+        """Load configuration from the YAML config file if available.
 
         This is needed because each charm hook creates a fresh instance,
         and the configuration set via configure() is not persisted in memory.
@@ -320,23 +318,23 @@ class RaftController:
         if self._self_addr and self._password:
             return  # Already configured
 
-        # Load password from file
-        password_path = Path(self.password_file)
-        if password_path.exists():
-            try:
-                self._password = password_path.read_text().strip()
-            except Exception as e:
-                logger.debug(f"Failed to load password file: {e}")
-
-        # Load config from JSON file
         config_path = Path(self.config_file)
-        if config_path.exists():
-            try:
-                config = json.loads(config_path.read_text())
-                self._self_addr = config.get("self_addr")
-                self._partner_addrs = config.get("partner_addrs", [])
-            except Exception as e:
-                logger.debug(f"Failed to load config file: {e}")
+        if not config_path.exists():
+            return
+
+        try:
+            # Parse the YAML config manually (simple key: value format)
+            content = config_path.read_text()
+            for line in content.split("\n"):
+                line = line.strip()
+                if line.startswith("self_addr:"):
+                    self._self_addr = line.split(":", 1)[1].strip().strip("'\"")
+                elif line.startswith("password:"):
+                    self._password = line.split(":", 1)[1].strip().strip("'\"")
+                elif line.startswith("- '") and line.endswith("'"):
+                    self._partner_addrs.append(line.strip("- '\""))
+        except Exception as e:
+            logger.debug(f"Failed to load config file: {e}")
 
     def get_status(self) -> dict[str, Any]:
         """Get the Raft controller status.

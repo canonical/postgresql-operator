@@ -11,7 +11,7 @@ Raft consensus as a lightweight witness for stereo mode (2-node clusters).
 Multi-cluster support:
 - Each watcher relation gets its own RaftController instance
 - Ports are assigned dynamically starting from RAFT_PORT (2222) and persisted
-  in a port allocation file at /var/lib/watcher-raft/ports.json
+  in a port allocation file at /var/snap/charmed-postgresql/common/watcher-raft/ports.json
 - Each RaftController uses instance-specific data directories and systemd services
 """
 
@@ -54,10 +54,10 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-PYSYNCOBJ_VERSION = "0.3.14"
+SNAP_NAME = "charmed-postgresql"
 
 # Port allocation file for persistent port mapping across hooks
-PORTS_FILE = "/var/lib/watcher-raft/ports.json"
+PORTS_FILE = "/var/snap/charmed-postgresql/common/watcher-raft/ports.json"
 
 
 class WatcherRequirerHandler(Object):
@@ -294,63 +294,58 @@ class WatcherRequirerHandler(Object):
     # -- Lifecycle events --
 
     @staticmethod
-    def _is_pysyncobj_installed() -> bool:
-        """Check if pysyncobj is installed in the system Python (not charm venv)."""
+    def _is_snap_installed() -> bool:
+        """Check if the charmed-postgresql snap is installed."""
         try:
-            result = subprocess.run(
-                ["/usr/bin/python3", "-c", "import pysyncobj"],
-                capture_output=True,
-                timeout=10,
-            )
-            return result.returncode == 0
+            from charmlibs import snap
+
+            cache = snap.SnapCache()
+            return cache[SNAP_NAME].present
         except Exception:
             return False
 
     def _on_install(self, event: InstallEvent) -> None:
-        """Install watcher components (skip PostgreSQL snap)."""
-        if self._is_pysyncobj_installed():
-            logger.info("pysyncobj already installed in system Python, skipping")
+        """Install watcher components.
+
+        Installs the charmed-postgresql snap (bundled with the charm) to
+        get Patroni's ``patroni_raft_controller`` binary, which is used
+        as the Raft voter. PostgreSQL services are not started.
+        """
+        if self._is_snap_installed():
+            logger.info(f"{SNAP_NAME} snap already installed, skipping")
             self.charm.unit.status = WaitingStatus("Waiting for relation to PostgreSQL")
             return
 
         self.charm.unit.status = MaintenanceStatus("Installing pysyncobj")
 
+        snap_path = Path(self.charm.charm_dir) / "snaps" / "charmed-postgresql.snap"
+        if not snap_path.exists():
+            logger.error(f"Bundled snap not found at {snap_path}")
+            event.defer()
+            return
+
         try:
-            subprocess.run(
-                ["/usr/bin/apt-get", "update"],
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-            subprocess.run(
-                ["/usr/bin/apt-get", "install", "-y", "python3-pip"],
+            # Install from the bundled snap file (--dangerous for unsigned local snaps)
+            subprocess.run(  # noqa: S603
+                ["/usr/bin/snap", "install", "--dangerous", str(snap_path)],
                 check=True,
                 capture_output=True,
                 timeout=300,
             )
-            env = os.environ.copy()
-            env.pop("PYTHONPATH", None)
+            # Hold the snap to prevent automatic updates
             subprocess.run(  # noqa: S603
-                [
-                    "/usr/bin/python3",
-                    "-m",
-                    "pip",
-                    "install",
-                    "--break-system-packages",
-                    f"pysyncobj=={PYSYNCOBJ_VERSION}",
-                ],
+                ["/usr/bin/snap", "refresh", "--hold", SNAP_NAME],
                 check=True,
                 capture_output=True,
-                timeout=120,
-                env=env,
+                timeout=30,
             )
-            logger.info("pysyncobj installed successfully")
+            logger.info(f"{SNAP_NAME} snap installed from bundled file")
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to install pysyncobj: {e.stderr}")
+            logger.error(f"Failed to install {SNAP_NAME} snap: {e.stderr}")
             event.defer()
             return
         except subprocess.TimeoutExpired:
-            logger.error("Timeout installing pysyncobj")
+            logger.error(f"Timeout installing {SNAP_NAME} snap")
             event.defer()
             return
 
