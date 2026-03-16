@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
 import typing
 from pathlib import Path
 from typing import Any
@@ -55,6 +54,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SNAP_NAME = "charmed-postgresql"
+SNAP_CHANNEL = "16/edge/neppel"
 
 # Port allocation file for persistent port mapping across hooks
 PORTS_FILE = "/var/snap/charmed-postgresql/common/watcher-raft/ports.json"
@@ -307,9 +307,9 @@ class WatcherRequirerHandler(Object):
     def _on_install(self, event: InstallEvent) -> None:
         """Install watcher components.
 
-        Installs the charmed-postgresql snap (bundled with the charm) to
-        get Patroni's ``patroni_raft_controller`` binary, which is used
-        as the Raft voter. PostgreSQL services are not started.
+        Installs the charmed-postgresql snap from the snap store to get
+        Patroni's ``patroni_raft_controller`` binary, which is used as
+        the Raft voter. PostgreSQL services are not started.
         """
         if self._is_snap_installed():
             logger.info(f"{SNAP_NAME} snap already installed, skipping")
@@ -318,34 +318,16 @@ class WatcherRequirerHandler(Object):
 
         self.charm.unit.status = MaintenanceStatus("Installing pysyncobj")
 
-        snap_path = Path(self.charm.charm_dir) / "snaps" / "charmed-postgresql.snap"
-        if not snap_path.exists():
-            logger.error(f"Bundled snap not found at {snap_path}")
-            event.defer()
-            return
-
         try:
-            # Install from the bundled snap file (--dangerous for unsigned local snaps)
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/snap", "install", "--dangerous", str(snap_path)],
-                check=True,
-                capture_output=True,
-                timeout=300,
-            )
-            # Hold the snap to prevent automatic updates
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/snap", "refresh", "--hold", SNAP_NAME],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
-            logger.info(f"{SNAP_NAME} snap installed from bundled file")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to install {SNAP_NAME} snap: {e.stderr}")
-            event.defer()
-            return
-        except subprocess.TimeoutExpired:
-            logger.error(f"Timeout installing {SNAP_NAME} snap")
+            from charmlibs import snap
+
+            cache = snap.SnapCache()
+            snap_package = cache[SNAP_NAME]
+            snap_package.ensure(snap.SnapState.Present, channel=SNAP_CHANNEL)
+            snap_package.hold()
+            logger.info(f"{SNAP_NAME} snap installed from channel {SNAP_CHANNEL}")
+        except Exception as e:
+            logger.error(f"Failed to install {SNAP_NAME} snap: {e}")
             event.defer()
             return
 
