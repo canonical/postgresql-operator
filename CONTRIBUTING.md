@@ -91,7 +91,7 @@ juju add-model dev
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
 
 # Deploy the charm
-juju deploy ./postgresql_ubuntu-22.04-amd64.charm
+juju deploy ./postgresql_ubuntu@22.04-amd64.charm
 ```
 
 ## Canonical Contributor Agreement
