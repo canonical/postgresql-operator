@@ -1,0 +1,71 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary (degraded)
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [executing] blocked: failed to update cluster members on member
+  database/1 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary (read-only)
+  database/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [executing] active: Primary (read-only)
+  database/1 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary (read-only)
+  database/1 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary (read-only)
+  database/1 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  01:44:15Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+another-database     16.13    active      2  postgresql                          0  no       
+database             16.13    active      2  postgresql                          1  no       
+postgresql-test-app           active      2  postgresql-test-app  latest/edge  463  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+another-database/0      active    idle   2        10.191.51.46    5432/tcp  
+another-database/1*     active    idle   3        10.191.51.165   5432/tcp  Primary
+database/0*             active    idle   4        10.191.51.110   5432/tcp  Primary (read-only)
+database/1              active    idle   5        10.191.51.252   5432/tcp  
+postgresql-test-app/0*  active    idle   0        10.191.51.131             received database credentials of the first database
+postgresql-test-app/1   active    idle   1        10.191.51.207             received database credentials of the first database
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.191.51.131  juju-35e250-0  ubuntu@24.04  runnervm46oaq  Running
+1        started  10.191.51.207  juju-35e250-1  ubuntu@24.04  runnervm46oaq  Running
+2        started  10.191.51.46   juju-35e250-2  ubuntu@24.04  runnervm46oaq  Running
+3        started  10.191.51.165  juju-35e250-3  ubuntu@24.04  runnervm46oaq  Running
+4        started  10.191.51.110  juju-35e250-4  ubuntu@24.04  runnervm46oaq  Running
+5        started  10.191.51.252  juju-35e250-5  ubuntu@24.04  runnervm46oaq  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:34:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:34:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:34:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:35:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:35:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:39:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:39:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
