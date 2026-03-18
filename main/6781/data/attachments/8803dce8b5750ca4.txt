@@ -1,0 +1,69 @@
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:229 waiting for the database charm to become blocked
+[32mINFO    [0m integration.conftest:conftest.py:59 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.14   unsupported  00:35:29Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  14.22    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable  145  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   idle   5        10.139.85.245   5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle   0        10.139.85.177             
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.139.85.177  juju-174be3-0  ubuntu@22.04  runnervm46oaq  Running
+5        started  10.139.85.245  juju-174be3-5  ubuntu@22.04  runnervm46oaq  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:11:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:11:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:12:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:12:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:13:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:13:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:13:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:13:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 00:13:52 ERROR unit.postgresql-gcp/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f067b427d60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 00:14:03 ERROR unit.postgresql-gcp/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-gcp-0: 00:28:06 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-s3-integrator-0: 00:28:06 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-self-signed-certificates-0: 00:28:06 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 00:30:18 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:30:18 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:30:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:30:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-new-postgresql-0: 00:30:54 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8bd6ca6ef0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:30:57 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbd4becf250 state=finished raised Exception>]
+unit-new-postgresql-0: 00:31:04 ERROR unit.new-postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-gcp-2: 00:31:07 ERROR unit.postgresql-gcp/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 00:31:54 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-gcp-2: 00:31:59 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "12ea3ef4-87a5-4d75-8626-b05458174be3:r#12#s3-integrator": settings 12ea3ef4-87a5-4d75-8626-b05458174be3:r#12#s3-integrator not found (not found)
+unit-postgresql-gcp-2: 00:32:04 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "12ea3ef4-87a5-4d75-8626-b05458174be3:r#6#postgresql-gcp": settings 12ea3ef4-87a5-4d75-8626-b05458174be3:r#6#postgresql-gcp not found (not found)
+unit-postgresql-gcp-2: 00:32:09 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "12ea3ef4-87a5-4d75-8626-b05458174be3:r#7#postgresql-gcp": settings 12ea3ef4-87a5-4d75-8626-b05458174be3:r#7#postgresql-gcp not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
