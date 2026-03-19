@@ -26,6 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Check libs
         uses: canonical/charming-actions/check-libraries@2.7.0
@@ -33,5 +34,4 @@ jobs:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
     permissions:
-      # Add label to prs
-      pull-requests: write
+      pull-requests: write  # Add label to prs
