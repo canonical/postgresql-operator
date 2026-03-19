@@ -8,13 +8,14 @@ on:
     - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch:
 
-permissions: {}
 jobs:
   TICS:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Create and activate virtual environment
         run: |
@@ -43,3 +44,4 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           installTics: true
           calc: ALL
+    permissions: {}

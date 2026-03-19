@@ -24,11 +24,46 @@ on:
       artifact-prefix:
         description: build_charm.yaml `artifact-prefix` output
         value: ${{ jobs.build.outputs.artifact-prefix }}
+    secrets:
+      CODECOV_TOKEN:
+        required: true
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      GCP_ACCESS_KEY:
+        required: true
+      GCP_SECRET_KEY:
+        required: true
+      UBUNTU_PRO_TOKEN:
+        required: true
+      LANDSCAPE_ACCOUNT_NAME:
+        required: true
+      LANDSCAPE_REGISTRATION_KEY:
+        required: true
 
 jobs:
+  lint-workflows:
+    name: Lint .github/workflows/
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@zizmor  # TODO use dpw release
+    permissions:
+      contents: read
+
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v42.0.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
+      - name: Run tests
+        run: tox run -e unit
     permissions: {}
 
   unit-test:
@@ -38,6 +73,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Install tox & poetry
         run: |
           pipx install tox
@@ -57,6 +94,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Install prometheus snap
         run: sudo snap install prometheus
       - name: Check validity of prometheus alert rules
@@ -73,12 +112,20 @@ jobs:
   integration-test:
     name: Integration test charm
     needs:
+      - lint-workflows
       - lint
       - unit-test
       - build
     uses: ./.github/workflows/integration_test.yaml
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-    secrets: inherit
+    secrets:
+      AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      GCP_ACCESS_KEY: ${{ secrets.GCP_ACCESS_KEY }}
+      GCP_SECRET_KEY: ${{ secrets.GCP_SECRET_KEY }}
+      UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
+      LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
+      LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
       contents: write  # Needed for Allure Report
