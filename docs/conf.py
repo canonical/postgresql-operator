@@ -209,8 +209,12 @@ sitemap_excludes = [
 # Template and asset locations
 #######################
 
-#html_static_path = ["_static"]
-#templates_path = ["_templates"]
+html_static_path = [
+    ".sphinx/_static",
+]
+templates_path = [
+    ".sphinx/_templates",
+]
 
 
 #############
@@ -307,15 +311,15 @@ new_tab_link_show_external_link_icon = True
 
 exclude_patterns = []
 
-# Adds custom CSS files, located under 'html_static_path'
+# Add CSS files (located in .sphinx/_static/)
+html_css_files = [
+    "cookie-banner.css",
+]
 
-# html_css_files = []
-
-
-# Adds custom JavaScript files, located under 'html_static_path'
-
-# html_js_files = []
-
+# Add JavaScript files (located in .sphinx/_static/)
+html_js_files = [
+    "bundle.js",
+]
 
 # Specifies a reST snippet to be appended to each .rst file
 
