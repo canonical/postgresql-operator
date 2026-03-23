@@ -34,6 +34,7 @@ To learn about other types of deployment environments and methods, see [](/how-t
 Install Multipass on your machine via the [snap store](https://snapcraft.io/multipass):
 
 ```{terminal}
+:copy:
 :user: user
 :host: my-pc
 
@@ -43,6 +44,7 @@ sudo snap install multipass
 Spin up a new VM using [`multipass launch`](https://multipass.run/docs/launch-command). We will call it `my-vm`, and use the [charm-dev](https://github.com/canonical/multipass-blueprints/blob/main/v1/charm-dev.yaml) cloud-init configuration, which will install some necessary software for us.
 
 ```{terminal}
+:copy:
 :user: user
 :host: my-pc
 
@@ -54,6 +56,7 @@ This may take several minutes if it's the first time you launch this VM.
 As soon as the new VM has started, access it:
 
 ```{terminal}
+:copy:
 :user: user
 :host: my-pc
 
@@ -78,6 +81,7 @@ Since `my-vm` already has Juju and LXD installed, we can go ahead and [bootstrap
 We will call our new controller “overlord”, but you can give it any name you’d like:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -87,6 +91,7 @@ juju bootstrap localhost overlord
 A controller can work with different [models](https://juju.is/docs/juju/model). Set up a specific model for Charmed PostgreSQL named `tutorial`:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -96,6 +101,7 @@ juju add-model tutorial
 You can now view the model you created by running the command [`juju status`](https://juju.is/docs/juju/juju-status). 
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -112,6 +118,7 @@ Model "admin/tutorial" is empty.
 To deploy Charmed PostgreSQL, run:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -123,6 +130,7 @@ Juju will now fetch Charmed PostgreSQL from [Charmhub][Charmhub PostgreSQL VM] a
 You can track the progress by running:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -170,6 +178,7 @@ In a later section, we will cover how to access PostgreSQL more safely.
 The user we will connect to in this tutorial will be `operator`. To retrieve its associated password, create a Juju secret named `tutorial`, specifying a password for our `operator` user. Then, grant it to the charm:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -180,6 +189,7 @@ secret:d1ohj30ek0fco390bt9g
 ```
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -193,6 +203,7 @@ For more information about password management with Juju secrets, see [](/how-to
 One more step is needed for the charm to update the passwords of its internal users based on our new Juju secret: we need to update the charm's `system-users` config option:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -206,6 +217,7 @@ Remember to replace the secret URI above with yours!
 Now we have all the information required to access PostgreSQL. Run the command below to enter the leader unit's shell:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -230,6 +242,7 @@ postgresql/0*  active    idle   0        10.26.224.154   5432/tcp  Primary
 While still in the leader unit's shell, run the command below to list all databases currently available. Remember to change the example IP to yours.
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: juju-1c143d-0
 
@@ -265,6 +278,7 @@ You will now see the list of default databases in the unit. `postgres` is the de
 In order to run queries, we can enter the `psql` interactive terminal by running the following command, again typing the password when requested:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: juju-1c143d-0
 
@@ -374,6 +388,7 @@ All units are members of the same database cluster.
 To add two replicas to your deployed PostgreSQL application, run:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -410,6 +425,7 @@ Before we scale them down, list all the units with `juju status`. You will see t
 
 To remove the replica hosted on the unit `postgresql/2` enter:
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -446,6 +462,7 @@ In this tutorial, we will relate to the [data integrator charm](https://charmhub
 To deploy `data-integrator` and associate it to a new database called `mydb-integrator`:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -478,6 +495,7 @@ Machine  State    Address       Inst id        Base          AZ  Message
 Now that the `data-integrator` charm has been set up, we can relate it to PostgreSQL. This will automatically create a username, password, and database for `data-integrator`:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -515,6 +533,7 @@ postgresql:restart                     postgresql:restart                     ro
 To retrieve the username, password and database name, run the `get-credentials` Juju action:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -544,6 +563,7 @@ postgresql:
 Use `endpoints`, `username`, `password` from above to connect newly created database `mydb-integrator` on the PostgreSQL server.
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -553,6 +573,7 @@ juju ssh --container postgresql postgresql/leader bash
 This time, your `host` is the postgresql leader unit (see the `endpoints:` field in the previous output), but your `username`, `password`, and database name are different since we are accessing the PostgreSQL server via a `data-integrator` user.
 
 ```{terminal}
+:copy:
 :scroll:
 :user: ubuntu
 :host: juju-1c143d-0
@@ -605,6 +626,7 @@ Type `exit` to leave the interactive prompt, then `exit` again to go back to the
 Removing the integration automatically removes the user that was created when the integration was created. Enter the following to remove the integration:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -614,6 +636,7 @@ juju remove-relation postgresql data-integrator
 If you try to connect to the same PostgreSQL unit you used in the previous section, you'll get an error message. 
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -621,6 +644,7 @@ juju ssh --container postgresql postgresql/leader bash
 ```
 
 ```{terminal}
+:copy:
 :scroll:
 :user: ubuntu
 :host: juju-1c143d-0
@@ -636,6 +660,7 @@ This is expected, since this user no longer exists after removing the integratio
 Data remains on the server at this stage. To create a user again, exit the unit and integrate the applications again:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -645,6 +670,7 @@ juju integrate data-integrator postgresql
 Re-integrating generates a new user and password:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -673,6 +699,7 @@ Check [this guide](https://discourse.charmhub.io/t/security-with-x-509-certifica
 Before enabling TLS on Charmed PostgreSQL, we must deploy the `self-signed-certificates` charm:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -708,6 +735,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 To enable TLS on Charmed PostgreSQL, integrate the two applications:
 
 ```{terminal}
+:copy:
 :scroll:
 :user: ubuntu
 :host: my-vm
@@ -720,6 +748,7 @@ Observe the `juju status --watch 1s` as the applications change status for a few
 Use `openssl` to connect to the PostgreSQL leader unit and check the TLS certificate in use. Remember to change the IP address and port to yours. 
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -743,6 +772,7 @@ Congratulations! PostgreSQL is now using TLS certificate generated by the extern
 To remove the external TLS, remove the integration:
 
 ```{terminal}
+:copy:
 :scroll:
 :user: ubuntu
 :host: my-vm
@@ -753,6 +783,7 @@ juju remove-relation postgresql:client-certificates self-signed-certificates:cer
 If you once again check the TLS certificates in use via the OpenSSL client, you will see something similar to the output below:
 
 ```{terminal}
+:copy:
 :user: ubuntu
 :host: my-vm
 
@@ -778,6 +809,7 @@ You may now keep your Charmed PostgreSQL deployment running and write to databas
 If you'd like to keep your environment for later, simply stop your VM with
 
 ```{terminal}
+:copy:
 :user: user
 :host: my-pc
 
@@ -795,6 +827,7 @@ For more information, see the docs for [`multipass delete`](https://multipass.ru
 **Delete your VM and all its data** by running:
 
 ```{terminal}
+:copy:
 :user: user
 :host: my-pc
 
