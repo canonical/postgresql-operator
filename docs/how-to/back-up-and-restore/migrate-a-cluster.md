@@ -1,3 +1,4 @@
+(migrate-a-cluster)=
 # How to migrate a cluster
 
 This is a guide on how to restore a backup that was made from a different cluster, (i.e. cluster migration via restore). 
@@ -42,7 +43,7 @@ backups: |-
 ## Restore backup
 To restore your current cluster to the state of the previous cluster, run the `restore` command and pass the correct `backup-id` to the command:
 
- ```text
+```text
 juju run postgresql/leader restore backup-id=YYYY-MM-DDTHH:MM:SSZ 
 ```
 
