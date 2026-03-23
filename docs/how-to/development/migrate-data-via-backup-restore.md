@@ -1,3 +1,4 @@
+(migrate-data-via-backup-restore)=
 # Migrate database data using ‘backup/restore’
 
 This is a guide for migrating data from modern charms. To migrate [legacy charms](/explanation/charm-versions/legacy-charm) data, refer to the guide [Migrate data via pg_dump](/how-to/development/migrate-data-via-pg-dump).

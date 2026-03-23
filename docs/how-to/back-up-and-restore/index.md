@@ -1,9 +1,9 @@
+(back-up-and-restore)=
 # Back up and restore
 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 
 Configure S3 AWS <configure-s3-aws>
 Configure S3 RadosGW <configure-s3-radosgw>

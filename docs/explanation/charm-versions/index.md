@@ -1,3 +1,4 @@
+(charm-versions)=
 # PostgreSQL major versions
 
 Charmed PostgreSQL is available in multiple versions to support different deployment requirements and lifecycle stages. It is shipped in the following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track):

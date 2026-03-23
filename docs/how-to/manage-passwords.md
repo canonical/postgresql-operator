@@ -1,3 +1,4 @@
+(manage-passwords)=
 # How to manage passwords
 
 In Charmed PostgreSQL 14, user credentials are managed with Juju's `get-password` and `set-password` actions.

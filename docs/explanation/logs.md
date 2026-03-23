@@ -1,3 +1,4 @@
+(logs)=
 # Logs
 
 The list of all the charm components are well described in [](/explanation/architecture).

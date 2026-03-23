@@ -1,3 +1,4 @@
+(units)=
 # PostgreSQL units
 
 Each [high-availability](https://en.wikipedia.org/wiki/High_availability)/[disaster-recovery](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has primary and secondary (standby) sites.

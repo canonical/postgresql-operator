@@ -1,3 +1,4 @@
+(deploy)=
 # How to deploy
 
 This page introduces the Charmed PostgreSQL deployment process and all related guides.

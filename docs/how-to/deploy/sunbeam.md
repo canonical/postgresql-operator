@@ -1,3 +1,4 @@
+(sunbeam)=
 # How to deploy on Sunbeam
 
 > **Duration** : Up to 60 minutes depending on internet download speed.
