@@ -1,3 +1,4 @@
+(maas)=
 # How to deploy on MAAS
 
 This guide aims to provide a quick start to deploying Charmed PostgreSQL on MAAS. It summarises the instructions from the [Build a MAAS and LXD environment with Multipass Tutorial](https://discourse.maas.io/t/5360) to set up and tear down a **playground environment**.

@@ -1,3 +1,4 @@
+(software-testing)=
 # Software testing for charms
 
 Most types of standard [software tests](https://en.wikipedia.org/wiki/Software_testing) are applicable to Charmed PostgreSQL.

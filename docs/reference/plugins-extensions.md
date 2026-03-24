@@ -1,3 +1,4 @@
+(plugins-extensions)=
 # Supported plugins/extensions
 
 The following list contains all plugins/extensions supported by Charmed PostgreSQL in alphabetical order. The **revision** column indicates which charm revision introduced support for the extension.

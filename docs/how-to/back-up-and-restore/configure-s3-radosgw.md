@@ -1,3 +1,4 @@
+(configure-s3-radosgw)=
 # Configure S3 for RadosGW
 
 A PostgreSQL backup can be stored on any S3-compatible storage. S3 access and configurations are managed with the [s3-integrator charm](https://charmhub.io/s3-integrator).

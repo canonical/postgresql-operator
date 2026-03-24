@@ -1,3 +1,4 @@
+(enable-profiling)=
 # Enable profiling with Parca
 
 This guide contains the steps to enable profiling with [Parca](https://www.parca.dev/docs/overview/) for your PostgreSQL application.

@@ -1,3 +1,4 @@
+(migrate-data-from-14-to-16)=
 # Migrate data from PostgreSQL 14 to 16
 
 There are two possible ways to migrate data from PostgreSQL 14 to 16 depending on how {ref}`roles` are managed:

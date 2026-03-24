@@ -1,3 +1,4 @@
+(enable-ldap)=
 # How to enable LDAP authentication
 
 The Lightweight Directory Access Protocol (LDAP) enables centralised authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.

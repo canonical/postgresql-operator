@@ -1,3 +1,4 @@
+(enable-monitoring)=
 # How to enable monitoring
 
 ## Prerequisites

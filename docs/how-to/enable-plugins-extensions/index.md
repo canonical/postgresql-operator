@@ -1,3 +1,4 @@
+(enable-plugins-extensions)=
 # How to enable plugins/extensions
 
 This guide outlines the steps for enabling an extension in a Charmed PostgreSQL deployment. 

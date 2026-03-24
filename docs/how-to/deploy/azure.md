@@ -1,3 +1,4 @@
+(azure)=
 # How to deploy on Azure
 
 [Azure](https://azure.com/) is a cloud computing platform developed by Microsoft. It has management, access and development of applications and services to individuals, companies, and governments through its global infrastructure. Access the Azure web console at [portal.azure.com](https://portal.azure.com/).

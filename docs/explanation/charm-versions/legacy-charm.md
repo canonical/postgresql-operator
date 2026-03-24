@@ -1,3 +1,4 @@
+(legacy-charm)=
 # Legacy PostgreSQL charm
 
 The legacy PostgreSQL charm is a [Reactive charm](https://documentation.ubuntu.com/juju/3.6/reference/charm/#reactive-charm) in the **now deprecated** Charmhub channel `latest/stable`. 

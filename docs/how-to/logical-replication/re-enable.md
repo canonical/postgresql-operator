@@ -1,3 +1,4 @@
+(re-enable)=
 # How to re-enable logical replication
 
 If the relation between the PostgreSQL clusters is broken, you can re-enable logical replication by following these steps.

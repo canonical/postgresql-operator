@@ -1,3 +1,4 @@
+(enable-tracing)=
 # Enable tracing
 
 This guide contains the steps to enable tracing with [Grafana Tempo](https://grafana.com/docs/tempo/latest/) for your PostgreSQL application. 
