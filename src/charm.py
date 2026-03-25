@@ -409,8 +409,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
 
-        Called after snap refresh
+        Called after snap or charm refresh.
         """
+        # Ensure the data directory structure (symlinks for existing deployments,
+        # real dirs for new ones) exists before starting Patroni — a charm-only
+        # refresh skips bootstrap_cluster/start_replica, so this may be the first
+        # time the new path layout is materialised.
+        self._patroni._create_pgdata()
+
         try:
             if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
                 cert = load_pem_x509_certificate(raw_cert.encode())
@@ -422,7 +428,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
-        if not self._patroni.start_patroni():
+        if not self._patroni.restart_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
 

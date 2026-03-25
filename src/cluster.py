@@ -15,6 +15,7 @@ import shutil
 import subprocess
 from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
@@ -61,7 +62,9 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    SNAP_COMMON_PATH,
     TEMP_PATH,
+    TEMP_STORAGE_PATH,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -256,24 +259,40 @@ class Patroni:
         For existing deployments, creates symlinks so the code always references
         the 16/main path while data stays at the mount root.
         """
-        # Archive and temp: always ensure these exist (e.g. tmpfs is wiped on reboot).
+        # Archive: always ensure this exists (e.g. tmpfs is wiped on reboot).
         self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
         is_existing_cluster = os.path.exists(POSTGRESQL_DATA_PATH)
         if is_existing_cluster:
-            # Existing cluster (e.g. reboot): create temp dir without fixing ownership.
-            # The library's set_up_database() detects wrong ownership to trigger the
-            # tablespace fix after tmpfs reboot. If we set _daemon_ ownership here,
-            # it would mask the reboot signal and the stale tablespace would never
-            # be recreated. For persistent storage reboots, the directory already
-            # exists with correct ownership, so makedirs is a no-op.
+            # Existing cluster (e.g. reboot or post-refresh re-entry): create
+            # temp dir without fixing ownership. The library's set_up_database()
+            # detects wrong ownership to trigger the tablespace fix after tmpfs
+            # reboot. If we set _daemon_ ownership here, it would mask the
+            # reboot signal and the stale tablespace would never be recreated.
+            # For persistent storage reboots, the directory already exists with
+            # correct ownership, so makedirs is a no-op.
             os.makedirs(TEMP_PATH, exist_ok=True)
-        else:
-            # Fresh deployment: set correct ownership so PostgreSQL can use it.
-            self._create_directory(TEMP_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-
-        # Skip if the target data directory already exists (already set up).
-        if is_existing_cluster:
             return
+
+        # --- Below runs only for clusters that have not yet set up 16/main ---
+
+        # Move stale content out of temp storage so pg_basebackup finds it
+        # empty. pg_basebackup refuses to stream into a non-empty tablespace
+        # directory, so leftover PG_* tablespace OID directories from prior
+        # (failed) bootstraps or our own 16/ directory structure must be
+        # relocated. We move instead of delete to avoid destroying data
+        # (following the same pattern as the K8s operator).
+        # This is safe because we only reach here when POSTGRESQL_DATA_PATH
+        # does not exist yet, meaning PostgreSQL is not using this temp storage.
+        if os.path.isdir(TEMP_STORAGE_PATH):
+            for entry in os.scandir(TEMP_STORAGE_PATH):
+                if entry.is_dir():
+                    timestamp = str(datetime.now()).replace(" ", "-").replace(":", "-")
+                    backup_path = os.path.join(
+                        SNAP_COMMON_PATH, "data", f"temp-backup-{timestamp}-{entry.name}"
+                    )
+                    logger.info("Moving %s to %s", entry.path, backup_path)
+                    shutil.move(entry.path, backup_path)
 
         is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
 
@@ -285,6 +304,11 @@ class Patroni:
             # Logs storage: symlink 16/main/pg_wal -> mount root.
             os.makedirs(os.path.join(LOGS_STORAGE_PATH, "16", "main"), exist_ok=True)
             os.symlink(LOGS_STORAGE_PATH, LOGS_PATH)
+
+            logger.warning(
+                "Existing deployment detected: 16/main is a symlink to the storage mount root. "
+                "To match the layout of new deployments, manually migrate pg_data."
+            )
         else:
             # New deployment: create actual subdirectories.
             self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
