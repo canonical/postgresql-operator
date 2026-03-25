@@ -3034,7 +3034,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         connection = None
         try:
             with (
-                self.postgresql._connect_to_database() as connection,
+                self.postgresql._connect_to_database(
+                    database_host=self.postgresql.current_host
+                ) as connection,
                 connection.cursor() as cursor,
             ):
                 cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")
