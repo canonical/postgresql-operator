@@ -1,3 +1,4 @@
+(monitoring-cos)=
 # Monitoring (COS)
 
 ```{toctree}

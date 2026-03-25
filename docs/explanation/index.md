@@ -1,3 +1,4 @@
+(explanation)=
 # Explanation
 
 Additional context about key concepts behind the PostgreSQL charm, including design and legacy information.

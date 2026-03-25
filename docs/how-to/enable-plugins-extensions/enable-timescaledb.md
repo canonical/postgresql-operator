@@ -1,3 +1,4 @@
+(enable-timescaledb)=
 # How to enable TimescaleDB
 
 [Charmed PostgreSQL 14](https://charmhub.io/postgresql?channel=14/stable) ships [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/).

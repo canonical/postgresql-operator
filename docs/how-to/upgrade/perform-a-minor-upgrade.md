@@ -1,3 +1,4 @@
+(perform-a-minor-upgrade)=
 # Perform a minor upgrade
 
 **Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>

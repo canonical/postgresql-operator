@@ -1,3 +1,4 @@
+(modern-charm)=
 # Modern PostgreSQL charm
 
 Modern PostgreSQL charms are [Ops charms](https://documentation.ubuntu.com/juju/3.6/reference/charm/#ops-charm) released in the Charmhub channels `14/` and `16/`. 

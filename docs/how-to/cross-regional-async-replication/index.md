@@ -1,3 +1,4 @@
+(cross-regional-async-replication)=
 # Cross-regional async replication
 
 Cross-regional (or multi-server) asynchronous replication focuses on disaster recovery by distributing data across different servers.

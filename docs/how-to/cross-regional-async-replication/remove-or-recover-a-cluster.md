@@ -1,3 +1,4 @@
+(remove-or-recover-a-cluster)=
 # Remove or recover a cluster
 
 This guide will cover how to manage clusters using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.

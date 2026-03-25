@@ -1,3 +1,4 @@
+(performance-and-resources)=
 # Performance and resource allocation
 
 This page covers topics related to measuring and configuring the performance of PostgreSQL

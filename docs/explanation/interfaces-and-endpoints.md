@@ -1,3 +1,4 @@
+(interfaces-and-endpoints)=
 # Interfaces and endpoints
 
 The charm supports modern `postgresql_client` and legacy `pgsql` interfaces (in a backward compatible mode).

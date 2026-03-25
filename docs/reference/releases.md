@@ -1,3 +1,4 @@
+(releases)=
 # Releases
 
 This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release of Charmed PostgreSQL 14.

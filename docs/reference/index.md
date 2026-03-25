@@ -1,3 +1,4 @@
+(reference)=
 # Reference
 
 The following generated API references can be found on [Charmhub](https://charmhub.io/postgresql):

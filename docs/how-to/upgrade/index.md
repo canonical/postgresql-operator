@@ -1,3 +1,4 @@
+(upgrade)=
 # Upgrade
 
 For instructions on carrying out **minor version upgrades**, see the following guides:
