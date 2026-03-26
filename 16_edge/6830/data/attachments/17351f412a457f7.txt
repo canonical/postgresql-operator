@@ -1,0 +1,114 @@
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/data-integrator-380
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [idle] blocked: Please specify either topic, index, database name, keyspace name, or prefix
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/data-integrator-380
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [executing] maintenance: installing charm software
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [executing] blocked: Please specify either topic, index, database name, keyspace name, or prefix
+  another-data-integrator/0 [executing] blocked: Please specify either topic, index, database name, keyspace name, or prefix
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: 
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] active: 
+  database/3 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] blocked: invalid role(s) for extra user roles
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] blocked: invalid role(s) for extra user roles
+  database/3 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] blocked: invalid role(s) for extra user roles
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [executing] blocked: invalid role(s) for extra user roles
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: 
+  database/3 [idle] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.19   unsupported  02:08:28Z
+
+App                      Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+another-application               active       1  postgresql-test-app  latest/edge  468  no       received database credentials of the first database
+another-data-integrator           blocked      1  data-integrator      latest/edge  380  no       Please relate the data-integrator with the desired product
+another-database         16.13    active       2  postgresql                          0  no       
+data-integrator                   blocked      1  data-integrator      latest/edge  380  no       Please relate the data-integrator with the desired product
+database                 16.13    active       2  postgresql                          1  no       
+postgresql-test-app               active       2  postgresql-test-app  latest/edge  468  no       received database credentials of the second database
+
+Unit                        Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*      active    idle   6        10.246.8.131              received database credentials of the first database
+another-data-integrator/0*  blocked   idle   10       10.246.8.245              Please relate the data-integrator with the desired product
+another-database/0*         active    idle   3        10.246.8.25     5432/tcp  Primary
+another-database/1          active    idle   4        10.246.8.145    5432/tcp  
+data-integrator/0*          blocked   idle   9        10.246.8.205              Please relate the data-integrator with the desired product
+database/2*                 active    idle   7        10.246.8.80     5432/tcp  
+database/3                  active    idle   8        10.246.8.50     5432/tcp  Primary
+postgresql-test-app/0*      active    idle   0        10.246.8.148              received database credentials of the second database
+postgresql-test-app/1       active    idle   1        10.246.8.228              received database credentials of the second database
+
+Machine  State    Address       Inst id         Base          AZ             Message
+0        started  10.246.8.148  juju-2529d1-0   ubuntu@24.04  runnervm46oaq  Running
+1        started  10.246.8.228  juju-2529d1-1   ubuntu@24.04  runnervm46oaq  Running
+3        started  10.246.8.25   juju-2529d1-3   ubuntu@24.04  runnervm46oaq  Running
+4        started  10.246.8.145  juju-2529d1-4   ubuntu@24.04  runnervm46oaq  Running
+6        started  10.246.8.131  juju-2529d1-6   ubuntu@24.04  runnervm46oaq  Running
+7        started  10.246.8.80   juju-2529d1-7   ubuntu@24.04  runnervm46oaq  Running
+8        started  10.246.8.50   juju-2529d1-8   ubuntu@24.04  runnervm46oaq  Running
+9        started  10.246.8.205  juju-2529d1-9   ubuntu@24.04  runnervm46oaq  Running
+10       started  10.246.8.245  juju-2529d1-10  ubuntu@24.04  runnervm46oaq  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:34:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:33 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:34:33 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:34:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:34:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:35:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:35:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:39:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:39:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:46:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:46:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:50:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:50:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:50:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:50:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:59:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-database-2: 02:00:49 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "c702630d-8b2c-4f56-8f32-553bdf2529d1:r#7#postgresql-test-app": settings c702630d-8b2c-4f56-8f32-553bdf2529d1:r#7#postgresql-test-app not found (not found)
+machine-9: 02:03:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 02:03:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 02:05:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 02:05:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-2: 02:06:23 ERROR unit.database/2.juju-log database-peers:1: single_kernel_postgresql.utils.postgresql:Invalid extra user roles: test
+unit-database-2: 02:06:25 ERROR unit.database/2.juju-log database-peers:1: single_kernel_postgresql.utils.postgresql:Invalid extra user roles: test
+unit-another-data-integrator-0: 02:07:56 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "c702630d-8b2c-4f56-8f32-553bdf2529d1:r#17#database": settings c702630d-8b2c-4f56-8f32-553bdf2529d1:r#17#database not found (not found)
+unit-database-3: 02:08:01 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "c702630d-8b2c-4f56-8f32-553bdf2529d1:r#17#another-data-integrator": settings c702630d-8b2c-4f56-8f32-553bdf2529d1:r#17#another-data-integrator not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
