@@ -1,0 +1,31 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.20   unsupported  00:11:28Z
+
+App         Version  Status   Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.22    waiting    1/3  postgresql             0  no       waiting for machine
+
+Unit           Workload  Agent       Machine  Public address  Ports  Message
+postgresql/0   waiting   allocating  0        10.104.166.85          waiting for machine
+postgresql/1   waiting   allocating  1                               waiting for machine
+postgresql/2*  waiting   executing   2        10.104.166.96          (start) waiting to start PostgreSQL
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        down     10.104.166.85  juju-b7e666-0  ubuntu@22.04  runnervmrg6be  Running
+1        down                    juju-b7e666-1  ubuntu@22.04  runnervmrg6be  Container started
+2        started  10.104.166.96  juju-b7e666-2  ubuntu@22.04  runnervmrg6be  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-2: 00:10:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:10:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:11:14 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb5f4499db0 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
