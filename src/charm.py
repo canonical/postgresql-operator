@@ -415,7 +415,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # real dirs for new ones) exists before starting Patroni — a charm-only
         # refresh skips bootstrap_cluster/start_replica, so this may be the first
         # time the new path layout is materialised.
-        self._patroni._create_pgdata()
+        layout_changed = self._patroni._create_pgdata()
 
         try:
             if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
@@ -428,7 +428,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
-        if not self._patroni.restart_patroni():
+        # layout_changed=True means the path layout was just materialised (new
+        # deployment or first upgrade from stable). Patroni must be restarted so
+        # it picks up the new config paths. layout_changed=False means the layout
+        # already existed (e.g. snap-only refresh); Patroni was stopped by the
+        # snap refresh and only needs to be started.
+        if layout_changed and not self._patroni.restart_patroni():
+            self.set_unit_status(
+                ops.BlockedStatus("Failed to restart PostgreSQL"), refresh=refresh
+            )
+            return
+
+        if not layout_changed and not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
 
@@ -1689,6 +1700,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Re-run database setup to fix temp tablespace after tmpfs wipe.
             if self._can_connect_to_postgresql:
                 try:
+                    os.makedirs(TEMP_PATH, exist_ok=True)
                     self.postgresql.set_up_database(temp_location=TEMP_PATH)
                 except Exception:
                     logger.debug("Could not run set_up_database after reboot, will retry later")
@@ -1812,6 +1824,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
+        os.makedirs(TEMP_PATH, exist_ok=True)
         self.postgresql.set_up_database(temp_location=TEMP_PATH)
 
         access_groups = self.postgresql.list_access_groups()

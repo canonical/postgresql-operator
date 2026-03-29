@@ -252,17 +252,28 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
-    def _create_pgdata(self) -> None:
+    def _create_pgdata(self) -> bool:
         """Create the PostgreSQL data directory structure.
 
         For new deployments, creates actual subdirectories under each storage mount.
         For existing deployments, creates symlinks so the code always references
         the 16/main path while data stays at the mount root.
+
+        Returns:
+            True if the directory layout was created or changed, False if it
+            already existed.
         """
         # Archive: always ensure this exists (e.g. tmpfs is wiped on reboot).
         self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-        is_existing_cluster = os.path.exists(POSTGRESQL_DATA_PATH)
+        # Use PG_VERSION to detect a real PostgreSQL cluster, not just an empty
+        # directory. _create_pgdata() itself creates POSTGRESQL_DATA_PATH as an
+        # empty dir on fresh units; subsequent calls must not treat that empty
+        # dir as an existing cluster and prematurely create TEMP_PATH (which
+        # would block pg_basebackup from streaming the primary's tablespace).
+        # PG_VERSION is written by initdb (primary) or pg_basebackup (replica),
+        # so it is the authoritative signal that a real cluster is present.
+        is_existing_cluster = os.path.exists(os.path.join(POSTGRESQL_DATA_PATH, "PG_VERSION"))
         if is_existing_cluster:
             # Existing cluster (e.g. reboot or post-refresh re-entry): create
             # temp dir without fixing ownership. The library's set_up_database()
@@ -272,7 +283,7 @@ class Patroni:
             # For persistent storage reboots, the directory already exists with
             # correct ownership, so makedirs is a no-op.
             os.makedirs(TEMP_PATH, exist_ok=True)
-            return
+            return False
 
         # --- Below runs only for clusters that have not yet set up 16/main ---
 
@@ -286,13 +297,12 @@ class Patroni:
         # does not exist yet, meaning PostgreSQL is not using this temp storage.
         if os.path.isdir(TEMP_STORAGE_PATH):
             for entry in os.scandir(TEMP_STORAGE_PATH):
-                if entry.is_dir():
-                    timestamp = str(datetime.now()).replace(" ", "-").replace(":", "-")
-                    backup_path = os.path.join(
-                        SNAP_COMMON_PATH, "data", f"temp-backup-{timestamp}-{entry.name}"
-                    )
-                    logger.info("Moving %s to %s", entry.path, backup_path)
-                    shutil.move(entry.path, backup_path)
+                timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+                backup_path = os.path.join(
+                    SNAP_COMMON_PATH, "data", f"temp-backup-{timestamp}-{entry.name}"
+                )
+                logger.info("Moving %s to %s", entry.path, backup_path)
+                shutil.move(entry.path, backup_path)
 
         is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
 
@@ -314,6 +324,8 @@ class Patroni:
             self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
             os.makedirs(os.path.dirname(LOGS_PATH), exist_ok=True)
             self._create_directory(LOGS_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
+        return True
 
     @cached_property
     def cluster_members(self) -> set:
