@@ -415,7 +415,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # real dirs for new ones) exists before starting Patroni — a charm-only
         # refresh skips bootstrap_cluster/start_replica, so this may be the first
         # time the new path layout is materialised.
-        layout_changed = self._patroni._create_pgdata()
+        self._patroni._create_pgdata()
 
         try:
             if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
@@ -428,18 +428,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
-        # layout_changed=True means the path layout was just materialised (new
-        # deployment or first upgrade from stable). Patroni must be restarted so
-        # it picks up the new config paths. layout_changed=False means the layout
-        # already existed (e.g. snap-only refresh); Patroni was stopped by the
-        # snap refresh and only needs to be started.
-        if layout_changed and not self._patroni.restart_patroni():
-            self.set_unit_status(
-                ops.BlockedStatus("Failed to restart PostgreSQL"), refresh=refresh
-            )
-            return
-
-        if not layout_changed and not self._patroni.start_patroni():
+        if not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
 

@@ -252,16 +252,12 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
-    def _create_pgdata(self) -> bool:
+    def _create_pgdata(self) -> None:
         """Create the PostgreSQL data directory structure.
 
         For new deployments, creates actual subdirectories under each storage mount.
         For existing deployments, creates symlinks so the code always references
         the 16/main path while data stays at the mount root.
-
-        Returns:
-            True if the directory layout was created or changed, False if it
-            already existed.
         """
         # Archive: always ensure this exists (e.g. tmpfs is wiped on reboot).
         self._create_directory(ARCHIVE_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
@@ -283,7 +279,7 @@ class Patroni:
             # For persistent storage reboots, the directory already exists with
             # correct ownership, so makedirs is a no-op.
             os.makedirs(TEMP_PATH, exist_ok=True)
-            return False
+            return
 
         # --- Below runs only for clusters that have not yet set up 16/main ---
 
@@ -324,8 +320,6 @@ class Patroni:
             self._create_directory(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
             os.makedirs(os.path.dirname(LOGS_PATH), exist_ok=True)
             self._create_directory(LOGS_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
-
-        return True
 
     @cached_property
     def cluster_members(self) -> set:

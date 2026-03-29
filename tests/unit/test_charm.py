@@ -372,6 +372,8 @@ def test_enable_disable_extensions(harness, caplog):
 
 
 def test_on_start(harness):
+    _makedirs_patcher = patch("charm.os.makedirs")
+    _makedirs_patcher.start()
     with (
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
@@ -472,6 +474,7 @@ def test_on_start(harness):
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
+    _makedirs_patcher.stop()
 
 
 def test_on_start_replica(harness):
