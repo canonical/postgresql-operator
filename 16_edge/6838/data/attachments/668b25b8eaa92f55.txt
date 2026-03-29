@@ -1,0 +1,21 @@
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network client created
+
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network peers created
+
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network isolated created
+
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju reload-spaces --model testing
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing client 10.0.0.1/24
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing peers 10.10.10.1/24
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing isolated 10.20.20.1/24
+[32mINFO    [0m root:test_spaced_async_replication.py:44 Creating model: testing-other
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-model --no-switch testing-other
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju reload-spaces --model testing-other
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing-other client 10.0.0.1/24
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing-other peers 10.10.10.1/24
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju add-space --model testing-other isolated 10.20.20.1/24
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju set-model-constraints --model testing-other arch=amd64
+[32mINFO    [0m root:test_spaced_async_replication.py:95 Deploying postgresql clusters
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju deploy --model testing /root/snap/juju/common/tmp6cyh3329/_temp.charm db1 --base ubuntu@24.04 --bind 'database-peers=peers database=client' --config profile=testing --constraints arch=amd64 --constraints spaces=client,peers --num-units 3
+[32mINFO    [0m root:test_spaced_async_replication.py:57 Destroying model: testing-other
+[32mINFO    [0m jubilant:_juju.py:394 cli: juju destroy-model testing-other --no-prompt --destroy-storage --force
