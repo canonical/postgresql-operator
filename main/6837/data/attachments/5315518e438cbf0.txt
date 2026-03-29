@@ -1,0 +1,33 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.20   unsupported  00:11:19Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+another-database              waiting    0/2  postgresql                          1  no       waiting for machine
+database                      waiting    0/1  postgresql                          0  no       waiting for machine
+postgresql-test-app           waiting    0/2  postgresql-test-app  latest/edge  469  no       waiting for machine
+
+Unit                   Workload  Agent       Machine  Public address  Ports  Message
+another-database/0     waiting   allocating  3                               waiting for machine
+another-database/1     waiting   allocating  4        10.83.100.196          waiting for machine
+database/0             waiting   allocating  2        10.83.100.51           waiting for machine
+postgresql-test-app/0  waiting   allocating  0        10.83.100.195          waiting for machine
+postgresql-test-app/1  waiting   allocating  1                               waiting for machine
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        pending  10.83.100.195  juju-978069-0  ubuntu@22.04  runnervmrg6be  Running
+1        pending                 pending        ubuntu@22.04                 Creating container
+2        pending  10.83.100.51   juju-978069-2  ubuntu@22.04  runnervmrg6be  Running
+3        pending                 pending        ubuntu@22.04                 Creating container
+4        pending  10.83.100.196  juju-978069-4  ubuntu@22.04  runnervmrg6be  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+controller-0: 00:10:24 ERROR juju.worker.provisioner cannot register instance for machine 3: connection is shutdown before send: connection is shut down
+controller-0: 00:10:24 ERROR juju.worker.provisioner setting machine status: setting error status for machine "3": connection is shutdown before send: connection is shut down
+controller-0: 00:10:27 ERROR juju.worker.provisioner worker 3: shutting down pool due to error while handling a "start-instance 3" task: setting instance info: connection is shutdown before send: connection is shut down
+controller-0: 00:10:30 ERROR juju.worker.provisioner worker 1: shutting down pool due to error while handling a "start-instance 1" task: catacomb 0xc000ac70c0 is dying
+controller-0: 00:10:57 ERROR juju.worker.firewaller Machine not yet provisioned: machine 3 not provisioned
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
