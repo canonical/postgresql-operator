@@ -486,6 +486,25 @@ class Patroni:
         )
         return local_timeline != leader_timeline
 
+    def ensure_replica_pgdata_for_upgrade(self) -> bool:
+        """Rename a circular symlink on an already-upgraded replica if timelines have diverged.
+
+        During a rolling upgrade, a unit that was upgraded as primary (receiving a circular
+        symlink) may be demoted after its own refresh step. If timelines later diverge,
+        pg_rewind will fail with ELOOP on the primary's circular symlink. This method detects
+        that condition and renames the symlink so Patroni triggers pg_basebackup on restart.
+
+        Returns True if the symlink was renamed (caller must stop and restart Patroni).
+        """
+        if (
+            os.path.islink(POSTGRESQL_DATA_PATH)
+            and os.path.isfile(os.path.join(DATA_STORAGE_PATH, "standby.signal"))
+            and self._is_timeline_diverged_from_cluster()
+        ):
+            self._rename_circular_symlink_for_basebackup()
+            return True
+        return False
+
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
         with pathlib.Path("refresh_versions.toml").open("rb") as file:

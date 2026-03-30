@@ -961,8 +961,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _fix_replica_pgdata_during_upgrade(self) -> bool:
+        """Rename circular symlink and restart Patroni if timelines have diverged mid-upgrade.
+
+        During a rolling upgrade, a unit refreshed as primary (with a circular symlink) may
+        be demoted after its own refresh step. If timelines then diverge, pg_rewind will fail
+        with ELOOP on the primary's circular symlink. Renaming triggers pg_basebackup instead.
+
+        Returns True if a restart was performed (caller should return early).
+        """
+        if self.refresh is None or not self.refresh.in_progress:
+            return False
+        if not self._patroni.ensure_replica_pgdata_for_upgrade():
+            return False
+        self._patroni.stop_patroni()
+        if not self._patroni.start_patroni():
+            self.set_unit_status(ops.BlockedStatus("Failed to restart PostgreSQL"))
+        return True
+
     def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
+        if self._fix_replica_pgdata_during_upgrade():
+            return
+
         if not self._peer_relation_changed_checks(event):
             return
 
