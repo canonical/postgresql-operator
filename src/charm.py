@@ -2421,13 +2421,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "rewind",
                 ):
                     continue
-                user_database_map[user] = ",".join(
+                if databases := ",".join(
                     sorted(
                         self.postgresql.list_accessible_databases_for_user(
                             user, current_host=self.is_connectivity_enabled
                         )
                     )
-                )
+                ):
+                    user_database_map[user] = databases
+                else:
+                    logger.debug(f"User {user} has no databases to connect to")
                 # Add "landscape" superuser by default to the list when the "db-admin" relation is present
                 # or when the "database" relation has "extra-user-roles" set to "SUPERUSER" (which may mean
                 # that PgBouncer is related to the database and there is the possibility that Landscape
