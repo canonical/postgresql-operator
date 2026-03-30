@@ -108,7 +108,9 @@ jobs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
     timeout-minutes: 216  # Sum of steps `timeout-minutes` + 5
-    environment: integration-test
+    environment:
+      name: integration-test
+      deployment: false
     steps:
       - name: Checkout
         timeout-minutes: 3
