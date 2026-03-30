@@ -232,14 +232,18 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._create_pgdata()
-        self._change_owner(POSTGRESQL_DATA_PATH)
 
-        # Create empty base config
+        # _create_pgdata() may intentionally leave POSTGRESQL_DATA_PATH absent
+        # (e.g. existing-deployment replica with standby.signal, or after
+        # renaming a circular symlink for pg_basebackup). In those cases Patroni
+        # will recreate the directory via pg_basebackup, so skip ownership/perms.
+        if os.path.exists(POSTGRESQL_DATA_PATH):
+            self._change_owner(POSTGRESQL_DATA_PATH)
+            # Replicas refuse to start with the default permissions.
+            os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
+        # Create empty base config (lives under /current/etc, independent of PGDATA).
         open(PG_BASE_CONF_PATH, "a").close()
-
-        # Expected permission
-        # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -271,6 +275,19 @@ class Patroni:
         # so it is the authoritative signal that a real cluster is present.
         is_existing_cluster = os.path.exists(os.path.join(POSTGRESQL_DATA_PATH, "PG_VERSION"))
         if is_existing_cluster:
+            # If POSTGRESQL_DATA_PATH is a circular symlink (16/main → DATA_STORAGE_PATH)
+            # on a replica, pg_rewind will fail with ELOOP ("Too many levels of symbolic
+            # links") when it traverses PGDATA via SQL pg_ls_dir(). Only move the symlink
+            # when timelines have actually diverged — that is the only case where Patroni
+            # would attempt pg_rewind. When timelines match, Patroni resumes streaming
+            # replication directly and pg_rewind is never called.
+            if (
+                os.path.islink(POSTGRESQL_DATA_PATH)
+                and os.path.isfile(os.path.join(DATA_STORAGE_PATH, "standby.signal"))
+                and self._is_timeline_diverged_from_cluster()
+            ):
+                self._rename_circular_symlink_for_basebackup()
+                return
             # Existing cluster (e.g. reboot or post-refresh re-entry): create
             # temp dir without fixing ownership. The library's set_up_database()
             # detects wrong ownership to trigger the tablespace fix after tmpfs
@@ -303,6 +320,15 @@ class Patroni:
         is_existing_deployment = os.path.exists(os.path.join(DATA_STORAGE_PATH, "PG_VERSION"))
 
         if is_existing_deployment:
+            # Replicas must not get the circular symlink. If we created one,
+            # pg_rewind would fail with ELOOP. Instead, leave POSTGRESQL_DATA_PATH
+            # absent so Patroni falls back to pg_basebackup from the primary.
+            if os.path.isfile(os.path.join(DATA_STORAGE_PATH, "standby.signal")):
+                return
+
+            # Primary: create circular symlinks so Patroni can locate existing data
+            # via the new versioned path. pg_rewind is not called on the primary, so
+            # the circular reference does not cause ELOOP there.
             # Data storage: symlink 16/main -> mount root.
             os.makedirs(os.path.join(DATA_STORAGE_PATH, "16"), exist_ok=True)
             os.symlink(DATA_STORAGE_PATH, POSTGRESQL_DATA_PATH)
@@ -339,6 +365,126 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
+
+    def _rename_circular_symlink_for_basebackup(self) -> None:
+        """Rename the circular symlinks so Patroni falls back to pg_basebackup.
+
+        When POSTGRESQL_DATA_PATH is a circular symlink on a replica with a diverged
+        timeline, pg_rewind would fail with ELOOP. Renaming the symlink to a sibling
+        causes Patroni to find no data directory and run pg_basebackup instead, which
+        produces a clean real directory and avoids the circular reference entirely.
+        """
+        timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        sibling = os.path.join(os.path.dirname(POSTGRESQL_DATA_PATH), f"main_{timestamp}")
+        logger.info(
+            "Moving circular symlink %s to %s to trigger pg_basebackup on replica",
+            POSTGRESQL_DATA_PATH,
+            sibling,
+        )
+        os.rename(POSTGRESQL_DATA_PATH, sibling)
+        # The parent 16/ directory was created by root when the circular symlink was
+        # first set up. Chown it to _daemon_ so pg_basebackup can create 16/main.
+        data_16_dir = os.path.dirname(POSTGRESQL_DATA_PATH)
+        if os.path.isdir(data_16_dir):
+            self._change_owner(data_16_dir)
+        if os.path.islink(LOGS_PATH):
+            logs_sibling = os.path.join(os.path.dirname(LOGS_PATH), f"pg_wal_{timestamp}")
+            os.rename(LOGS_PATH, logs_sibling)
+            # Same ownership fix for the LOGS 16/main/ parent directory.
+            logs_main_dir = os.path.dirname(LOGS_PATH)
+            if os.path.isdir(logs_main_dir):
+                self._change_owner(logs_main_dir)
+        # pg_basebackup refuses to stream into a non-empty tablespace directory.
+        # Clear any stale content from TEMP_STORAGE_PATH so the basebackup succeeds.
+        if os.path.isdir(TEMP_STORAGE_PATH):
+            for entry in os.scandir(TEMP_STORAGE_PATH):
+                backup_path = os.path.join(
+                    SNAP_COMMON_PATH, "data", f"temp-backup-{timestamp}-{entry.name}"
+                )
+                logger.info("Moving %s to %s", entry.path, backup_path)
+                shutil.move(entry.path, backup_path)
+
+    def _is_timeline_diverged_from_cluster(self) -> bool:
+        """Check whether the local timeline differs from the cluster leader's timeline.
+
+        Patroni only attempts pg_rewind when the replica's timeline has diverged from
+        the leader's. If timelines match, Patroni resumes streaming replication directly
+        and pg_rewind is never called. This check avoids an unnecessary pg_basebackup
+        (triggered by renaming the circular symlink) when rewind would not have been
+        attempted anyway.
+
+        Returns True (diverged, rename needed) when:
+        - pg_controldata cannot be read or parsed — fail-safe, assume the worst.
+        - the cluster cannot be reached — fail-safe, assume the worst.
+        - the leader's timeline is absent from the API response — fail-safe.
+        - local timeline ≠ leader timeline (covers both lag and split-brain remnant).
+
+        Returns False (same timeline, rename not needed) only when both timelines are
+        successfully obtained and they are equal.
+        """
+        try:
+            pg_version = self.get_postgresql_version().split(".")[0]
+            result = subprocess.run(  # noqa: S603
+                [
+                    f"/snap/charmed-postgresql/current/usr/lib/postgresql/{pg_version}/bin/pg_controldata",
+                    # Use the mount root directly: the caller already verified that
+                    # POSTGRESQL_DATA_PATH is a circular symlink pointing back here,
+                    # so the actual pg_control file lives at DATA_STORAGE_PATH.
+                    DATA_STORAGE_PATH,
+                ],
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                logger.warning(
+                    "pg_controldata failed (rc=%d): %s",
+                    result.returncode,
+                    result.stderr.decode(),
+                )
+                return True
+
+            local_timeline: int | None = None
+            for line in result.stdout.decode().splitlines():
+                if "Latest checkpoint's TimeLineID" in line:
+                    local_timeline = int(line.split()[-1])
+                    break
+
+            if local_timeline is None:
+                logger.warning("Could not parse TimeLineID from pg_controldata output")
+                return True
+
+        except Exception:
+            logger.exception("Failed to read local timeline via pg_controldata")
+            return True
+
+        try:
+            members = self.cluster_status()
+        except RetryError:
+            logger.warning("Could not reach cluster to check timeline; assuming diverged")
+            return True
+
+        leader = next((m for m in members if m.get("role") == "leader"), None)
+        if leader is None:
+            logger.warning("No leader found in cluster members; assuming diverged")
+            return True
+
+        leader_timeline = leader.get("timeline")
+        if leader_timeline is None:
+            logger.warning(
+                "Leader %s has no timeline in cluster response; assuming diverged",
+                leader.get("name", "unknown"),
+            )
+            return True
+
+        logger.info(
+            "Timeline check: local=%d, leader=%d — %s",
+            local_timeline,
+            leader_timeline,
+            "diverged, will trigger pg_basebackup"
+            if local_timeline != leader_timeline
+            else "same, pg_rewind not needed",
+        )
+        return local_timeline != leader_timeline
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""

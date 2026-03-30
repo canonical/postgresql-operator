@@ -503,6 +503,7 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         patch("os.chown") as _chown,
         patch("pwd.getpwnam") as _getpwnam,
         patch("cluster.Patroni._create_pgdata") as _create_pgdata,
+        patch("os.path.exists", return_value=True) as _exists,
     ):
         _getpwnam.return_value.pw_uid = sentinel.uid
         _getpwnam.return_value.pw_gid = sentinel.gid
@@ -522,6 +523,27 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         _chmod.assert_called_once_with(
             "/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main", 448
         )
+
+
+def test_configure_patroni_on_unit_pgdata_absent(peers_ips, patroni):
+    """Verify chown/chmod are skipped when _create_pgdata leaves POSTGRESQL_DATA_PATH absent."""
+    with (
+        patch("os.chmod") as _chmod,
+        patch("builtins.open") as _open,
+        patch("os.chown") as _chown,
+        patch("pwd.getpwnam") as _getpwnam,
+        patch("cluster.Patroni._create_pgdata") as _create_pgdata,
+        patch("os.path.exists", return_value=False),
+    ):
+        _getpwnam.return_value.pw_uid = sentinel.uid
+        _getpwnam.return_value.pw_gid = sentinel.gid
+
+        patroni.configure_patroni_on_unit()
+
+        _create_pgdata.assert_called_once()
+        _chown.assert_not_called()
+        _chmod.assert_not_called()
+        _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
 
 
 def test_member_started_true(peers_ips, patroni):
