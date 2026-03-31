@@ -1,0 +1,26 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.20   unsupported  00:13:22Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+postgresql                    waiting    0/2  postgresql                          0  no       waiting for machine
+postgresql-test-app           blocked      1  postgresql-test-app  latest/edge  468  no       No database integration available
+
+Unit                    Workload  Agent       Machine  Public address  Ports  Message
+postgresql-test-app/0*  blocked   idle        0        10.88.173.253          No database integration available
+postgresql/0            waiting   allocating  1        10.88.173.4            waiting for machine
+postgresql/1            waiting   allocating  2                               waiting for machine
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.88.173.253  juju-d22beb-0  ubuntu@24.04  runnervmrg6be  Running
+1        pending  10.88.173.4    juju-d22beb-1  ubuntu@22.04  runnervmrg6be  Running
+2        pending                 pending        ubuntu@22.04                 Creating container
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:13:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:13:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+controller-0: 00:13:18 ERROR juju.worker.provisioner worker 2: shutting down pool due to error while handling a "start-instance 2" task: catacomb 0xc000b1e220 is dying
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

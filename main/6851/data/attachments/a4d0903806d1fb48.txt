@@ -1,0 +1,29 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.20   unsupported  00:14:14Z
+
+App                  Version  Status       Scale  Charm                Channel      Rev  Exposed  Message
+postgresql                    maintenance    1/3  postgresql                          0  no       installing PostgreSQL
+postgresql-test-app           blocked        0/1  postgresql-test-app  latest/edge  468  no       No database integration available
+
+Unit                    Workload     Agent       Machine  Public address  Ports  Message
+postgresql-test-app/0*  unknown      lost        0        10.66.155.126          agent lost, see 'juju show-status-log postgresql-test-app/0'
+postgresql/0*           maintenance  executing   1        10.66.155.179          (install) installing PostgreSQL
+postgresql/1            waiting      allocating  2        10.66.155.247          waiting for machine
+postgresql/2            waiting      allocating  3                               waiting for machine
+
+Machine  State  Address        Inst id        Base          AZ             Message
+0        down   10.66.155.126  juju-f1f4d8-0  ubuntu@24.04  runnervmrg6be  Running
+1        down   10.66.155.179  juju-f1f4d8-1  ubuntu@22.04  runnervmrg6be  Running
+2        down   10.66.155.247  juju-f1f4d8-2  ubuntu@22.04  runnervmrg6be  Running
+3        down                  juju-f1f4d8-3  ubuntu@22.04  runnervmrg6be  Container started
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:13:06 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:13:06 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:13:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:13:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
