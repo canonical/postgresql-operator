@@ -18,10 +18,11 @@ on:
 jobs:
   tag:
     name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v42.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v48.0.0
     with:
       track: '16'
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to create git tag
 
   ci-tests:
@@ -39,6 +40,7 @@ jobs:
       LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
       LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed for Allure Report
 
   release:
@@ -46,11 +48,12 @@ jobs:
     needs:
       - tag
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v42.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v48.0.0
     with:
       track: 16
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to create git tags

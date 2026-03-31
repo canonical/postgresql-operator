@@ -45,7 +45,7 @@ on:
 jobs:
   lint-workflows:
     name: Lint .github/workflows/
-    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@zizmor  # TODO use dpw release
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v48.0.0
     permissions:
       contents: read
 
@@ -102,8 +102,10 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v42.0.1
-    permissions: {}
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v48.0.0
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
+      contents: read
 
   integration-test:
     name: Integration test charm
