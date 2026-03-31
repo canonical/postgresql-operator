@@ -16,7 +16,7 @@ this operator.
   - test coverage
   - user experience for Juju administrators of this charm.
 - Please help us out in ensuring easy to review branches by rebasing your pull request branch onto
-  the `main` branch. This also avoids merge commits and creates a linear Git commit history.
+  the `16/edge` branch. This also avoids merge commits and creates a linear Git commit history.
 
 ## Developing
 
@@ -91,7 +91,7 @@ juju add-model dev
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
 
 # Deploy the charm
-juju deploy ./postgresql_ubuntu-22.04-amd64.charm
+juju deploy ./postgresql_ubuntu@24.04-amd64.charm
 ```
 
 ## Canonical Contributor Agreement
