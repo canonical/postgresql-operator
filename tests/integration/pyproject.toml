@@ -1,0 +1,87 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+asyncio_mode = "auto"
+markers = ["juju3", "juju_secrets"]
+addopts = "--exitfirst"
+
+# Linting tools configuration
+[tool.ruff]
+# preview and explicit preview are enabled for CPY001
+preview = true
+target-version = "py310"
+src = ["."]
+line-length = 99
+
+[tool.ruff.lint]
+explicit-preview-rules = true
+select = [
+  "A",
+  "E",
+  "W",
+  "F",
+  "C",
+  "N",
+  "D",
+  "I001",
+  "B",
+  "CPY001",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+  "TC",
+]
+extend-ignore = [
+  "D203",
+  "D204",
+  "D213",
+  "D215",
+  "D400",
+  "D404",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D413",
+  "B904",
+]
+# Ignore E501 because using black creates errors with this
+# Ignore D107 Missing docstring in __init__
+ignore = ["E501", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"*" = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  # Asserts
+  "B011",
+  # Disable security checks for tests
+  "S",
+]
+
+[tool.ruff.lint.flake8-copyright]
+# Check for properly formatted copyright header in each file
+author = "Canonical Ltd."
+notice-rgx = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+"
+min-file-size = 1
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ty.environment]
+python = ".tox/lint/"
+extra-paths = ["./lib"]
+
+[tool.ty.src]
+include = ["src", "scripts"]
+exclude = ["tests"]
