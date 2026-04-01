@@ -4,12 +4,12 @@
 import logging
 
 import pytest as pytest
-from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from .adapters import JujuFixture
 from .backup_helpers import backup_operations
 from .conftest import AWS
-from .helpers import (
+from .jubilant_helpers import (
     DATABASE_APP_NAME,
     db_connect,
     get_password,
@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict], charm) -> None:
+def test_backup_aws(juju: JujuFixture, aws_cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in AWS, test backup and restore actions."""
     config = aws_cloud_configs[0]
     credentials = aws_cloud_configs[1]
 
-    await backup_operations(
-        ops_test,
+    backup_operations(
+        juju,
         S3_INTEGRATOR_APP_NAME,
         tls_certificates_app_name,
         tls_channel,
@@ -49,25 +49,23 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
     database_app_name = f"{DATABASE_APP_NAME}-aws"
 
     # Remove the relation to the TLS certificates operator.
-    await ops_test.model.applications[database_app_name].remove_relation(
+    juju.ext.model.applications[database_app_name].remove_relation(
         f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
     )
-    await ops_test.model.applications[database_app_name].remove_relation(
+    juju.ext.model.applications[database_app_name].remove_relation(
         f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
 
     new_unit_name = f"{database_app_name}/2"
 
     # Scale up to be able to test primary and leader being different.
-    async with ops_test.fast_forward():
-        await scale_application(ops_test, database_app_name, 2)
+    with juju.ext.fast_forward():
+        scale_application(juju, database_app_name, 2)
 
     # Ensure replication is working correctly.
-    address = get_unit_address(ops_test, new_unit_name)
-    password = await get_password(ops_test, database_app_name=database_app_name)
-    patroni_password = await get_password(
-        ops_test, username="patroni", database_app_name=database_app_name
-    )
+    address = get_unit_address(juju, new_unit_name)
+    password = get_password(database_app_name=database_app_name)
+    patroni_password = get_password(username="patroni", database_app_name=database_app_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
@@ -85,11 +83,11 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
         )
     connection.close()
 
-    old_primary = await get_primary(ops_test, new_unit_name)
-    switchover(ops_test, old_primary, patroni_password, new_unit_name)
+    old_primary = get_primary(juju, new_unit_name)
+    switchover(juju, old_primary, patroni_password, new_unit_name)
 
     # Get the new primary unit.
-    primary = await get_primary(ops_test, new_unit_name)
+    primary = get_primary(juju, new_unit_name)
     # Check that the primary changed.
     for attempt in Retrying(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -99,15 +97,15 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
 
     # Ensure stanza is working correctly.
     logger.info("listing the available backups")
-    action = await ops_test.model.units.get(new_unit_name).run_action("list-backups")
-    await action.wait()
+    action = juju.ext.model.units.get(new_unit_name).run_action("list-backups")
+    action.wait()
     backups = action.results.get("backups")
     assert backups, "backups not outputted"
 
-    await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    juju.ext.model.wait_for_idle(status="active", timeout=1000)
 
     # Remove the database app.
-    await ops_test.model.remove_application(database_app_name, block_until_done=True)
+    juju.ext.model.remove_application(database_app_name, block_until_done=True)
 
     # Remove the TLS operator.
-    await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
+    juju.ext.model.remove_application(tls_certificates_app_name, block_until_done=True)
