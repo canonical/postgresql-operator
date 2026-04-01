@@ -1,0 +1,42 @@
+name: Automatic documentation checks
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+  pull_request:
+    paths:
+      - 'docs/**'
+
+jobs:
+  check-docs:
+    name: Check documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up environment
+        run: |
+          sudo apt-get install -y aspell aspell-en
+          sudo snap install woke
+      - run: make install
+      - name: Spell check
+        run: make spelling
+      - name: Inclusive language check
+        run: make woke
+      - name: Link check
+        run: make linkcheck
+    permissions:
+      contents: read
