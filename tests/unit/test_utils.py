@@ -59,8 +59,17 @@ def test_remove_stale_otel_sdk_packages():
         _distributions.reset_mock()
         _shutil.rmtree.reset_mock()
 
+        # don't execute on Juju 3
+        _getenv.side_effect = ["3.0.0", "hooks/upgrade-charm"]
+        _remove_stale_otel_sdk_packages()
+
+        _distributions.assert_not_called()
+        _shutil.rmtree.assert_not_called()
+        _distributions.reset_mock()
+        _shutil.rmtree.reset_mock()
+
         # Upgrade hook, nothing to remove
-        _getenv.return_value = "hooks/upgrade-charm"
+        _getenv.side_effect = ["2.9.53", "hooks/upgrade-charm"]
         _distributions.return_value = [other_dist, otel_dist]
 
         _remove_stale_otel_sdk_packages()
@@ -71,6 +80,7 @@ def test_remove_stale_otel_sdk_packages():
         _shutil.rmtree.reset_mock()
 
         # Upgrade hook, duplicate otel packages
+        _getenv.side_effect = ["2.9.53", "hooks/upgrade-charm"]
         _distributions.return_value = [other_dist, otel_dist, stale_otel_dist]
         _remove_stale_otel_sdk_packages()
 

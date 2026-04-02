@@ -68,7 +68,8 @@ def _remove_stale_otel_sdk_packages():
     """
     # all imports are local to keep this function standalone, side-effect-free, and easy to revert later
 
-    if os.getenv("JUJU_DISPATCH_PATH") != "hooks/upgrade-charm":
+    major_version = int(juju_ver.split(".")[0]) if (juju_ver := os.getenv("JUJU_VERSION")) else 3
+    if os.getenv("JUJU_DISPATCH_PATH") != "hooks/upgrade-charm" or major_version > 2:
         return
 
     otel_logger = logging.getLogger("charm_tracing_otel_patcher")
