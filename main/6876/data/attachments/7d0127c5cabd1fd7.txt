@@ -1,0 +1,34 @@
+[32mINFO    [0m integration.ha_tests.conftest:conftest.py:67 Destroying second model
+[33mWARNING [0m juju.client.connection:connection.py:579 RPC: Connection closed, reconnecting
+[31m[1mERROR   [0m juju.client.connection:connection.py:587 RPC: Automatic reconnect failed
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.20   unsupported  00:12:48Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               waiting    0/1  data-integrator      latest/edge  380  no       waiting for machine
+postgresql                    waiting    0/3  postgresql                          0  no       waiting for machine
+postgresql-test-app           waiting    0/1  postgresql-test-app  latest/edge  469  no       waiting for machine
+
+Unit                   Workload  Agent       Machine  Public address  Ports  Message
+data-integrator/0      waiting   allocating  3        10.52.226.115          waiting for machine
+postgresql-test-app/0  waiting   allocating  4                               waiting for machine
+postgresql/0           waiting   allocating  0                               waiting for machine
+postgresql/1           waiting   allocating  1                               waiting for machine
+postgresql/2           waiting   allocating  2        10.52.226.12           waiting for machine
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        pending                 pending        ubuntu@22.04                 Failed remote LXD image download. Retrying. Attempt number 2
+1        pending                 pending        ubuntu@22.04                 Failed remote LXD image download. Retrying. Attempt number 2
+2        pending  10.52.226.12   juju-2cc064-2  ubuntu@22.04  runnervmrg6be  Running
+3        pending  10.52.226.115  juju-2cc064-3  ubuntu@24.04  runnervmrg6be  Running
+4        pending                 pending        ubuntu@22.04                 Creating container
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+controller-0: 00:12:42 ERROR juju.worker.provisioner cannot register instance for machine 4: connection is shutdown before send: connection is shut down
+controller-0: 00:12:42 ERROR juju.worker.provisioner setting machine status: setting error status for machine "4": connection is shutdown before send: connection is shut down
+controller-0: 00:12:45 ERROR juju.worker.provisioner worker 4: shutting down pool due to error while handling a "start-instance 4" task: setting instance info: connection is shutdown before send: connection is shut down
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
