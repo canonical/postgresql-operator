@@ -8,13 +8,14 @@ on:
     - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch:
 
-permissions: {}
 jobs:
   TICS:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Create and activate virtual environment
         run: |
@@ -40,6 +41,7 @@ jobs:
           project: postgresql-operator
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
           branchdir: ${{ env.GITHUB_WORKSPACE }}
-          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}  # zizmor: ignore[secrets-outside-env] Organization secret (does not support environments: https://github.com/orgs/community/discussions/15379)
           installTics: true
           calc: ALL
+    permissions: {}
