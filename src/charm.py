@@ -19,6 +19,15 @@ from pathlib import Path
 from typing import Literal, get_args
 from urllib.parse import urlparse
 
+from utils import _remove_stale_otel_sdk_packages
+
+# apply hacky patch to remove stale opentelemetry sdk packages on upgrade-charm.
+# it could be trouble if someone ever decides to implement their own tracer parallel to
+# ours and before the charm has inited. We assume they won't.
+# !!IMPORTANT!! keep all otlp imports UNDER this call.
+_remove_stale_otel_sdk_packages()
+
+# ruff: disable[E402]
 import psycopg2
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -121,6 +130,8 @@ from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
 from utils import new_password, snap_refreshed
+
+# ruff: enable[E402]
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
