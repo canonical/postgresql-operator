@@ -8,9 +8,8 @@ from asyncio import gather
 
 import psycopg2
 import pytest
-from pytest_operator.plugin import OpsTest
-
 from constants import DATABASE_DEFAULT_NAME
+from pytest_operator.plugin import OpsTest
 
 from ..helpers import CHARM_BASE, DATABASE_APP_NAME
 from .helpers import build_connection_string
