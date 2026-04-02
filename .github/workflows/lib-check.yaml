@@ -21,9 +21,6 @@ jobs:
     name: Check libraries
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment:
-      name: check-libraries
-      deployment: false
     if: ${{ github.event.pull_request.head.repo.full_name == 'canonical/postgresql-operator' }}
     steps:
       - name: Checkout
@@ -34,7 +31,7 @@ jobs:
       - name: Check libs
         uses: canonical/charming-actions/check-libraries@2.7.0
         with:
-          credentials: "${{ secrets.CHARMHUB_TOKEN_CHECK_LIBS }}"
+          credentials: ''
           github-token: "${{ secrets.GITHUB_TOKEN }}"
     permissions:
       pull-requests: write  # Add label to prs
