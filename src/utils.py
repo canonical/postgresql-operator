@@ -73,7 +73,7 @@ def _remove_stale_otel_sdk_packages():
         return
 
     otel_logger = logging.getLogger("charm_tracing_otel_patcher")
-    otel_logger.debug("Applying _remove_stale_otel_sdk_packages patch on charm upgrade")
+    otel_logger.info("Applying _remove_stale_otel_sdk_packages patch on charm upgrade")
     # group by name all distributions starting with "opentelemetry_"
     otel_distributions = defaultdict(list)
     for distribution in distributions():
@@ -81,18 +81,18 @@ def _remove_stale_otel_sdk_packages():
         if name.startswith("opentelemetry_"):
             otel_distributions[name].append(distribution)
 
-    otel_logger.debug(f"Found {len(otel_distributions)} opentelemetry distributions")
+    otel_logger.info(f"Found {len(otel_distributions)} opentelemetry distributions")
 
     # If we have multiple distributions with the same name, remove any that have 0 associated files
     for name, distributions_ in otel_distributions.items():
         if len(distributions_) <= 1:
             continue
 
-        otel_logger.debug(f"Package {name} has multiple ({len(distributions_)}) distributions.")
+        otel_logger.info(f"Package {name} has multiple ({len(distributions_)}) distributions.")
         for distribution in distributions_:
             if not distribution.files:  # Not None or empty list
                 path = distribution._path
                 otel_logger.info(f"Removing empty distribution of {name} at {path}.")
                 shutil.rmtree(path)
 
-    otel_logger.debug("Successfully applied _remove_stale_otel_sdk_packages patch.")
+    otel_logger.info("Successfully applied _remove_stale_otel_sdk_packages patch.")
