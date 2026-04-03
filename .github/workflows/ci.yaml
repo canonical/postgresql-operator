@@ -20,10 +20,6 @@ on:
   workflow_dispatch:
   # Triggered on push by .github/workflows/release.yaml
   workflow_call:
-    outputs:
-      artifact-prefix:
-        description: build_charm.yaml `artifact-prefix` output
-        value: ${{ jobs.build.outputs.artifact-prefix }}
     secrets:
       AWS_ACCESS_KEY:
         required: true
@@ -39,6 +35,10 @@ on:
         required: true
       LANDSCAPE_REGISTRATION_KEY:
         required: true
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
   lint-workflows:
