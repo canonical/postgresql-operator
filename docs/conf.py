@@ -27,6 +27,14 @@ import yaml
 project = "Charmed PostgreSQL"
 author = "Canonical Ltd."
 
+# The year in the copyright statement defaults to the current year, so
+# individual document versions show when they were built.
+# TODO: If the date must be a range, like in a software license, replace 
+# 2026 with the starting year of development and use:
+#
+copyright = f"2025-{datetime.date.today().year}"
+
+# copyright = f"{datetime.date.today().year}"
 
 # Sidebar documentation title; best kept reasonably short
 #
@@ -35,33 +43,6 @@ author = "Canonical Ltd."
 # TODO: To disable the title, set to an empty string.
 
 html_title = project + " 16 documentation"
-
-
-# Copyright string; shown at the bottom of the page
-#
-# Now, the starter pack uses CC-BY-SA as the license
-# and the current year as the copyright year.
-#
-# TODO: If your docs need another license, specify it instead of 'CC-BY-SA'.
-#
-# TODO: If your documentation is a part of the code repository of your project,
-#       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
-#
-# NOTE: For static works, it is common to provide the first publication year.
-#       Another option is to provide both the first year of publication
-#       and the current year, especially for docs that frequently change,
-#       e.g. 2022–2023 (note the en-dash).
-#
-#       A way to check a repo's creation date is to get a classic GitHub token
-#       with 'repo' permissions; see https://github.com/settings/tokens
-#       Next, use 'curl' and 'jq' to extract the date from the API's output:
-#
-#       curl -H 'Authorization: token <TOKEN>' \
-#         -H 'Accept: application/vnd.github.v3.raw' \
-#         https://api.github.com/repos/canonical/<REPO> | jq '.created_at'
-
-copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
-
 
 # Documentation website URL
 #
@@ -84,7 +65,7 @@ ogp_site_name = project
 #
 # TODO: To customise the preview image, update as needed.
 
-ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg"
+ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
@@ -151,14 +132,34 @@ html_context = {
 
     # Required for feedback button    
     'github_issues': 'enabled',
+
+    # Inherit the author value
+    "author": author,
+
+    # The starter pack uses CC-BY-SA as the license
+    #
+    # TODO: If your docs need another license, specify it instead of 'CC-BY-SA'.
+    # For the name, we recommend using the standard shorthand identifier from
+    # https://spdx.org/licenses
+    #
+    # For the URL, link directly to the license statement, typically found on
+    # the product's home page or in its GitHub project.
+    #
+    # TODO: If your documentation is a part of the code repository of your project,
+    #       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
+
+    "license": {
+        "name": "Apache License 2.0",
+        "url": "https://github.com/canonical/postgresql-operator/blob/16/edge/LICENSE",
+    },
 }
 
-html_extra_path = []
+# html_extra_path = []
 
 # Allow opt-in build of the OpenAPI "Hello" example so docs stay clean by default.
-if os.getenv("OPENAPI", ""):
-    tags.add("openapi")
-    html_extra_path.append("how-to/assets/openapi.yaml")
+# if os.getenv("OPENAPI", ""):
+#     tags.add("openapi")
+#     html_extra_path.append("how-to/assets/openapi.yaml")
 
 # TODO: To enable the edit button on pages, uncomment and change the link to a
 # public repository on GitHub or Launchpad. Any of the following link domains
@@ -209,30 +210,24 @@ sitemap_excludes = [
 # Template and asset locations
 #######################
 
-html_static_path = [
-    ".sphinx/_static",
-]
-templates_path = [
-    ".sphinx/_templates",
-]
+# html_static_path = ["_static"]
+templates_path = ["_templates"]
 
 
 #############
 # Redirects #
 #############
 
-# To set up redirects: https://documatt.gitlab.io/sphinx-reredirects/usage.html
-# For example: 'explanation/old-name.html': '../how-to/prettify.html',
+# Add redirects to the 'redirects.txt' file
+# https://sphinxext-rediraffe.readthedocs.io/en/latest/
 
 # To set up redirects in the Read the Docs project dashboard:
 # https://docs.readthedocs.io/en/stable/guides/redirects.html
 
-# NOTE: If undefined, set to None, or empty,
-#       the sphinx_reredirects extension will be disabled.
-
-redirects = {}
-
 rediraffe_redirects = "redirects.txt"
+
+# Strips '/index.html' from destination URLs when building with 'dirhtml'
+rediraffe_dir_only = True
 
 ###########################
 # Link checker exceptions #
@@ -285,6 +280,7 @@ extensions = [
     "canonical_sphinx",
     "notfound.extension",
     "sphinx_design",
+    "sphinx_rerediraffe",
     "sphinx_reredirects",
     "sphinx_tabs.tabs",
     "sphinxcontrib.jquery",
@@ -301,7 +297,6 @@ extensions = [
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
     "sphinx_sitemap",
-    "sphinxext.rediraffe",
     "sphinx_new_tab_link"
 ]
 
@@ -309,16 +304,18 @@ new_tab_link_show_external_link_icon = True
 
 # Excludes files or directories from processing
 
-exclude_patterns = []
+exclude_patterns = [".venv*"]
 
-# Add CSS files (located in .sphinx/_static/)
+# Adds custom CSS files, located under 'html_static_path'
+
 html_css_files = [
-    "cookie-banner.css",
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
 ]
 
-# Add JavaScript files (located in .sphinx/_static/)
+# Adds custom JavaScript files, located under 'html_static_path'
+
 html_js_files = [
-    "bundle.js",
+    "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
 ]
 
 # Specifies a reST snippet to be appended to each .rst file

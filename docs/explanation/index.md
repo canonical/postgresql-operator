@@ -5,7 +5,7 @@ Additional context about the PostgreSQL charm, including design, legacy informat
 
 ## Core
 
-Core concepts about the history and design of the charm:
+Core concepts about the history and high-level design of Charmed PostgreSQL:
 
 ```{toctree}
 :titlesonly:
@@ -17,7 +17,7 @@ Charm versions <charm-versions/index>
 
 ## Operation
 
-Clarification of standard operational concepts:
+Clarification of standard PostgreSQL operational concepts in the context of charms and Juju:
 
 ```{toctree}
 :titlesonly:
@@ -31,7 +31,7 @@ Connection pooling <connection-pooling>
 
 ## Security
 
-Security hardening overview:
+Overview of security features in the charm and hardening guidance:
 
 ```{toctree}
 :titlesonly:

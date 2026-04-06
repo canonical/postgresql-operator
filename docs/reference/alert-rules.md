@@ -7,7 +7,7 @@ This page contains a markdown version of the alert rules described in the `postg
 
 > This documentation describes the latest alert rule expressions. See the YAML file(s) on listed above if you require an older version.
 
-## PostgresqlExporter
+## `PostgresqlExporter`
 
 | Alert | Severity | Notes |
 |------|----------|-------|
@@ -33,7 +33,7 @@ This page contains a markdown version of the alert rules described in the `postg
 | PostgresqlBloatTableHigh(>80%) | ![warning] | PostgreSQL instance has a high bloat table (> 80%).<br>A table is bloated.Consider running `VACUUM {{ $labels.relname }};` |
 | PostgresqlInvalidIndex | ![critical] | PostgresSQL instance )= has an invalid index.<br>A table has an invalid index.<br>Consider running `DROP INDEX <index name>;` |
 
-## PgbouncerExporter
+## `PgbouncerExporter`
 
 | Alert | Severity | Notes |
 |------|----------|-------|
@@ -41,7 +41,7 @@ This page contains a markdown version of the alert rules described in the `postg
 | PgbouncerErrors | ![warning] | PgBouncer instance is logging errors.<br>This may be due to a a server restart or an admin typing commands at the PgBouncer console. |
 | PgbouncerMaxConnections | ![critical] | PgBouncer instance has reached `max_client_conn`.<br>Consider checking how many connections the client application is opening. |
 
-## PatroniExporter
+## `PatroniExporter`
 
 | Alert | Severity | Notes |
 |------|----------|-------|
