@@ -985,6 +985,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Start can be called here multiple times as it's idempotent.
         # At this moment, it starts Patroni at the first time the data is received
         # in the relation.
+        if not self._patroni.member_started:
+            self._patroni._hide_lost_found()
         self._patroni.start_patroni()
 
         # Assert the member is up and running before marking the unit as active.
@@ -994,6 +996,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self._patroni._restore_lost_found()
         self._start_stop_pgbackrest_service(event)
 
         # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
@@ -1814,6 +1817,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
+            self._patroni._restore_lost_found()
             self.set_unit_status(BlockedStatus("failed to start Patroni"))
             return
 
@@ -1823,6 +1827,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.set_unit_status(WaitingStatus("awaiting for member to start"))
             event.defer()
             return
+
+        self._patroni._restore_lost_found()
 
         if not self._can_connect_to_postgresql:
             logger.debug("Deferring on_start: awaiting for database to start")

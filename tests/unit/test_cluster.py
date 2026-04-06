@@ -19,6 +19,8 @@ from tenacity import (
 
 from charm import PostgresqlOperatorCharm
 from cluster import (
+    LOST_FOUND_STASH_DIRECTORY,
+    LOST_FOUND_STASH_PATH,
     PATRONI_TIMEOUT,
     Patroni,
     RemoveRaftMemberFailedError,
@@ -518,6 +520,104 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         _chmod.assert_called_once_with(
             "/var/snap/charmed-postgresql/common/var/lib/postgresql", 448
         )
+
+
+def test_hide_lost_found(peers_ips, patroni):
+    lost_found_path = f"{POSTGRESQL_DATA_PATH}/lost+found"
+
+    with (
+        patch(
+            "cluster.os.path.isdir",
+            side_effect=lambda path: path == lost_found_path,
+        ),
+        patch("cluster.os.makedirs") as _makedirs,
+        patch("cluster.shutil.move") as _move,
+    ):
+        patroni._hide_lost_found()
+
+        _makedirs.assert_called_once_with(LOST_FOUND_STASH_DIRECTORY, exist_ok=True)
+        _move.assert_called_once_with(lost_found_path, LOST_FOUND_STASH_PATH)
+
+
+def test_hide_lost_found_noop_when_already_moved(peers_ips, patroni):
+    lost_found_path = f"{POSTGRESQL_DATA_PATH}/lost+found"
+
+    with (
+        patch(
+            "cluster.os.path.isdir",
+            side_effect=lambda path: path in {lost_found_path, LOST_FOUND_STASH_PATH},
+        ),
+        patch("cluster.os.makedirs") as _makedirs,
+        patch("cluster.shutil.move") as _move,
+    ):
+        patroni._hide_lost_found()
+
+        _makedirs.assert_not_called()
+        _move.assert_not_called()
+
+
+def test_hide_lost_found_handles_file_not_found(peers_ips, patroni):
+    lost_found_path = f"{POSTGRESQL_DATA_PATH}/lost+found"
+
+    with (
+        patch(
+            "cluster.os.path.isdir",
+            side_effect=lambda path: path == lost_found_path,
+        ),
+        patch("cluster.os.makedirs"),
+        patch("cluster.shutil.move", side_effect=FileNotFoundError) as _move,
+    ):
+        patroni._hide_lost_found()
+
+        _move.assert_called_once_with(lost_found_path, LOST_FOUND_STASH_PATH)
+
+
+def test_restore_lost_found(peers_ips, patroni):
+    lost_found_path = f"{POSTGRESQL_DATA_PATH}/lost+found"
+
+    with (
+        patch(
+            "cluster.os.path.isdir",
+            side_effect=lambda path: path == LOST_FOUND_STASH_PATH,
+        ),
+        patch("cluster.shutil.move") as _move,
+    ):
+        patroni._restore_lost_found()
+
+        _move.assert_called_once_with(LOST_FOUND_STASH_PATH, lost_found_path)
+
+
+def test_restore_lost_found_handles_file_not_found(peers_ips, patroni):
+    lost_found_path = f"{POSTGRESQL_DATA_PATH}/lost+found"
+
+    with (
+        patch(
+            "cluster.os.path.isdir",
+            side_effect=lambda path: path == LOST_FOUND_STASH_PATH,
+        ),
+        patch("cluster.shutil.move", side_effect=FileNotFoundError) as _move,
+    ):
+        patroni._restore_lost_found()
+
+        _move.assert_called_once_with(LOST_FOUND_STASH_PATH, lost_found_path)
+
+
+def test_bootstrap_cluster(peers_ips, patroni):
+    call_order = []
+
+    with (
+        patch(
+            "cluster.Patroni.configure_patroni_on_unit",
+            side_effect=lambda: call_order.append("configure"),
+        ),
+        patch("cluster.Patroni._hide_lost_found", side_effect=lambda: call_order.append("hide")),
+        patch(
+            "cluster.Patroni.start_patroni",
+            side_effect=lambda: call_order.append("start") or True,
+        ),
+    ):
+        assert patroni.bootstrap_cluster()
+        assert call_order == ["configure", "hide", "start"]
 
 
 def test_member_started_true(peers_ips, patroni):

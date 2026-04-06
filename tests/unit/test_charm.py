@@ -10,7 +10,7 @@ import platform
 import subprocess
 from datetime import UTC, datetime
 from typing import ClassVar
-from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
+from unittest.mock import DEFAULT, MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import charm_refresh
 import psycopg2
@@ -396,8 +396,12 @@ def test_on_start(harness):
             new_callable=PropertyMock,
         ) as _member_started,
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
-        patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
-        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.Patroni._restore_lost_found") as _restore_lost_found,
+        patch.multiple(
+            "charm.PostgresqlOperatorCharm",
+            _replication_password=DEFAULT,
+            _get_password=DEFAULT,
+        ) as _password_mocks,
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -416,6 +420,8 @@ def test_on_start(harness):
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
     ):
+        _replication_password = _password_mocks["_replication_password"]
+        _get_password = _password_mocks["_get_password"]
         _get_postgresql_version.return_value = "16.6"
 
         # Test before the passwords are generated.
@@ -448,17 +454,20 @@ def test_on_start(harness):
         _bootstrap_cluster.assert_called_once()
         _oversee_users.assert_not_called()
         _restart_services_after_reboot.assert_called_once()
+        _restore_lost_found.assert_called_once()
         assert isinstance(harness.model.unit.status, BlockedStatus)
         # Set an initial waiting status (like after the install hook was triggered).
         harness.model.unit.status = WaitingStatus("fake message")
 
         # Test the event of an error happening when trying to create the default postgres user.
         _restart_services_after_reboot.reset_mock()
+        _restore_lost_found.reset_mock()
         _member_started.return_value = True
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()
         _restart_services_after_reboot.assert_called_once()
+        _restore_lost_found.assert_called_once()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
         # Set an initial waiting status again (like after the install hook was triggered).
@@ -466,12 +475,14 @@ def test_on_start(harness):
 
         # Then test the event of a correct cluster bootstrapping.
         _restart_services_after_reboot.reset_mock()
+        _restore_lost_found.reset_mock()
         harness.charm.on.start.emit()
         assert _postgresql.create_user.call_count == 3  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
+        _restore_lost_found.assert_called_once()
 
 
 def test_on_start_replica(harness):
@@ -1778,6 +1789,8 @@ def test_on_peer_relation_changed(harness):
         patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.Patroni._hide_lost_found") as _hide_lost_found,
+        patch("charm.Patroni._restore_lost_found") as _restore_lost_found,
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
@@ -1810,6 +1823,8 @@ def test_on_peer_relation_changed(harness):
         harness.charm._on_peer_relation_changed(mock_event)
         _reconfigure_cluster.assert_called_once_with(mock_event)
         mock_event.defer.assert_called_once()
+        _hide_lost_found.assert_not_called()
+        _restore_lost_found.assert_not_called()
 
         # Test when the leader can reconfigure the cluster.
         mock_event.defer.reset_mock()
@@ -1823,31 +1838,45 @@ def test_on_peer_relation_changed(harness):
         _reconfigure_cluster.assert_called_once_with(mock_event)
         _update_config.assert_called_once()
         _start_patroni.assert_called_once()
+        _hide_lost_found.assert_not_called()
+        _restore_lost_found.assert_called_once()
         _update_new_unit_status.assert_called_once()
 
         # Test when the unit fails to update the Patroni configuration.
         _update_config.reset_mock()
         _start_patroni.reset_mock()
+        _hide_lost_found.reset_mock()
+        _restore_lost_found.reset_mock()
         _update_new_unit_status.reset_mock()
         _update_config.side_effect = RetryError(last_attempt=1)
         harness.charm._on_peer_relation_changed(mock_event)
         _update_config.assert_called_once()
         _start_patroni.assert_not_called()
+        _hide_lost_found.assert_not_called()
+        _restore_lost_found.assert_not_called()
         _update_new_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
         # Test event is early exiting when in blocked status.
         _update_config.side_effect = None
         _member_started.return_value = False
+        _hide_lost_found.reset_mock()
+        _restore_lost_found.reset_mock()
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_not_called()
+        _hide_lost_found.assert_not_called()
+        _restore_lost_found.assert_not_called()
 
         # Test when Patroni hasn't started yet in the unit.
         harness.model.unit.status = ActiveStatus()
         _update_config.side_effect = None
         _member_started.return_value = False
+        _hide_lost_found.reset_mock()
+        _restore_lost_found.reset_mock()
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_called_once()
+        _hide_lost_found.assert_called_once()
+        _restore_lost_found.assert_not_called()
         _update_new_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, WaitingStatus)
 

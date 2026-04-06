@@ -57,6 +57,7 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    SNAP_COMMON_PATH,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -64,6 +65,8 @@ from utils import label2name
 logger = logging.getLogger(__name__)
 
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
+LOST_FOUND_STASH_DIRECTORY = f"{SNAP_COMMON_PATH}/data/.lost+found-stash"
+LOST_FOUND_STASH_PATH = f"{LOST_FOUND_STASH_DIRECTORY}/lost+found"
 
 STARTED_STATES = ["running", "streaming"]
 RUNNING_STATES = [*STARTED_STATES, "starting"]
@@ -219,6 +222,7 @@ class Patroni:
         """Bootstrap a PostgreSQL cluster using Patroni."""
         # Render the configuration files and start the cluster.
         self.configure_patroni_on_unit()
+        self._hide_lost_found()
         return self.start_patroni()
 
     def configure_patroni_on_unit(self):
@@ -231,6 +235,27 @@ class Patroni:
         # Expected permission
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+
+    def _hide_lost_found(self) -> None:
+        """Move lost+found out of the data directory so initdb can bootstrap."""
+        lost_found_path = os.path.join(POSTGRESQL_DATA_PATH, "lost+found")
+        if os.path.isdir(LOST_FOUND_STASH_PATH) or not os.path.isdir(lost_found_path):
+            return
+
+        with suppress(FileNotFoundError):
+            os.makedirs(LOST_FOUND_STASH_DIRECTORY, exist_ok=True)
+            shutil.move(lost_found_path, LOST_FOUND_STASH_PATH)
+            logger.info("Temporarily moved lost+found out of the data directory")
+
+    def _restore_lost_found(self) -> None:
+        """Move lost+found back to the data directory after a bootstrap attempt."""
+        lost_found_path = os.path.join(POSTGRESQL_DATA_PATH, "lost+found")
+        if os.path.isdir(lost_found_path) or not os.path.isdir(LOST_FOUND_STASH_PATH):
+            return
+
+        with suppress(FileNotFoundError):
+            shutil.move(LOST_FOUND_STASH_PATH, lost_found_path)
+            logger.info("Restored lost+found into the data directory")
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
