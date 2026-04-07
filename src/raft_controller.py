@@ -16,6 +16,7 @@ The Raft service runs as a systemd service to ensure it persists between
 charm hook invocations.
 """
 
+import importlib
 import logging
 import os
 import re
@@ -23,13 +24,14 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+TcpUtility: type[Any] | None = None
+UtilityException: type[Exception] = Exception
 try:
-    from pysyncobj.utility import TcpUtility, UtilityException
-
+    utility_module = importlib.import_module("pysyncobj.utility")
+    TcpUtility = utility_module.TcpUtility
+    UtilityException = utility_module.UtilityException
     PYSYNCOBJ_AVAILABLE = True
 except ImportError:
-    TcpUtility = None  # type: ignore[assignment]
-    UtilityException = Exception  # type: ignore[assignment]
     PYSYNCOBJ_AVAILABLE = False
 
 if TYPE_CHECKING:

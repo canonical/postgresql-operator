@@ -310,13 +310,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
-        self._role = self.model.config.get("role", "postgresql")
-
-        if self._role not in ("postgresql", "watcher"):
+        configured_role = self.model.config.get("role", "postgresql")
+        if not isinstance(configured_role, str) or configured_role not in (
+            "postgresql",
+            "watcher",
+        ):
             self.unit.status = BlockedStatus(
-                f"invalid role '{self._role}' (must be 'postgresql' or 'watcher')"
+                f"invalid role '{configured_role}' (must be 'postgresql' or 'watcher')"
             )
             return
+
+        if configured_role == "postgresql":
+            self._role: Literal["postgresql", "watcher"] = "postgresql"
+        else:
+            self._role = "watcher"
 
         if not self._validate_initial_role_unchanged():
             return
@@ -366,7 +373,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if stored_role is None:
             # First time — persist the role (leader only)
             if self.unit.is_leader():
-                self._peers.data[self.app]["role"] = self._role  # type: ignore[assignment]
+                self._peers.data[self.app]["role"] = self._role
             return True
         if stored_role != self._role:
             logger.error(
