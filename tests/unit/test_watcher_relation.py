@@ -14,6 +14,7 @@ def create_mock_charm():
     mock_charm = MagicMock()
     mock_charm.unit.is_leader.return_value = True
     mock_charm.cluster_name = "postgresql"
+    mock_charm._unit_ip = "10.0.0.1"
     mock_charm._patroni.unit_ip = "10.0.0.1"
     mock_charm._patroni.peers_ips = {"10.0.0.2"}
     mock_charm._patroni.raft_password = "test-raft-password"
@@ -128,8 +129,12 @@ class TestWatcherRelation:
 
         relation = PostgreSQLWatcherRelation(mock_charm)
 
-        with patch.object(relation, "_get_or_create_watcher_secret") as mock_secret:
+        with (
+            patch.object(relation, "update_unit_address") as update_unit_address,
+            patch.object(relation, "_get_or_create_watcher_secret") as mock_secret,
+        ):
             relation._on_watcher_relation_joined(mock_event)
+            update_unit_address.assert_called_once_with(mock_event.relation)
             mock_secret.assert_not_called()
 
     def test_on_watcher_relation_joined_leader(self):
@@ -179,7 +184,10 @@ class TestWatcherRelation:
         # Setup mock relation with watcher unit
         mock_unit = MagicMock()
         mock_event.relation.units = {mock_unit}
-        mock_event.relation.data = {mock_unit: {"unit-address": "10.0.0.10"}}
+        mock_event.relation.data = {
+            mock_unit: {"unit-address": "10.0.0.10"},
+            mock_charm.unit: {},
+        }
 
         relation = PostgreSQLWatcherRelation(mock_charm)
 
@@ -236,7 +244,10 @@ class TestWatcherRelation:
 
         relation = PostgreSQLWatcherRelation(mock_charm)
 
-        with patch.object(mock_charm.model, "get_secret", return_value=mock_secret):
+        with (
+            patch.object(mock_charm.model, "get_secret", return_value=mock_secret),
+            patch.object(relation, "_get_standby_clusters", return_value=[]),
+        ):
             relation._update_relation_data(mock_relation)
 
         # Verify app data was updated
@@ -251,6 +262,23 @@ class TestWatcherRelation:
         # Verify unit data was updated
         unit_data = mock_relation.data[mock_charm.unit]
         assert "unit-address" in unit_data
+
+    def test_update_unit_address_updates_az(self):
+        """Test update_unit_address also publishes unit AZ."""
+        mock_charm = create_mock_charm()
+        mock_relation = MagicMock()
+        mock_relation.data = {
+            mock_charm.unit: {
+                "unit-address": "10.0.0.1",
+            }
+        }
+
+        relation = PostgreSQLWatcherRelation(mock_charm)
+
+        with patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az1"}, clear=False):
+            relation.update_unit_address(mock_relation)
+
+        assert mock_relation.data[mock_charm.unit]["unit-az"] == "az1"
 
     def test_update_watcher_secret_not_leader(self):
         """Test update_watcher_secret does nothing for non-leader."""

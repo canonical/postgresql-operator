@@ -93,6 +93,23 @@ def test_config_fallback(harness):
     assert charm.config.connection_authentication_timeout == 120
 
 
+def test_validate_initial_role_unchanged_allows_matching_role(harness):
+    rel_id = harness.model.get_relation(PEER).id
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.app.name, {"role": "postgresql"})
+
+    assert harness.charm._validate_initial_role_unchanged()
+
+
+def test_validate_initial_role_unchanged_blocks_role_mismatch(harness):
+    rel_id = harness.model.get_relation(PEER).id
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.app.name, {"role": "watcher"})
+
+    assert not harness.charm._validate_initial_role_unchanged()
+    assert isinstance(harness.model.unit.status, BlockedStatus)
+
+
 def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,

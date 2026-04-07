@@ -97,9 +97,20 @@ restore:
     restore-to-time:
       type: string
       description: Point-in-time-recovery target in PSQL format.
-show-topology:
+get-cluster-status:
   description: Display cluster topology, PostgreSQL units health status, and Raft cluster state.
     Only available when role=watcher.
+  params:
+    cluster-name:
+      type: string
+      description: |
+        The name of the cluster to filter the output by.
+        Useful in async-replication (Disaster Recovery) setups where multiple clusters are related.
+    cluster-set:
+      type: boolean
+      default: false
+      description: |
+        Show cluster-set status information, including linked standby clusters (async replication).
 trigger-health-check:
   description: Manually trigger health checks on PostgreSQL endpoints and return results.
     Only available when role=watcher.

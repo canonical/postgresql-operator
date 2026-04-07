@@ -3,6 +3,7 @@
 
 """Unit tests for the watcher requirer relation handler (AZ co-location logic)."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from ops import ActiveStatus, BlockedStatus, WaitingStatus
@@ -252,3 +253,241 @@ class TestAZProfileEnforcement:
 
             status = mock_charm.unit.status
             assert isinstance(status, WaitingStatus)
+
+
+class TestWatcherRelationLifecycle:
+    """Tests for watcher relation lifecycle cleanup."""
+
+    def test_relation_broken_removes_service_and_port(self):
+        """Relation-broken removes the Raft service and releases the allocated port."""
+        mock_charm = create_mock_charm()
+        mock_relation = MagicMock()
+        mock_relation.id = 42
+        mock_event = MagicMock()
+        mock_event.relation = mock_relation
+
+        with patch.object(WatcherRequirerHandler, "__init__", return_value=None):
+            handler = WatcherRequirerHandler.__new__(WatcherRequirerHandler)
+            handler.charm = mock_charm
+            handler._raft_controllers = {}
+            handler._release_port_for_relation = MagicMock()
+
+            mock_framework = MagicMock()
+            mock_framework.model = mock_charm.model
+            handler.framework = mock_framework
+
+            controller = MagicMock()
+            handler._raft_controllers[42] = controller
+            mock_charm.model.relations.get.return_value = []
+
+            handler._on_watcher_relation_broken(mock_event)
+
+            controller.remove_service.assert_called_once()
+            handler._release_port_for_relation.assert_called_once_with(42)
+            assert 42 not in handler._raft_controllers
+
+
+class TestWatcherActions:
+    """Tests for watcher actions output formatting."""
+
+    def _build_handler(self):
+        mock_charm = create_mock_charm()
+        mock_framework = MagicMock()
+        mock_framework.model = mock_charm.model
+        with patch.object(WatcherRequirerHandler, "__init__", return_value=None):
+            handler = WatcherRequirerHandler.__new__(WatcherRequirerHandler)
+            handler.charm = mock_charm
+            handler.framework = mock_framework
+            handler._get_standby_clusters = MagicMock(return_value=[])
+            return handler, mock_charm
+
+    def test_get_cluster_status_serializes_json_result(self):
+        """Action output is a JSON string in the `status` key."""
+        handler, mock_charm = self._build_handler()
+        relation = MagicMock()
+        relation.id = 1
+        mock_charm.model.relations.get.return_value = [relation]
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+        handler._format_cluster_status = MagicMock(return_value={"raft": {"has_quorum": True}})
+
+        event = MagicMock()
+        event.params = {"cluster-set": False}
+
+        handler._on_get_cluster_status(event)
+
+        event.set_results.assert_called_once()
+        results = event.set_results.call_args.args[0]
+        assert results["success"] == "True"
+        parsed = json.loads(results["status"])
+        assert parsed["raft"]["has_quorum"] is True
+
+    def test_get_cluster_status_no_relations_returns_empty_json(self):
+        """No-related-cluster response returns an empty JSON object string."""
+        handler, mock_charm = self._build_handler()
+        mock_charm.model.relations.get.return_value = []
+
+        event = MagicMock()
+        event.params = {}
+
+        handler._on_get_cluster_status(event)
+
+        event.set_results.assert_called_once_with({"success": "True", "status": "{}"})
+
+    def test_get_cluster_status_cluster_filter_not_found_fails(self):
+        """Unknown cluster filter fails instead of returning status."""
+        handler, mock_charm = self._build_handler()
+        relation = MagicMock()
+        relation.id = 1
+        mock_charm.model.relations.get.return_value = [relation]
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+
+        event = MagicMock()
+        event.params = {"cluster-name": "cluster-missing"}
+
+        handler._on_get_cluster_status(event)
+
+        event.fail.assert_called_once()
+        event.set_results.assert_not_called()
+
+    def test_get_cluster_status_cluster_set_uses_role_and_links(self):
+        """Cluster-set output honors role and includes linked standby clusters."""
+        handler, mock_charm = self._build_handler()
+        rel_primary = MagicMock()
+        rel_primary.id = 1
+        rel_standby = MagicMock()
+        rel_standby.id = 2
+        mock_charm.model.relations.get.return_value = [rel_primary, rel_standby]
+        handler._get_cluster_name = MagicMock(side_effect=["cluster-a", "cluster-b"])
+        handler._format_cluster_status = MagicMock(side_effect=[
+            {
+                "clusterrole": "primary",
+                "status": "ok",
+                "primary": "10.0.0.1:5432",
+                "timeline": 1,
+            },
+            {
+                "clusterrole": "standby",
+                "status": "ok",
+                "primary": None,
+                "timeline": 1,
+            },
+        ])
+        handler._get_standby_clusters = MagicMock(side_effect=[["cluster-b"], ["cluster-a"]])
+
+        event = MagicMock()
+        event.params = {"cluster-set": True}
+
+        handler._on_get_cluster_status(event)
+
+        results = event.set_results.call_args.args[0]
+        payload = json.loads(results["status"])
+        assert payload["primary_cluster"] == "cluster-a"
+        assert payload["clusters"]["cluster-a"]["linked_standby_clusters"] == ["cluster-b"]
+        assert payload["clusters"]["cluster-b"]["replication_status"] == "streaming"
+
+    def test_trigger_health_check_marks_non_dict_result_unhealthy(self):
+        """Non-dict health results are treated as unhealthy values."""
+        handler, mock_charm = self._build_handler()
+        relation = MagicMock()
+        relation.id = 1
+        mock_charm.model.relations.get.return_value = [relation]
+        handler._get_pg_endpoints = MagicMock(return_value=["10.0.0.1"])
+        handler._build_ip_maps = MagicMock(return_value=({}, {"10.0.0.1": "postgresql/0"}))
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+
+        event = MagicMock()
+
+        with patch("watcher_health.HealthChecker") as mock_health_checker:
+            mock_health_checker.return_value.check_all_endpoints.return_value = {
+                "10.0.0.1": ["unexpected"]
+            }
+            handler._on_trigger_health_check(event)
+
+        results = event.set_results.call_args.args[0]
+        payload = json.loads(results["health-check"])
+        assert payload["healthy-count"] == 0
+        assert payload["total-count"] == 1
+        assert payload["clusters"][0]["endpoints"]["postgresql/0"] == "unhealthy"
+
+    def test_format_cluster_status_marks_standby_when_recovery_only(self):
+        """Cluster role becomes standby when healthy members are in recovery."""
+        handler, _ = self._build_handler()
+        relation = MagicMock()
+        relation.id = 7
+
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+        handler._get_pg_endpoints = MagicMock(return_value=["10.0.0.1"])
+        handler._build_ip_maps = MagicMock(return_value=({}, {"10.0.0.1": "postgresql/0"}))
+        handler._get_port_for_relation = MagicMock(return_value=2222)
+        handler._get_pg_version = MagicMock(return_value="16")
+
+        raft_controller = MagicMock()
+        raft_controller.get_status.return_value = {
+            "running": True,
+            "connected": True,
+            "has_quorum": True,
+            "leader": "10.0.0.1:2222",
+            "members": ["10.0.0.1:2222"],
+        }
+        handler._get_or_create_raft_controller = MagicMock(return_value=raft_controller)
+
+        with patch("watcher_health.HealthChecker") as mock_health_checker:
+            mock_health_checker.return_value.check_all_endpoints.return_value = {
+                "10.0.0.1": {"healthy": True, "is_in_recovery": True}
+            }
+            status = handler._format_cluster_status(relation)
+
+        assert status["clusterrole"] == "standby"
+        assert status["primary"] is None
+
+    def test_format_cluster_status_uses_unit_address_when_binding_missing(self):
+        """Watcher topology address falls back to relation unit-address."""
+        handler, mock_charm = self._build_handler()
+        relation = MagicMock()
+        relation.id = 7
+        relation.data = {mock_charm.unit: {"unit-address": "10.1.1.7"}}
+        mock_charm.model.get_binding.return_value = None
+
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+        handler._get_pg_endpoints = MagicMock(return_value=[])
+        handler._build_ip_maps = MagicMock(return_value=({}, {}))
+        handler._get_port_for_relation = MagicMock(return_value=2222)
+
+        raft_controller = MagicMock()
+        raft_controller.get_status.return_value = {
+            "running": True,
+            "connected": True,
+            "has_quorum": True,
+            "leader": None,
+            "members": [],
+        }
+        handler._get_or_create_raft_controller = MagicMock(return_value=raft_controller)
+
+        status = handler._format_cluster_status(relation)
+        assert status["topology"]["pg-watcher/0"]["address"] == "10.1.1.7:2222"
+
+    def test_format_cluster_status_does_not_emit_none_port_address(self):
+        """Watcher topology address is None when no IP source is available."""
+        handler, mock_charm = self._build_handler()
+        relation = MagicMock()
+        relation.id = 7
+        relation.data = {mock_charm.unit: {}}
+        mock_charm.model.get_binding.return_value = None
+
+        handler._get_cluster_name = MagicMock(return_value="cluster-a")
+        handler._get_pg_endpoints = MagicMock(return_value=[])
+        handler._build_ip_maps = MagicMock(return_value=({}, {}))
+        handler._get_port_for_relation = MagicMock(return_value=2222)
+
+        raft_controller = MagicMock()
+        raft_controller.get_status.return_value = {
+            "running": True,
+            "connected": True,
+            "has_quorum": True,
+            "leader": None,
+            "members": [],
+        }
+        handler._get_or_create_raft_controller = MagicMock(return_value=raft_controller)
+
+        status = handler._format_cluster_status(relation)
+        assert status["topology"]["pg-watcher/0"]["address"] is None

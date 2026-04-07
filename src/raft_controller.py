@@ -117,19 +117,22 @@ class RaftController:
         Path(self.data_dir).mkdir(parents=True, exist_ok=True)
 
         # Write Patroni-compatible YAML config (includes password)
-        self._write_config_file()
+        config_changed = self._write_config_file()
 
         # Install/update systemd service
-        changed = self._install_service()
+        service_changed = self._install_service()
 
         logger.info(f"Raft controller configured: self={self_addr}, partners={partner_addrs}")
-        return changed
+        return config_changed or service_changed
 
-    def _write_config_file(self) -> None:
+    def _write_config_file(self) -> bool:
         """Write Raft configuration as a Patroni-compatible YAML file.
 
         The patroni_raft_controller expects a YAML config with a ``raft:``
         section containing self_addr, partner_addrs, password, and data_dir.
+
+        Returns:
+            True if the config file changed, False if unchanged.
         """
         # Build YAML manually to avoid adding pyyaml as a dependency.
         # The values are validated addresses and a password string, so
@@ -144,10 +147,20 @@ class RaftController:
   password: '{self._password}'
   data_dir: '{self.data_dir}/raft'
 """
+        config_path = Path(self.config_file)
+        if config_path.exists():
+            try:
+                if config_path.read_text() == yaml_content:
+                    logger.debug("Raft config already up to date")
+                    return False
+            except OSError as e:
+                logger.warning(f"Failed reading existing Raft config: {e}")
+
         Path(f"{self.data_dir}/raft").mkdir(parents=True, exist_ok=True)
         fd = os.open(self.config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(yaml_content)
+        return True
 
     def _install_service(self) -> bool:
         """Install the systemd service for the Raft controller.
@@ -187,6 +200,8 @@ class RaftController:
         Path(self.service_file).write_text(service_content)
         os.chmod(self.service_file, 0o644)
 
+        success = True
+
         # Reload systemd to pick up the new service
         try:
             subprocess.run(
@@ -198,10 +213,12 @@ class RaftController:
             logger.info(f"Installed systemd service {self.service_name}")
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to reload systemd: {e.stderr}")
+            success = False
         except Exception as e:
             logger.error(f"Failed to reload systemd: {e}")
+            success = False
 
-        return True
+        return success
 
     def start(self) -> bool:
         """Start the Raft controller service.
@@ -265,6 +282,63 @@ class RaftController:
         except Exception as e:
             logger.error(f"Failed to stop Raft controller: {e}")
             return False
+
+    def remove_service(self) -> bool:
+        """Disable and remove the Raft systemd service unit file."""
+        success = True
+
+        if self.is_running() and not self.stop():
+            success = False
+
+        try:
+            enabled_result = subprocess.run(  # noqa: S603
+                ["/usr/bin/systemctl", "is-enabled", self.service_name],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out checking if service is enabled: {e}")
+            return False
+
+        if enabled_result.returncode == 0:
+            try:
+                subprocess.run(  # noqa: S603
+                    ["/usr/bin/systemctl", "disable", self.service_name],
+                    check=True,
+                    capture_output=True,
+                    timeout=30,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to disable Raft controller service: {e.stderr}")
+                success = False
+            except subprocess.TimeoutExpired as e:
+                logger.error(f"Timed out disabling Raft controller service: {e}")
+                success = False
+
+        service_path = Path(self.service_file)
+        if service_path.exists():
+            try:
+                service_path.unlink()
+            except OSError as e:
+                logger.error(f"Failed to remove service file {self.service_file}: {e}")
+                success = False
+
+        try:
+            subprocess.run(
+                ["/usr/bin/systemctl", "daemon-reload"],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to reload systemd after service removal: {e.stderr}")
+            success = False
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Timed out reloading systemd after service removal: {e}")
+            success = False
+
+        return success
 
     def restart(self) -> bool:
         """Restart the Raft controller service.

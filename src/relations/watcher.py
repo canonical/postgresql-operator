@@ -30,6 +30,8 @@ from ops import (
 from constants import (
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
     WATCHER_OFFER_RELATION,
     WATCHER_PASSWORD_KEY,
     WATCHER_SECRET_LABEL,
@@ -143,6 +145,9 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             event: The relation joined event.
         """
+        # Every unit should publish its own per-unit data.
+        self.update_unit_address(event.relation)
+
         if not self.charm.unit.is_leader():
             return
 
@@ -176,6 +181,9 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             event: The relation changed event.
         """
+        # Keep this unit's relation data current on every relation-changed hook.
+        self.update_unit_address(event.relation)
+
         if not self.charm.is_cluster_initialised:
             logger.debug("Cluster not initialized, deferring watcher relation changed")
             event.defer()
@@ -598,38 +606,46 @@ class PostgreSQLWatcherRelation(Object):
             "pg-endpoints": json.dumps(sorted(pg_endpoints)),
             "raft-partner-addrs": json.dumps(sorted(pg_endpoints)),
             "raft-port": str(RAFT_PORT),
+            "standby-clusters": json.dumps(self._get_standby_clusters()),
         })
 
-        # Also share unit-specific data
-        unit_ip = self.charm._unit_ip
-        if unit_ip:
-            relation.data[self.charm.unit]["unit-address"] = unit_ip
+        # Also share this unit's per-unit data.
+        self.update_unit_address(relation)
 
-        # Share this unit's availability zone if available
-        unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
-        if unit_az:
-            relation.data[self.charm.unit]["unit-az"] = unit_az
-
-    def update_unit_address(self) -> None:
+    def update_unit_address(self, relation: Relation | None = None) -> None:
         """Update this unit's address in the watcher relation.
 
         Called when the unit's IP changes (e.g., after network isolation).
-        This updates the unit-specific data in the relation, not the application data.
+        This updates unit-specific data in the relation, not application data.
         Can be called by any unit, not just the leader.
         """
-        if not (relation := self._relation):
+        if relation is None:
+            relation = self._relation
+
+        if not relation:
             return
 
         unit_ip = self.charm._unit_ip
         if unit_ip is None:
             return
 
+        changed = False
         current_address = relation.data[self.charm.unit].get("unit-address")
         if current_address != unit_ip:
             logger.info(
                 f"Updating unit-address in watcher relation from {current_address} to {unit_ip}"
             )
             relation.data[self.charm.unit]["unit-address"] = unit_ip
+            changed = True
+
+        unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
+        current_az = relation.data[self.charm.unit].get("unit-az")
+        if unit_az and current_az != unit_az:
+            relation.data[self.charm.unit]["unit-az"] = unit_az
+            changed = True
+
+        if changed:
+            logger.debug("Updated watcher relation unit data")
 
     def update_endpoints(self) -> None:
         """Update the watcher with current cluster endpoints.
@@ -647,6 +663,20 @@ class PostgreSQLWatcherRelation(Object):
         self._add_peers_to_raft()
 
         self._update_relation_data(relation)
+
+    def _get_standby_clusters(self) -> list[str]:
+        """Return the names of related standby clusters."""
+        standby_clusters = []
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            # We are interested in the other side's application name
+            if relation.app:
+                standby_clusters.append(relation.app.name)
+        return sorted(set(standby_clusters))
 
     def _add_peers_to_raft(self) -> None:
         """Dynamically add new PostgreSQL peers to the running Raft cluster.

@@ -318,6 +318,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
 
+        if not self._validate_initial_role_unchanged():
+            return
+
         # Watcher mode: lightweight Raft witness, no PostgreSQL
         if self._role == "watcher":
             self._init_watcher_mode()
@@ -332,6 +335,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def is_watcher_role(self) -> bool:
         """Return True if this charm is deployed in watcher mode."""
         return self._role == "watcher"
+
+    def _validate_initial_role_unchanged(self) -> bool:
+        """Validate configured role against persisted peer-role during startup."""
+        if not self._peers:
+            return True
+
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None or stored_role == self._role:
+            return True
+
+        logger.error(
+            f"Role change is not supported. Deployed as '{stored_role}', "
+            f"but config now says '{self._role}'."
+        )
+        self.unit.status = BlockedStatus(
+            f"role change not supported (deployed as '{stored_role}')"
+        )
+        return False
 
     def _validate_role_unchanged(self) -> bool:
         """Validate that the role has not changed since initial deployment.
@@ -2155,6 +2176,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        # Keep this unit data current for watcher AZ/IP checks.
+        self.watcher_offer.update_unit_address()
 
         # Ensure watcher is in Raft cluster (handles cases where relation events weren't delivered)
         self.watcher_offer.ensure_watcher_in_raft()

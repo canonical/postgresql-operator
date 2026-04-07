@@ -112,24 +112,28 @@ async def test_watcher_raft_quorum_both_clusters(ops_test: OpsTest) -> None:
 
 @pytest.mark.abort_on_fail
 async def test_watcher_topology_shows_both_clusters(ops_test: OpsTest) -> None:
-    """Verify show-topology action reports both clusters."""
+    """Verify get-cluster-status action reports both clusters."""
     import json
 
     watcher_unit = ops_test.model.applications[WATCHER_APP].units[0]
-    action = await watcher_unit.run_action("show-topology")
+    action = await watcher_unit.run_action("get-cluster-status")
     action = await action.wait()
 
     assert action.status == "completed"
-    topology = json.loads(action.results["topology"])
-    assert len(topology["clusters"]) == 2, f"Expected 2 clusters, got {len(topology['clusters'])}"
+    status = json.loads(action.results["status"])
+    # Multi-cluster: status has a "clusters" list
+    assert "clusters" in status
+    assert len(status["clusters"]) == 2, (
+        f"Expected 2 clusters, got {len(status['clusters'])}"
+    )
 
-    cluster_names = sorted(c["cluster_name"] for c in topology["clusters"])
+    cluster_names = sorted(c["clustername"] for c in status["clusters"])
     logger.info(f"Watcher sees clusters: {cluster_names}")
 
-    # Each cluster should have 2 endpoints
-    for cluster in topology["clusters"]:
-        assert len(cluster["postgresql_endpoints"]) == 2, (
-            f"Cluster {cluster['cluster_name']} should have 2 endpoints"
+    # Each cluster should have topology entries (PG units + watcher)
+    for cluster in status["clusters"]:
+        assert len(cluster["topology"]) >= 2, (
+            f"Cluster {cluster['clustername']} should have topology entries"
         )
 
 
@@ -206,12 +210,13 @@ async def test_watcher_quorum_after_replication(ops_test: OpsTest) -> None:
     import json
 
     watcher_unit = ops_test.model.applications[WATCHER_APP].units[0]
-    action = await watcher_unit.run_action("show-topology")
+    action = await watcher_unit.run_action("get-cluster-status")
     action = await action.wait()
     assert action.status == "completed"
-    topology = json.loads(action.results["topology"])
-    assert len(topology["clusters"]) == 2, (
-        f"Watcher should still see 2 clusters after replication, got {len(topology['clusters'])}"
+    status = json.loads(action.results["status"])
+    assert "clusters" in status
+    assert len(status["clusters"]) == 2, (
+        f"Watcher should still see 2 clusters after replication, got {len(status['clusters'])}"
     )
     logger.info("Watcher still monitors both clusters after replication setup")
 

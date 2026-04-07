@@ -267,24 +267,25 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
 
 @pytest.mark.abort_on_fail
 async def test_watcher_topology_action(ops_test: OpsTest) -> None:
-    """Test the show-topology action on the watcher."""
+    """Test the get-cluster-status action on the watcher."""
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
 
-    action = await watcher_unit.run_action("show-topology")
+    action = await watcher_unit.run_action("get-cluster-status")
     action = await action.wait()
 
     assert action.status == "completed"
-    assert "topology" in action.results
+    assert "status" in action.results
 
-    # Verify topology includes PostgreSQL endpoints
     import json
 
-    topology = json.loads(action.results["topology"])
-    assert "clusters" in topology
-    assert len(topology["clusters"]) == 1
-    cluster = topology["clusters"][0]
-    assert "postgresql_endpoints" in cluster
-    assert len(cluster["postgresql_endpoints"]) == 2
+    status = json.loads(action.results["status"])
+    # Single cluster: status is the cluster dict directly
+    assert "clustername" in status
+    assert "topology" in status
+    # Topology should have 2 PG units + 1 watcher = 3 entries
+    assert len(status["topology"]) == 3
+    assert "raft" in status
+    assert status["raft"]["has_quorum"] is True
 
 
 @pytest.mark.abort_on_fail
@@ -768,24 +769,25 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
                 ops_test, second_pg_app, WATCHER_APP_NAME, expected_members=3
             )
 
-        # Run show-topology and verify both clusters appear
+        # Run get-cluster-status and verify both clusters appear
         watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
-        action = await watcher_unit.run_action("show-topology")
+        action = await watcher_unit.run_action("get-cluster-status")
         action = await action.wait()
         assert action.status == "completed"
-        assert "topology" in action.results
+        assert "status" in action.results
 
         import json
 
-        topology = json.loads(action.results["topology"])
-        assert "clusters" in topology, "Topology should contain clusters list"
-        assert len(topology["clusters"]) == 2, (
-            f"Expected 2 clusters in topology, got {len(topology['clusters'])}"
+        status = json.loads(action.results["status"])
+        # Multi-cluster: status has a "clusters" list
+        assert "clusters" in status, "Status should contain clusters list"
+        assert len(status["clusters"]) == 2, (
+            f"Expected 2 clusters in status, got {len(status['clusters'])}"
         )
 
-        # Verify each cluster has endpoints
-        for cluster in topology["clusters"]:
-            assert len(cluster["postgresql_endpoints"]) == 2, (
+        # Verify each cluster has topology entries (PG units + watcher)
+        for cluster in status["clusters"]:
+            assert len(cluster["topology"]) >= 2, (
                 f"Cluster {cluster.get('cluster_name')} should have 2 endpoints"
             )
 

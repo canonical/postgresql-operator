@@ -14,7 +14,7 @@ when the watcher relation is established. The password is shared via a Juju secr
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import psycopg2
 
@@ -51,7 +51,7 @@ class HealthChecker:
         self._retry_interval = DEFAULT_RETRY_INTERVAL_SECONDS
         self._query_timeout = DEFAULT_QUERY_TIMEOUT_SECONDS
         self._check_interval = DEFAULT_CHECK_INTERVAL_SECONDS
-        self._last_health_results: dict[str, bool] = {}
+        self._last_health_results: dict[str, dict[str, Any]] = {}
 
     def update_config(
         self,
@@ -83,7 +83,7 @@ class HealthChecker:
             f"retry_interval={self._retry_interval}s"
         )
 
-    def check_all_endpoints(self, endpoints: list[str]) -> dict[str, bool]:
+    def check_all_endpoints(self, endpoints: list[str]) -> dict[str, dict[str, Any]]:
         """Test connectivity to all PostgreSQL endpoints.
 
         WARNING: This method uses blocking time.sleep() for retry intervals
@@ -94,16 +94,16 @@ class HealthChecker:
             endpoints: List of PostgreSQL unit IP addresses.
 
         Returns:
-            Dictionary mapping endpoint IP to health status (True = healthy).
+            Dictionary mapping endpoint IP to health status data.
         """
-        results = {}
+        results: dict[str, dict[str, Any]] = {}
         for endpoint in endpoints:
             results[endpoint] = self._check_endpoint_with_retries(endpoint)
 
         self._last_health_results = results
         return results
 
-    def _check_endpoint_with_retries(self, endpoint: str) -> bool:
+    def _check_endpoint_with_retries(self, endpoint: str) -> dict[str, Any]:
         """Check a single endpoint with retry logic.
 
         Per acceptance criteria: Repeat tests at least 3 times before
@@ -114,15 +114,13 @@ class HealthChecker:
             endpoint: PostgreSQL endpoint IP address.
 
         Returns:
-            True if the endpoint is healthy, False otherwise.
+            Dictionary with health status data.
         """
         for attempt in range(self._retry_count):
-            try:
-                if self._execute_health_query(endpoint):
-                    logger.debug(f"Health check passed for {endpoint} on attempt {attempt + 1}")
-                    return True
-            except Exception as e:
-                logger.warning(f"Health check failed for {endpoint} on attempt {attempt + 1}: {e}")
+            result = self._execute_health_query(endpoint)
+            if result:
+                logger.debug(f"Health check passed for {endpoint} on attempt {attempt + 1}")
+                return result
 
             # Wait before retry (unless this is the last attempt)
             if attempt < self._retry_count - 1:
@@ -130,10 +128,10 @@ class HealthChecker:
                 time.sleep(self._retry_interval)
 
         logger.error(f"Endpoint {endpoint} unhealthy after {self._retry_count} attempts")
-        return False
+        return {"healthy": False}
 
-    def _execute_health_query(self, endpoint: str) -> bool:
-        """Execute SELECT 1 query with TCP keepalive and timeout.
+    def _execute_health_query(self, endpoint: str) -> dict[str, Any] | None:
+        """Execute health check queries with TCP keepalive and timeout.
 
         Per acceptance criteria:
         - Testing actual queries (SELECT 1)
@@ -145,7 +143,7 @@ class HealthChecker:
             endpoint: PostgreSQL endpoint IP address.
 
         Returns:
-            True if the query succeeds and returns 1.
+            Dictionary with health info (is_in_recovery, etc.) or None if failed.
         """
         connection = None
         try:
@@ -172,34 +170,27 @@ class HealthChecker:
             connection.autocommit = True
 
             with connection.cursor() as cursor:
-                # Execute simple health check query
-                # Note: PostgreSQL doesn't have DUAL table like Oracle
-                # SELECT 1 is the standard PostgreSQL health check
-                cursor.execute("SELECT 1")
-                result = cursor.fetchone()
-
-                if result and result[0] == 1:
-                    return True
-                else:
-                    logger.warning(f"Unexpected result from health check: {result}")
-                    return False
+                # Query recovery status to determine primary vs replica
+                cursor.execute("SELECT pg_is_in_recovery()")
+                is_in_recovery = cursor.fetchone()[0]
+                return {"healthy": True, "is_in_recovery": is_in_recovery}
 
         except psycopg2.OperationalError as e:
             # Connection failures, timeouts, etc.
             logger.debug(f"Operational error connecting to {endpoint}: {e}")
-            raise
+            return None
         except psycopg2.Error as e:
             # Other database errors
             logger.debug(f"Database error on {endpoint}: {e}")
-            raise
+            return None
         finally:
             if connection is not None:
                 try:
                     connection.close()
-                except Exception:
-                    logger.debug(f"Failed to close connection to {endpoint}")
+                except psycopg2.Error as e:
+                    logger.debug(f"Failed to close connection to {endpoint}: {e}")
 
-    def get_last_health_results(self) -> dict[str, bool]:
+    def get_last_health_results(self) -> dict[str, dict[str, Any]]:
         """Get the last health check results.
 
         Returns:
@@ -213,7 +204,7 @@ class HealthChecker:
         Returns:
             Number of healthy endpoints.
         """
-        return sum(1 for healthy in self._last_health_results.values() if healthy)
+        return sum(1 for res in self._last_health_results.values() if res.get("healthy"))
 
     def all_endpoints_healthy(self) -> bool:
         """Check if all endpoints were healthy in last check.
@@ -223,7 +214,7 @@ class HealthChecker:
         """
         if not self._last_health_results:
             return False
-        return all(self._last_health_results.values())
+        return all(res.get("healthy") for res in self._last_health_results.values())
 
     def any_endpoint_healthy(self) -> bool:
         """Check if any endpoint was healthy in last check.
@@ -233,4 +224,4 @@ class HealthChecker:
         """
         if not self._last_health_results:
             return False
-        return any(self._last_health_results.values())
+        return any(res.get("healthy") for res in self._last_health_results.values())

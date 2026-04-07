@@ -297,22 +297,23 @@ async def test_raft_quorum_across_spaces(ops_test: OpsTest) -> None:
 
 @pytest.mark.abort_on_fail
 async def test_topology_action_with_spaces(ops_test: OpsTest) -> None:
-    """Test show-topology action returns correct cross-space topology."""
+    """Test get-cluster-status action returns correct cross-space topology."""
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
 
-    action = await watcher_unit.run_action("show-topology")
+    action = await watcher_unit.run_action("get-cluster-status")
     action = await action.wait()
 
     assert action.status == "completed"
-    assert "topology" in action.results
+    assert "status" in action.results
 
     import json
 
-    topology = json.loads(action.results["topology"])
-    assert "clusters" in topology
-    assert len(topology["clusters"]) == 1
-    cluster = topology["clusters"][0]
-    assert len(cluster["postgresql_endpoints"]) == 2
+    status = json.loads(action.results["status"])
+    # Single cluster: status is the cluster dict directly
+    assert "clustername" in status
+    assert "topology" in status
+    # Topology should have 2 PG units + 1 watcher = 3 entries
+    assert len(status["topology"]) == 3
 
 
 @pytest.mark.abort_on_fail

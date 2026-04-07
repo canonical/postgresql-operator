@@ -530,10 +530,14 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
             self.charm.update_config()
 
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
+
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
         if self.charm.unit.is_leader():
             self.set_app_status()
+            self.charm.watcher_offer.update_endpoints()
 
         primary_cluster = self._get_primary_cluster()
         logger.debug("Primary cluster: %s", primary_cluster)
@@ -592,6 +596,9 @@ class PostgreSQLAsyncReplication(Object):
             self.charm.unit_peer_data.update({
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
+
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""

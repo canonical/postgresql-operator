@@ -54,7 +54,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SNAP_NAME = "charmed-postgresql"
-SNAP_CHANNEL = "16/edge/neppel"
+SNAP_CHANNEL = "16/edge"
 
 # Port allocation file for persistent port mapping across hooks
 PORTS_FILE = "/var/snap/charmed-postgresql/common/watcher-raft/ports.json"
@@ -94,7 +94,7 @@ class WatcherRequirerHandler(Object):
         )
 
         # Actions
-        self.framework.observe(self.charm.on.show_topology_action, self._on_show_topology)
+        self.framework.observe(self.charm.on.get_cluster_status_action, self._on_get_cluster_status)
         self.framework.observe(
             self.charm.on.trigger_health_check_action, self._on_trigger_health_check
         )
@@ -291,6 +291,28 @@ class WatcherRequirerHandler(Object):
                 return name
         return f"relation-{relation.id}"
 
+    def _get_standby_clusters(self, relation: Relation) -> list[str]:
+        """Get related standby clusters from the relation app data.
+
+        Args:
+            relation: The specific watcher relation.
+
+        Returns:
+            A list of standby cluster names.
+        """
+        if not relation.app:
+            return []
+
+        standby_clusters_json = relation.data[relation.app].get("standby-clusters")
+        if not standby_clusters_json:
+            return []
+
+        try:
+            return json.loads(standby_clusters_json)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse standby-clusters JSON")
+            return []
+
     # -- Lifecycle events --
 
     @staticmethod
@@ -349,32 +371,42 @@ class WatcherRequirerHandler(Object):
         if not new_address:
             return
 
+        unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
         for relation in self.model.relations.get(WATCHER_RELATION, []):
             current_address = relation.data[self.charm.unit].get("unit-address")
-            if current_address == new_address:
+            current_az = relation.data[self.charm.unit].get("unit-az")
+            address_changed = current_address != new_address
+            az_changed = bool(unit_az and current_az != unit_az)
+
+            if not address_changed and not az_changed:
                 continue
 
-            logger.info(
-                f"Unit IP changed from {current_address} to {new_address} "
-                f"in relation {relation.id}, updating relation data"
-            )
-            relation.data[self.charm.unit]["unit-address"] = new_address
-
-            port = self._get_port_for_relation(relation.id)
-            raft_password = self._get_raft_password(relation)
-            partner_addrs = self._get_raft_partner_addrs(relation)
-            if raft_password and partner_addrs:
-                raft_controller = self._get_or_create_raft_controller(relation.id)
-                changed = raft_controller.configure(
-                    self_addr=f"{new_address}:{port}",
-                    partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
-                    password=raft_password,
+            if address_changed:
+                logger.info(
+                    f"Unit IP changed from {current_address} to {new_address} "
+                    f"in relation {relation.id}, updating relation data"
                 )
-                if changed and raft_controller.is_running():
-                    logger.info(
-                        f"Restarting Raft controller for relation {relation.id} due to IP change"
+                relation.data[self.charm.unit]["unit-address"] = new_address
+
+            if az_changed:
+                relation.data[self.charm.unit]["unit-az"] = str(unit_az)
+
+            if address_changed:
+                port = self._get_port_for_relation(relation.id)
+                raft_password = self._get_raft_password(relation)
+                partner_addrs = self._get_raft_partner_addrs(relation)
+                if raft_password and partner_addrs:
+                    raft_controller = self._get_or_create_raft_controller(relation.id)
+                    changed = raft_controller.configure(
+                        self_addr=f"{new_address}:{port}",
+                        partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
+                        password=raft_password,
                     )
-                    raft_controller.restart()
+                    if changed and raft_controller.is_running():
+                        logger.info(
+                            f"Restarting Raft controller for relation {relation.id} due to IP change"
+                        )
+                        raft_controller.restart()
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Handle update status event in watcher mode."""
@@ -541,14 +573,14 @@ class WatcherRequirerHandler(Object):
 
         # Stop and clean up the Raft controller for this relation
         if relation_id in self._raft_controllers:
-            self._raft_controllers[relation_id].stop()
-            del self._raft_controllers[relation_id]
+            controller = self._raft_controllers.pop(relation_id)
         else:
             # Try to stop via a fresh controller in case we were recreated
             from raft_controller import RaftController
 
             controller = RaftController(self.charm, instance_id=f"rel{relation_id}")
-            controller.stop()
+
+        controller.remove_service()
 
         # Release the port allocation
         self._release_port_for_relation(relation_id)
@@ -592,22 +624,66 @@ class WatcherRequirerHandler(Object):
             resolved.append(ip_to_unit.get(member_ip, member_addr))
         raft_status["members"] = sorted(resolved)
 
-    def _build_cluster_topology(self, relation: Relation) -> dict[str, Any]:
-        """Build topology information for a single cluster relation."""
+    def _on_get_cluster_status(self, event: ActionEvent) -> None:
+        """Handle get-cluster-status action."""
+        cluster_name_filter = event.params.get("cluster-name")
+        cluster_set_mode = event.params.get("cluster-set", False)
+
+        relations = self.model.relations.get(WATCHER_RELATION, [])
+        clusters_data: dict[str, dict[str, Any]] = {}
+        standby_clusters_map: dict[str, list[str]] = {}
+        for relation in relations:
+            cluster_name = self._get_cluster_name(relation)
+            if cluster_name_filter and cluster_name != cluster_name_filter:
+                continue
+            clusters_data[cluster_name] = self._format_cluster_status(relation)
+            standby_clusters_map[cluster_name] = self._get_standby_clusters(relation)
+
+        if not clusters_data:
+            if cluster_name_filter:
+                event.fail(f"Cluster '{cluster_name_filter}' not found among related clusters.")
+            else:
+                event.set_results({"success": "True", "status": json.dumps({})})
+            return
+
+        if cluster_set_mode:
+            result_status = self._format_cluster_set_status(clusters_data, standby_clusters_map)
+        elif len(clusters_data) == 1:
+            # Single cluster: return the cluster status directly
+            result_status = next(iter(clusters_data.values()))
+        else:
+            # Multi-cluster: return list with watcher summary
+            result_status = {
+                "clusters": list(clusters_data.values()),
+                "watcher": {
+                    "unit": self.charm.unit.name,
+                    "address": self.unit_ip,
+                    "clusters_monitored": len(clusters_data),
+                },
+            }
+
+        event.set_results({"success": "True", "status": json.dumps(result_status)})
+
+    def _format_cluster_status(self, relation: Relation) -> dict[str, Any]:
+        """Format cluster status for a single cluster relation."""
         cluster_name = self._get_cluster_name(relation)
         pg_endpoints = self._get_pg_endpoints(relation)
-        ip_to_az, ip_to_unit = self._build_ip_maps(relation)
+        _ip_to_az, ip_to_unit = self._build_ip_maps(relation)
 
-        endpoint_entries: list[dict[str, Any]] = []
-        for endpoint in pg_endpoints:
-            entry: dict[str, Any] = {"ip": endpoint}
-            if endpoint in ip_to_az:
-                entry["az"] = ip_to_az[endpoint]
-            endpoint_entries.append(entry)
-
+        # Get Raft status
         raft_controller = self._get_or_create_raft_controller(relation.id)
         raft_status = raft_controller.get_status()
         self._resolve_raft_members(raft_status, ip_to_unit)
+        has_quorum = raft_status.get("has_quorum", False)
+
+        # Determine watcher voting status
+        watcher_voting = raft_status.get("connected", False)
+
+        # Build topology entries from health checks
+        topology: dict[str, Any] = {}
+        primary_endpoint = None
+        saw_healthy_member = False
+        saw_primary_member = False
 
         if pg_endpoints:
             from watcher_health import HealthChecker
@@ -617,38 +693,118 @@ class WatcherRequirerHandler(Object):
                 password_getter=lambda rel=relation: self.get_watcher_password(rel),
             )
             health_results = health_checker.check_all_endpoints(pg_endpoints)
-            for i, endpoint in enumerate(pg_endpoints):
-                if i < len(endpoint_entries):
-                    endpoint_entries[i]["healthy"] = health_results.get(endpoint, False)
+
+            for endpoint in pg_endpoints:
+                unit_name = ip_to_unit.get(endpoint, endpoint)
+                res = health_results.get(endpoint, {})
+                is_healthy = res.get("healthy", False)
+                is_primary = not res.get("is_in_recovery", True)
+
+                if is_healthy:
+                    saw_healthy_member = True
+                    if is_primary:
+                        saw_primary_member = True
+
+                if is_primary:
+                    primary_endpoint = f"{endpoint}:5432"
+
+                entry: dict[str, Any] = {
+                    "address": f"{endpoint}:5432",
+                    "memberrole": "primary" if is_primary else "sync_standby",
+                    "mode": "r/w" if is_primary else "r/o",
+                    "status": "online" if is_healthy else "offline",
+                    "version": self._get_pg_version(),
+                    "lag": 0,
+                }
+                topology[unit_name] = entry
+
+        # Add watcher entry to topology
+        watcher_port = self._get_port_for_relation(relation.id)
+        watcher_ip = self.unit_ip or relation.data[self.charm.unit].get("unit-address")
+        watcher_address = f"{watcher_ip}:{watcher_port}" if watcher_ip else None
+        topology[self.charm.unit.name] = {
+            "address": watcher_address,
+            "memberrole": "watcher",
+            "mode": "n/a",
+            "status": "online" if raft_status.get("running", False) else "offline",
+            "version": "n/a",
+            "voting": watcher_voting,
+        }
+
+        status_text = (
+            "cluster is tolerant to failures."
+            if has_quorum
+            else "cluster is not tolerant to any failures."
+        )
+        cluster_role = "unknown"
+        if saw_primary_member:
+            cluster_role = "primary"
+        elif saw_healthy_member:
+            cluster_role = "standby"
 
         return {
-            "cluster_name": cluster_name,
-            "relation_id": relation.id,
-            "postgresql_endpoints": endpoint_entries,
-            "raft_status": raft_status,
+            "clustername": cluster_name,
+            "clusterrole": cluster_role,
+            "primary": primary_endpoint,
+            "ssl": "required",
+            "status": "ok" if has_quorum else "ok_no_tolerance",
+            "statustext": status_text,
+            "timeline": 0,  # TODO: query from Patroni REST API
+            "topology": topology,
+            "raft": {
+                "has_quorum": has_quorum,
+                "leader": raft_status.get("leader"),
+                "members": raft_status.get("members", []),
+            },
         }
 
-    def _on_show_topology(self, event: ActionEvent) -> None:
-        """Handle show-topology action."""
-        watcher_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
-        watcher_info: dict[str, Any] = {
-            "unit": self.charm.unit.name,
-            "ip": self.unit_ip,
+    def _format_cluster_set_status(
+        self,
+        clusters_data: dict[str, dict[str, Any]],
+        standby_clusters_map: dict[str, list[str]],
+    ) -> dict[str, Any]:
+        """Format cluster-set status for async replication view."""
+        clusters_summary: dict[str, Any] = {}
+        primary_cluster_name = None
+
+        for name, data in clusters_data.items():
+            cluster_role = data.get("clusterrole", "unknown")
+            is_primary = cluster_role == "primary"
+            summary: dict[str, Any] = {
+                "clusterrole": cluster_role,
+                "status": data.get("status", "unknown"),
+                "primary": data.get("primary"),
+                "linked_standby_clusters": standby_clusters_map.get(name, []),
+            }
+            if is_primary and primary_cluster_name is None:
+                primary_cluster_name = name
+            elif cluster_role == "standby":
+                summary["replication_status"] = "streaming"
+                summary["replication_lag"] = 0
+            summary["timeline"] = data.get("timeline", 0)
+            clusters_summary[name] = summary
+
+        all_healthy = all(c.get("status") == "ok" for c in clusters_data.values())
+
+        return {
+            "clusters": clusters_summary,
+            "primary_cluster": primary_cluster_name,
+            "status": "healthy" if all_healthy else "degraded",
+            "statustext": (
+                "all clusters available." if all_healthy else "some clusters at risk."
+            ),
         }
-        if watcher_az:
-            watcher_info["az"] = watcher_az
 
-        clusters = [
-            self._build_cluster_topology(relation)
-            for relation in self.model.relations.get(WATCHER_RELATION, [])
-        ]
+    def _get_pg_version(self) -> str:
+        """Get PostgreSQL version from refresh_versions.toml."""
+        try:
+            with open("refresh_versions.toml", "rb") as f:
+                import tomli
 
-        topology: dict[str, Any] = {
-            "watcher": watcher_info,
-            "clusters": clusters,
-        }
-
-        event.set_results({"topology": json.dumps(topology, indent=2)})
+                versions = tomli.load(f)
+                return str(versions.get("workload", "unknown"))
+        except Exception:
+            return "unknown"
 
     def _on_trigger_health_check(self, event: ActionEvent) -> None:
         """Handle trigger-health-check action."""
@@ -673,11 +829,12 @@ class WatcherRequirerHandler(Object):
 
             cluster_name = self._get_cluster_name(relation)
             endpoint_statuses: dict[str, str] = {}
-            for endpoint, healthy in health_results.items():
+            for endpoint, res in health_results.items():
                 unit_name = ip_to_unit.get(endpoint)
                 label = unit_name if unit_name else f"{cluster_name}/{endpoint}"
-                endpoint_statuses[label] = "healthy" if healthy else "unhealthy"
-                if healthy:
+                is_healthy = res.get("healthy", False) if isinstance(res, dict) else False
+                endpoint_statuses[label] = "healthy" if is_healthy else "unhealthy"
+                if is_healthy:
                     total_healthy += 1
                 total_count += 1
 
