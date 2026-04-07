@@ -123,9 +123,7 @@ async def test_watcher_topology_shows_both_clusters(ops_test: OpsTest) -> None:
     status = json.loads(action.results["status"])
     # Multi-cluster: status has a "clusters" list
     assert "clusters" in status
-    assert len(status["clusters"]) == 2, (
-        f"Expected 2 clusters, got {len(status['clusters'])}"
-    )
+    assert len(status["clusters"]) == 2, f"Expected 2 clusters, got {len(status['clusters'])}"
 
     cluster_names = sorted(c["clustername"] for c in status["clusters"])
     logger.info(f"Watcher sees clusters: {cluster_names}")

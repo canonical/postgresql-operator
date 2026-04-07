@@ -358,20 +358,22 @@ class TestWatcherActions:
         rel_standby.id = 2
         mock_charm.model.relations.get.return_value = [rel_primary, rel_standby]
         handler._get_cluster_name = MagicMock(side_effect=["cluster-a", "cluster-b"])
-        handler._format_cluster_status = MagicMock(side_effect=[
-            {
-                "clusterrole": "primary",
-                "status": "ok",
-                "primary": "10.0.0.1:5432",
-                "timeline": 1,
-            },
-            {
-                "clusterrole": "standby",
-                "status": "ok",
-                "primary": None,
-                "timeline": 1,
-            },
-        ])
+        handler._format_cluster_status = MagicMock(
+            side_effect=[
+                {
+                    "clusterrole": "primary",
+                    "status": "ok",
+                    "primary": "10.0.0.1:5432",
+                    "timeline": 1,
+                },
+                {
+                    "clusterrole": "standby",
+                    "status": "ok",
+                    "primary": None,
+                    "timeline": 1,
+                },
+            ]
+        )
         handler._get_standby_clusters = MagicMock(side_effect=[["cluster-b"], ["cluster-a"]])
 
         event = MagicMock()

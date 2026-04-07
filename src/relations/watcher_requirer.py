@@ -94,7 +94,9 @@ class WatcherRequirerHandler(Object):
         )
 
         # Actions
-        self.framework.observe(self.charm.on.get_cluster_status_action, self._on_get_cluster_status)
+        self.framework.observe(
+            self.charm.on.get_cluster_status_action, self._on_get_cluster_status
+        )
         self.framework.observe(
             self.charm.on.trigger_health_check_action, self._on_trigger_health_check
         )
@@ -790,9 +792,7 @@ class WatcherRequirerHandler(Object):
             "clusters": clusters_summary,
             "primary_cluster": primary_cluster_name,
             "status": "healthy" if all_healthy else "degraded",
-            "statustext": (
-                "all clusters available." if all_healthy else "some clusters at risk."
-            ),
+            "statustext": ("all clusters available." if all_healthy else "some clusters at risk."),
         }
 
     def _get_pg_version(self) -> str:
