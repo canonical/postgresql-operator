@@ -92,7 +92,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     model_1.deploy(
         charm=charm,
         app=DB_APP_1,
-        base="ubuntu@24.04",
+        base="ubuntu@26.04",
         config=configuration,
         constraints=constraints,
         num_units=3,
@@ -101,7 +101,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     model_2.deploy(
         charm=charm,
         app=DB_APP_2,
-        base="ubuntu@24.04",
+        base="ubuntu@26.04",
         config=configuration,
         constraints=constraints,
         num_units=3,
@@ -113,7 +113,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     model_1.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_1,
-        base="ubuntu@24.04",
+        base="ubuntu@26.04",
         channel="latest/edge",
         num_units=1,
         constraints=constraints,
@@ -121,7 +121,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     model_2.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_2,
-        base="ubuntu@24.04",
+        base="ubuntu@26.04",
         channel="latest/edge",
         num_units=1,
         constraints=constraints,
