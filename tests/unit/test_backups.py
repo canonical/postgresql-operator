@@ -15,7 +15,13 @@ from tenacity import RetryError, wait_fixed
 
 from backups import ListBackupsError, PostgreSQLBackups
 from charm import PostgresqlOperatorCharm
-from constants import PEER
+from constants import (
+    PEER,
+    POSTGRESQL_ARCHIVE_PATH,
+    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_STORAGE_PATH,
+    POSTGRESQL_TEMP_PATH,
+)
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
@@ -513,19 +519,17 @@ def test_empty_data_files(harness):
         _is_dir.return_value = True
         _rmtree.side_effect = OSError
         assert not harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/data/archive/test_file.txt"
-        )
+        _rmtree.assert_called_once_with(f"{POSTGRESQL_ARCHIVE_PATH}/test_file.txt")
 
         # Test when data files are successfully removed.
         _rmtree.reset_mock()
         _rmtree.side_effect = None
         assert harness.charm.backup._empty_data_files()
         _rmtree.assert_has_calls([
-            call("/var/snap/charmed-postgresql/common/data/archive/test_file.txt"),
-            call("/var/snap/charmed-postgresql/common/var/lib/postgresql/test_file.txt"),
-            call("/var/snap/charmed-postgresql/common/data/logs/test_file.txt"),
-            call("/var/snap/charmed-postgresql/common/data/temp/test_file.txt"),
+            call(f"{POSTGRESQL_ARCHIVE_PATH}/test_file.txt"),
+            call(f"{POSTGRESQL_DATA_PATH}/test_file.txt"),
+            call(f"{POSTGRESQL_LOGS_STORAGE_PATH}/test_file.txt"),
+            call(f"{POSTGRESQL_TEMP_PATH}/test_file.txt"),
         ])
 
 
@@ -1793,7 +1797,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
-            data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            data_path=POSTGRESQL_DATA_PATH,
             log_path="/var/snap/charmed-postgresql/common/var/log/pgbackrest",
             region="us-east-1",
             endpoint="https://storage.googleapis.com",

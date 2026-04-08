@@ -42,7 +42,10 @@ from constants import (
     PGBACKREST_LOG_LEVEL_STDERR,
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
+    POSTGRESQL_ARCHIVE_PATH,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_STORAGE_PATH,
+    POSTGRESQL_TEMP_PATH,
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
@@ -327,10 +330,10 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_ARCHIVE_PATH,
             POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            POSTGRESQL_LOGS_STORAGE_PATH,
+            POSTGRESQL_TEMP_PATH,
         ]
         path = None
         try:

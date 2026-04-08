@@ -112,6 +112,7 @@ from constants import (
     PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_TEMP_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
@@ -1799,9 +1800,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
+        self.postgresql.set_up_database(temp_location=POSTGRESQL_TEMP_PATH)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):

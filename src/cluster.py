@@ -54,9 +54,13 @@ from constants import (
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
     PGBACKREST_CONFIGURATION_FILE,
+    POSTGRESQL_ARCHIVE_PATH,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    POSTGRESQL_LOGS_STORAGE_PATH,
+    POSTGRESQL_TEMP_PATH,
+    POSTGRESQL_WAL_PATH,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import label2name
@@ -223,14 +227,17 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(POSTGRESQL_DATA_PATH)
+        for path in (
+            POSTGRESQL_ARCHIVE_PATH,
+            POSTGRESQL_DATA_PATH,
+            POSTGRESQL_LOGS_STORAGE_PATH,
+            POSTGRESQL_TEMP_PATH,
+            POSTGRESQL_WAL_PATH,
+        ):
+            self._create_directory(path, POSTGRESQL_STORAGE_PERMISSIONS)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
-
-        # Expected permission
-        # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -712,6 +719,7 @@ class Patroni:
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
+            wal_path=POSTGRESQL_WAL_PATH,
             enable_ldap=enable_ldap,
             enable_tls=enable_tls,
             member_name=self.member_name,

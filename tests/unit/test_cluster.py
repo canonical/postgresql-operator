@@ -10,7 +10,7 @@ from charmlibs import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
-from single_kernel_postgresql.config.literals import REWIND_USER
+from single_kernel_postgresql.config.literals import POSTGRESQL_STORAGE_PERMISSIONS, REWIND_USER
 from tenacity import (
     RetryError,
     stop_after_delay,
@@ -28,8 +28,12 @@ from cluster import (
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
+    POSTGRESQL_ARCHIVE_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    POSTGRESQL_LOGS_STORAGE_PATH,
+    POSTGRESQL_TEMP_PATH,
+    POSTGRESQL_WAL_PATH,
 )
 
 PATRONI_SERVICE = "patroni"
@@ -335,6 +339,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             data_path=POSTGRESQL_DATA_PATH,
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
+            wal_path=POSTGRESQL_WAL_PATH,
             member_name=member_name,
             partner_addrs=["2.2.2.2", "3.3.3.3"],
             peers_ips=sorted(peers_ips),
@@ -496,6 +501,7 @@ def test_update_synchronous_node_count(peers_ips, patroni):
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
     with (
+        patch("os.makedirs") as _makedirs,
         patch("os.chmod") as _chmod,
         patch("builtins.open") as _open,
         patch("os.chown") as _chown,
@@ -506,18 +512,21 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 
         patroni.configure_patroni_on_unit()
 
-        _getpwnam.assert_called_once_with("_daemon_")
+        _getpwnam.assert_called_with("_daemon_")
 
-        _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
-            uid=sentinel.uid,
-            gid=sentinel.gid,
-        )
+        expected_paths = [
+            POSTGRESQL_ARCHIVE_PATH,
+            POSTGRESQL_DATA_PATH,
+            POSTGRESQL_LOGS_STORAGE_PATH,
+            POSTGRESQL_TEMP_PATH,
+            POSTGRESQL_WAL_PATH,
+        ]
+        for path in expected_paths:
+            _makedirs.assert_any_call(path, mode=POSTGRESQL_STORAGE_PERMISSIONS, exist_ok=True)
+            _chown.assert_any_call(path, uid=sentinel.uid, gid=sentinel.gid)
+            _chmod.assert_any_call(path, POSTGRESQL_STORAGE_PERMISSIONS)
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
-        _chmod.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 448
-        )
 
 
 def test_member_started_true(peers_ips, patroni):

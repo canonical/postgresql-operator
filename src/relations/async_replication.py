@@ -48,7 +48,10 @@ from constants import (
     APP_SCOPE,
     PATRONI_CONF_PATH,
     PEER,
+    POSTGRESQL_ARCHIVE_PATH,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_STORAGE_PATH,
+    POSTGRESQL_TEMP_PATH,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
 )
@@ -682,10 +685,10 @@ class PostgreSQLAsyncReplication(Object):
     def _reinitialise_pgdata(self) -> None:
         """Reinitialise the data folder."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_ARCHIVE_PATH,
             POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            POSTGRESQL_LOGS_STORAGE_PATH,
+            POSTGRESQL_TEMP_PATH,
         ]
         path = None
         try:
