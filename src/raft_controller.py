@@ -412,6 +412,56 @@ class RaftController:
         except Exception as e:
             logger.debug(f"Failed to load config file: {e}")
 
+    def _status_query_targets(self) -> list[str]:
+        """Build Raft status probe targets for this local unit.
+
+        Returns:
+            Ordered list of addresses to query with TcpUtility.
+        """
+        if not self._self_addr:
+            return []
+
+        targets = [self._self_addr]
+
+        # In some environments the controller advertises a routable unit IP
+        # but local administration works only through loopback on the same port.
+        host_port = self._self_addr.rsplit(":", maxsplit=1)
+        if len(host_port) == 2 and host_port[1].isdigit():
+            localhost_addr = f"127.0.0.1:{host_port[1]}"
+            if localhost_addr not in targets:
+                targets.append(localhost_addr)
+
+        return targets
+
+    def _query_raft_status(self, utility: Any, target: str) -> dict[str, Any] | None:
+        """Query Raft status for a specific target address."""
+        try:
+            raft_status = utility.executeCommand(target, ["status"])
+        except UtilityException as e:
+            logger.debug(f"Failed to query Raft status via TcpUtility (target={target}): {e}")
+            return None
+        except Exception as e:
+            logger.debug(f"Error querying Raft status via TcpUtility (target={target}): {e}")
+            return None
+        return raft_status if isinstance(raft_status, dict) else None
+
+    def _populate_status(
+        self, status: dict[str, Any], raft_status: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Populate public status fields from a Raft status payload."""
+        status["connected"] = True
+        status["has_quorum"] = raft_status.get("has_quorum", False)
+        status["leader"] = str(raft_status.get("leader")) if raft_status.get("leader") else None
+
+        # Extract member addresses from partner_node_status_server_* keys
+        prefix = "partner_node_status_server_"
+        members: list[str] = [self._self_addr] if self._self_addr else []
+        for key in raft_status:
+            if isinstance(key, str) and key.startswith(prefix):
+                members.append(key[len(prefix) :])
+        status["members"] = sorted(members)
+        return status
+
     def get_status(self) -> dict[str, Any]:
         """Get the Raft controller status.
 
@@ -437,25 +487,10 @@ class RaftController:
         if TcpUtility is not None and is_running:
             try:
                 utility = TcpUtility(password=self._password, timeout=3)
-                raft_status = utility.executeCommand(self._self_addr, ["status"])
-
-                if raft_status:
-                    status["connected"] = True
-                    status["has_quorum"] = raft_status.get("has_quorum", False)
-                    status["leader"] = (
-                        str(raft_status.get("leader")) if raft_status.get("leader") else None
-                    )
-                    # Extract member addresses from partner_node_status_server_* keys
-                    prefix = "partner_node_status_server_"
-                    members: list[str] = [self._self_addr] if self._self_addr else []
-                    for key in raft_status:
-                        if isinstance(key, str) and key.startswith(prefix):
-                            members.append(key[len(prefix) :])
-                    status["members"] = sorted(members)
-                    return status
-
-            except UtilityException as e:
-                logger.debug(f"Failed to query Raft status via TcpUtility: {e}")
+                for target in self._status_query_targets():
+                    raft_status = self._query_raft_status(utility, target)
+                    if raft_status:
+                        return self._populate_status(status, raft_status)
             except Exception as e:
                 logger.debug(f"Error querying Raft status via TcpUtility: {e}")
 

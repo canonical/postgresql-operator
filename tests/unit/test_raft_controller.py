@@ -3,7 +3,7 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from src.raft_controller import RaftController
 
@@ -59,3 +59,32 @@ def test_install_service_returns_false_when_daemon_reload_fails(tmp_path: Path):
         ),
     ):
         assert not controller._install_service()
+
+
+def test_get_status_falls_back_to_loopback_target(tmp_path: Path):
+    controller = _build_controller(tmp_path)
+    controller._self_addr = "10.0.0.1:2222"
+    controller._password = "secret"
+
+    raft_response = {
+        "has_quorum": True,
+        "leader": "10.0.0.2:2222",
+        "partner_node_status_server_10.0.0.2:2222": {},
+    }
+    utility = MagicMock()
+    utility.executeCommand.side_effect = [Exception("connection lost"), raft_response]
+
+    with (
+        patch.object(controller, "is_running", return_value=True),
+        patch("src.raft_controller.TcpUtility", return_value=utility),
+    ):
+        status = controller.get_status()
+
+    assert status["connected"] is True
+    assert status["has_quorum"] is True
+    assert status["leader"] == "10.0.0.2:2222"
+    assert status["members"] == ["10.0.0.1:2222", "10.0.0.2:2222"]
+    assert utility.executeCommand.call_args_list == [
+        call("10.0.0.1:2222", ["status"]),
+        call("127.0.0.1:2222", ["status"]),
+    ]
