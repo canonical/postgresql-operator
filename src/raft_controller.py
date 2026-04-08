@@ -51,7 +51,9 @@ Wants=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/snap run charmed-postgresql.patroni-raft-controller {config_file}
+# charmed-postgresql.patroni-raft-controller app lacks network interfaces
+# in the snap profile, so run the controller under the patroni app profile.
+ExecStart=/usr/bin/snap run --shell charmed-postgresql.patroni -c "/snap/charmed-postgresql/current/usr/bin/patroni_raft_controller {config_file}"
 Restart=always
 RestartSec=5
 TimeoutStartSec=30
