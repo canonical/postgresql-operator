@@ -761,6 +761,7 @@ def test_handle_replication_change():
     mock_event = MagicMock()
     mock_relation = MagicMock()
     mock_unit = MagicMock()
+    mock_unit.app = mock_relation.app
     mock_relation.units = [mock_unit]
     mock_relation.data = {mock_unit: {"unit-address": "10.0.0.1"}, mock_charm.app: {}}
 
@@ -784,6 +785,8 @@ def test_handle_replication_change():
 
     mock_unit1 = MagicMock()
     mock_unit2 = MagicMock()
+    mock_unit1.app = mock_relation.app
+    mock_unit2.app = mock_relation.app
     mock_relation.units = [mock_unit1, mock_unit2]
     mock_relation.data = {
         mock_unit1: {"unit-address": "10.0.0.1"},
@@ -834,6 +837,7 @@ def test_re_emit_async_relation_changed_event():
     mock_charm.on.replication_offer_relation_changed.emit.assert_not_called()
 
     remote_unit = MagicMock()
+    remote_unit.app = mock_relation.app
     mock_relation.units = [remote_unit]
     with patch.object(
         PostgreSQLAsyncReplication,
