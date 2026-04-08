@@ -150,9 +150,7 @@ async def test_standby_backup_rejected_with_clear_message(
     assert leader_unit is not None, "No leader unit found in primary model"
     create_replication = await leader_unit.run_action("create-replication")
     await create_replication.wait()
-    assert (create_replication.results.get("return-code", None) == 0) or (
-        create_replication.results.get("Code", None) == "0"
-    ), "create-replication failed"
+    assert create_replication.results.get("return-code") == 0, "create-replication failed"
 
     # Primary backup should succeed.
     primary_unit_name = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0", model=first_model)
@@ -163,9 +161,9 @@ async def test_standby_backup_rejected_with_clear_message(
     )
     primary_backup_action = await first_model.units[replica_unit_name].run_action("create-backup")
     await primary_backup_action.wait()
-    assert (primary_backup_action.results.get("return-code", None) == 0) or (
-        primary_backup_action.results.get("Code", None) == "0"
-    ), "create-backup failed on primary cluster"
+    assert primary_backup_action.results.get("return-code") == 0, (
+        "create-backup failed on primary cluster"
+    )
 
     # Standby backup should fail with explicit unsupported-operation message.
     standby_unit = second_model.units[f"{DATABASE_APP_NAME}/0"]
