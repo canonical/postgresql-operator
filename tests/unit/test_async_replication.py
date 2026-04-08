@@ -369,16 +369,52 @@ def test_handle_replication_change():
     relation._can_promote_cluster = MagicMock(return_value=False)
     result = relation._handle_replication_change(mock_event)
     assert result is False
+
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    mock_relation = MagicMock()
+    mock_relation.units = []
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._can_promote_cluster = MagicMock(return_value=True)
+    relation.get_system_identifier = MagicMock()
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_replication_change(mock_event)
+
+    assert result is False
+    relation.get_system_identifier.assert_not_called()
+    mock_event.fail.assert_called_once_with(
+        "All units from the other cluster must publish their unit addresses in the relation data."
+    )
+
+    # 3.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_relation = MagicMock()
+    mock_unit = MagicMock()
+    mock_relation.units = [mock_unit]
+    mock_relation.data = {mock_unit: {"unit-address": "10.0.0.1"}, mock_charm.app: {}}
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._can_promote_cluster = MagicMock(return_value=True)
     relation.get_system_identifier = MagicMock(return_value=(12345, "some error"))
-    result = relation._handle_replication_change(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_replication_change(mock_event)
+
     assert result is False
 
-    # 3.
+    # 4.
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
@@ -393,14 +429,19 @@ def test_handle_replication_change():
     }
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._relation = mock_relation
     relation._can_promote_cluster = MagicMock(return_value=True)
     relation.get_system_identifier = MagicMock(return_value=(12345, None))
     relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
     relation._update_primary_cluster_data = MagicMock()
     relation._re_emit_async_relation_changed_event = MagicMock()
 
-    result = relation._handle_replication_change(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_replication_change(mock_event)
 
     assert result is True
     relation._can_promote_cluster.assert_called_once_with(mock_event)
@@ -409,6 +450,41 @@ def test_handle_replication_change():
     relation._update_primary_cluster_data.assert_called_once_with(2, 12345)
     relation._re_emit_async_relation_changed_event.assert_called_once()
     mock_event.fail.assert_not_called()
+
+
+def test_re_emit_async_relation_changed_event():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    mock_relation = MagicMock()
+    mock_relation.name = "replication-offer"
+    mock_relation.app = MagicMock()
+    mock_relation.units = []
+
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        relation._re_emit_async_relation_changed_event()
+
+    mock_charm.on.replication_offer_relation_changed.emit.assert_not_called()
+
+    remote_unit = MagicMock()
+    mock_relation.units = [remote_unit]
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        relation._re_emit_async_relation_changed_event()
+
+    mock_charm.on.replication_offer_relation_changed.emit.assert_called_once_with(
+        mock_relation,
+        app=mock_relation.app,
+        unit=remote_unit,
+    )
 
 
 def test_handle_forceful_promotion():

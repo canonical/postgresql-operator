@@ -465,6 +465,16 @@ class PostgreSQLAsyncReplication(Object):
             return False
 
         relation = self._relation
+        if relation is None:
+            event.fail("Replication relation not found")
+            return False
+
+        # Ensure the relation has at least one remote unit before trying to process unit data.
+        if len(relation.units) == 0:
+            event.fail(
+                "All units from the other cluster must publish their unit addresses in the relation data."
+            )
+            return False
 
         # Check if all units from the other cluster published their IPs in the relation data.
         # If not, fail the action telling that all units must publish their pod addresses in the
@@ -673,10 +683,16 @@ class PostgreSQLAsyncReplication(Object):
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
         if relation := self._relation:
+            relation_unit = next(iter(relation.units), None)
+            if relation_unit is None:
+                logger.debug(
+                    "Skipping re-emitting relation-changed event: no related units found yet."
+                )
+                return
             getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
                 relation,
                 app=relation.app,
-                unit=next(unit for unit in relation.units if unit.app == relation.app),
+                unit=relation_unit,
             )
 
     def _reinitialise_pgdata(self) -> None:
