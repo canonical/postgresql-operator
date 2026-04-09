@@ -67,6 +67,16 @@ def _configure_s3_integrator(
     if app_name not in model.status().apps:
         model.deploy("s3-integrator", app=app_name, channel="1/stable")
 
+    # Wait until Juju has finished unit setup and registered charm actions.
+    model.wait(
+        ready=lambda status: (
+            app_name in status.apps
+            and bool(status.apps[app_name].units)
+            and jubilant.all_agents_idle(status, app_name)
+        ),
+        timeout=5 * MINUTE_SECS,
+    )
+
     model.config(
         app_name,
         {
@@ -78,6 +88,15 @@ def _configure_s3_integrator(
             "tls-ca-chain": microceph.cert,
         },
     )
+    model.wait(
+        ready=lambda status: (
+            app_name in status.apps
+            and bool(status.apps[app_name].units)
+            and jubilant.all_agents_idle(status, app_name)
+        ),
+        timeout=5 * MINUTE_SECS,
+    )
+
     model.run(
         unit=f"{app_name}/0",
         action="sync-s3-credentials",
