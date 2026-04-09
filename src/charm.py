@@ -329,6 +329,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
+        self.framework.observe(self.on.reinit_action, self._on_reinit_action)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         # add specific handler for updated system-user secrets
@@ -716,6 +717,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.set_results({"primary": primary})
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
+
+    def _on_reinit_action(self, event: ActionEvent) -> None:
+        """Handle the reinit action."""
+        if self.is_primary:
+            event.fail("Cannot reinitialize the primary unit.")
+            return
+
+        self.unit_peer_data["nofailover"] = "True"
+        self.update_config()
+
+        try:
+            self._patroni.reinit_member(self._member_name)
+            event.set_results({"result": f"reinitialize started for member {self._member_name}"})
+        except Exception as e:
+            event.fail(f"Failed to reinitialize member: {e}")
+        finally:
+            self.unit_peer_data.pop("nofailover", None)
+            self.update_config()
 
     def updated_synchronous_node_count(self) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
@@ -2641,6 +2660,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
+            nofailover="nofailover" in self.unit_peer_data,
             # slots=replication_slots,
         )
         if no_peers:

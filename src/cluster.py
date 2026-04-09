@@ -673,6 +673,7 @@ class Patroni:
         no_peers: bool = False,
         user_databases_map: dict[str, str] | None = None,
         slots: dict[str, str] | None = None,
+        nofailover: bool = False,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -692,6 +693,7 @@ class Patroni:
             no_peers: Don't include peers.
             user_databases_map: map of databases to be accessible by each user.
             slots: replication slots (keys) with assigned database name (values).
+            nofailover: whether to set the nofailover tag in the configuration.
         """
         slots = slots or {}
         if not self._are_passwords_set:
@@ -749,8 +751,25 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
+            nofailover=nofailover,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+
+    def _remove_lost_and_found(self) -> None:
+        """Remove lost+found directories from storages if they exist."""
+        storages = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_DATA_PATH,
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+        ]
+        for storage in storages:
+            lost_and_found = f"{storage}/lost+found"
+            try:
+                if os.path.exists(lost_and_found):
+                    shutil.rmtree(lost_and_found)
+            except OSError as e:
+                logger.warning("Failed to remove %s: %s", lost_and_found, e)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -758,6 +777,7 @@ class Patroni:
         Returns:
             Whether the service started successfully.
         """
+        self._remove_lost_and_found()
         try:
             logger.debug("Starting Patroni...")
             cache = snap.SnapCache()
@@ -768,6 +788,63 @@ class Patroni:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
             return False
+
+    def reinit_member(self, member: str) -> None:
+        """Reinitialize a database member.
+        
+        Args:
+            member: The member to reinitialize.
+        """
+        try:
+            logger.info("Reinitializing %s", member)
+
+            # Additional cleanup for reinit
+            pg_wal = f"{POSTGRESQL_DATA_PATH}/pg_wal"
+            if os.path.islink(pg_wal):
+                logger.info("Removing pg_wal symlink")
+                os.remove(pg_wal)
+
+            logs_path = "/var/snap/charmed-postgresql/common/data/logs"
+            if os.path.exists(logs_path):
+                logger.info("Cleaning logs storage content")
+                for item in os.listdir(logs_path):
+                    item_path = os.path.join(logs_path, item)
+                    try:
+                        if os.path.isfile(item_path) or os.path.islink(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                    except Exception as e:
+                        logger.warning("Failed to remove %s: %s", item_path, e)
+
+            subprocess.run(
+                [
+                    "charmed-postgresql.patronictl",
+                    "-c",
+                    f"{PATRONI_CONF_PATH}/patroni.yaml",
+                    "reinit",
+                    self.cluster_name,
+                    member,
+                    "--force",
+                ],
+                check=True,
+            )
+            # Wait for Patroni to start the reinitialization process
+            try:
+                for attempt in Retrying(
+                    stop=stop_after_delay(60),
+                    wait=wait_fixed(3),
+                    retry=retry_if_result(lambda s: s == "running"),
+                    reraise=True,
+                ):
+                    with attempt:
+                        attempt.retry_state.set_result(self.get_member_status(member))
+            except RetryError:
+                logger.warning("Timed out waiting for member %s to start reinitializing", member)
+
+        except subprocess.CalledProcessError as e:
+            logger.error("Failed to reinitialize %s: %s", member, e)
+            raise
 
     def patroni_logs(self, num_lines: int | Literal["all"] = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
