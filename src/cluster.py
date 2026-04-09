@@ -791,7 +791,7 @@ class Patroni:
 
     def reinit_member(self, member: str) -> None:
         """Reinitialize a database member.
-        
+
         Args:
             member: The member to reinitialize.
         """
@@ -814,12 +814,12 @@ class Patroni:
                             os.remove(item_path)
                         elif os.path.isdir(item_path):
                             shutil.rmtree(item_path)
-                    except Exception as e:
+                    except OSError as e:
                         logger.warning("Failed to remove %s: %s", item_path, e)
 
-            subprocess.run(
+            subprocess.run(  # noqa: S603
                 [
-                    "charmed-postgresql.patronictl",
+                    "/snap/bin/charmed-postgresql.patronictl",
                     "-c",
                     f"{PATRONI_CONF_PATH}/patroni.yaml",
                     "reinit",

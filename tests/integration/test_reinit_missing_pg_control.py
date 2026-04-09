@@ -20,9 +20,7 @@ REINIT_TIMEOUT = 20 * MINUTE
 
 PATRONI_CONFIGURATION_FILE = "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml"
 # Without 16/main because we are not on the multiple clusters branch
-PG_CONTROL_FILE = (
-    "/var/snap/charmed-postgresql/common/var/lib/postgresql/global/pg_control"
-)
+PG_CONTROL_FILE = "/var/snap/charmed-postgresql/common/var/lib/postgresql/global/pg_control"
 
 LAYOUT_DIRECTORIES = (
     "/var/snap/charmed-postgresql/common/var/lib/postgresql",
@@ -125,11 +123,10 @@ def test_reinit_after_pg_control_removal(juju: jubilant.Juju) -> None:
     for attempt in Retrying(stop=stop_after_delay(5 * MINUTE), wait=wait_fixed(10), reraise=True):
         with attempt:
             result = subprocess.run(
-                [
-                    "juju", "run", "-m", juju.model, replica_unit,
-                    "reinit"
-                ],
-                text=True, capture_output=True, check=True
+                ["juju", "run", "-m", juju.model, replica_unit, "reinit"],
+                text=True,
+                capture_output=True,
+                check=True,
             )
             reinit_output = result.stdout
 
