@@ -57,12 +57,13 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 @pytest.fixture(autouse=True)
 def harness():
-    harness = Harness(PostgresqlOperatorCharm)
-    harness.begin()
-    harness.add_relation(PEER, harness.charm.app.name)
-    harness.add_relation("restart", harness.charm.app.name)
-    yield harness
-    harness.cleanup()
+    with patch("charm.PostgresqlOperatorCharm._remove_lost_and_found"):
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        harness.add_relation(PEER, harness.charm.app.name)
+        harness.add_relation("restart", harness.charm.app.name)
+        yield harness
+        harness.cleanup()
 
 
 def test_config_fallback(harness):
@@ -115,6 +116,34 @@ def test_on_install(harness):
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
+
+
+def test_remove_lost_and_found_is_called(harness):
+    """Test that the lost+found cleanup is called during install and start."""
+    # Reset the mock from the fixture (it might have been called during harness initialization if hooks were enabled)
+    harness.charm._remove_lost_and_found.reset_mock()
+
+    with (
+        patch("charm.PostgresqlOperatorCharm._install_snap_package"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.snap.SnapCache"),
+    ):
+        harness.charm.on.install.emit()
+        harness.charm._remove_lost_and_found.assert_called_once()
+        harness.charm._remove_lost_and_found.reset_mock()
+
+    # Mock dependencies for on_start to avoid early exit
+    with (
+        patch("charm.PostgresqlOperatorCharm._can_start", return_value=True),
+        patch("charm.PostgresqlOperatorCharm._get_password", return_value="pwd"),
+        patch("charm.PostgresqlOperatorCharm._replication_password", return_value="pwd"),
+        patch("charm.PostgresqlOperatorCharm._patroni") as mock_patroni,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+    ):
+        mock_patroni.start_patroni.return_value = True
+        harness.charm.on.start.emit()
+        harness.charm._remove_lost_and_found.assert_called_once()
 
 
 def test_patroni_scrape_config(harness):
