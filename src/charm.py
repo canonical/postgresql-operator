@@ -11,6 +11,7 @@ import os
 import pathlib
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -121,6 +122,7 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
+    STORAGE_PATHS,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -1398,6 +1400,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
+        self._remove_lost_and_found()
         logger.debug("Install start time: %s", datetime.now())
         self._check_detached_storage()
 
@@ -1632,6 +1635,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_start(self, event: StartEvent) -> None:
         """Handle the start event."""
+        self._remove_lost_and_found()
         if not self._can_start(event):
             return
 
@@ -3043,6 +3047,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         finally:
             if connection:
                 connection.close()
+
+    def _remove_lost_and_found(self) -> None:
+        """Remove the lost+found directory from the root of each storage if it exists."""
+        for storage_path in STORAGE_PATHS:
+            lost_and_found_path = Path(storage_path) / "lost+found"
+            if lost_and_found_path.is_dir():
+                logger.info(f"Removing {lost_and_found_path}")
+                try:
+                    shutil.rmtree(lost_and_found_path)
+                except OSError:
+                    logger.exception(f"Failed to remove {lost_and_found_path}")
 
 
 if __name__ == "__main__":
