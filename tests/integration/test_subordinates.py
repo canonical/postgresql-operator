@@ -64,11 +64,12 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
     )
 
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
+    await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
     await ops_test.model.relate(
         f"{DATABASE_APP_NAME}:juju-info", f"{UBUNTU_PRO_APP_NAME}:juju-info"
     )
     await ops_test.model.wait_for_idle(
-        apps=[UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active"
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active"
     )
 
 
@@ -76,7 +77,7 @@ async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
     await ops_test.model.wait_for_idle(
-        apps=[UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
     )
 
 
@@ -84,5 +85,5 @@ async def test_scale_down(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
     await ops_test.model.wait_for_idle(
-        apps=[UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
     )
