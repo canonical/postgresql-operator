@@ -951,3 +951,71 @@ async def test_watcher_production_profile_az_blocked(ops_test: OpsTest, charm) -
             status="active",
             timeout=600,
         )
+
+
+@pytest.mark.abort_on_fail
+async def test_odd_count_raft_exclusion(ops_test: OpsTest, continuous_writes) -> None:
+    """Test watcher gracefully yields quorum/voting if database scales to an odd count."""
+    db_app = ops_test.model.applications[DATABASE_APP_NAME]
+    
+    # Ensure starting condition: 2 units (Even)
+    if len(db_app.units) != 2:
+        logger.info(f"Test requires 2 DB units initially, found {len(db_app.units)}.")
+
+    # Validate watcher is voting initially
+    watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
+    action = await watcher_unit.run_action("get-cluster-status")
+    action = await action.wait()
+    
+    import json
+    status = json.loads(action.results["status"])
+    watcher_topology = status["topology"].get(watcher_unit.name)
+    assert watcher_topology["voting"] is True, "Watcher should be voting when PG is 2 units"
+
+    logger.info("Scaling DB to 3 units to verify watcher Raft eviction")
+    await db_app.add_unit(count=1)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME, WATCHER_APP_NAME], 
+        status="active", 
+        timeout=1800,
+        idle_period=30,
+    )
+
+    # Validate watcher stepped down from voting
+    action = await watcher_unit.run_action("get-cluster-status")
+    action = await action.wait()
+    status = json.loads(action.results["status"])
+    watcher_topology = status["topology"].get(watcher_unit.name)
+    assert watcher_topology["voting"] is False, "Watcher should NOT vote when PG is an odd count"
+
+    logger.info("Scaling DB back to 2 units")
+    await ops_test.model.destroy_unit(db_app.units[-1].name)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME, WATCHER_APP_NAME], 
+        status="active", 
+        timeout=1800,
+        idle_period=30,
+    )
+
+    # Validate watcher resumed voting
+    action = await watcher_unit.run_action("get-cluster-status")
+    action = await action.wait()
+    status = json.loads(action.results["status"])
+    watcher_topology = status["topology"].get(watcher_unit.name)
+    assert watcher_topology["voting"] is True, "Watcher should resume voting when PG drops to 2 units"
+
+
+@pytest.mark.abort_on_fail
+async def test_action_blocking_for_watcher_role(ops_test: OpsTest) -> None:
+    """Test that PostgreSQL specific actions are blocked dynamically on watcher role."""
+    watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
+    
+    # Execute a database-specific action
+    logger.info("Triggering PG-only action 'create-backup' on watcher unit")
+    action = await watcher_unit.run_action("create-backup")
+    action = await action.wait()
+    
+    assert action.status == "failed", "Action should have failed cleanly"
+    assert "this action is not available for the role assigned to this application" in action.message.lower(), (
+        f"Incorrect failure string: {action.message}"
+    )

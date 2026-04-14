@@ -45,6 +45,9 @@ def create_mock_relation(units_with_az=None):
         mock_data[mock_unit] = unit_data
 
     mock_relation.units = set(mock_units)
+    mock_relation.app = MagicMock()
+    mock_relation.app.name = "postgresql"
+    mock_data[mock_relation.app] = {}
     mock_relation.data = mock_data
     return mock_relation
 
@@ -311,7 +314,7 @@ class TestWatcherActions:
         handler._format_cluster_status = MagicMock(return_value={"raft": {"has_quorum": True}})
 
         event = MagicMock()
-        event.params = {"cluster-set": False}
+        event.params = {"standby-clusters": False}
 
         handler._on_get_cluster_status(event)
 
@@ -377,7 +380,7 @@ class TestWatcherActions:
         handler._get_standby_clusters = MagicMock(side_effect=[["cluster-b"], ["cluster-a"]])
 
         event = MagicMock()
-        event.params = {"cluster-set": True}
+        event.params = {"standby-clusters": True}
 
         handler._on_get_cluster_status(event)
 
@@ -447,7 +450,8 @@ class TestWatcherActions:
         handler, mock_charm = self._build_handler()
         relation = MagicMock()
         relation.id = 7
-        relation.data = {mock_charm.unit: {"unit-address": "10.1.1.7"}}
+        relation.app = MagicMock()
+        relation.data = {mock_charm.unit: {"unit-address": "10.1.1.7"}, relation.app: {}}
         mock_charm.model.get_binding.return_value = None
 
         handler._get_cluster_name = MagicMock(return_value="cluster-a")
@@ -473,7 +477,8 @@ class TestWatcherActions:
         handler, mock_charm = self._build_handler()
         relation = MagicMock()
         relation.id = 7
-        relation.data = {mock_charm.unit: {}}
+        relation.app = MagicMock()
+        relation.data = {mock_charm.unit: {}, relation.app: {}}
         mock_charm.model.get_binding.return_value = None
 
         handler._get_cluster_name = MagicMock(return_value="cluster-a")

@@ -349,8 +349,24 @@ class PostgreSQLWatcherRelation(Object):
             logger.warning(f"Error removing member {member_addr} from Raft: {e}")
             return False
 
+    def _pg_unit_count_is_odd(self) -> bool:
+        """Return True if the number of PostgreSQL units is odd.
+
+        When the PG unit count is odd (1, 3, 5…), adding the watcher as a Raft
+        voter would produce an even total, which degrades partition tolerance.
+        The watcher should participate in Raft only when the PG count is even
+        (2, 4, 6…), so that the total Raft member count is odd.
+        """
+        # self + peers
+        pg_count = 1 + len(self.charm._peers.units) if self.charm._peers else 1
+        return pg_count % 2 == 1
+
     def _add_watcher_to_raft(self, watcher_address: str) -> None:
         """Dynamically add the watcher to the running Raft cluster.
+
+        Only adds the watcher when the PostgreSQL unit count is even. With an
+        even number of PG nodes, adding the watcher brings the total Raft voter
+        count to odd, preserving partition tolerance.
 
         This is necessary because simply updating partner_addrs in the config
         file doesn't add the member to a running cluster.
@@ -363,6 +379,18 @@ class PostgreSQLWatcherRelation(Object):
             return
 
         watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
+
+        # Only add the watcher when the PG unit count is even (2, 4, …).
+        # With an odd PG count, adding the watcher creates an even Raft total
+        # which degrades partition tolerance — remove it instead.
+        if self._pg_unit_count_is_odd():
+            logger.info(
+                f"PG unit count is odd; watcher {watcher_raft_addr} should not vote. "
+                "Removing from Raft if present."
+            )
+            if self._is_watcher_in_raft(watcher_address):
+                self._remove_member_from_raft(watcher_raft_addr)
+            return
 
         # Check if watcher is already in the Raft cluster
         if self._is_watcher_in_raft(watcher_address):
@@ -599,6 +627,22 @@ class PostgreSQLWatcherRelation(Object):
             logger.warning("No PostgreSQL endpoints available")
             return
 
+        # Collect timeline and per-member lag from Patroni cluster status.
+        # Both fields are already available from the existing cluster_status() call
+        # (see ClusterMember TypedDict: timeline: int, lag: int in bytes).
+        pg_timeline = 0
+        member_lag: dict[str, int] = {}
+        try:
+            from tenacity import RetryError
+
+            cluster_status = self.charm._patroni.cluster_status()
+            for member in cluster_status:
+                if member.get("role") in ("leader", "standby_leader"):
+                    pg_timeline = member.get("timeline", 0)
+                member_lag[member["host"]] = member.get("lag", 0)
+        except Exception:
+            logger.debug("Could not retrieve cluster status for timeline/lag — using defaults")
+
         # Update relation data
         relation.data[self.charm.app].update({
             "cluster-name": self.charm.cluster_name,
@@ -607,6 +651,10 @@ class PostgreSQLWatcherRelation(Object):
             "raft-partner-addrs": json.dumps(sorted(pg_endpoints)),
             "raft-port": str(RAFT_PORT),
             "standby-clusters": json.dumps(self._get_standby_clusters()),
+            "timeline": str(pg_timeline),
+            "member-lag": json.dumps(member_lag),
+            "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
+            "watcher-voting": "false" if self._pg_unit_count_is_odd() else "true",
         })
 
         # Also share this unit's per-unit data.

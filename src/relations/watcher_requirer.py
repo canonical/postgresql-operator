@@ -629,7 +629,7 @@ class WatcherRequirerHandler(Object):
     def _on_get_cluster_status(self, event: ActionEvent) -> None:
         """Handle get-cluster-status action."""
         cluster_name_filter = event.params.get("cluster-name")
-        cluster_set_mode = event.params.get("cluster-set", False)
+        cluster_set_mode = event.params.get("standby-clusters", False)
 
         relations = self.model.relations.get(WATCHER_RELATION, [])
         clusters_data: dict[str, dict[str, Any]] = {}
@@ -678,8 +678,13 @@ class WatcherRequirerHandler(Object):
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
 
-        # Determine watcher voting status
-        watcher_voting = raft_status.get("connected", False)
+        # Determine watcher voting status from relation data (set by PG side based on
+        # odd/even unit count). Fall back to Raft connection status if not present.
+        watcher_voting_str = relation.data[relation.app].get("watcher-voting")
+        if watcher_voting_str is not None:
+            watcher_voting = watcher_voting_str == "true"
+        else:
+            watcher_voting = raft_status.get("connected", False)
 
         # Build topology entries from health checks
         topology: dict[str, Any] = {}
@@ -716,7 +721,7 @@ class WatcherRequirerHandler(Object):
                     "mode": "r/w" if is_primary else "r/o",
                     "status": "online" if is_healthy else "offline",
                     "version": self._get_pg_version(),
-                    "lag": 0,
+                    "lag": json.loads(relation.data[relation.app].get("member-lag", "{}")).get(endpoint, 0),
                 }
                 topology[unit_name] = entry
 
@@ -744,14 +749,21 @@ class WatcherRequirerHandler(Object):
         elif saw_healthy_member:
             cluster_role = "standby"
 
+        tls_enabled = relation.data[relation.app].get("tls-enabled", "false") == "true"
+        timeline_str = relation.data[relation.app].get("timeline", "0")
+        try:
+            pg_timeline = int(timeline_str)
+        except (ValueError, TypeError):
+            pg_timeline = 0
+
         return {
             "clustername": cluster_name,
             "clusterrole": cluster_role,
             "primary": primary_endpoint,
-            "ssl": "required",
+            "ssl": "required" if tls_enabled else "disabled",
             "status": "ok" if has_quorum else "ok_no_tolerance",
             "statustext": status_text,
-            "timeline": 0,  # TODO: query from Patroni REST API
+            "timeline": pg_timeline,
             "topology": topology,
             "raft": {
                 "has_quorum": has_quorum,

@@ -394,6 +394,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.leader_elected, self._on_watcher_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_watcher_config_changed)
 
+        # Register handlers for PostgreSQL-specific actions so users get a
+        # clear message rather than a generic Juju "action not found" error.
+        _pg_only_actions = [
+            "create_backup",
+            "create_replication",
+            "get_primary",
+            "list_backups",
+            "pre_refresh_check",
+            "force_refresh_start",
+            "resume_refresh",
+            "promote_to_primary",
+            "restore",
+        ]
+        for action_name in _pg_only_actions:
+            self.framework.observe(
+                getattr(self.on, f"{action_name}_action"),
+                self._on_action_not_available_for_watcher,
+            )
+
+    def _on_action_not_available_for_watcher(self, event: ActionEvent) -> None:
+        """Fail any PG-specific action run against a watcher unit."""
+        event.fail("this action is not available for the role assigned to this application")
+
     def _on_watcher_leader_elected(self, event):
         """Persist the role in peer data on first leader election (watcher mode)."""
         self._validate_role_unchanged()
