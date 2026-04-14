@@ -25,7 +25,7 @@ on:
 jobs:
   promote:
     name: Promote charm
-    uses: canonical/data-platform-workflows/.github/workflows/_promote_charm_legacy.yaml@v42.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/_promote_charm_legacy.yaml@v48.0.2
     with:
       track: '14'
       from-risk: ${{ inputs.from-risk }}
@@ -33,4 +33,5 @@ jobs:
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to edit GitHub releases
