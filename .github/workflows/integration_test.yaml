@@ -147,12 +147,18 @@ jobs:
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
           VAR_SPREAD_JOB: ${{ matrix.job.spread_job }}
+      - name: Check spread name for Allure collection
+        id: check-spread-name
+        run: |
+          if [[ '${{ matrix.job.spread_job }}' =~ ^github-ci:ubuntu-[0-9][0-9].04:[a-z_\/\.]+:juju36$ ]]; then
+              echo "match=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Upload Allure results
         timeout-minutes: 3
         # Only upload results from one spread system & one spread variant
         # Allure can only process one result per pytest test ID. If parameterization is done via
         # spread instead of pytest, there will be overlapping pytest test IDs.
-        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && startsWith(matrix.job.spread_job, 'github-ci:ubuntu-24.04:') && endsWith(matrix.job.spread_job, ':juju36') && github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
+        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && steps.check-spread-name.outputs.match == 'true' && github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
         uses: actions/upload-artifact@v7
         with:
           name: allure-results-integration-test-${{ matrix.job.name_in_artifact }}
