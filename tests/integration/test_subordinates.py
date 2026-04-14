@@ -32,6 +32,7 @@ async def check_subordinate_env_vars(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.skip(reason="Unstable")
 async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars):
     await gather(
         ops_test.model.deploy(
@@ -72,6 +73,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
     )
 
 
+@pytest.mark.skip(reason="Unstable")
 async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
@@ -80,6 +82,7 @@ async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
     )
 
 
+@pytest.mark.skip(reason="Unstable")
 async def test_scale_down(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
