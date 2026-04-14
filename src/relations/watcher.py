@@ -633,8 +633,6 @@ class PostgreSQLWatcherRelation(Object):
         pg_timeline = 0
         member_lag: dict[str, int] = {}
         try:
-            from tenacity import RetryError
-
             cluster_status = self.charm._patroni.cluster_status()
             for member in cluster_status:
                 if member.get("role") in ("leader", "standby_leader"):

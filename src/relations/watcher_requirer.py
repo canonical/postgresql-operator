@@ -666,6 +666,110 @@ class WatcherRequirerHandler(Object):
 
         event.set_results({"success": "True", "status": json.dumps(result_status)})
 
+    def _get_watcher_voting(self, relation: Relation, raft_status: dict[str, Any]) -> bool:
+        """Return whether the watcher should be shown as voting."""
+        if not relation.app:
+            return raft_status.get("connected", False)
+
+        watcher_voting_str = relation.data[relation.app].get("watcher-voting")
+        if watcher_voting_str is None:
+            return raft_status.get("connected", False)
+        return watcher_voting_str == "true"
+
+    def _get_member_lag_by_endpoint(self, relation: Relation) -> dict[str, Any]:
+        """Return per-endpoint lag data from relation application data."""
+        if not relation.app:
+            return {}
+
+        member_lag_raw = relation.data[relation.app].get("member-lag", "{}")
+        if not isinstance(member_lag_raw, str):
+            return {}
+
+        try:
+            parsed_member_lag = json.loads(member_lag_raw)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse member-lag JSON")
+            return {}
+
+        if isinstance(parsed_member_lag, dict):
+            return parsed_member_lag
+        return {}
+
+    @staticmethod
+    def _cluster_role_from_health(saw_healthy_member: bool, saw_primary_member: bool) -> str:
+        """Return the inferred cluster role from endpoint health results."""
+        if saw_primary_member:
+            return "primary"
+        if saw_healthy_member:
+            return "standby"
+        return "unknown"
+
+    def _build_postgresql_topology(
+        self,
+        relation: Relation,
+        pg_endpoints: list[str],
+        ip_to_unit: dict[str, str],
+    ) -> tuple[dict[str, Any], str | None, str]:
+        """Build PostgreSQL topology entries and infer the cluster role."""
+        topology: dict[str, Any] = {}
+        primary_endpoint = None
+        saw_healthy_member = False
+        saw_primary_member = False
+        member_lag_by_endpoint = self._get_member_lag_by_endpoint(relation)
+
+        if not pg_endpoints:
+            return topology, primary_endpoint, "unknown"
+
+        from watcher_health import HealthChecker
+
+        health_checker = HealthChecker(
+            self.charm,
+            password_getter=lambda rel=relation: self.get_watcher_password(rel),
+        )
+        health_results = health_checker.check_all_endpoints(pg_endpoints)
+
+        for endpoint in pg_endpoints:
+            unit_name = ip_to_unit.get(endpoint, endpoint)
+            res = health_results.get(endpoint, {})
+            is_healthy = res.get("healthy", False)
+            is_primary = not res.get("is_in_recovery", True)
+
+            if is_healthy:
+                saw_healthy_member = True
+            if is_primary:
+                primary_endpoint = f"{endpoint}:5432"
+            if is_healthy and is_primary:
+                saw_primary_member = True
+
+            topology[unit_name] = {
+                "address": f"{endpoint}:5432",
+                "memberrole": "primary" if is_primary else "sync_standby",
+                "mode": "r/w" if is_primary else "r/o",
+                "status": "online" if is_healthy else "offline",
+                "version": self._get_pg_version(),
+                "lag": member_lag_by_endpoint.get(endpoint, 0),
+            }
+
+        cluster_role = self._cluster_role_from_health(saw_healthy_member, saw_primary_member)
+        return topology, primary_endpoint, cluster_role
+
+    def _is_tls_enabled(self, relation: Relation) -> bool:
+        """Return whether TLS is enabled for the related PostgreSQL cluster."""
+        if not relation.app:
+            return False
+        return relation.data[relation.app].get("tls-enabled", "false") == "true"
+
+    def _get_timeline(self, relation: Relation) -> int:
+        """Return the related PostgreSQL timeline from relation data."""
+        if not relation.app:
+            return 0
+
+        timeline_str = relation.data[relation.app].get("timeline", "0")
+        try:
+            return int(timeline_str)
+        except (ValueError, TypeError):
+            return 0
+
     def _format_cluster_status(self, relation: Relation) -> dict[str, Any]:
         """Format cluster status for a single cluster relation."""
         cluster_name = self._get_cluster_name(relation)
@@ -677,53 +781,10 @@ class WatcherRequirerHandler(Object):
         raft_status = raft_controller.get_status()
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
-
-        # Determine watcher voting status from relation data (set by PG side based on
-        # odd/even unit count). Fall back to Raft connection status if not present.
-        watcher_voting_str = relation.data[relation.app].get("watcher-voting")
-        if watcher_voting_str is not None:
-            watcher_voting = watcher_voting_str == "true"
-        else:
-            watcher_voting = raft_status.get("connected", False)
-
-        # Build topology entries from health checks
-        topology: dict[str, Any] = {}
-        primary_endpoint = None
-        saw_healthy_member = False
-        saw_primary_member = False
-
-        if pg_endpoints:
-            from watcher_health import HealthChecker
-
-            health_checker = HealthChecker(
-                self.charm,
-                password_getter=lambda rel=relation: self.get_watcher_password(rel),
-            )
-            health_results = health_checker.check_all_endpoints(pg_endpoints)
-
-            for endpoint in pg_endpoints:
-                unit_name = ip_to_unit.get(endpoint, endpoint)
-                res = health_results.get(endpoint, {})
-                is_healthy = res.get("healthy", False)
-                is_primary = not res.get("is_in_recovery", True)
-
-                if is_healthy:
-                    saw_healthy_member = True
-                    if is_primary:
-                        saw_primary_member = True
-
-                if is_primary:
-                    primary_endpoint = f"{endpoint}:5432"
-
-                entry: dict[str, Any] = {
-                    "address": f"{endpoint}:5432",
-                    "memberrole": "primary" if is_primary else "sync_standby",
-                    "mode": "r/w" if is_primary else "r/o",
-                    "status": "online" if is_healthy else "offline",
-                    "version": self._get_pg_version(),
-                    "lag": json.loads(relation.data[relation.app].get("member-lag", "{}")).get(endpoint, 0),
-                }
-                topology[unit_name] = entry
+        watcher_voting = self._get_watcher_voting(relation, raft_status)
+        topology, primary_endpoint, cluster_role = self._build_postgresql_topology(
+            relation, pg_endpoints, ip_to_unit
+        )
 
         # Add watcher entry to topology
         watcher_port = self._get_port_for_relation(relation.id)
@@ -743,27 +804,15 @@ class WatcherRequirerHandler(Object):
             if has_quorum
             else "cluster is not tolerant to any failures."
         )
-        cluster_role = "unknown"
-        if saw_primary_member:
-            cluster_role = "primary"
-        elif saw_healthy_member:
-            cluster_role = "standby"
-
-        tls_enabled = relation.data[relation.app].get("tls-enabled", "false") == "true"
-        timeline_str = relation.data[relation.app].get("timeline", "0")
-        try:
-            pg_timeline = int(timeline_str)
-        except (ValueError, TypeError):
-            pg_timeline = 0
 
         return {
             "clustername": cluster_name,
             "clusterrole": cluster_role,
             "primary": primary_endpoint,
-            "ssl": "required" if tls_enabled else "disabled",
+            "ssl": "required" if self._is_tls_enabled(relation) else "disabled",
             "status": "ok" if has_quorum else "ok_no_tolerance",
             "statustext": status_text,
-            "timeline": pg_timeline,
+            "timeline": self._get_timeline(relation),
             "topology": topology,
             "raft": {
                 "has_quorum": has_quorum,
