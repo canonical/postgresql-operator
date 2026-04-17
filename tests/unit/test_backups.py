@@ -1810,7 +1810,7 @@ def test_pre_restore_checks(harness):
 )
 def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
     with (
-        patch("charm.Patroni.render_file") as _render_file,
+        patch("backups.render_file") as _render_file,
         patch(
             "charm.PostgreSQLBackups._tls_ca_chain_filename",
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
