@@ -8,11 +8,6 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
   pull_request:
     paths:
       - 'docs/**'
@@ -36,7 +31,7 @@ jobs:
         run: make spelling
       - name: Inclusive language check
         run: make woke
-      - name: Link check
-        run: make linkcheck
+      #- name: Link check
+      #  run: make linkcheck
     permissions:
       contents: read

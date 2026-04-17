@@ -20,10 +20,6 @@ on:
   workflow_dispatch:
   # Triggered on push by .github/workflows/release.yaml
   workflow_call:
-    outputs:
-      artifact-prefix:
-        description: build_charm.yaml `artifact-prefix` output
-        value: ${{ jobs.build.outputs.artifact-prefix }}
     secrets:
       AWS_ACCESS_KEY:
         required: true
@@ -39,11 +35,15 @@ on:
         required: true
       LANDSCAPE_REGISTRATION_KEY:
         required: true
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
   lint-workflows:
     name: Lint .github/workflows/
-    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v48.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v48.1.1
     permissions:
       contents: read
 
@@ -100,7 +100,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v48.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v48.1.1
     permissions:
       actions: read  # Needed for GitHub API call to get workflow version
       contents: read
