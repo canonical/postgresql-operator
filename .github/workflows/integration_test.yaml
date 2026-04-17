@@ -149,8 +149,9 @@ jobs:
           VAR_SPREAD_JOB: ${{ matrix.job.spread_job }}
       - name: Check spread name for Allure collection
         id: check-spread-name
+        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
         run: |
-          if [[ '${{ matrix.job.spread_job }}' =~ ^github-ci:ubuntu-[0-9][0-9].04:[a-z_\/\.]+:juju36$ ]]; then
+          if [[ '${{ matrix.job.spread_job }}' =~ ^github-ci:ubuntu-[0-9][0-9].04:[a-z_\/\.0-9]+:juju36$ ]]; then
               echo "match=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload Allure results
