@@ -46,6 +46,7 @@ from constants import (
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+from utils import render_file
 
 logger = logging.getLogger(__name__)
 
@@ -1332,7 +1333,7 @@ Stderr:
             return False
 
         if self._tls_ca_chain_filename != "":
-            self.charm._patroni.render_file(
+            render_file(
                 self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
             )
 
@@ -1359,14 +1360,12 @@ Stderr:
             process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
-        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
+        render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
-            self.charm._patroni.render_file(
-                PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
-            )
+            render_file(PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False)
 
         return True
 

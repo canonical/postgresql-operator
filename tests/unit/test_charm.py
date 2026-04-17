@@ -2025,7 +2025,7 @@ def test_update_member_ip(harness):
 def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.Patroni.render_file") as _render_file,
+        patch("charm.render_file") as _render_file,
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
         patch(

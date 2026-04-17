@@ -1,0 +1,19 @@
+[Unit]
+Description=PostgreSQL Watcher Raft Service ({{ instance_id }})
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# charmed-postgresql.patroni-raft-controller app lacks network interfaces
+# in the snap profile, so run the controller under the patroni app profile.
+ExecStart=/snap/bin/charmed-postgresql.patroni-raft-controller {{ config_file }}
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

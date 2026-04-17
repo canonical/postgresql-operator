@@ -16,23 +16,16 @@ The Raft service runs as a systemd service to ensure it persists between
 charm hook invocations.
 """
 
-import importlib
 import logging
-import os
 import re
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-TcpUtility: type[Any] | None = None
-UtilityException: type[Exception] = Exception
-try:
-    utility_module = importlib.import_module("pysyncobj.utility")
-    TcpUtility = utility_module.TcpUtility
-    UtilityException = utility_module.UtilityException
-    PYSYNCOBJ_AVAILABLE = True
-except ImportError:
-    PYSYNCOBJ_AVAILABLE = False
+from jinja2 import Template
+from pysyncobj.utility import TcpUtility, UtilityException
+
+from utils import create_directory, render_file
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -43,27 +36,6 @@ logger = logging.getLogger(__name__)
 # Must be under the snap's common path so that
 # charmed-postgresql.patroni-raft-controller can access it.
 RAFT_BASE_DIR = "/var/snap/charmed-postgresql/common/watcher-raft"
-
-SERVICE_TEMPLATE = """[Unit]
-Description=PostgreSQL Watcher Raft Service ({instance_id})
-After=network.target
-Wants=network.target
-
-[Service]
-Type=simple
-# charmed-postgresql.patroni-raft-controller app lacks network interfaces
-# in the snap profile, so run the controller under the patroni app profile.
-ExecStart=/usr/bin/snap run --shell charmed-postgresql.patroni -c "/snap/charmed-postgresql/current/usr/bin/patroni_raft_controller {config_file}"
-Restart=always
-RestartSec=5
-TimeoutStartSec=30
-TimeoutStopSec=30
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-"""
 
 
 class RaftController:
@@ -118,7 +90,7 @@ class RaftController:
         self._password = password
 
         # Ensure data directory exists
-        Path(self.data_dir).mkdir(parents=True, exist_ok=True)
+        create_directory(self.data_dir, 0o600)
 
         # Write Patroni-compatible YAML config (includes password)
         config_changed = self._write_config_file()
@@ -138,32 +110,17 @@ class RaftController:
         Returns:
             True if the config file changed, False if unchanged.
         """
-        # Build YAML manually to avoid adding pyyaml as a dependency.
-        # The values are validated addresses and a password string, so
-        # simple formatting is safe.
-        partner_lines = ""
-        for addr in self._partner_addrs:
-            partner_lines += f"\n    - '{addr}'"
+        create_directory(f"{self.data_dir}/raft", 0o600)
+        with open("templates/watcher.yml.j2") as file:
+            template = Template(file.read())
 
-        yaml_content = f"""raft:
-  self_addr: '{self._self_addr}'
-  partner_addrs:{partner_lines}
-  password: '{self._password}'
-  data_dir: '{self.data_dir}/raft'
-"""
-        config_path = Path(self.config_file)
-        if config_path.exists():
-            try:
-                if config_path.read_text() == yaml_content:
-                    logger.debug("Raft config already up to date")
-                    return False
-            except OSError as e:
-                logger.warning(f"Failed reading existing Raft config: {e}")
-
-        Path(f"{self.data_dir}/raft").mkdir(parents=True, exist_ok=True)
-        fd = os.open(self.config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(yaml_content)
+        rendered = template.render(
+            partner_addrs=self._partner_addrs,
+            self_addr=self._self_addr,
+            password=self._password,
+            data_dir=self.data_dir,
+        )
+        render_file(self.config_file, rendered, 0o600)
         return True
 
     def _install_service(self) -> bool:
@@ -186,25 +143,14 @@ class RaftController:
                 logger.error(f"Invalid partner address format: {addr}")
                 return False
 
-        service_content = SERVICE_TEMPLATE.format(
+        with open("templates/watcher.service.j2") as file:
+            template = Template(file.read())
+
+        rendered = template.render(
             instance_id=self.instance_id,
             config_file=self.config_file,
         )
-
-        # Check if service file needs to be updated
-        existing_content = ""
-        if Path(self.service_file).exists():
-            existing_content = Path(self.service_file).read_text()
-
-        if existing_content == service_content:
-            logger.debug("Systemd service already installed and up to date")
-            return False
-
-        # Write service file
-        Path(self.service_file).write_text(service_content)
-        os.chmod(self.service_file, 0o644)
-
-        success = True
+        render_file(self.service_file, rendered, 0o644, change_owner=False)
 
         # Reload systemd to pick up the new service
         try:
@@ -217,12 +163,12 @@ class RaftController:
             logger.info(f"Installed systemd service {self.service_name}")
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to reload systemd: {e.stderr}")
-            success = False
+            return False
         except Exception as e:
             logger.error(f"Failed to reload systemd: {e}")
-            success = False
+            return False
 
-        return success
+        return True
 
     def start(self) -> bool:
         """Start the Raft controller service.
@@ -495,14 +441,6 @@ class RaftController:
                         return self._populate_status(status, raft_status)
             except Exception as e:
                 logger.debug(f"Error querying Raft status via TcpUtility: {e}")
-
-        # If TcpUtility isn't available (pysyncobj not installed in charm venv)
-        # but the service is running, assume connected as a fallback.
-        # If TcpUtility IS available but the query failed, leave connected=False
-        # since the node may not be ready yet.
-        if is_running and not PYSYNCOBJ_AVAILABLE:
-            status["connected"] = True
-            logger.debug("Raft controller service is running (TcpUtility not available)")
 
         return status
 
