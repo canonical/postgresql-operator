@@ -18,10 +18,19 @@ charm hook invocations.
 
 import logging
 import re
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from charmlibs.systemd import (
+    SystemdError,
+    daemon_reload,
+    service_disable,
+    service_enable,
+    service_restart,
+    service_running,
+    service_start,
+    service_stop,
+)
 from jinja2 import Template
 from pysyncobj.utility import TcpUtility, UtilityException
 
@@ -154,17 +163,9 @@ class RaftController:
 
         # Reload systemd to pick up the new service
         try:
-            subprocess.run(
-                ["/usr/bin/systemctl", "daemon-reload"],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
+            daemon_reload()
             logger.info(f"Installed systemd service {self.service_name}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to reload systemd: {e.stderr}")
-            return False
-        except Exception as e:
+        except SystemdError as e:
             logger.error(f"Failed to reload systemd: {e}")
             return False
 
@@ -176,7 +177,7 @@ class RaftController:
         Returns:
             True if started successfully, False otherwise.
         """
-        if self.is_running():
+        if service_running(self.service_name):
             logger.debug("Raft controller already running")
             return True
 
@@ -186,24 +187,11 @@ class RaftController:
 
         try:
             # Enable and start the service
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "enable", self.service_name],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "start", self.service_name],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
+            service_enable(self.service_name)
+            service_start(self.service_name)
             logger.info(f"Started Raft controller service {self.service_name}")
             return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to start Raft controller: {e.stderr}")
-            return False
-        except Exception as e:
+        except SystemdError as e:
             logger.error(f"Failed to start Raft controller: {e}")
             return False
 
@@ -213,58 +201,28 @@ class RaftController:
         Returns:
             True if stopped successfully, False otherwise.
         """
-        if not self.is_running():
+        if not service_running(self.service_name):
             logger.debug("Raft controller not running")
             return True
 
         try:
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "stop", self.service_name],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
+            service_stop(self.service_name)
             logger.info(f"Stopped Raft controller service {self.service_name}")
             return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to stop Raft controller: {e.stderr}")
-            return False
-        except Exception as e:
+        except SystemdError as e:
             logger.error(f"Failed to stop Raft controller: {e}")
             return False
 
     def remove_service(self) -> bool:
         """Disable and remove the Raft systemd service unit file."""
-        success = True
-
-        if self.is_running() and not self.stop():
-            success = False
-
-        try:
-            enabled_result = subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "is-enabled", self.service_name],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Timed out checking if service is enabled: {e}")
+        if not self.stop():
             return False
 
-        if enabled_result.returncode == 0:
-            try:
-                subprocess.run(  # noqa: S603
-                    ["/usr/bin/systemctl", "disable", self.service_name],
-                    check=True,
-                    capture_output=True,
-                    timeout=30,
-                )
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Failed to disable Raft controller service: {e.stderr}")
-                success = False
-            except subprocess.TimeoutExpired as e:
-                logger.error(f"Timed out disabling Raft controller service: {e}")
-                success = False
+        try:
+            service_disable(self.service_name)
+        except SystemdError as e:
+            logger.error(f"Failed to disable Raft controller service: {e}")
+            return False
 
         service_path = Path(self.service_file)
         if service_path.exists():
@@ -272,23 +230,15 @@ class RaftController:
                 service_path.unlink()
             except OSError as e:
                 logger.error(f"Failed to remove service file {self.service_file}: {e}")
-                success = False
+                return False
 
         try:
-            subprocess.run(
-                ["/usr/bin/systemctl", "daemon-reload"],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to reload systemd after service removal: {e.stderr}")
-            success = False
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Timed out reloading systemd after service removal: {e}")
-            success = False
+            daemon_reload()
+        except SystemdError as e:
+            logger.error(f"Failed to reload systemd after service removal: {e}")
+            return False
 
-        return success
+        return True
 
     def restart(self) -> bool:
         """Restart the Raft controller service.
@@ -297,40 +247,11 @@ class RaftController:
             True if restarted successfully, False otherwise.
         """
         try:
-            subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "restart", self.service_name],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
+            service_restart(self.service_name)
             logger.info(f"Restarted Raft controller service {self.service_name}")
             return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to restart Raft controller: {e.stderr}")
-            return False
-        except Exception as e:
+        except SystemdError as e:
             logger.error(f"Failed to restart Raft controller: {e}")
-            return False
-
-    def is_running(self) -> bool:
-        """Check if the Raft controller service is running.
-
-        Returns:
-            True if running, False otherwise.
-        """
-        try:
-            result = subprocess.run(  # noqa: S603
-                ["/usr/bin/systemctl", "is-active", self.service_name],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            is_active = result.stdout.strip() == "active"
-            if is_active:
-                logger.debug("Raft controller service is active")
-            return is_active
-        except Exception as e:
-            logger.debug(f"Failed to check service status: {e}")
             return False
 
     def _load_config(self) -> None:
@@ -416,7 +337,7 @@ class RaftController:
         Returns:
             Dictionary with status information.
         """
-        is_running = self.is_running()
+        is_running = service_running(self.service_name)
         status: dict[str, Any] = {
             "running": is_running,
             "connected": False,

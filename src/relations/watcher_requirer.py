@@ -24,6 +24,7 @@ import typing
 from pathlib import Path
 from typing import Any
 
+from charmlibs.systemd import service_running
 from ops import (
     ActionEvent,
     ActiveStatus,
@@ -404,7 +405,7 @@ class WatcherRequirerHandler(Object):
                         partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
                         password=raft_password,
                     )
-                    if changed and raft_controller.is_running():
+                    if changed and service_running(raft_controller.service_name):
                         logger.info(
                             f"Restarting Raft controller for relation {relation.id} due to IP change"
                         )
@@ -536,7 +537,7 @@ class WatcherRequirerHandler(Object):
             password=raft_password,
         )
 
-        if raft_controller.is_running():
+        if service_running(raft_controller.service_name):
             if changed:
                 logger.info(
                     f"Restarting Raft controller for relation {relation.id} "
@@ -553,7 +554,7 @@ class WatcherRequirerHandler(Object):
         if unit_az:
             relation.data[self.charm.unit]["unit-az"] = unit_az
         # Only set raft-status and ActiveStatus after verifying the service is running
-        if raft_controller.is_running():
+        if service_running(raft_controller.service_name):
             relation.data[self.charm.unit]["raft-status"] = "connected"
             # Check AZ co-location and enforce based on profile
             az_warning = self._check_az_colocation(relation)

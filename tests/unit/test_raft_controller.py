@@ -1,10 +1,10 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from charmlibs.systemd import SystemdError
 from jinja2 import Template
 from pytest import fixture
 
@@ -51,15 +51,16 @@ def test_remove_service_disables_and_deletes_unit(tmp_path: Path, controller: Ra
     Path(controller.service_file).write_text("[Unit]\nDescription=test\n")
 
     with (
-        patch.object(controller, "is_running", return_value=False),
-        patch("src.raft_controller.subprocess.run") as run,
+        patch("raft_controller.service_running") as _service_running,
+        patch("raft_controller.service_stop") as _service_stop,
+        patch("raft_controller.service_disable") as _service_disable,
+        patch("raft_controller.daemon_reload") as _daemon_reload,
     ):
-        run.side_effect = [
-            subprocess.CompletedProcess(args=[], returncode=0, stdout="enabled", stderr=""),
-            subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
-            subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
-        ]
         assert controller.remove_service()
+        _service_running.assert_called_once_with(controller.service_name)
+        _service_stop.assert_called_once_with(controller.service_name)
+        _service_disable.assert_called_once_with(controller.service_name)
+        _daemon_reload.assert_called_once_with()
 
     assert not Path(controller.service_file).exists()
 
@@ -72,17 +73,12 @@ def test_install_service_returns_false_when_daemon_reload_fails(
     controller._password = "secret"
 
     with (
-        patch(
-            "src.raft_controller.subprocess.run",
-            side_effect=subprocess.CalledProcessError(
-                returncode=1,
-                cmd=["/usr/bin/systemctl", "daemon-reload"],
-                stderr="reload failed",
-            ),
-        ),
+        patch("raft_controller.daemon_reload") as _daemon_reload,
         patch("raft_controller.render_file"),
         patch("raft_controller.create_directory"),
     ):
+        _daemon_reload.side_effect = SystemdError
+
         assert not controller._install_service()
 
 
@@ -101,10 +97,7 @@ def test_install_service_uses_patroni_profile_execstart(
     )
 
     with (
-        patch(
-            "src.raft_controller.subprocess.run",
-            return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
-        ),
+        patch("raft_controller.daemon_reload") as _daemon_reload,
         patch("raft_controller.render_file") as _render_file,
         patch("raft_controller.create_directory"),
     ):
@@ -116,3 +109,4 @@ def test_install_service_uses_patroni_profile_execstart(
         0o644,
         change_owner=False,
     )
+    _daemon_reload.assert_called_once_with()
