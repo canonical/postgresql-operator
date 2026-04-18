@@ -90,7 +90,7 @@ class RaftController:
         self._password = password
 
         # Ensure data directory exists
-        create_directory(self.data_dir, 0o600)
+        create_directory(self.data_dir, 0o700)
 
         # Write Patroni-compatible YAML config (includes password)
         config_changed = self._write_config_file()
@@ -110,7 +110,7 @@ class RaftController:
         Returns:
             True if the config file changed, False if unchanged.
         """
-        create_directory(f"{self.data_dir}/raft", 0o600)
+        create_directory(f"{self.data_dir}/raft", 0o700)
         with open("templates/watcher.yml.j2") as file:
             template = Template(file.read())
 

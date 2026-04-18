@@ -40,8 +40,8 @@ def test_configure(tmp_path: Path, controller: RaftController):
         assert controller.configure("10.0.0.1:2222", ["10.0.0.2:2222"], "secret")
 
         assert _create_directory.call_count == 2
-        _create_directory.assert_any_call(f"{tmp_path}/watcher-raft/rel42", 0o600)
-        _create_directory.assert_any_call(f"{tmp_path}/watcher-raft/rel42/raft", 0o600)
+        _create_directory.assert_any_call(f"{tmp_path}/watcher-raft/rel42", 0o700)
+        _create_directory.assert_any_call(f"{tmp_path}/watcher-raft/rel42/raft", 0o700)
         _render_file.assert_called_once_with(
             f"{tmp_path}/watcher-raft/rel42/patroni-raft.yaml", expected_content, 0o600
         )
