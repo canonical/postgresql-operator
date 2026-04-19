@@ -450,6 +450,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
             )
         else:
+            try:
+                self._patroni.set_max_timelines_history()
+            except Exception:
+                logger.warning("Unable to patch in max_timelines_history")
             refresh.next_unit_allowed_to_refresh = True
 
     def set_unit_status(
