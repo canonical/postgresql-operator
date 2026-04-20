@@ -1400,7 +1400,7 @@ Stderr:
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
-            render_file(PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False)
+        render_file(PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False)
 
         return True
 
