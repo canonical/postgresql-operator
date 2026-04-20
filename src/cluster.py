@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import pathlib
-import pwd
 import re
 import shutil
 import subprocess
@@ -59,7 +58,7 @@ from constants import (
     POSTGRESQL_LOGS_PATH,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import label2name
+from utils import _change_owner, label2name, render_file
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +222,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(POSTGRESQL_DATA_PATH)
+        _change_owner(POSTGRESQL_DATA_PATH)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
@@ -232,35 +231,11 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-    def _change_owner(self, path: str) -> None:
-        """Change the ownership of a file or a directory to the postgres user.
-
-        Args:
-            path: path to a file or directory.
-        """
-        # Get the uid/gid for the _daemon_ user.
-        user_database = pwd.getpwnam("_daemon_")
-        # Set the correct ownership for the file or directory.
-        os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
-
     @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
         return {member["name"] for member in self.cached_cluster_status}
-
-    def _create_directory(self, path: str, mode: int) -> None:
-        """Creates a directory.
-
-        Args:
-            path: the path of the directory that should be created.
-            mode: access permission mask applied to the
-              directory using chmod (e.g. 0o640).
-        """
-        os.makedirs(path, mode=mode, exist_ok=True)
-        # Ensure correct permissions are set on the directory.
-        os.chmod(path, mode)
-        self._change_owner(path)
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -635,27 +610,6 @@ class Patroni:
                 if self.get_primary() is None:
                     raise ClusterNotPromotedError("cluster not promoted")
 
-    def render_file(self, path: str, content: str, mode: int, change_owner: bool = True) -> None:
-        """Write a content rendered from a template to a file.
-
-        Args:
-            path: the path to the file.
-            content: the data to be written to the file.
-            mode: access permission mask applied to the
-              file using chmod (e.g. 0o640).
-            change_owner: whether to change the file owner
-              to the _daemon_ user.
-        """
-        # TODO: keep this method to use it also for generating replication configuration files and
-        # move it to an utils / helpers file.
-        # Write the content to the file.
-        with open(path, "w+") as file:
-            file.write(content)
-        # Ensure correct permissions are set on the file.
-        os.chmod(path, mode)
-        if change_owner:
-            self._change_owner(path)
-
     def render_patroni_yml_file(
         self,
         connectivity: bool = False,
@@ -750,7 +704,7 @@ class Patroni:
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
