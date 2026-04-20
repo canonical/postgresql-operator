@@ -47,18 +47,20 @@ def test_configure(tmp_path: Path, controller: RaftController):
         )
 
 
-def test_remove_service_disables_and_deletes_unit(tmp_path: Path, controller: RaftController):
+def test_remove_service_disables_unit_and_deletes_dir(tmp_path: Path, controller: RaftController):
     Path(controller.service_file).write_text("[Unit]\nDescription=test\n")
 
     with (
         patch("raft_controller.service_running") as _service_running,
         patch("raft_controller.service_stop") as _service_stop,
         patch("raft_controller.service_disable") as _service_disable,
+        patch("raft_controller.rmtree") as _rmtree,
     ):
         assert controller.remove_service()
         _service_running.assert_called_once_with(controller.service_name)
         _service_stop.assert_called_once_with(controller.service_name)
         _service_disable.assert_called_once_with(controller.service_name)
+        _rmtree.assert_called_once_with(controller.data_dir)
 
 
 def test_install_service_returns_false_when_daemon_reload_fails(

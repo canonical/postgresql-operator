@@ -18,7 +18,8 @@ charm hook invocations.
 
 import logging
 from ipaddress import IPv4Address
-from typing import TYPE_CHECKING, Any
+from shutil import rmtree
+from typing import TYPE_CHECKING, TypedDict
 
 from charmlibs.systemd import (
     SystemdError,
@@ -45,6 +46,16 @@ logger = logging.getLogger(__name__)
 # charmed-postgresql.patroni-raft-controller can access it.
 RAFT_BASE_DIR = "/var/snap/charmed-postgresql/common/watcher-raft"
 SERVICE_FILE = "/etc/systemd/system/watcher-raft@.service"
+
+
+class ClusterStatus(TypedDict):
+    """Type definition for the cluster status mapping."""
+
+    running: bool
+    connected: bool
+    has_quorum: bool
+    leader: str | None
+    members: list[str]
 
 
 def install_service() -> bool:
@@ -205,6 +216,12 @@ class RaftController:
             logger.error(f"Failed to disable Raft controller service: {e}")
             return False
 
+        try:
+            rmtree(self.data_dir)
+        except Exception as e:
+            logger.error(f"Failed to remove Raft controller directory: {e}")
+            return False
+
         return True
 
     def restart(self) -> bool:
@@ -221,14 +238,14 @@ class RaftController:
             logger.error(f"Failed to restart Raft controller: {e}")
             return False
 
-    def get_status(self, self_port: int, password: str | None) -> dict[str, Any]:
+    def get_status(self, self_port: int, password: str | None) -> ClusterStatus:
         """Get the Raft controller status.
 
         Returns:
             Dictionary with status information.
         """
         is_running = service_running(self.service_name)
-        status: dict[str, Any] = {
+        status: ClusterStatus = {
             "running": is_running,
             "connected": False,
             "has_quorum": False,
@@ -251,8 +268,7 @@ class RaftController:
 
             # Extract member addresses from partner_node_status_server_* keys
             prefix = "partner_node_status_server_"
-            # members: list[str] = [self._self_addr] if self._self_addr else []
-            members = []
+            members: list[str] = [raft_status["self"]]
             for key in raft_status:
                 if isinstance(key, str) and key.startswith(prefix):
                     members.append(key[len(prefix) :])

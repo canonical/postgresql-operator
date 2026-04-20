@@ -42,7 +42,7 @@ from ops import (
 )
 
 from constants import RAFT_PORT, WATCHER_RELATION
-from raft_controller import RaftController, install_service
+from raft_controller import ClusterStatus, RaftController, install_service
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -447,6 +447,11 @@ class WatcherRequirerHandler(Object):
         relation = event.relation
         logger.info(f"Watcher relation {relation.id} data changed")
 
+        if self.charm._peers is None:
+            logger.debug("Deferring watcher relation: Peer relation not yet joined")
+            event.defer()
+            return
+
         raft_password = self._get_raft_password(relation)
         if not raft_password:
             logger.debug("Raft password not yet available")
@@ -542,7 +547,7 @@ class WatcherRequirerHandler(Object):
         return ip_to_az, ip_to_unit
 
     def _resolve_raft_members(
-        self, raft_status: dict[str, Any], ip_to_unit: dict[str, str]
+        self, raft_status: ClusterStatus, ip_to_unit: dict[str, str]
     ) -> None:
         """Resolve Raft member IPs to unit names in-place."""
         resolved = []
@@ -591,7 +596,7 @@ class WatcherRequirerHandler(Object):
 
         event.set_results({"success": "True", "status": json.dumps(result_status)})
 
-    def _get_watcher_voting(self, relation: Relation, raft_status: dict[str, Any]) -> bool:
+    def _get_watcher_voting(self, relation: Relation, raft_status: ClusterStatus) -> bool:
         """Return whether the watcher should be shown as voting."""
         if not relation.app:
             return raft_status.get("connected", False)
