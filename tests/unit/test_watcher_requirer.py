@@ -142,7 +142,6 @@ class TestAZProfileEnforcement:
         with patch.object(WatcherRequirerHandler, "__init__", return_value=None):
             handler = WatcherRequirerHandler.__new__(WatcherRequirerHandler)
             handler.charm = mock_charm
-            handler._raft_controllers = {}
 
             # Mock framework.model to make self.model work
             mock_framework = MagicMock()
@@ -151,11 +150,6 @@ class TestAZProfileEnforcement:
 
             # Mock model.relations
             mock_charm.model.relations.get.return_value = [mock_relation]
-
-            # Mock raft controller
-            mock_raft = MagicMock()
-            mock_raft.get_status.return_value = {"connected": True}
-            handler._raft_controllers[mock_relation.id] = mock_raft
 
             # Mock _get_pg_endpoints
             handler._get_pg_endpoints = MagicMock(return_value=list(pg_units_az.keys()))
@@ -171,7 +165,13 @@ class TestAZProfileEnforcement:
             pg_units_az={"postgresql/0": "az1", "postgresql/1": "az2"},
         )
 
-        with patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az1"}, clear=False):
+        with (
+            patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az1"}, clear=False),
+            patch(
+                "relations.watcher_requirer.RaftController.get_status",
+                return_value={"connected": True},
+            ),
+        ):
             handler._on_update_status(MagicMock())
 
         status = mock_charm.unit.status
@@ -188,7 +188,13 @@ class TestAZProfileEnforcement:
             pg_units_az={"postgresql/0": "az1", "postgresql/1": "az2"},
         )
 
-        with patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az1"}, clear=False):
+        with (
+            patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az1"}, clear=False),
+            patch(
+                "relations.watcher_requirer.RaftController.get_status",
+                return_value={"connected": True},
+            ),
+        ):
             handler._on_update_status(MagicMock())
 
         status = mock_charm.unit.status
@@ -205,7 +211,13 @@ class TestAZProfileEnforcement:
             pg_units_az={"postgresql/0": "az1", "postgresql/1": "az2"},
         )
 
-        with patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az3"}, clear=False):
+        with (
+            patch.dict("os.environ", {"JUJU_AVAILABILITY_ZONE": "az3"}, clear=False),
+            patch(
+                "relations.watcher_requirer.RaftController.get_status",
+                return_value={"connected": True},
+            ),
+        ):
             handler._on_update_status(MagicMock())
 
         status = mock_charm.unit.status
@@ -223,7 +235,13 @@ class TestAZProfileEnforcement:
         )
 
         env = {k: v for k, v in __import__("os").environ.items() if k != "JUJU_AVAILABILITY_ZONE"}
-        with patch.dict("os.environ", env, clear=True):
+        with (
+            patch.dict("os.environ", env, clear=True),
+            patch(
+                "relations.watcher_requirer.RaftController.get_status",
+                return_value={"connected": True},
+            ),
+        ):
             handler._on_update_status(MagicMock())
 
         status = mock_charm.unit.status
@@ -261,7 +279,7 @@ class TestAZProfileEnforcement:
 class TestWatcherRelationLifecycle:
     """Tests for watcher relation lifecycle cleanup."""
 
-    def test_relation_broken_removes_service_and_port(self):
+    def test_relation_broken_removes_port(self):
         """Relation-broken removes the Raft service and releases the allocated port."""
         mock_charm = create_mock_charm()
         mock_relation = MagicMock()
@@ -269,25 +287,24 @@ class TestWatcherRelationLifecycle:
         mock_event = MagicMock()
         mock_event.relation = mock_relation
 
-        with patch.object(WatcherRequirerHandler, "__init__", return_value=None):
+        with (
+            patch.object(WatcherRequirerHandler, "__init__", return_value=None),
+            patch("relations.watcher_requirer.RaftController.remove_service") as _remove_service,
+        ):
             handler = WatcherRequirerHandler.__new__(WatcherRequirerHandler)
             handler.charm = mock_charm
-            handler._raft_controllers = {}
             handler._release_port_for_relation = MagicMock()
 
             mock_framework = MagicMock()
             mock_framework.model = mock_charm.model
             handler.framework = mock_framework
 
-            controller = MagicMock()
-            handler._raft_controllers[42] = controller
             mock_charm.model.relations.get.return_value = []
 
             handler._on_watcher_relation_broken(mock_event)
 
-            controller.remove_service.assert_called_once()
+            _remove_service.assert_called_once_with()
             handler._release_port_for_relation.assert_called_once_with(42)
-            assert 42 not in handler._raft_controllers
 
 
 class TestWatcherActions:

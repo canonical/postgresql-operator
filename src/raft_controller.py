@@ -17,8 +17,7 @@ charm hook invocations.
 """
 
 import logging
-import re
-from pathlib import Path
+from ipaddress import IPv4Address
 from typing import TYPE_CHECKING, Any
 
 from charmlibs.systemd import (
@@ -45,6 +44,30 @@ logger = logging.getLogger(__name__)
 # Must be under the snap's common path so that
 # charmed-postgresql.patroni-raft-controller can access it.
 RAFT_BASE_DIR = "/var/snap/charmed-postgresql/common/watcher-raft"
+SERVICE_FILE = "/etc/systemd/system/watcher-raft@.service"
+
+
+def install_service() -> bool:
+    """Install the systemd template service for the Raft controller.
+
+    Returns:
+        True if the service file was updated, False if unchanged.
+    """
+    with open("templates/watcher.service.j2") as file:
+        template = Template(file.read())
+
+    rendered = template.render(config_file=RAFT_BASE_DIR)
+    render_file(SERVICE_FILE, rendered, 0o644, change_owner=False)
+
+    # Reload systemd to pick up the new service
+    try:
+        daemon_reload()
+        logger.info(f"Installed systemd service {SERVICE_FILE}")
+    except SystemdError as e:
+        logger.error(f"Failed to reload systemd: {e}")
+        return False
+
+    return True
 
 
 class RaftController:
@@ -65,110 +88,72 @@ class RaftController:
             instance_id: Unique identifier for this Raft instance. Used to
                 derive data directories, config files, and service names.
                 Defaults to "default" for backward compatibility.
+
         """
         self.charm = charm
         self.instance_id = instance_id
-        self._self_addr: str | None = None
-        self._partner_addrs: list[str] = []
-        self._password: str | None = None
 
         # Derive all paths from instance_id
         self.data_dir = f"{RAFT_BASE_DIR}/{instance_id}"
         self.config_file = f"{RAFT_BASE_DIR}/{instance_id}/patroni-raft.yaml"
-        self.service_name = f"watcher-raft-{instance_id}"
-        self.service_file = f"/etc/systemd/system/watcher-raft-{instance_id}.service"
+        self.service_name = f"watcher-raft@{instance_id}"
 
     def configure(
         self,
-        self_addr: str,
-        partner_addrs: list[str],
-        password: str,
+        self_port: int,
+        self_addr: str | None = None,
+        partner_addrs: list[str] | None = None,
+        password: str | None = None,
     ) -> bool:
         """Configure the Raft controller.
 
         Args:
-            self_addr: This node's Raft address (ip:port).
+            self_port: This node's Raft port.
+            self_addr: This node's Raft address.
             partner_addrs: List of partner Raft addresses.
             password: Raft cluster password.
 
         Returns:
             True if configuration changed, False if unchanged.
         """
-        self._self_addr = self_addr
-        self._partner_addrs = partner_addrs
-        self._password = password
+        if not partner_addrs:
+            partner_addrs = []
 
         # Ensure data directory exists
         create_directory(self.data_dir, 0o700)
-
-        # Write Patroni-compatible YAML config (includes password)
-        config_changed = self._write_config_file()
-
-        # Install/update systemd service
-        service_changed = self._install_service()
-
-        logger.info(f"Raft controller configured: self={self_addr}, partners={partner_addrs}")
-        return config_changed or service_changed
-
-    def _write_config_file(self) -> bool:
-        """Write Raft configuration as a Patroni-compatible YAML file.
-
-        The patroni_raft_controller expects a YAML config with a ``raft:``
-        section containing self_addr, partner_addrs, password, and data_dir.
-
-        Returns:
-            True if the config file changed, False if unchanged.
-        """
         create_directory(f"{self.data_dir}/raft", 0o700)
-        with open("templates/watcher.yml.j2") as file:
-            template = Template(file.read())
 
-        rendered = template.render(
-            partner_addrs=self._partner_addrs,
-            self_addr=self._self_addr,
-            password=self._password,
-            data_dir=self.data_dir,
-        )
-        render_file(self.config_file, rendered, 0o600)
-        return True
-
-    def _install_service(self) -> bool:
-        """Install the systemd service for the Raft controller.
-
-        Returns:
-            True if the service file was updated, False if unchanged.
-        """
-        if not self._self_addr or not self._password:
+        if not self_addr or not password:
             logger.warning("Cannot install service: not configured")
             return False
 
         # Validate addresses to prevent injection into the systemd unit file
-        addr_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}$")
-        if not addr_pattern.match(self._self_addr):
-            logger.error(f"Invalid self_addr format: {self._self_addr}")
+        try:
+            IPv4Address(self_addr)
+        except Exception:
+            logger.error(f"Invalid self_addr format: {self_addr}")
             return False
-        for addr in self._partner_addrs:
-            if not addr_pattern.match(addr):
-                logger.error(f"Invalid partner address format: {addr}")
-                return False
+        try:
+            for addr in partner_addrs:
+                IPv4Address(addr)
+        except Exception:
+            logger.error(f"Invalid partner address format: {addr}")
+            return False
 
-        with open("templates/watcher.service.j2") as file:
+        with open("templates/watcher.yml.j2") as file:
             template = Template(file.read())
 
+        # Write Patroni-compatible YAML config (includes password)
         rendered = template.render(
-            instance_id=self.instance_id,
-            config_file=self.config_file,
+            self_addr=self_addr,
+            self_port=self_port,
+            partner_addrs=partner_addrs,
+            password=password,
+            data_dir=self.data_dir,
         )
-        render_file(self.service_file, rendered, 0o644, change_owner=False)
+        render_file(self.config_file, rendered, 0o600)
 
-        # Reload systemd to pick up the new service
-        try:
-            daemon_reload()
-            logger.info(f"Installed systemd service {self.service_name}")
-        except SystemdError as e:
-            logger.error(f"Failed to reload systemd: {e}")
-            return False
-
+        logger.info(f"Raft controller configured: self={self_addr}, partners={partner_addrs}")
         return True
 
     def start(self) -> bool:
@@ -180,10 +165,6 @@ class RaftController:
         if service_running(self.service_name):
             logger.debug("Raft controller already running")
             return True
-
-        if not self._self_addr or not self._password:
-            logger.error("Raft controller not configured")
-            return False
 
         try:
             # Enable and start the service
@@ -224,20 +205,6 @@ class RaftController:
             logger.error(f"Failed to disable Raft controller service: {e}")
             return False
 
-        service_path = Path(self.service_file)
-        if service_path.exists():
-            try:
-                service_path.unlink()
-            except OSError as e:
-                logger.error(f"Failed to remove service file {self.service_file}: {e}")
-                return False
-
-        try:
-            daemon_reload()
-        except SystemdError as e:
-            logger.error(f"Failed to reload systemd after service removal: {e}")
-            return False
-
         return True
 
     def restart(self) -> bool:
@@ -254,84 +221,7 @@ class RaftController:
             logger.error(f"Failed to restart Raft controller: {e}")
             return False
 
-    def _load_config(self) -> None:
-        """Load configuration from the YAML config file if available.
-
-        This is needed because each charm hook creates a fresh instance,
-        and the configuration set via configure() is not persisted in memory.
-        """
-        if self._self_addr and self._password:
-            return  # Already configured
-
-        config_path = Path(self.config_file)
-        if not config_path.exists():
-            return
-
-        try:
-            # Parse the YAML config manually (simple key: value format)
-            content = config_path.read_text()
-            for line in content.split("\n"):
-                line = line.strip()
-                if line.startswith("self_addr:"):
-                    self._self_addr = line.split(":", 1)[1].strip().strip("'\"")
-                elif line.startswith("password:"):
-                    self._password = line.split(":", 1)[1].strip().strip("'\"")
-                elif line.startswith("- '") and line.endswith("'"):
-                    self._partner_addrs.append(line.strip("- '\""))
-        except Exception as e:
-            logger.debug(f"Failed to load config file: {e}")
-
-    def _status_query_targets(self) -> list[str]:
-        """Build Raft status probe targets for this local unit.
-
-        Returns:
-            Ordered list of addresses to query with TcpUtility.
-        """
-        if not self._self_addr:
-            return []
-
-        targets = [self._self_addr]
-
-        # In some environments the controller advertises a routable unit IP
-        # but local administration works only through loopback on the same port.
-        host_port = self._self_addr.rsplit(":", maxsplit=1)
-        if len(host_port) == 2 and host_port[1].isdigit():
-            localhost_addr = f"127.0.0.1:{host_port[1]}"
-            if localhost_addr not in targets:
-                targets.append(localhost_addr)
-
-        return targets
-
-    def _query_raft_status(self, utility: Any, target: str) -> dict[str, Any] | None:
-        """Query Raft status for a specific target address."""
-        try:
-            raft_status = utility.executeCommand(target, ["status"])
-        except UtilityException as e:
-            logger.debug(f"Failed to query Raft status via TcpUtility (target={target}): {e}")
-            return None
-        except Exception as e:
-            logger.debug(f"Error querying Raft status via TcpUtility (target={target}): {e}")
-            return None
-        return raft_status if isinstance(raft_status, dict) else None
-
-    def _populate_status(
-        self, status: dict[str, Any], raft_status: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Populate public status fields from a Raft status payload."""
-        status["connected"] = True
-        status["has_quorum"] = raft_status.get("has_quorum", False)
-        status["leader"] = str(raft_status.get("leader")) if raft_status.get("leader") else None
-
-        # Extract member addresses from partner_node_status_server_* keys
-        prefix = "partner_node_status_server_"
-        members: list[str] = [self._self_addr] if self._self_addr else []
-        for key in raft_status:
-            if isinstance(key, str) and key.startswith(prefix):
-                members.append(key[len(prefix) :])
-        status["members"] = sorted(members)
-        return status
-
-    def get_status(self) -> dict[str, Any]:
+    def get_status(self, self_port: int, password: str | None) -> dict[str, Any]:
         """Get the Raft controller status.
 
         Returns:
@@ -346,48 +236,31 @@ class RaftController:
             "members": [],
         }
 
-        # Load config from persistent files if not already set
-        self._load_config()
-
-        if not self._self_addr or not self._password:
+        if not password or not is_running:
             return status
 
         # Query Raft status using pysyncobj TcpUtility
-        if TcpUtility is not None and is_running:
-            try:
-                utility = TcpUtility(password=self._password, timeout=3)
-                for target in self._status_query_targets():
-                    raft_status = self._query_raft_status(utility, target)
-                    if raft_status:
-                        return self._populate_status(status, raft_status)
-            except Exception as e:
-                logger.debug(f"Error querying Raft status via TcpUtility: {e}")
+        try:
+            utility = TcpUtility(password=password, timeout=3)
+            raft_status = utility.executeCommand(f"localhost:{self_port}", ["status"])
+            status["connected"] = True
+            status["has_quorum"] = raft_status.get("has_quorum", False)
+            status["leader"] = (
+                str(raft_status.get("leader")) if raft_status.get("leader") else None
+            )
+
+            # Extract member addresses from partner_node_status_server_* keys
+            prefix = "partner_node_status_server_"
+            # members: list[str] = [self._self_addr] if self._self_addr else []
+            members = []
+            for key in raft_status:
+                if isinstance(key, str) and key.startswith(prefix):
+                    members.append(key[len(prefix) :])
+            status["members"] = sorted(members)
+            return status
+        except UtilityException as e:
+            logger.debug(f"Failed to query Raft status via TcpUtility: {e}")
+        except Exception as e:
+            logger.debug(f"Error querying Raft status via TcpUtility: {e}")
 
         return status
-
-    def has_quorum(self) -> bool:
-        """Check if the Raft cluster has quorum.
-
-        Returns:
-            True if quorum is established, False otherwise.
-        """
-        status = self.get_status()
-        return status.get("has_quorum", False)
-
-    def get_leader(self) -> str | None:
-        """Get the current Raft leader.
-
-        Returns:
-            Leader address, or None if no leader.
-        """
-        status = self.get_status()
-        return status.get("leader")
-
-    def get_members(self) -> list[str]:
-        """Get the list of Raft cluster members.
-
-        Returns:
-            List of member addresses.
-        """
-        status = self.get_status()
-        return status.get("members", [])

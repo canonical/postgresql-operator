@@ -15,14 +15,11 @@ Multi-cluster support:
 - Each RaftController uses instance-specific data directories and systemd services
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
 import typing
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from charmlibs.systemd import service_running
@@ -44,28 +41,22 @@ from ops import (
     WaitingStatus,
 )
 
-from constants import (
-    RAFT_PORT,
-    WATCHER_RELATION,
-)
+from constants import RAFT_PORT, WATCHER_RELATION
+from raft_controller import RaftController, install_service
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
-    from raft_controller import RaftController
 
 logger = logging.getLogger(__name__)
 
 SNAP_NAME = "charmed-postgresql"
 SNAP_CHANNEL = "16/edge"
 
-# Port allocation file for persistent port mapping across hooks
-PORTS_FILE = "/var/snap/charmed-postgresql/common/watcher-raft/ports.json"
-
 
 class WatcherRequirerHandler(Object):
     """Handles the watcher requirer relation and watcher-mode lifecycle."""
 
-    def __init__(self, charm: PostgresqlOperatorCharm):
+    def __init__(self, charm: "PostgresqlOperatorCharm"):
         super().__init__(charm, WATCHER_RELATION)
         self.charm = charm
 
@@ -124,20 +115,16 @@ class WatcherRequirerHandler(Object):
         Returns:
             Dictionary mapping relation_id (as string) to port number.
         """
-        port_path = Path(PORTS_FILE)
-        if port_path.exists():
+        if "port_allocations" in self.charm.app_peer_data:
             try:
-                return json.loads(port_path.read_text())
-            except (json.JSONDecodeError, OSError) as e:
+                return json.loads(self.charm.app_peer_data["port_allocations"])
+            except json.JSONDecodeError as e:
                 logger.warning(f"Failed to load port allocations: {e}")
         return {}
 
     def _save_port_allocations(self, allocations: dict[str, int]) -> None:
         """Save port allocations to persistent file."""
-        Path(PORTS_FILE).parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(PORTS_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(json.dumps(allocations))
+        self.charm.app_peer_data["port_allocations"] = json.dumps(allocations)
 
     def _get_port_for_relation(self, relation_id: int) -> int:
         """Get or assign a port for a given relation ID.
@@ -177,26 +164,6 @@ class WatcherRequirerHandler(Object):
             port = allocations.pop(key)
             self._save_port_allocations(allocations)
             logger.info(f"Released port {port} from relation {relation_id}")
-
-    # -- Per-relation RaftController management --
-
-    def _get_or_create_raft_controller(self, relation_id: int) -> RaftController:
-        """Get or create a RaftController for the given relation.
-
-        Args:
-            relation_id: The Juju relation ID.
-
-        Returns:
-            The RaftController instance for this relation.
-        """
-        if relation_id not in self._raft_controllers:
-            from raft_controller import RaftController
-
-            instance_id = f"rel{relation_id}"
-            self._raft_controllers[relation_id] = RaftController(
-                self.charm, instance_id=instance_id
-            )
-        return self._raft_controllers[relation_id]
 
     # -- Per-relation helpers --
 
@@ -327,6 +294,7 @@ class WatcherRequirerHandler(Object):
 
         # Install the charmed PostgreSQL snap.
         self.charm._install_snap_package(revision=None)
+        install_service()
 
     def _on_start(self, event: StartEvent) -> None:
         """Handle start event in watcher mode."""
@@ -363,22 +331,21 @@ class WatcherRequirerHandler(Object):
             if az_changed:
                 relation.data[self.charm.unit]["unit-az"] = str(unit_az)
 
-            if address_changed:
+            if (
+                address_changed
+                and (raft_password := self._get_raft_password(relation))
+                and (partner_addrs := self._get_raft_partner_addrs(relation))
+            ):
                 port = self._get_port_for_relation(relation.id)
-                raft_password = self._get_raft_password(relation)
-                partner_addrs = self._get_raft_partner_addrs(relation)
-                if raft_password and partner_addrs:
-                    raft_controller = self._get_or_create_raft_controller(relation.id)
-                    changed = raft_controller.configure(
-                        self_addr=f"{new_address}:{port}",
-                        partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
-                        password=raft_password,
+                raft_controller = RaftController(self.charm, f"rel{relation.id}")
+                changed = raft_controller.configure(
+                    port, new_address, partner_addrs, raft_password
+                )
+                if changed and service_running(raft_controller.service_name):
+                    logger.info(
+                        f"Restarting Raft controller for relation {relation.id} due to IP change"
                     )
-                    if changed and service_running(raft_controller.service_name):
-                        logger.info(
-                            f"Restarting Raft controller for relation {relation.id} due to IP change"
-                        )
-                        raft_controller.restart()
+                    raft_controller.restart()
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Handle update status event in watcher mode."""
@@ -395,8 +362,10 @@ class WatcherRequirerHandler(Object):
         info_warnings: list[str] = []
 
         for relation in relations:
-            raft_controller = self._get_or_create_raft_controller(relation.id)
-            raft_status = raft_controller.get_status()
+            port = self._get_port_for_relation(relation.id)
+            password = self._get_raft_password(relation)
+            raft_controller = RaftController(self.charm, instance_id=f"rel{relation.id}")
+            raft_status = raft_controller.get_status(port, password)
             if raft_status.get("connected"):
                 connected_count += 1
 
@@ -481,30 +450,23 @@ class WatcherRequirerHandler(Object):
         raft_password = self._get_raft_password(relation)
         if not raft_password:
             logger.debug("Raft password not yet available")
-            event.defer()
             return
 
         partner_addrs = self._get_raft_partner_addrs(relation)
         if not partner_addrs:
             logger.debug("Raft partner addresses not yet available")
-            event.defer()
             return
 
         unit_ip = self.unit_ip
         if not unit_ip:
             logger.debug("Unit IP not available yet")
-            event.defer()
             return
 
         # Get or assign a port for this relation
         port = self._get_port_for_relation(relation.id)
 
-        raft_controller = self._get_or_create_raft_controller(relation.id)
-        changed = raft_controller.configure(
-            self_addr=f"{unit_ip}:{port}",
-            partner_addrs=[f"{addr}:{RAFT_PORT}" for addr in partner_addrs],
-            password=raft_password,
-        )
+        raft_controller = RaftController(self.charm, f"rel{relation.id}")
+        changed = raft_controller.configure(port, unit_ip, partner_addrs, raft_password)
 
         if service_running(raft_controller.service_name):
             if changed:
@@ -544,14 +506,7 @@ class WatcherRequirerHandler(Object):
         logger.info(f"Watcher relation {relation_id} broken")
 
         # Stop and clean up the Raft controller for this relation
-        if relation_id in self._raft_controllers:
-            controller = self._raft_controllers.pop(relation_id)
-        else:
-            # Try to stop via a fresh controller in case we were recreated
-            from raft_controller import RaftController
-
-            controller = RaftController(self.charm, instance_id=f"rel{relation_id}")
-
+        controller = RaftController(self.charm, instance_id=f"rel{relation_id}")
         controller.remove_service()
 
         # Release the port allocation
@@ -747,8 +702,10 @@ class WatcherRequirerHandler(Object):
         _ip_to_az, ip_to_unit = self._build_ip_maps(relation)
 
         # Get Raft status
-        raft_controller = self._get_or_create_raft_controller(relation.id)
-        raft_status = raft_controller.get_status()
+        port = self._get_port_for_relation(relation.id)
+        password = self._get_raft_password(relation)
+        raft_controller = RaftController(self.charm, instance_id=f"rel{relation.id}")
+        raft_status = raft_controller.get_status(port, password)
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
         watcher_voting = self._get_watcher_voting(relation, raft_status)

@@ -132,6 +132,7 @@ from constants import (
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
+from raft_controller import install_service
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
@@ -580,6 +581,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 refresh.next_unit_allowed_to_refresh = True
         else:
+            install_service()
             refresh.next_unit_allowed_to_refresh = True
 
     def set_unit_status(
