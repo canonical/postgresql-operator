@@ -94,7 +94,7 @@ def _configure_s3_integrator(
             and bool(status.apps[app_name].units)
             and jubilant.all_agents_idle(status, app_name)
         ),
-        timeout=5 * MINUTE_SECS,
+        timeout=15 * MINUTE_SECS,
     )
 
     model.run(
