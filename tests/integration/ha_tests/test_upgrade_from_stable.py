@@ -17,6 +17,7 @@ from ..helpers import (
 from .helpers import (
     are_writes_increasing,
     check_writes,
+    get_patroni_setting,
     start_continuous_writes,
 )
 
@@ -142,3 +143,4 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
         assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
             "Number of switchovers is greater than 2"
         )
+        assert await get_patroni_setting(ops_test, "max_timelines_history") == 50
