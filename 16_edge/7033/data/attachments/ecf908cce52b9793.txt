@@ -1,0 +1,14 @@
+[32mINFO    [0m integration.conftest:conftest.py:286 Setting up TLS certificates
+[32mINFO    [0m integration.conftest:conftest.py:351 Setting up microceph
+[32mINFO    [0m integration.conftest:conftest.py:380 Set up microceph
+[32mINFO    [0m integration.high_availability.test_async_replication_backups_ceph:test_async_replication_backups_ceph.py:47 Creating model: testing-other
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju add-model --no-switch testing-other
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju set-model-constraints --model testing-other arch=amd64
+[32mINFO    [0m integration.high_availability.test_async_replication_backups_ceph:test_async_replication_backups_ceph.py:127 Deploying PostgreSQL clusters
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju deploy --model testing /root/snap/juju/common/tmpth4fy7y7/_temp.charm db1 --base ubuntu@24.04 --config profile=testing --constraints arch=amd64 --num-units 3
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju deploy --model testing-other /root/snap/juju/common/tmpc1ao5w_d/_temp.charm db2 --base ubuntu@24.04 --config profile=testing --constraints arch=amd64 --num-units 3
+[32mINFO    [0m integration.high_availability.test_async_replication_backups_ceph:test_async_replication_backups_ceph.py:145 Deploying and configuring S3 integrators
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju deploy --model testing s3-integrator s3-primary --channel 1/stable
+[32mINFO    [0m integration.high_availability.test_async_replication_backups_ceph:test_async_replication_backups_ceph.py:56 Destroying model: testing-other
+[32mINFO    [0m jubilant:_juju.py:398 cli: juju destroy-model testing-other --no-prompt --destroy-storage --force
