@@ -241,18 +241,21 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     def refresh_snap(
         self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
     ) -> None:
-        # Update the configuration.
-        self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
-        self._charm.update_config(refresh=refresh)
+        if self._charm._role != "watcher":
+            # Update the configuration.
+            self._charm.set_unit_status(
+                MaintenanceStatus("updating configuration"), refresh=refresh
+            )
+            self._charm.update_config(refresh=refresh)
 
-        # TODO add graceful shutdown before refreshing snap?
-        # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
-        # graceful shutdown, restart workload
+            # TODO add graceful shutdown before refreshing snap?
+            # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
+            # graceful shutdown, restart workload
 
-        self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
-        self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
+            self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
+            self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
 
-        self._charm._post_snap_refresh(refresh)
+            self._charm._post_snap_refresh(refresh)
 
 
 def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
@@ -333,10 +336,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._init_watcher_mode()
             # Set tracing_endpoint for @trace_charm decorator compatibility
             self.tracing_endpoint = None
-            return
+        else:
+            # PostgreSQL mode: full database server
+            self._init_postgresql_mode()
 
-        # PostgreSQL mode: full database server
-        self._init_postgresql_mode()
+        self.refresh: charm_refresh.Machines | None
+        try:
+            self.refresh = charm_refresh.Machines(
+                _PostgreSQLRefresh(
+                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
+                )
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+        self._reconcile_refresh_status()
+
+        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
+            if self.refresh.in_progress:
+                self._post_snap_refresh(self.refresh)
+            else:
+                self.refresh.next_unit_allowed_to_refresh = True
 
     @property
     def is_watcher_role(self) -> bool:
@@ -478,17 +497,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             charm=self, relation="restart", callback=self._restart
         )
 
-        self.refresh: charm_refresh.Machines | None
-        try:
-            self.refresh = charm_refresh.Machines(
-                _PostgreSQLRefresh(
-                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
-                )
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
-        self._reconcile_refresh_status()
-
         # Support for disabling the operator.
         disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
         if disable_file.exists():
@@ -498,12 +506,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             self.unit.status = BlockedStatus("Disabled")
             sys.exit(0)
-
-        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
-            if self.refresh.in_progress:
-                self._post_snap_refresh(self.refresh)
-            else:
-                self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
         self._rotate_logs.start_log_rotation()
@@ -530,45 +532,53 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         Called after snap refresh
         """
-        try:
-            if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
-                cert = load_pem_x509_certificate(raw_cert.encode())
-                if (
-                    cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-                    != self._unit_ip
-                ):
-                    self.tls.generate_internal_peer_cert()
-        except Exception:
-            logger.exception("Unable to check or update internal cert")
-
-        if not self._patroni.start_patroni():
-            self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
-            return
-
-        self._setup_exporter()
-        self.backup.start_stop_pgbackrest_service()
-        self._setup_pgbackrest_exporter()
-
-        # Wait until the database initialise.
-        self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
-                with attempt:
-                    # Check if the member hasn't started or hasn't joined the cluster yet.
+        if self._role != "watcher":
+            try:
+                if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
+                    cert = load_pem_x509_certificate(raw_cert.encode())
                     if (
-                        not self._patroni.member_started
-                        or self.unit.name.replace("/", "-") not in self._patroni.cluster_members
-                        or not self._patroni.is_replication_healthy()
+                        cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+                        != self._unit_ip
                     ):
-                        logger.debug(
-                            "Instance not yet back in the cluster."
-                            f" Retry {attempt.retry_state.attempt_number}/6"
-                        )
-                        raise Exception()
-        except RetryError:
-            logger.debug(
-                "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
+                        self.tls.generate_internal_peer_cert()
+            except Exception:
+                logger.exception("Unable to check or update internal cert")
+
+            if not self._patroni.start_patroni():
+                self.set_unit_status(
+                    ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh
+                )
+                return
+
+            self._setup_exporter()
+            self.backup.start_stop_pgbackrest_service()
+            self._setup_pgbackrest_exporter()
+
+            # Wait until the database initialise.
+            self.set_unit_status(
+                WaitingStatus("waiting for database initialisation"), refresh=refresh
             )
+            try:
+                for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+                    with attempt:
+                        # Check if the member hasn't started or hasn't joined the cluster yet.
+                        if (
+                            not self._patroni.member_started
+                            or self.unit.name.replace("/", "-")
+                            not in self._patroni.cluster_members
+                            or not self._patroni.is_replication_healthy()
+                        ):
+                            logger.debug(
+                                "Instance not yet back in the cluster."
+                                f" Retry {attempt.retry_state.attempt_number}/6"
+                            )
+                            raise Exception()
+            except RetryError:
+                logger.debug(
+                    "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
+                )
+            else:
+                refresh.next_unit_allowed_to_refresh = True
         else:
             refresh.next_unit_allowed_to_refresh = True
 
@@ -593,7 +603,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit.status = status
 
     def _reconcile_refresh_status(self, _=None):
-        if self.unit.is_leader():
+        if self._role != "watcher" and self.unit.is_leader():
             self.async_replication.set_app_status()
 
         # Workaround for other unit statuses being set in a stateful way (i.e. unable to recompute
@@ -613,7 +623,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.unit.status = refresh_status
                 new_refresh_unit_status = refresh_status.message
-            else:
+            elif self._role != "watcher":
                 # Clear refresh status from unit status
                 self._set_primary_status_message()
         elif (

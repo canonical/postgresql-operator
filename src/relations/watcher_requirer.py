@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import typing
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -318,46 +319,14 @@ class WatcherRequirerHandler(Object):
 
     # -- Lifecycle events --
 
-    @staticmethod
-    def _is_snap_installed() -> bool:
-        """Check if the charmed-postgresql snap is installed."""
-        try:
-            from charmlibs import snap
-
-            cache = snap.SnapCache()
-            return cache[SNAP_NAME].present
-        except Exception:
-            return False
-
     def _on_install(self, event: InstallEvent) -> None:
-        """Install watcher components.
+        """Install prerequisites for the application."""
+        logger.debug("Install start time: %s", datetime.now())
 
-        Installs the charmed-postgresql snap from the snap store to get
-        Patroni's ``patroni_raft_controller`` binary, which is used as
-        the Raft voter. PostgreSQL services are not started.
-        """
-        if self._is_snap_installed():
-            logger.info(f"{SNAP_NAME} snap already installed, skipping")
-            self.charm.unit.status = WaitingStatus("Waiting for relation to PostgreSQL")
-            return
+        self.charm.set_unit_status(MaintenanceStatus("installing RAFT controller"))
 
-        self.charm.unit.status = MaintenanceStatus("Installing pysyncobj")
-
-        try:
-            from charmlibs import snap
-
-            cache = snap.SnapCache()
-            snap_package = cache[SNAP_NAME]
-            snap_package.ensure(snap.SnapState.Present, channel=SNAP_CHANNEL)
-            snap_package.hold()
-            logger.info(f"{SNAP_NAME} snap installed from channel {SNAP_CHANNEL}")
-        except Exception as e:
-            logger.error(f"Failed to install {SNAP_NAME} snap: {e}")
-            event.defer()
-            return
-
-        self.charm.unit.status = WaitingStatus("Waiting for relation to PostgreSQL")
-        logger.info("Watcher mode install complete")
+        # Install the charmed PostgreSQL snap.
+        self.charm._install_snap_package(revision=None)
 
     def _on_start(self, event: StartEvent) -> None:
         """Handle start event in watcher mode."""
