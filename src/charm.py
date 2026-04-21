@@ -3007,14 +3007,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "ldapbindpasswd": data.bind_password,
             "ldaptls": data.starttls,
             "ldapurl": data.urls[0],
-        }
-
-        # LDAP authentication parameters that are exclusive to
-        # one of the two supported modes (simple bind or search+bind)
-        # must be put at the very end of the parameters string
-        params.update({
+            # LDAP authentication parameters that are exclusive to
+            # one of the two supported modes (simple bind or search+bind)
+            # must be put at the very end of the parameters string
             "ldapsearchfilter": self.config.ldap_search_filter,
-        })
+        }
 
         return params
 
