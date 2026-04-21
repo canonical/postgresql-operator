@@ -22,6 +22,7 @@ import typing
 from datetime import datetime
 from typing import Any
 
+import tomli
 from charmlibs.systemd import service_running
 from ops import (
     ActionEvent,
@@ -33,7 +34,6 @@ from ops import (
     Relation,
     RelationBrokenEvent,
     RelationChangedEvent,
-    RelationDepartedEvent,
     RelationJoinedEvent,
     SecretNotFoundError,
     StartEvent,
@@ -76,10 +76,6 @@ class WatcherRequirerHandler(Object):
         self.framework.observe(
             self.charm.on[WATCHER_RELATION].relation_changed,
             self._on_watcher_relation_changed,
-        )
-        self.framework.observe(
-            self.charm.on[WATCHER_RELATION].relation_departed,
-            self._on_watcher_relation_departed,
         )
         self.framework.observe(
             self.charm.on[WATCHER_RELATION].relation_broken,
@@ -173,11 +169,9 @@ class WatcherRequirerHandler(Object):
         Args:
             relation: The specific watcher relation.
         """
-        if not relation.app:
-            return None
-
-        secret_id = relation.data[relation.app].get("raft-secret-id")
-        if not secret_id:
+        if not relation.app or not (
+            secret_id := relation.data[relation.app].get("raft-secret-id")
+        ):
             return None
 
         try:
@@ -194,11 +188,9 @@ class WatcherRequirerHandler(Object):
         Args:
             relation: The specific watcher relation.
         """
-        if not relation.app:
-            return None
-
-        secret_id = relation.data[relation.app].get("raft-secret-id")
-        if not secret_id:
+        if not relation.app or not (
+            secret_id := relation.data[relation.app].get("raft-secret-id")
+        ):
             return None
 
         try:
@@ -215,11 +207,9 @@ class WatcherRequirerHandler(Object):
         Args:
             relation: The specific watcher relation.
         """
-        if not relation.app:
-            return []
-
-        pg_endpoints_json = relation.data[relation.app].get("pg-endpoints")
-        if not pg_endpoints_json:
+        if not relation.app or not (
+            pg_endpoints_json := relation.data[relation.app].get("pg-endpoints")
+        ):
             return []
 
         try:
@@ -234,11 +224,9 @@ class WatcherRequirerHandler(Object):
         Args:
             relation: The specific watcher relation.
         """
-        if not relation.app:
-            return []
-
-        raft_addrs_json = relation.data[relation.app].get("raft-partner-addrs")
-        if not raft_addrs_json:
+        if not relation.app or not (
+            raft_addrs_json := relation.data[relation.app].get("raft-partner-addrs")
+        ):
             return []
 
         try:
@@ -256,10 +244,8 @@ class WatcherRequirerHandler(Object):
         Returns:
             The cluster name, or a fallback label.
         """
-        if relation.app:
-            name = relation.data[relation.app].get("cluster-name")
-            if name:
-                return name
+        if relation.app and (name := relation.data[relation.app].get("cluster-name")):
+            return name
         return f"relation-{relation.id}"
 
     def _get_standby_clusters(self, relation: Relation) -> list[str]:
@@ -271,11 +257,9 @@ class WatcherRequirerHandler(Object):
         Returns:
             A list of standby cluster names.
         """
-        if not relation.app:
-            return []
-
-        standby_clusters_json = relation.data[relation.app].get("standby-clusters")
-        if not standby_clusters_json:
+        if not relation.app or not (
+            standby_clusters_json := relation.data[relation.app].get("standby-clusters")
+        ):
             return []
 
         try:
@@ -307,8 +291,7 @@ class WatcherRequirerHandler(Object):
 
     def _update_unit_address_if_changed(self) -> None:
         """Update unit-address in relation data if IP has changed, for ALL relations."""
-        new_address = self.unit_ip
-        if not new_address:
+        if not (new_address := self.unit_ip):
             return
 
         unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
@@ -349,8 +332,7 @@ class WatcherRequirerHandler(Object):
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Handle update status event in watcher mode."""
-        relations = self.model.relations.get(WATCHER_RELATION, [])
-        if not relations:
+        if not (relations := self.model.relations.get(WATCHER_RELATION, [])):
             self.charm.unit.status = WaitingStatus("Waiting for relation to PostgreSQL")
             return
 
@@ -402,8 +384,7 @@ class WatcherRequirerHandler(Object):
             self.charm.unit.status = BlockedStatus("AZ co-location: " + "; ".join(az_warnings))
             return
 
-        all_warnings = az_warnings + info_warnings
-        if all_warnings:
+        if all_warnings := az_warnings + info_warnings:
             msg += "; " + "; ".join(all_warnings)
 
         self.charm.unit.status = ActiveStatus(msg)
@@ -417,8 +398,7 @@ class WatcherRequirerHandler(Object):
         Returns:
             Warning message if co-located, None otherwise.
         """
-        watcher_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
-        if not watcher_az:
+        if not (watcher_az := os.environ.get("JUJU_AVAILABILITY_ZONE")):
             return None
 
         colocated_units = []
@@ -452,18 +432,15 @@ class WatcherRequirerHandler(Object):
             event.defer()
             return
 
-        raft_password = self._get_raft_password(relation)
-        if not raft_password:
+        if not (raft_password := self._get_raft_password(relation)):
             logger.debug("Raft password not yet available")
             return
 
-        partner_addrs = self._get_raft_partner_addrs(relation)
-        if not partner_addrs:
+        if not (partner_addrs := self._get_raft_partner_addrs(relation)):
             logger.debug("Raft partner addresses not yet available")
             return
 
-        unit_ip = self.unit_ip
-        if not unit_ip:
+        if not (unit_ip := self.unit_ip):
             logger.debug("Unit IP not available yet")
             return
 
@@ -471,39 +448,28 @@ class WatcherRequirerHandler(Object):
         port = self._get_port_for_relation(relation.id)
 
         raft_controller = RaftController(self.charm, f"rel{relation.id}")
-        changed = raft_controller.configure(port, unit_ip, partner_addrs, raft_password)
-
-        if service_running(raft_controller.service_name):
-            if changed:
-                logger.info(
-                    f"Restarting Raft controller for relation {relation.id} "
-                    "to apply config changes"
-                )
-                raft_controller.restart()
-        else:
-            logger.info(f"Starting Raft controller service for relation {relation.id}")
-            raft_controller.start()
+        if raft_controller.configure(port, unit_ip, partner_addrs, raft_password):
+            logger.info(
+                f"Restarting Raft controller for relation {relation.id} to apply config changes"
+            )
+            raft_controller.restart()
 
         relation.data[self.charm.unit]["unit-address"] = unit_ip
         relation.data[self.charm.unit]["watcher-raft-port"] = str(port)
-        unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
-        if unit_az:
+        if unit_az := os.environ.get("JUJU_AVAILABILITY_ZONE"):
             relation.data[self.charm.unit]["unit-az"] = unit_az
         # Only set raft-status and ActiveStatus after verifying the service is running
         if service_running(raft_controller.service_name):
             relation.data[self.charm.unit]["raft-status"] = "connected"
             # Check AZ co-location and enforce based on profile
-            az_warning = self._check_az_colocation(relation)
-            if az_warning and self.charm.config.profile == "production":
+            if (
+                az_warning := self._check_az_colocation(relation)
+            ) and self.charm.config.profile == "production":
                 self.charm.unit.status = BlockedStatus(f"AZ co-location: {az_warning}")
             else:
                 self.charm.unit.status = ActiveStatus()
         else:
             self.charm.unit.status = WaitingStatus("Raft controller not running")
-
-    def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle watcher relation departed event."""
-        logger.info(f"PostgreSQL unit departed from watcher relation {event.relation.id}")
 
     def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle watcher relation broken event."""
@@ -535,14 +501,11 @@ class WatcherRequirerHandler(Object):
         ip_to_az: dict[str, str] = {}
         ip_to_unit: dict[str, str] = {}
         for unit in relation.units:
-            unit_ip = relation.data[unit].get("unit-address")
-            if unit_ip:
+            if unit_ip := relation.data[unit].get("unit-address"):
                 ip_to_unit[unit_ip] = unit.name
-            unit_az = relation.data[unit].get("unit-az")
-            if unit_ip and unit_az:
-                ip_to_az[unit_ip] = unit_az
-        watcher_ip = self.unit_ip
-        if watcher_ip:
+                if unit_az := relation.data[unit].get("unit-az"):
+                    ip_to_az[unit_ip] = unit_az
+        if watcher_ip := self.unit_ip:
             ip_to_unit[watcher_ip] = self.charm.unit.name
         return ip_to_az, ip_to_unit
 
@@ -792,8 +755,6 @@ class WatcherRequirerHandler(Object):
         """Get PostgreSQL version from refresh_versions.toml."""
         try:
             with open("refresh_versions.toml", "rb") as f:
-                import tomli
-
                 versions = tomli.load(f)
                 return str(versions.get("workload", "unknown"))
         except Exception:

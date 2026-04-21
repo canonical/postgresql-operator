@@ -32,7 +32,7 @@ from charmlibs.systemd import (
     service_stop,
 )
 from jinja2 import Template
-from pysyncobj.utility import TcpUtility, UtilityException
+from pysyncobj.utility import TcpUtility
 
 from utils import create_directory, render_file
 
@@ -274,8 +274,6 @@ class RaftController:
                     members.append(key[len(prefix) :])
             status["members"] = sorted(members)
             return status
-        except UtilityException as e:
-            logger.debug(f"Failed to query Raft status via TcpUtility: {e}")
         except Exception as e:
             logger.debug(f"Error querying Raft status via TcpUtility: {e}")
 
