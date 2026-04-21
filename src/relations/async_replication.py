@@ -293,7 +293,7 @@ class PostgreSQLAsyncReplication(Object):
             }.items():
                 databag = relation_data[app]
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
-                if relation_promoted_cluster_counter > promoted_cluster_counter:
+                if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
         return primary_cluster
