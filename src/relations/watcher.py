@@ -26,6 +26,7 @@ from ops import (
     Secret,
     SecretNotFoundError,
 )
+from pysyncobj.utility import TcpUtility, UtilityException
 
 from constants import (
     RAFT_PASSWORD_KEY,
@@ -229,12 +230,6 @@ class PostgreSQLWatcherRelation(Object):
 
         # Get Raft cluster status to find all members
         try:
-            from pysyncobj.utility import TcpUtility, UtilityException
-        except ImportError:
-            logger.warning("pysyncobj not available, cannot cleanup old watcher")
-            return
-
-        try:
             syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
             raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
             if raft_status:
@@ -271,12 +266,6 @@ class PostgreSQLWatcherRelation(Object):
         Returns:
             True if the watcher is in the Raft cluster, False otherwise.
         """
-        try:
-            from pysyncobj.utility import TcpUtility, UtilityException
-        except ImportError:
-            logger.warning("pysyncobj not available, cannot check Raft membership")
-            return False
-
         watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
         try:
             syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
@@ -304,12 +293,6 @@ class PostgreSQLWatcherRelation(Object):
             True if successful, False otherwise.
         """
         try:
-            from pysyncobj.utility import TcpUtility, UtilityException
-        except ImportError:
-            logger.warning("pysyncobj not available, cannot add Raft member")
-            return False
-
-        try:
             utility = TcpUtility(password=self.charm._patroni.raft_password, timeout=10)
             utility.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["add", member_addr])
             logger.info(f"Successfully added member to Raft cluster: {member_addr}")
@@ -330,12 +313,6 @@ class PostgreSQLWatcherRelation(Object):
         Returns:
             True if successful, False otherwise.
         """
-        try:
-            from pysyncobj.utility import TcpUtility, UtilityException
-        except ImportError:
-            logger.warning("pysyncobj not available, cannot remove Raft member")
-            return False
-
         try:
             utility = TcpUtility(password=self.charm._patroni.raft_password, timeout=10)
             utility.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["remove", member_addr])
@@ -413,17 +390,16 @@ class PostgreSQLWatcherRelation(Object):
         logger.info("Watcher unit departed from relation")
 
         # Skip if the departing unit is from our own app (e.g., PG unit scaling down)
-        if event.departing_unit and event.departing_unit.app == self.charm.app:
-            return
-
-        if not self.charm.is_cluster_initialised:
+        if (
+            event.departing_unit and event.departing_unit.app == self.charm.app
+        ) or not self.charm.is_cluster_initialised:
             return
 
         # Get the departing watcher's address from the event
-        if event.departing_unit:
-            watcher_address = event.relation.data[event.departing_unit].get("unit-address")
-            if watcher_address:
-                self._remove_watcher_from_raft(watcher_address)
+        if event.departing_unit and (
+            watcher_address := event.relation.data[event.departing_unit].get("unit-address")
+        ):
+            self._remove_watcher_from_raft(watcher_address)
 
     def _remove_watcher_from_raft(self, watcher_address: str) -> None:
         """Remove the watcher from the Raft cluster.
@@ -699,10 +675,7 @@ class PostgreSQLWatcherRelation(Object):
         Called when cluster membership changes (peer joins/departs).
         Also dynamically adds new PostgreSQL peers to the running Raft cluster.
         """
-        if not self.charm.unit.is_leader():
-            return
-
-        if not (relation := self._relation):
+        if not self.charm.unit.is_leader() or not (relation := self._relation):
             return
 
         # Add any new PostgreSQL peers to the Raft cluster
@@ -757,9 +730,8 @@ class PostgreSQLWatcherRelation(Object):
             return
 
         try:
-            secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
-            raft_password = self.charm._patroni.raft_password
-            if raft_password:
+            if raft_password := self.charm._patroni.raft_password:
+                secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
                 content = secret.get_content(refresh=True)
                 content[RAFT_PASSWORD_KEY] = raft_password
                 secret.set_content(content)
@@ -784,8 +756,7 @@ class PostgreSQLWatcherRelation(Object):
         if not self.charm.is_cluster_initialised:
             return
 
-        watcher_address = self.watcher_address
-        if not watcher_address:
+        if not (watcher_address := self.watcher_address):
             return
 
         # Only the leader handles Raft membership changes to avoid races
