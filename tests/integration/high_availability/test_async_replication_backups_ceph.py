@@ -65,7 +65,19 @@ def _configure_s3_integrator(
 ) -> None:
     """Deploy and configure one s3-integrator app against microceph RGW."""
     if app_name not in model.status().apps:
-        model.deploy("s3-integrator", app=app_name, channel="1/stable")
+        model.deploy(
+            "s3-integrator",
+            app=app_name,
+            channel="1/stable",
+            config={
+                "endpoint": f"https://{microceph.host}",
+                "bucket": f"{app_name}-bucket",
+                "path": "/pg",
+                "region": "",
+                "s3-uri-style": "path",
+                "tls-ca-chain": microceph.cert,
+            },
+        )
 
     # Wait until Juju has finished unit setup and registered charm actions.
     model.wait(
@@ -73,28 +85,9 @@ def _configure_s3_integrator(
             app_name in status.apps
             and bool(status.apps[app_name].units)
             and jubilant.all_agents_idle(status, app_name)
+            and wait_for_apps_status(jubilant.all_blocked, app_name)
         ),
         timeout=5 * MINUTE_SECS,
-    )
-
-    model.config(
-        app_name,
-        {
-            "endpoint": f"https://{microceph.host}",
-            "bucket": f"{app_name}-bucket",
-            "path": "/pg",
-            "region": "",
-            "s3-uri-style": "path",
-            "tls-ca-chain": microceph.cert,
-        },
-    )
-    model.wait(
-        ready=lambda status: (
-            app_name in status.apps
-            and bool(status.apps[app_name].units)
-            and jubilant.all_agents_idle(status, app_name)
-        ),
-        timeout=15 * MINUTE_SECS,
     )
 
     model.run(
