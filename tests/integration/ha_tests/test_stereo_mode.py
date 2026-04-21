@@ -20,6 +20,7 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
+from yaml import safe_load
 
 from ..helpers import (
     APPLICATION_NAME,
@@ -107,25 +108,8 @@ async def verify_raft_cluster_health(
                 return_code, stdout, _ = await ops_test.juju(*complete_command)
                 assert return_code == 0, f"Failed to read patroni.yaml on {unit.name}"
 
-                # Parse the Raft password from YAML - look in the raft: section
-                # The structure is:
-                # raft:
-                #   data_dir: ...
-                #   self_addr: ...
-                #   password: THE_PASSWORD_WE_NEED
-                password = None
-                in_raft_section = False
-                for line in stdout.split("\n"):
-                    if line.strip() == "raft:" or line.startswith("raft:"):
-                        in_raft_section = True
-                        continue
-                    # Exit raft section when we hit another top-level key
-                    if in_raft_section and line and not line.startswith(" ") and ":" in line:
-                        in_raft_section = False
-                    if in_raft_section and "password:" in line:
-                        # Extract the password value after "password:"
-                        password = line.split("password:")[-1].strip()
-                        break
+                conf = safe_load(stdout)
+                password = conf.get("raft", {}).get("password")
                 assert password, f"Could not find Raft password in patroni.yaml on {unit.name}"
 
                 # Check Raft status using the password via juju exec directly
@@ -136,7 +120,7 @@ async def verify_raft_cluster_health(
                     "--",
                     "charmed-postgresql.syncobj-admin",
                     "-conn",
-                    "127.0.0.1:2222",
+                    conf["raft"]["self_addr"],
                     "-pass",
                     password,
                     "-status",
