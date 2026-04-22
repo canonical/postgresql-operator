@@ -1231,9 +1231,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and (ip_to_remove := event.relation.data[event.unit].get("ip-to-remove"))
         ):
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
-            # Get the new IP before removing the old one - we need to add it to Raft
-            # to ensure the member can rejoin when it restarts Patroni
-            new_ip = event.relation.data[event.unit].get("ip")
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
@@ -1241,12 +1238,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return False
             if ip_to_remove in self.members_ips:
                 self._remove_from_members_ips(ip_to_remove)
-            # Add the new IP to Raft cluster immediately after removing the old one
-            # This prevents a race condition where the member restarts Patroni before
-            # being added to Raft, causing quorum issues
-            if new_ip and new_ip != ip_to_remove:
-                logger.info("Adding new IP %s to Raft cluster after IP change", new_ip)
-                self._patroni.add_raft_member(new_ip)
         try:
             self._add_members(event)
         except Exception:
@@ -1274,23 +1265,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
-            # Update peer relation endpoint address so other units see the new IP
-            # This is critical because _get_unit_ip() reads from {PEER}-address key
-            self.update_endpoint_addresses()
             self._patroni.stop_patroni()
-            # Invalidate the cached _patroni property so it will be recreated with the new IP
-            # when next accessed. This is critical for update_config() to use the correct IP
-            # when rendering the Patroni configuration file (especially for Raft self_addr).
-            if "_patroni" in self.__dict__:
-                del self.__dict__["_patroni"]
             self._update_certificate()
-            # Regenerate patroni.yml immediately with the new IP.
-            # This is critical because the Raft self_addr must be correct before Patroni restarts.
-            # Without this, Patroni might restart with the old IP in its config file.
-            try:
-                self.update_config()
-            except Exception as e:
-                logger.warning(f"Failed to update config after IP change: {e}")
             # Update watcher relation - unit address for all units, endpoints only for leader
             self.watcher_offer.update_unit_address()
             if self.unit.is_leader():
