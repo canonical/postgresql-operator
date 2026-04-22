@@ -1,0 +1,144 @@
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:221 waiting for the database charm to become blocked
+[32mINFO    [0m integration.conftest:conftest.py:71 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  02:15:08Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  16.13    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable  145  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   idle   5        10.5.80.34      5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle   0        10.5.80.213               
+
+Machine  State    Address      Inst id        Base          AZ             Message
+0        started  10.5.80.213  juju-780f24-0  ubuntu@22.04  runnervmrc6n4  Running
+5        started  10.5.80.34   juju-780f24-5  ubuntu@24.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 01:38:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:38:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:38:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:38:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:39:18 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:39:18 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 02:02:37 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:02:37 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:02:37 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:02:37 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:02:37 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql-gcp-0: 02:04:37 ERROR unit.postgresql-gcp/0.juju-log __main__:Host not set
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/charm.py", line 2047, in _was_restore_successful
+    self._setup_users()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/charm.py", line 1780, in _setup_users
+    self.postgresql.create_predefined_instance_roles()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 559, in create_predefined_instance_roles
+    for database in self._get_existing_databases():
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 1105, in _get_existing_databases
+    with self._connect_to_database() as connection, connection.cursor() as cursor:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 298, in _connect_to_database
+    raise PostgreSQLUndefinedHostError("Host not set")
+single_kernel_postgresql.utils.postgresql.PostgreSQLUndefinedHostError: Host not set
+unit-postgresql-gcp-0: 02:07:07 ERROR unit.postgresql-gcp/0.juju-log __main__:Host not set
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/charm.py", line 2047, in _was_restore_successful
+    self._setup_users()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/charm.py", line 1780, in _setup_users
+    self.postgresql.create_predefined_instance_roles()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 559, in create_predefined_instance_roles
+    for database in self._get_existing_databases():
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 1105, in _get_existing_databases
+    with self._connect_to_database() as connection, connection.cursor() as cursor:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/utils/postgresql.py", line 298, in _connect_to_database
+    raise PostgreSQLUndefinedHostError("Host not set")
+single_kernel_postgresql.utils.postgresql.PostgreSQLUndefinedHostError: Host not set
+unit-postgresql-gcp-0: 02:08:03 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cbe42971-0dce-462c-8bb1-87fcf7780f24:r#5#self-signed-certificates": settings cbe42971-0dce-462c-8bb1-87fcf7780f24:r#5#self-signed-certificates not found (not found)
+unit-postgresql-gcp-0: 02:08:10 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cbe42971-0dce-462c-8bb1-87fcf7780f24:r#2#postgresql-gcp": settings cbe42971-0dce-462c-8bb1-87fcf7780f24:r#2#postgresql-gcp not found (not found)
+machine-2: 02:08:19 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 02:08:21 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:09:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 02:09:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:09:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:09:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-2: 02:11:30 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cbe42971-0dce-462c-8bb1-87fcf7780f24:r#13#s3-integrator": settings cbe42971-0dce-462c-8bb1-87fcf7780f24:r#13#s3-integrator not found (not found)
+unit-postgresql-gcp-2: 02:11:36 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cbe42971-0dce-462c-8bb1-87fcf7780f24:r#7#postgresql-gcp": settings cbe42971-0dce-462c-8bb1-87fcf7780f24:r#7#postgresql-gcp not found (not found)
+unit-postgresql-gcp-2: 02:11:42 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cbe42971-0dce-462c-8bb1-87fcf7780f24:r#9#postgresql-gcp": settings cbe42971-0dce-462c-8bb1-87fcf7780f24:r#9#postgresql-gcp not found (not found)
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:11:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-new-postgresql-0: 02:14:11 ERROR unit.new-postgresql/0.juju-log s3-parameters:14: backups:Failed to create a session 'bucket' in region=region.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 305, in _create_bucket_if_not_exists
+    s3 = self._get_s3_session_resource(s3_parameters)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 126, in _get_s3_session_resource
+    return session.resource(
+           ^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/boto3/session.py", line 475, in resource
+    client = self.client(
+             ^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/boto3/session.py", line 337, in client
+    return self._session.create_client(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/session.py", line 1031, in create_client
+    client = client_creator.create_client(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/client.py", line 161, in create_client
+    client_args = self._get_client_args(
+                  ^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/client.py", line 561, in _get_client_args
+    return args_creator.get_client_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/args.py", line 163, in get_client_args
+    endpoint = endpoint_creator.create_endpoint(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/botocore/endpoint.py", line 408, in create_endpoint
+    raise ValueError(f"Invalid endpoint: {endpoint_url}")
+ValueError: Invalid endpoint: endpoint
+unit-new-postgresql-0: 02:15:02 ERROR unit.new-postgresql/0.juju-log s3-parameters:14: backups:Invalid stanza name from s3
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
