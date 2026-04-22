@@ -3,18 +3,21 @@
 
 Additional context about key concepts behind the PostgreSQL charm, including design and legacy information.
 
-## Core concepts and design
+## Core
+
+Core concepts about the history and high-level design of Charmed PostgreSQL:
 
 ```{toctree}
 :titlesonly:
 
 Architecture <architecture>
 Interfaces and endpoints <interfaces-and-endpoints>
-Juju <juju>
 Charm versions <charm-versions/index>
 ```
 
-## Operational concepts
+## Operation
+
+Clarification of standard PostgreSQL operational concepts in the context of charms and Juju:
 
 ```{toctree}
 :titlesonly:
@@ -24,9 +27,12 @@ Users <users>
 Roles <roles>
 Logs <logs>
 Connection pooling <connection-pooling>
+Juju <juju>
 ```
 
-## Security and hardening
+## Security
+
+Overview of security features in the charm and hardening guidance:
 
 ```{toctree}
 :titlesonly:
