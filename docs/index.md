@@ -10,6 +10,8 @@ Charmed PostgreSQL is made for anyone looking for a comprehensive database manag
 This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL K8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/).
 ```
 
+## In this documentation
+
 ### Get started
 
 Learn about what's in the charm, how to set up your environment, and perform the most common operations.
