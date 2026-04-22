@@ -48,13 +48,14 @@ from tenacity import (
 
 from constants import (
     API_REQUEST_TIMEOUT,
+    LOGS_DATA_DIR,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
-    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_DATA_DIR,
     POSTGRESQL_LOGS_PATH,
     TLS_CA_BUNDLE_FILE,
 )
@@ -222,14 +223,15 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        _change_owner(POSTGRESQL_DATA_PATH)
+        os.makedirs(POSTGRESQL_DATA_DIR, exist_ok=True)
+        _change_owner(POSTGRESQL_DATA_DIR)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
 
         # Expected permission
         # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
+        os.chmod(POSTGRESQL_DATA_DIR, POSTGRESQL_STORAGE_PERMISSIONS)
 
     @cached_property
     def cluster_members(self) -> set:
@@ -665,7 +667,8 @@ class Patroni:
             is_creating_backup=is_creating_backup,
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
-            data_path=POSTGRESQL_DATA_PATH,
+            data_path=POSTGRESQL_DATA_DIR,
+            wal_dir=LOGS_DATA_DIR,
             enable_ldap=enable_ldap,
             enable_tls=enable_tls,
             member_name=self.member_name,
