@@ -446,6 +446,21 @@ def test_update_synchronous_node_count(peers_ips, patroni):
             assert False
 
 
+def test_set_max_timelines_history(peers_ips, patroni):
+    with (
+        patch("requests.patch") as _patch,
+    ):
+        patroni.set_max_timelines_history()
+
+        _patch.assert_called_once_with(
+            f"{patroni._patroni_url}/config",
+            json={"max_timelines_history": 50},
+            verify=patroni.verify,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
+
+
 def test_configure_patroni_on_unit(peers_ips, patroni):
     with (
         patch("os.chmod") as _chmod,
