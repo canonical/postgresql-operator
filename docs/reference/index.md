@@ -1,29 +1,45 @@
 (reference)=
 # Reference
 
-The following generated API references can be found on [Charmhub](https://charmhub.io/postgresql):
+Information about releases, charm options, technical specifications, and other reference material for quick lookup. 
 
-| Page | Description |
-|------|-------------|
-| [Integrations](https://charmhub.io/postgresql/integrations) | Integration/relation interfaces supported by this charm |
-| [Libraries](https://charmhub.io/postgresql/libraries) | VM charm library is empty as charm uses [K8s library](https://charmhub.io/postgresql-k8s/libraries/) (more info [here](/explanation/architecture)) |
-| [Configuration](https://charmhub.io/postgresql/configuration) | Application configuration parameters                   |
-| [Actions](https://charmhub.io/postgresql/actions) | Juju actions supported by this charm                    |
+## Releases
 
-The following guides contain technical specifications, APIs, release notes, and other reference material for fast lookup.
-
+All stable revisions of Charmed PostgreSQL 16 for bare metal/virtual machines:
 
 ```{toctree}
 :titlesonly:
-:maxdepth: 2
-:glob:
 
 Releases <releases>
+```
+
+## Requirements and operations
+
+Technical specifications, performance guidance, software testing approaches, and troubleshooting resources.
+
+```{toctree}
+:titlesonly:
+
 System requirements <system-requirements>
-Software testing <software-testing>
 Performance and resources <performance-and-resources>
 Troubleshooting <troubleshooting/index>
+Charm statuses <statuses>
+```
+
+## Integrations
+
+Available plugins and extensions, Prometheus alert rules, and testing information.
+
+```{toctree}
+:titlesonly:
+
 Plugins/extensions <plugins-extensions>
 Alert rules <alert-rules>
-Statuses <statuses>
+Software testing <software-testing>
+```
+
+```{toctree}
+:hidden:
+
 Contacts <contacts>
+```
