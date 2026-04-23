@@ -535,13 +535,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if self._role != "watcher":
             try:
-                if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
-                    cert = load_pem_x509_certificate(raw_cert.encode())
-                    if (
+                if (
+                    (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
+                    and (cert := load_pem_x509_certificate(raw_cert.encode()))
+                    and (
                         cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
                         != self._unit_ip
-                    ):
-                        self.tls.generate_internal_peer_cert()
+                    )
+                ):
+                    self.tls.generate_internal_peer_cert()
             except Exception:
                 logger.exception("Unable to check or update internal cert")
 
@@ -579,6 +581,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
                 )
             else:
+                try:
+                    self._patroni.set_max_timelines_history()
+                except Exception:
+                    logger.warning("Unable to patch in max_timelines_history")
                 refresh.next_unit_allowed_to_refresh = True
         else:
             install_service()
