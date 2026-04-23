@@ -32,9 +32,8 @@ author = "Canonical Ltd."
 # TODO: If the date must be a range, like in a software license, replace 
 # 2026 with the starting year of development and use:
 #
-# copyright = f"2026-{datetime.date.today().year}"
 
-copyright = f"{datetime.date.today().year}"
+copyright = f"2025-{datetime.date.today().year}"
 
 # Sidebar documentation title; best kept reasonably short
 #
@@ -152,8 +151,8 @@ html_context = {
     #       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
 
     "license": {
-        "name": "CC-BY-SA-3.0",
-        "url": "https://github.com/canonical/sphinx-docs-starter-pack/blob/main/LICENSE",
+        "name": "Apache License 2.0",
+        "url": "https://github.com/canonical/postgresql-operator/blob/main/LICENSE",
     },
 }
 
