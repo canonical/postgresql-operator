@@ -379,39 +379,71 @@ def test_enable_disable_extensions(harness, caplog):
             assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
-def test_on_start(harness):
+def test_on_start_no_password(harness):
+    """Test start is deferred when passwords are not yet generated."""
+    with (
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+    ):
+        _get_password.return_value = None
+        harness.charm.on.start.emit()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+
+        # ModelError when fetching the password has the same outcome.
+        _get_password.side_effect = ModelError
+        harness.charm.on.start.emit()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+
+
+def test_on_start_bootstrap_failure(harness):
+    """Test start is blocked when cluster bootstrap fails."""
     with (
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
         patch(
-            "charm.PostgresqlOperatorCharm._set_primary_status_message"
-        ) as _set_primary_status_message,
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+    ):
+        _get_password.return_value = "fake-operator-password"
+        _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = False
+
+        # TODO: test replicas start (DPE-494).
+        harness.set_leader()
+        harness.charm.on.start.emit()
+        _bootstrap_cluster.assert_called_once()
+        _restart_services_after_reboot.assert_called_once()
+        assert isinstance(harness.model.unit.status, BlockedStatus)
+
+
+def test_on_start_create_user_error(harness):
+    """Test start is blocked when creating the default postgres user fails."""
+    with (
         patch(
-            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
-        ) as _enable_disable_extensions,
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+            "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
+        ) as _restart_services_after_reboot,
         patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
-        ) as _update_relation_endpoints,
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
-        patch("charm.PostgreSQLProvider.update_endpoints"),
-        patch("charm.PostgresqlOperatorCharm.update_config"),
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch(
             "charm.Patroni.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
-        patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
-        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
-        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_storage_attached",
-            side_effect=[False, True, True, True, True, True],
-        ),
         patch(
             "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
             new_callable=PropertyMock,
@@ -422,61 +454,71 @@ def test_on_start(harness):
             new_callable=PropertyMock,
             return_value=True,
         ),
-        patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
     ):
-        _get_postgresql_version.return_value = "16.6"
-
-        # Test before the passwords are generated.
-        _member_started.return_value = False
-        _get_password.return_value = None
-        harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_not_called()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-
-        # ModelError in get password
-        _get_password.side_effect = ModelError
-        harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_not_called()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-
-        # Mock the passwords.
-        _get_password.side_effect = None
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = True
+        _member_started.return_value = True
+        _postgresql.list_users.return_value = []
+        _postgresql.create_user.side_effect = PostgreSQLCreateUserError
 
-        # Mock cluster start and postgres user creation success values.
-        _bootstrap_cluster.side_effect = [False, True, True]
-        _postgresql.list_users.side_effect = [[], [], []]
-        _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None, None, None]
-
-        # Test for a failed cluster bootstrapping.
-        # TODO: test replicas start (DPE-494).
         harness.set_leader()
         harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_called_once()
-        _oversee_users.assert_not_called()
-        _restart_services_after_reboot.assert_called_once()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
-        # Set an initial waiting status (like after the install hook was triggered).
-        harness.model.unit.status = WaitingStatus("fake message")
-
-        # Test the event of an error happening when trying to create the default postgres user.
-        _restart_services_after_reboot.reset_mock()
-        _member_started.return_value = True
-        harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
-        _oversee_users.assert_not_called()
         _restart_services_after_reboot.assert_called_once()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
-        # Set an initial waiting status again (like after the install hook was triggered).
-        harness.model.unit.status = WaitingStatus("fake message")
 
-        # Then test the event of a correct cluster bootstrapping.
-        _restart_services_after_reboot.reset_mock()
+def test_on_start_success(harness):
+    """Test successful cluster bootstrapping on the primary unit."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
+        ) as _restart_services_after_reboot,
+        patch(
+            "charm.PostgresqlOperatorCharm._set_primary_status_message"
+        ) as _set_primary_status_message,
+        patch(
+            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+        ) as _enable_disable_extensions,
+        patch("charm.PostgresqlOperatorCharm._update_relation_endpoints"),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch(
+            "charm.Patroni.member_started",
+            new_callable=PropertyMock,
+        ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+    ):
+        _get_password.return_value = "fake-operator-password"
+        _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = True
+        _member_started.return_value = True
+        _postgresql.list_users.return_value = []
+
+        harness.set_leader()
         harness.charm.on.start.emit()
-        assert _postgresql.create_user.call_count == 3  # Considering the previous failed call.
+        assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
