@@ -268,9 +268,9 @@ class RaftController:
 
             # Extract member addresses from partner_node_status_server_* keys
             prefix = "partner_node_status_server_"
-            members: list[str] = [raft_status["self"]]
+            members: list[str] = [str(raft_status["self"])]
             for key in raft_status:
-                if isinstance(key, str) and key.startswith(prefix):
+                if key.startswith(prefix):
                     members.append(key[len(prefix) :])
             status["members"] = sorted(members)
             return status

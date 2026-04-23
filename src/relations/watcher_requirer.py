@@ -20,9 +20,8 @@ import logging
 import os
 import typing
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-import tomli
 from charmlibs.systemd import service_running
 from ops import (
     ActionEvent,
@@ -43,6 +42,7 @@ from ops import (
 
 from constants import RAFT_PORT, WATCHER_RELATION
 from raft_controller import ClusterStatus, RaftController, install_service
+from watcher_health import HealthChecker
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -569,99 +569,82 @@ class WatcherRequirerHandler(Object):
             return raft_status.get("connected", False)
         return watcher_voting_str == "true"
 
-    def _get_member_lag_by_endpoint(self, relation: Relation) -> dict[str, Any]:
-        """Return per-endpoint lag data from relation application data."""
+    def _get_pg_version(self, relation: Relation) -> str:
+        """Return Postgresql version of the cluster."""
         if not relation.app:
-            return {}
+            return "unknown"
 
-        member_lag_raw = relation.data[relation.app].get("member-lag", "{}")
-        if not isinstance(member_lag_raw, str):
-            return {}
-
-        try:
-            parsed_member_lag = json.loads(member_lag_raw)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse member-lag JSON")
-            return {}
-
-        if isinstance(parsed_member_lag, dict):
-            return parsed_member_lag
-        return {}
-
-    @staticmethod
-    def _cluster_role_from_health(saw_healthy_member: bool, saw_primary_member: bool) -> str:
-        """Return the inferred cluster role from endpoint health results."""
-        if saw_primary_member:
-            return "primary"
-        if saw_healthy_member:
-            return "standby"
-        return "unknown"
+        return relation.data[relation.app].get("version", "unknown")
 
     def _build_postgresql_topology(
         self,
         relation: Relation,
         pg_endpoints: list[str],
         ip_to_unit: dict[str, str],
-    ) -> tuple[dict[str, Any], str | None, str]:
+    ) -> tuple[
+        dict[str, Any],
+        str | None,
+        Literal["primary", "standby", "unknown"],
+        int | Literal["unknown"],
+    ]:
         """Build PostgreSQL topology entries and infer the cluster role."""
         topology: dict[str, Any] = {}
         primary_endpoint = None
-        saw_healthy_member = False
-        saw_primary_member = False
-        member_lag_by_endpoint = self._get_member_lag_by_endpoint(relation)
+        cluster_role = "unknown"
+        version = self._get_pg_version(relation)
+        timeline = "unknown"
 
         if not pg_endpoints:
-            return topology, primary_endpoint, "unknown"
+            return topology, primary_endpoint, cluster_role, timeline
 
-        from watcher_health import HealthChecker
-
-        health_checker = HealthChecker(
-            self.charm,
-            password_getter=lambda rel=relation: self.get_watcher_password(rel),
+        health_checker = HealthChecker(self.charm)
+        # TODO figure out how to share the password for async clusters
+        health_results = (
+            health_checker.check_all_endpoints(pg_endpoints, password)
+            if (password := self.get_watcher_password(relation))
+            else dict.fromkeys(pg_endpoints, False)
         )
-        health_results = health_checker.check_all_endpoints(pg_endpoints)
+        cluster_status = health_checker.cluster_status(pg_endpoints)
+        patroni_members = {}
+        for member in cluster_status:
+            patroni_members[member["host"]] = member
 
         for endpoint in pg_endpoints:
             unit_name = ip_to_unit.get(endpoint, endpoint)
-            res = health_results.get(endpoint, {})
-            is_healthy = res.get("healthy", False)
-            is_primary = not res.get("is_in_recovery", True)
+            patroni_member = patroni_members.get(endpoint, {})
+            is_healthy = health_results.get(endpoint, False)
 
-            if is_healthy:
-                saw_healthy_member = True
-            if is_primary:
+            if is_primary := patroni_member.get("role") == "leader":
                 primary_endpoint = f"{endpoint}:5432"
-            if is_healthy and is_primary:
-                saw_primary_member = True
+
+            role = patroni_member.get("role", "unknown")
+            lag = patroni_member.get("lag", "unknown")
+            if role == "leader":
+                role = "primary"
+                timeline = patroni_member.get("timeline", "unknown")
+                cluster_role = "primary"
+                lag = 0
+            elif role == "standby_leader":
+                role = "standby"
+                cluster_role = "standby"
+                timeline = patroni_member.get("timeline", "unknown")
+                lag = 0
 
             topology[unit_name] = {
                 "address": f"{endpoint}:5432",
-                "memberrole": "primary" if is_primary else "sync_standby",
+                "memberrole": role,
                 "mode": "r/w" if is_primary else "r/o",
                 "status": "online" if is_healthy else "offline",
-                "version": self._get_pg_version(),
-                "lag": member_lag_by_endpoint.get(endpoint, 0),
+                "version": version,
+                "lag": lag,
             }
-
-        cluster_role = self._cluster_role_from_health(saw_healthy_member, saw_primary_member)
-        return topology, primary_endpoint, cluster_role
+        return topology, primary_endpoint, cluster_role, timeline
 
     def _is_tls_enabled(self, relation: Relation) -> bool:
         """Return whether TLS is enabled for the related PostgreSQL cluster."""
         if not relation.app:
             return False
         return relation.data[relation.app].get("tls-enabled", "false") == "true"
-
-    def _get_timeline(self, relation: Relation) -> int:
-        """Return the related PostgreSQL timeline from relation data."""
-        if not relation.app:
-            return 0
-
-        timeline_str = relation.data[relation.app].get("timeline", "0")
-        try:
-            return int(timeline_str)
-        except (ValueError, TypeError):
-            return 0
 
     def _format_cluster_status(self, relation: Relation) -> dict[str, Any]:
         """Format cluster status for a single cluster relation."""
@@ -677,7 +660,7 @@ class WatcherRequirerHandler(Object):
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
         watcher_voting = self._get_watcher_voting(relation, raft_status)
-        topology, primary_endpoint, cluster_role = self._build_postgresql_topology(
+        topology, primary_endpoint, cluster_role, timeline = self._build_postgresql_topology(
             relation, pg_endpoints, ip_to_unit
         )
 
@@ -707,7 +690,7 @@ class WatcherRequirerHandler(Object):
             "ssl": "required" if self._is_tls_enabled(relation) else "disabled",
             "status": "ok" if has_quorum else "ok_no_tolerance",
             "statustext": status_text,
-            "timeline": self._get_timeline(relation),
+            "timeline": timeline,
             "topology": topology,
             "raft": {
                 "has_quorum": has_quorum,
@@ -723,6 +706,7 @@ class WatcherRequirerHandler(Object):
     ) -> dict[str, Any]:
         """Format cluster-set status for async replication view."""
         clusters_summary: dict[str, Any] = {}
+        # TODO No way to have multiple primaries
         primary_cluster_name = None
 
         for name, data in clusters_data.items():
@@ -751,15 +735,6 @@ class WatcherRequirerHandler(Object):
             "statustext": ("all clusters available." if all_healthy else "some clusters at risk."),
         }
 
-    def _get_pg_version(self) -> str:
-        """Get PostgreSQL version from refresh_versions.toml."""
-        try:
-            with open("refresh_versions.toml", "rb") as f:
-                versions = tomli.load(f)
-                return str(versions.get("workload", "unknown"))
-        except Exception:
-            return "unknown"
-
     def _on_trigger_health_check(self, event: ActionEvent) -> None:
         """Handle trigger-health-check action."""
         clusters: list[dict[str, Any]] = []
@@ -768,25 +743,20 @@ class WatcherRequirerHandler(Object):
 
         for relation in self.model.relations.get(WATCHER_RELATION, []):
             pg_endpoints = self._get_pg_endpoints(relation)
-            if not pg_endpoints:
+            if not pg_endpoints or not (password := self.get_watcher_password(relation)):
                 continue
 
-            from watcher_health import HealthChecker
-
-            health_checker = HealthChecker(
-                self.charm,
-                password_getter=lambda rel=relation: self.get_watcher_password(rel),
-            )
-            health_results = health_checker.check_all_endpoints(pg_endpoints)
+            health_checker = HealthChecker(self.charm)
+            health_results = health_checker.check_all_endpoints(pg_endpoints, password)
 
             _ip_to_az, ip_to_unit = self._build_ip_maps(relation)
 
             cluster_name = self._get_cluster_name(relation)
             endpoint_statuses: dict[str, str] = {}
-            for endpoint, res in health_results.items():
+            for endpoint in health_results:
                 unit_name = ip_to_unit.get(endpoint)
                 label = unit_name if unit_name else f"{cluster_name}/{endpoint}"
-                is_healthy = res.get("healthy", False) if isinstance(res, dict) else False
+                is_healthy = health_results.get(endpoint, False)
                 endpoint_statuses[label] = "healthy" if is_healthy else "unhealthy"
                 if is_healthy:
                     total_healthy += 1
@@ -807,4 +777,4 @@ class WatcherRequirerHandler(Object):
             "total-count": total_count,
         }
 
-        event.set_results({"health-check": json.dumps(output, indent=2)})
+        event.set_results({"health-check": json.dumps(output)})

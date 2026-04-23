@@ -280,30 +280,6 @@ class PostgreSQLWatcherRelation(Object):
             logger.debug(f"Error checking Raft membership: {e}")
         return False
 
-    def _add_member_to_raft(self, member_addr: str) -> bool:
-        """Add a member to the running Raft cluster via TcpUtility.
-
-        Uses pysyncobj's TcpUtility directly instead of syncobj-admin subprocess
-        to avoid exposing the Raft password on the command line.
-
-        Args:
-            member_addr: The member's Raft address (ip:port).
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        try:
-            utility = TcpUtility(password=self.charm._patroni.raft_password, timeout=10)
-            utility.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["add", member_addr])
-            logger.info(f"Successfully added member to Raft cluster: {member_addr}")
-            return True
-        except UtilityException as e:
-            logger.warning(f"Failed to add member {member_addr} to Raft: {e}")
-            return False
-        except Exception as e:
-            logger.warning(f"Error adding member {member_addr} to Raft: {e}")
-            return False
-
     def _remove_member_from_raft(self, member_addr: str) -> bool:
         """Remove a member from the running Raft cluster via TcpUtility.
 
@@ -373,9 +349,6 @@ class PostgreSQLWatcherRelation(Object):
         if self._is_watcher_in_raft(watcher_address):
             logger.info(f"Watcher {watcher_raft_addr} already in Raft cluster")
             return
-
-        logger.info(f"Adding watcher to Raft cluster: {watcher_raft_addr}")
-        self._add_member_to_raft(watcher_raft_addr)
 
     def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle watcher departing from the relation.
@@ -603,30 +576,15 @@ class PostgreSQLWatcherRelation(Object):
             logger.warning("No PostgreSQL endpoints available")
             return
 
-        # Collect timeline and per-member lag from Patroni cluster status.
-        # Both fields are already available from the existing cluster_status() call
-        # (see ClusterMember TypedDict: timeline: int, lag: int in bytes).
-        pg_timeline = 0
-        member_lag: dict[str, int] = {}
-        try:
-            cluster_status = self.charm._patroni.cluster_status()
-            for member in cluster_status:
-                if member.get("role") in ("leader", "standby_leader"):
-                    pg_timeline = member.get("timeline", 0)
-                member_lag[member["host"]] = member.get("lag", 0)
-        except Exception:
-            logger.debug("Could not retrieve cluster status for timeline/lag — using defaults")
-
         # Update relation data
         relation.data[self.charm.app].update({
             "cluster-name": self.charm.cluster_name,
             "raft-secret-id": secret_id,
+            "version": self.charm._patroni.get_postgresql_version(),
             "pg-endpoints": json.dumps(sorted(pg_endpoints)),
             "raft-partner-addrs": json.dumps(sorted(pg_endpoints)),
             "raft-port": str(RAFT_PORT),
             "standby-clusters": json.dumps(self._get_standby_clusters()),
-            "timeline": str(pg_timeline),
-            "member-lag": json.dumps(member_lag),
             "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
             "watcher-voting": "false" if self._pg_unit_count_is_odd() else "true",
         })
@@ -675,13 +633,8 @@ class PostgreSQLWatcherRelation(Object):
         Called when cluster membership changes (peer joins/departs).
         Also dynamically adds new PostgreSQL peers to the running Raft cluster.
         """
-        if not self.charm.unit.is_leader() or not (relation := self._relation):
-            return
-
-        # Add any new PostgreSQL peers to the Raft cluster
-        self._add_peers_to_raft()
-
-        self._update_relation_data(relation)
+        if self.charm.unit.is_leader() and (relation := self._relation):
+            self._update_relation_data(relation)
 
     def _get_standby_clusters(self) -> list[str]:
         """Return the names of related standby clusters."""
@@ -693,32 +646,9 @@ class PostgreSQLWatcherRelation(Object):
             if relation is None:
                 continue
             # We are interested in the other side's application name
-            if relation.app:
+            if relation.app and self.charm.async_replication.is_primary_cluster():
                 standby_clusters.append(relation.app.name)
         return sorted(set(standby_clusters))
-
-    def _add_peers_to_raft(self) -> None:
-        """Dynamically add new PostgreSQL peers to the running Raft cluster.
-
-        When a new PostgreSQL unit joins, it needs to be added to the existing
-        Raft cluster via syncobj_admin. Simply updating partner_addrs in the
-        config file is not enough for a running cluster.
-        """
-        if not self.charm.is_cluster_initialised:
-            logger.debug("Cluster not initialized, skipping Raft peer addition")
-            return
-
-        # Get all peer IPs from the fresh property (not from cached _patroni)
-        # This ensures we get the latest peer IPs after members have been added
-        peer_ips = list(self.charm._peer_members_ips)
-        logger.info(f"Found {len(peer_ips)} peer IPs for Raft addition: {peer_ips}")
-        if not peer_ips:
-            return
-
-        for peer_ip in peer_ips:
-            peer_raft_addr = f"{peer_ip}:{RAFT_PORT}"
-            logger.info(f"Adding peer to Raft cluster: {peer_raft_addr}")
-            self._add_member_to_raft(peer_raft_addr)
 
     def update_watcher_secret(self) -> None:
         """Update the watcher secret with current Raft password.
