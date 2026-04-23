@@ -5,7 +5,7 @@ Information about releases, charm options, technical specifications, and other r
 
 ## Releases
 
-All stable revisions of Charmed PostgreSQL 16 for bare metal/virtual machines:
+All stable revisions of Charmed PostgreSQL 14 for bare metal/virtual machines:
 
 ```{toctree}
 :titlesonly:
