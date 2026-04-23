@@ -416,11 +416,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         charm_tracing_config(self._grafana_agent)
 
-    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
-        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
-
-        Called after snap refresh
-        """
+    def _check_and_update_internal_cert(self) -> None:
+        """Check if the internal cert CN matches the unit IP and regenerate if needed."""
         try:
             if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
                 cert = load_pem_x509_certificate(raw_cert.encode())
@@ -431,6 +428,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.tls.generate_internal_peer_cert()
         except Exception:
             logger.exception("Unable to check or update internal cert")
+
+    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
+        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
+
+        Called after snap refresh
+        """
+        self._check_and_update_internal_cert()
 
         try:
             self._ensure_storage_layout()
@@ -471,6 +475,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
         else:
             self._ensure_temp_tablespace_location_if_primary()
+            try:
+                self._patroni.set_max_timelines_history()
+            except Exception:
+                logger.warning("Unable to patch in max_timelines_history")
             refresh.next_unit_allowed_to_refresh = True
 
     def set_unit_status(
