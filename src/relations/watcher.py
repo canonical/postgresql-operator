@@ -571,7 +571,7 @@ class PostgreSQLWatcherRelation(Object):
         # Collect PostgreSQL unit endpoints using fresh IPs from unit relation data.
         # _units_ips reads directly from unit relation data (always fresh), while
         # _peer_members_ips reads from app peer data (may be stale after network disruptions).
-        pg_endpoints: list[str] = list(self.charm._units_ips)
+        pg_endpoints: list[str] = sorted(self.charm._units_ips)
         if not pg_endpoints:
             logger.warning("No PostgreSQL endpoints available")
             return
@@ -581,9 +581,9 @@ class PostgreSQLWatcherRelation(Object):
             "cluster-name": self.charm.cluster_name,
             "raft-secret-id": secret_id,
             "version": self.charm._patroni.get_postgresql_version(),
-            "pg-endpoints": json.dumps(sorted(pg_endpoints)),
-            "raft-partner-addrs": json.dumps(sorted(pg_endpoints)),
+            "raft-partner-addrs": json.dumps(pg_endpoints),
             "raft-port": str(RAFT_PORT),
+            "patroni-cas": self.charm.tls.get_peer_ca_bundle(),
             "standby-clusters": json.dumps(self._get_standby_clusters()),
             "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
             "watcher-voting": "false" if self._pg_unit_count_is_odd() else "true",

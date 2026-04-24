@@ -255,7 +255,6 @@ class TestWatcherRelation:
         assert "cluster-name" in app_data
         assert app_data["cluster-name"] == "postgresql"
         assert "raft-secret-id" in app_data
-        assert "pg-endpoints" in app_data
         assert "raft-partner-addrs" in app_data
         assert "raft-port" in app_data
 

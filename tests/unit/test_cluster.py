@@ -94,7 +94,7 @@ def patroni(harness, peers_ips):
 
 def test_get_member_ip(peers_ips, patroni):
     with patch(
-        "charm.Patroni.parallel_patroni_get_request", return_value=None
+        "cluster.parallel_patroni_get_request", return_value=None
     ) as _parallel_patroni_get_request:
         # No IP if no members
         assert patroni.get_member_ip(patroni.member_name) is None
@@ -163,7 +163,7 @@ def test_dict_to_hba_string(harness, patroni):
 def test_get_primary(peers_ips, patroni):
     with (
         patch(
-            "charm.Patroni.parallel_patroni_get_request", return_value=None
+            "cluster.parallel_patroni_get_request", return_value=None
         ) as _parallel_patroni_get_request,
     ):
         # No primary if no members

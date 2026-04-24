@@ -13,17 +13,15 @@ when the watcher relation is established. The password is shared via a Juju secr
 """
 
 import logging
-from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
-from ssl import CERT_NONE, create_default_context
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import psycopg2
-from httpx import AsyncClient, HTTPError
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from cluster import ClusterMember
-from constants import API_REQUEST_TIMEOUT, PATRONI_CLUSTER_STATUS_ENDPOINT
+from constants import PATRONI_CLUSTER_STATUS_ENDPOINT
+from utils import parallel_patroni_get_request
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -156,38 +154,11 @@ class HealthChecker:
                     logger.debug(f"Failed to close connection to {endpoint}: {e}")
         return result
 
-    async def _httpx_get_request(self, url: str) -> dict[str, Any] | None:
-        ssl_ctx = create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = CERT_NONE
-        async with AsyncClient(timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx) as client:
-            try:
-                return (await client.get(url)).raise_for_status().json()
-            except (HTTPError, ValueError):
-                return None
-
-    async def _async_get_request(self, uri: str, endpoints: list[str]) -> dict[str, Any] | None:
-        tasks = [
-            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}")) for ip in endpoints
-        ]
-        for task in as_completed(tasks):
-            if result := await task:
-                for task in tasks:
-                    task.cancel()
-                await wait(tasks)
-                return result
-
-    def parallel_patroni_get_request(
-        self, uri: str, endpoints: list[str]
-    ) -> dict[str, Any] | None:
-        """Call all possible patroni endpoints in parallel."""
-        return run(self._async_get_request(uri, endpoints))
-
     def cluster_status(self, endpoints: list[str]) -> list[ClusterMember]:
         """Query the cluster status."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(
-            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", endpoints
+        if response := parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", endpoints, "", None, False
         ):
             logger.debug("API cluster_status: %s", response["members"])
             return response["members"]

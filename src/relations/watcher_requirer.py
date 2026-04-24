@@ -201,23 +201,6 @@ class WatcherRequirerHandler(Object):
             logger.warning(f"Secret {secret_id} not found")
             return None
 
-    def _get_pg_endpoints(self, relation: Relation) -> list[str]:
-        """Get PostgreSQL endpoints from the relation.
-
-        Args:
-            relation: The specific watcher relation.
-        """
-        if not relation.app or not (
-            pg_endpoints_json := relation.data[relation.app].get("pg-endpoints")
-        ):
-            return []
-
-        try:
-            return json.loads(pg_endpoints_json)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse pg-endpoints JSON")
-            return []
-
     def _get_raft_partner_addrs(self, relation: Relation) -> list[str]:
         """Get Raft partner addresses from the relation.
 
@@ -245,6 +228,11 @@ class WatcherRequirerHandler(Object):
             The cluster name, or a fallback label.
         """
         if relation.app and (name := relation.data[relation.app].get("cluster-name")):
+            return name
+        return f"relation-{relation.id}"
+
+    def _get_patroni_cas(self, relation: Relation) -> str | None:
+        if relation.app and (name := relation.data[relation.app].get("patroni-cas")):
             return name
         return f"relation-{relation.id}"
 
@@ -322,7 +310,11 @@ class WatcherRequirerHandler(Object):
                 port = self._get_port_for_relation(relation.id)
                 raft_controller = RaftController(self.charm, f"rel{relation.id}")
                 changed = raft_controller.configure(
-                    port, new_address, partner_addrs, raft_password
+                    port,
+                    new_address,
+                    partner_addrs,
+                    raft_password,
+                    self._get_patroni_cas(relation),
                 )
                 if changed and service_running(raft_controller.service_name):
                     logger.info(
@@ -351,7 +343,7 @@ class WatcherRequirerHandler(Object):
             if raft_status.get("connected"):
                 connected_count += 1
 
-            pg_endpoints = self._get_pg_endpoints(relation)
+            pg_endpoints = self._get_raft_partner_addrs(relation)
             total_endpoints += len(pg_endpoints)
 
             if len(pg_endpoints) % 2 != 0:
@@ -448,7 +440,9 @@ class WatcherRequirerHandler(Object):
         port = self._get_port_for_relation(relation.id)
 
         raft_controller = RaftController(self.charm, f"rel{relation.id}")
-        if raft_controller.configure(port, unit_ip, partner_addrs, raft_password):
+        if raft_controller.configure(
+            port, unit_ip, partner_addrs, raft_password, self._get_patroni_cas(relation)
+        ):
             logger.info(
                 f"Restarting Raft controller for relation {relation.id} to apply config changes"
             )
@@ -649,7 +643,7 @@ class WatcherRequirerHandler(Object):
     def _format_cluster_status(self, relation: Relation) -> dict[str, Any]:
         """Format cluster status for a single cluster relation."""
         cluster_name = self._get_cluster_name(relation)
-        pg_endpoints = self._get_pg_endpoints(relation)
+        pg_endpoints = self._get_raft_partner_addrs(relation)
         _ip_to_az, ip_to_unit = self._build_ip_maps(relation)
 
         # Get Raft status
@@ -742,7 +736,7 @@ class WatcherRequirerHandler(Object):
         total_count = 0
 
         for relation in self.model.relations.get(WATCHER_RELATION, []):
-            pg_endpoints = self._get_pg_endpoints(relation)
+            pg_endpoints = self._get_raft_partner_addrs(relation)
             if not pg_endpoints or not (password := self.get_watcher_password(relation)):
                 continue
 

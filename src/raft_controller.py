@@ -107,6 +107,7 @@ class RaftController:
         # Derive all paths from instance_id
         self.data_dir = f"{RAFT_BASE_DIR}/{instance_id}"
         self.config_file = f"{RAFT_BASE_DIR}/{instance_id}/patroni-raft.yaml"
+        self.ca_file = f"{RAFT_BASE_DIR}/{instance_id}/patroni-ca.pem"
         self.service_name = f"watcher-raft@{instance_id}"
 
     def configure(
@@ -115,6 +116,7 @@ class RaftController:
         self_addr: str | None = None,
         partner_addrs: list[str] | None = None,
         password: str | None = None,
+        cas: str | None = None,
     ) -> bool:
         """Configure the Raft controller.
 
@@ -123,6 +125,7 @@ class RaftController:
             self_addr: This node's Raft address.
             partner_addrs: List of partner Raft addresses.
             password: Raft cluster password.
+            cas: Patroni CA bundle.
 
         Returns:
             True if configuration changed, False if unchanged.
@@ -163,6 +166,8 @@ class RaftController:
             data_dir=self.data_dir,
         )
         render_file(self.config_file, rendered, 0o600)
+        if cas:
+            render_file(self.ca_file, cas, 0o600)
 
         logger.info(f"Raft controller configured: self={self_addr}, partners={partner_addrs}")
         return True

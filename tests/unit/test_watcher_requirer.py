@@ -413,7 +413,7 @@ class TestWatcherActions:
         relation = MagicMock()
         relation.id = 1
         mock_charm.model.relations.get.return_value = [relation]
-        handler._get_pg_endpoints = MagicMock(return_value=["10.0.0.1"])
+        handler._get_raft_partner_addrs = MagicMock(return_value=["10.0.0.1"])
         handler._build_ip_maps = MagicMock(return_value=({}, {"10.0.0.1": "postgresql/0"}))
         handler._get_cluster_name = MagicMock(return_value="cluster-a")
 
@@ -447,7 +447,7 @@ class TestWatcherActions:
         relation.id = 7
 
         handler._get_cluster_name = MagicMock(return_value="cluster-a")
-        handler._get_pg_endpoints = MagicMock(return_value=["10.0.0.1"])
+        handler._get_raft_partner_addrs = MagicMock(return_value=["10.0.0.1"])
         handler._build_ip_maps = MagicMock(return_value=({}, {"10.0.0.1": "postgresql/0"}))
         handler._get_port_for_relation = MagicMock(return_value=2222)
         handler._get_pg_version = MagicMock(return_value="16")
@@ -485,7 +485,7 @@ class TestWatcherActions:
         mock_charm.model.get_binding.return_value = None
 
         handler._get_cluster_name = MagicMock(return_value="cluster-a")
-        handler._get_pg_endpoints = MagicMock(return_value=[])
+        handler._get_raft_partner_addrs = MagicMock(return_value=[])
         handler._build_ip_maps = MagicMock(return_value=({}, {}))
         handler._get_port_for_relation = MagicMock(return_value=2222)
 
@@ -520,7 +520,7 @@ class TestWatcherActions:
         mock_charm.model.get_binding.return_value = None
 
         handler._get_cluster_name = MagicMock(return_value="cluster-a")
-        handler._get_pg_endpoints = MagicMock(return_value=[])
+        handler._get_raft_partner_addrs = MagicMock(return_value=[])
         handler._build_ip_maps = MagicMock(return_value=({}, {}))
         handler._get_port_for_relation = MagicMock(return_value=2222)
 
