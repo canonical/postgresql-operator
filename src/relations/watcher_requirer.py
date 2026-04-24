@@ -42,7 +42,6 @@ from ops import (
 
 from constants import RAFT_PORT, WATCHER_RELATION
 from raft_controller import ClusterStatus, RaftController, install_service
-from watcher_health import HealthChecker
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -59,9 +58,6 @@ class WatcherRequirerHandler(Object):
     def __init__(self, charm: "PostgresqlOperatorCharm"):
         super().__init__(charm, WATCHER_RELATION)
         self.charm = charm
-
-        # Per-relation RaftControllers, keyed by relation ID
-        self._raft_controllers: dict[int, RaftController] = {}
 
         # Lifecycle events
         self.framework.observe(self.charm.on.install, self._on_install)
@@ -591,14 +587,14 @@ class WatcherRequirerHandler(Object):
         if not pg_endpoints:
             return topology, primary_endpoint, cluster_role, timeline
 
-        health_checker = HealthChecker(self.charm)
+        raft_controller = RaftController(self.charm, f"rel{relation.id}")
         # TODO figure out how to share the password for async clusters
         health_results = (
-            health_checker.check_all_endpoints(pg_endpoints, password)
+            raft_controller.check_all_endpoints(pg_endpoints, password)
             if (password := self.get_watcher_password(relation))
             else dict.fromkeys(pg_endpoints, False)
         )
-        cluster_status = health_checker.cluster_status(pg_endpoints)
+        cluster_status = raft_controller.cluster_status(pg_endpoints)
         patroni_members = {}
         for member in cluster_status:
             patroni_members[member["host"]] = member
@@ -740,8 +736,8 @@ class WatcherRequirerHandler(Object):
             if not pg_endpoints or not (password := self.get_watcher_password(relation)):
                 continue
 
-            health_checker = HealthChecker(self.charm)
-            health_results = health_checker.check_all_endpoints(pg_endpoints, password)
+            raft_controller = RaftController(self.charm, f"rel{relation.id}")
+            health_results = raft_controller.check_all_endpoints(pg_endpoints, password)
 
             _ip_to_az, ip_to_unit = self._build_ip_maps(relation)
 

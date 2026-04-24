@@ -420,7 +420,7 @@ class TestWatcherActions:
         event = MagicMock()
 
         with patch(
-            "relations.watcher_requirer.HealthChecker.check_all_endpoints",
+            "relations.watcher_requirer.RaftController.check_all_endpoints",
             return_value={"10.0.0.1": False},
         ):
             handler._on_trigger_health_check(event)
@@ -454,11 +454,11 @@ class TestWatcherActions:
 
         with (
             patch(
-                "relations.watcher_requirer.HealthChecker.check_all_endpoints",
+                "relations.watcher_requirer.RaftController.check_all_endpoints",
                 return_value={"10.0.0.1": True},
             ),
             patch(
-                "relations.watcher_requirer.HealthChecker.cluster_status",
+                "relations.watcher_requirer.RaftController.cluster_status",
                 return_value=[{"role": "standby_leader", "host": "10.0.0.1"}],
             ),
             patch("relations.watcher_requirer.RaftController.get_status") as _get_status,
@@ -491,11 +491,11 @@ class TestWatcherActions:
 
         with (
             patch(
-                "relations.watcher_requirer.HealthChecker.check_all_endpoints",
+                "relations.watcher_requirer.RaftController.check_all_endpoints",
                 return_value={"10.0.0.1": True},
             ),
             patch(
-                "relations.watcher_requirer.HealthChecker.cluster_status",
+                "relations.watcher_requirer.RaftController.cluster_status",
                 return_value=[{"role": "standby_leader", "host": "10.0.0.1"}],
             ),
             patch("relations.watcher_requirer.RaftController.get_status") as _get_status,
@@ -526,11 +526,11 @@ class TestWatcherActions:
 
         with (
             patch(
-                "relations.watcher_requirer.HealthChecker.check_all_endpoints",
+                "relations.watcher_requirer.RaftController.check_all_endpoints",
                 return_value={"10.0.0.1": True},
             ),
             patch(
-                "relations.watcher_requirer.HealthChecker.cluster_status",
+                "relations.watcher_requirer.RaftController.cluster_status",
                 return_value=[{"role": "standby_leader", "host": "10.0.0.1"}],
             ),
             patch("relations.watcher_requirer.RaftController.get_status") as _get_status,
