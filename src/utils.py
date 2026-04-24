@@ -7,6 +7,14 @@ import os
 import pwd
 import secrets
 import string
+from asyncio import as_completed, create_task, run, wait
+from contextlib import suppress
+from ssl import CERT_NONE, create_default_context
+from typing import Any
+
+from httpx import AsyncClient, BasicAuth, HTTPError
+
+from constants import API_REQUEST_TIMEOUT
 
 
 def new_password() -> str:
@@ -78,3 +86,46 @@ def _change_owner(path: str) -> None:
     user_database = pwd.getpwnam("_daemon_")
     # Set the correct ownership for the file or directory.
     os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
+
+
+async def _httpx_get_request(
+    url: str, cafile: str, auth: BasicAuth | None = None, verify: bool = True
+) -> dict[str, Any] | None:
+    ssl_ctx = create_default_context()
+    if verify:
+        with suppress(FileNotFoundError):
+            ssl_ctx.load_verify_locations(cafile=cafile)
+    else:
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = CERT_NONE
+    async with AsyncClient(auth=auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx) as client:
+        try:
+            return (await client.get(url)).raise_for_status().json()
+        except (HTTPError, ValueError):
+            return None
+
+
+async def _async_get_request(
+    uri: str, endpoints: list[str], cafile: str, auth: BasicAuth | None, verify: bool = True
+) -> dict[str, Any] | None:
+    tasks = [
+        create_task(_httpx_get_request(f"https://{ip}:8008{uri}", cafile, auth, verify))
+        for ip in endpoints
+    ]
+    for task in as_completed(tasks):
+        if result := await task:
+            for task in tasks:
+                task.cancel()
+            await wait(tasks)
+            return result
+
+
+def parallel_patroni_get_request(
+    uri: str,
+    endpoints: list[str],
+    cafile: str,
+    auth: BasicAuth | None = None,
+    verify: bool = True,
+) -> dict[str, Any] | None:
+    """Call all possible patroni endpoints in parallel."""
+    return run(_async_get_request(uri, endpoints, cafile, auth, verify))

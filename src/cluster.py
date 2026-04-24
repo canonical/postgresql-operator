@@ -12,18 +12,15 @@ import pathlib
 import re
 import shutil
 import subprocess
-from asyncio import as_completed, create_task, run, wait
-from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
-from ssl import CERT_NONE, create_default_context
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import psutil
 import requests
 import tomli
 from charmlibs import snap
-from httpx import AsyncClient, BasicAuth, HTTPError
+from httpx import BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -58,7 +55,7 @@ from constants import (
     POSTGRESQL_LOGS_PATH,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import _change_owner, label2name, render_file
+from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
 
 logger = logging.getLogger(__name__)
 
@@ -249,9 +246,28 @@ class Patroni:
 
     def cluster_status(self, alternative_endpoints: list | None = None) -> list[ClusterMember]:
         """Query the cluster status."""
+        if not self._patroni_async_auth:
+            raise RetryError(
+                last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
+            )
+
+        # TODO we don't know the other cluster's ca
+        verify = not bool(alternative_endpoints)
+        if alternative_endpoints:
+            endpoints = alternative_endpoints
+        else:
+            endpoints = []
+            if self.unit_ip:
+                endpoints.append(self.unit_ip)
+                for peer_ip in self.peers_ips:
+                    endpoints.append(peer_ip)
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(
-            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
+        if response := parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+            endpoints,
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            self._patroni_async_auth,
+            verify,
         ):
             logger.debug("API cluster_status: %s", response["members"])
             return response["members"]
@@ -294,54 +310,6 @@ class Patroni:
                 if member["name"] == member_name:
                     return member["state"]
         return ""
-
-    async def _httpx_get_request(self, url: str, verify: bool = True) -> dict[str, Any] | None:
-        if not self._patroni_async_auth:
-            return None
-        ssl_ctx = create_default_context()
-        if verify:
-            with suppress(FileNotFoundError):
-                ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-        else:
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = CERT_NONE
-        async with AsyncClient(
-            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
-        ) as client:
-            try:
-                return (await client.get(url)).raise_for_status().json()
-            except (HTTPError, ValueError):
-                return None
-
-    async def _async_get_request(
-        self, uri: str, endpoints: list[str], verify: bool = True
-    ) -> dict[str, Any] | None:
-        tasks = [
-            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}", verify))
-            for ip in endpoints
-        ]
-        for task in as_completed(tasks):
-            if result := await task:
-                for task in tasks:
-                    task.cancel()
-                await wait(tasks)
-                return result
-
-    def parallel_patroni_get_request(
-        self, uri: str, endpoints: list[str] | None = None
-    ) -> dict[str, Any] | None:
-        """Call all possible patroni endpoints in parallel."""
-        if not endpoints:
-            endpoints = []
-            if self.unit_ip:
-                endpoints.append(self.unit_ip)
-            for peer_ip in self.peers_ips:
-                endpoints.append(peer_ip)
-            verify = True
-        else:
-            # TODO we don't know the other cluster's ca
-            verify = False
-        return run(self._async_get_request(uri, endpoints, verify))
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None

@@ -411,13 +411,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Called after snap refresh
         """
         try:
-            if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
-                cert = load_pem_x509_certificate(raw_cert.encode())
-                if (
+            if (
+                (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
+                and (cert := load_pem_x509_certificate(raw_cert.encode()))
+                and (
                     cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
                     != self._unit_ip
-                ):
-                    self.tls.generate_internal_peer_cert()
+                )
+            ):
+                self.tls.generate_internal_peer_cert()
         except Exception:
             logger.exception("Unable to check or update internal cert")
 

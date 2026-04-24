@@ -1,0 +1,18 @@
+#########################################################################################
+# [ WARNING ]
+# watcher configuration file maintained by the postgres-operator
+# local changes may be overwritten.
+#########################################################################################
+# For a complete reference of all the options for this configuration file,
+# please refer to https://patroni.readthedocs.io/en/latest/SETTINGS.html.
+
+raft:
+  {% if partner_addrs -%}
+  partner_addrs:
+  {% endif -%}
+  {% for partner_addr in partner_addrs -%}
+  - {{ partner_addr }}:2222
+  {% endfor %}
+  self_addr: '{{ self_addr }}:{{ self_port }}'
+  password: {{ password }}
+  data_dir: {{ data_dir }}/raft
