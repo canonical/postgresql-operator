@@ -10,7 +10,9 @@ import logging
 import os
 import pathlib
 import platform
+import pwd
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -60,6 +62,7 @@ from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
     PEER,
+    POSTGRESQL_STORAGE_PERMISSIONS,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
@@ -100,9 +103,14 @@ from cluster_topology_observer import (
 from config import CharmConfig
 from constants import (
     APP_SCOPE,
+    ARCHIVE_DATA_DIR,
+    ARCHIVE_STORAGE_PATH,
+    DATA_DIR_SUBFOLDER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    LOGS_DATA_DIR,
+    LOGS_STORAGE_PATH,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -111,6 +119,7 @@ from constants import (
     PGBACKREST_METRICS_PORT,
     PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
+    POSTGRESQL_DATA_DIR,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
@@ -121,6 +130,9 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
+    STORAGE_LAYOUT_MIGRATED_KEY,
+    TEMP_DATA_DIR,
+    TEMP_STORAGE_PATH,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -136,13 +148,14 @@ from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from rotate_logs import RotateLogs
-from utils import label2name, new_password, render_file
+from utils import _change_owner, label2name, new_password, render_file
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 logging.getLogger("boto3").setLevel(logging.WARNING)
+STORAGE_LAYOUT_IGNORED_ENTRIES = {DATA_DIR_SUBFOLDER.split("/", maxsplit=1)[0], "lost+found"}
 logging.getLogger("botocore").setLevel(logging.WARNING)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
@@ -405,11 +418,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         charm_tracing_config(self._grafana_agent)
 
-    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
-        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
-
-        Called after snap refresh
-        """
+    def _check_and_update_internal_cert(self) -> None:
+        """Check if the internal cert CN matches the unit IP and regenerate if needed."""
         try:
             if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
                 cert = load_pem_x509_certificate(raw_cert.encode())
@@ -420,6 +430,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.tls.generate_internal_peer_cert()
         except Exception:
             logger.exception("Unable to check or update internal cert")
+
+    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
+        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
+
+        Called after snap refresh
+        """
+        self._check_and_update_internal_cert()
+
+        try:
+            self._ensure_storage_layout()
+        except (OSError, RuntimeError):
+            logger.exception("Unable to migrate PostgreSQL storage layout")
+            self.set_unit_status(
+                ops.BlockedStatus("Failed to migrate PostgreSQL storage layout"), refresh=refresh
+            )
+            return
 
         if not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
@@ -450,6 +476,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
             )
         else:
+            self._ensure_temp_tablespace_location_if_primary()
             try:
                 self._patroni.set_max_timelines_history()
             except Exception:
@@ -653,6 +680,179 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def is_unit_stopped(self) -> bool:
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
+
+    @property
+    def is_storage_layout_migrated(self) -> bool:
+        """Returns whether this unit already migrated to the versioned storage layout."""
+        return self.unit_peer_data.get(STORAGE_LAYOUT_MIGRATED_KEY) == "True"
+
+    def _migrate_storage_mount(self, storage_path: str, target_path: str) -> None:
+        """Move a storage mount root into the versioned PostgreSQL data layout."""
+        Path(storage_path).mkdir(parents=True, exist_ok=True)
+        Path(target_path).mkdir(parents=True, exist_ok=True)
+        _change_owner(target_path)
+        os.chmod(target_path, POSTGRESQL_STORAGE_PERMISSIONS)
+
+        for item in os.listdir(storage_path):
+            if item in STORAGE_LAYOUT_IGNORED_ENTRIES:
+                continue
+
+            source = os.path.join(storage_path, item)
+            destination = os.path.join(target_path, item)
+            logger.info("Moving %s to %s", source, destination)
+            os.rename(source, destination)
+
+    def _repair_pg_wal_symlink(self) -> None:
+        """Ensure pg_wal points to the versioned WAL directory for migrated deployments."""
+        pg_wal_path = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
+        if not pg_wal_path.is_symlink():
+            return
+
+        current_target = Path(os.path.realpath(pg_wal_path))
+        new_target = Path(LOGS_DATA_DIR)
+        if current_target == new_target:
+            return
+
+        old_target = Path(LOGS_STORAGE_PATH)
+        if current_target != old_target:
+            logger.warning(
+                "Skipping pg_wal repair: unexpected target %s (expected %s or %s)",
+                current_target,
+                old_target,
+                new_target,
+            )
+            return
+
+        self._migrate_storage_mount(LOGS_STORAGE_PATH, LOGS_DATA_DIR)
+        pg_wal_path.unlink()
+        pg_wal_path.symlink_to(LOGS_DATA_DIR)
+        logger.info("Updated pg_wal symlink to %s", LOGS_DATA_DIR)
+
+    def _ensure_storage_layout(self) -> None:
+        """Ensure the PostgreSQL storage layout is prepared or migrated exactly once."""
+        if self._peers is None:
+            raise RuntimeError("Peer relation not ready")
+        if not self.is_storage_layout_migrated:
+            for storage_path, target_path in (
+                (POSTGRESQL_DATA_PATH, POSTGRESQL_DATA_DIR),
+                (ARCHIVE_STORAGE_PATH, ARCHIVE_DATA_DIR),
+                (LOGS_STORAGE_PATH, LOGS_DATA_DIR),
+                (TEMP_STORAGE_PATH, TEMP_DATA_DIR),
+            ):
+                self._migrate_storage_mount(storage_path, target_path)
+
+            self.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
+
+        self._repair_pg_wal_symlink()
+        self._reconcile_storage_permissions()
+
+    def _reconcile_storage_permissions(self) -> None:
+        """Reconcile storage root permissions and pg_wal symlink ownership.
+
+        Storage roots (e.g. common/var/lib/postgresql/) are container directories
+        after migration and must be 0755, not the 0700 of a PostgreSQL data dir.
+        The pg_wal symlink must be owned by _daemon_ — it is created by Patroni on
+        fresh deploys, but recreated as root when the charm repairs it during upgrade.
+        This method is idempotent and always runs so it heals units migrated before
+        these fixes were applied.
+        """
+        for storage_path in (
+            POSTGRESQL_DATA_PATH,
+            ARCHIVE_STORAGE_PATH,
+            LOGS_STORAGE_PATH,
+            TEMP_STORAGE_PATH,
+        ):
+            if os.path.exists(storage_path):
+                os.chmod(storage_path, 0o755)  # noqa: S103
+
+        pg_wal_path = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
+        if pg_wal_path.is_symlink():
+            user_database = pwd.getpwnam("_daemon_")
+            os.lchown(str(pg_wal_path), user_database.pw_uid, user_database.pw_gid)
+
+    @staticmethod
+    def _clear_pg_version_dirs(path: Path) -> None:
+        """Remove PostgreSQL version subdirectories (PG_<ver>_<catalog>) from a directory.
+
+        These directories are created by PostgreSQL when a tablespace is created and must not
+        exist at a target path before CREATE TABLESPACE is called.  Temp tablespace data is
+        ephemeral, so removal is safe.
+        """
+        if path.exists():
+            for entry in path.iterdir():
+                if entry.name.startswith("PG_"):
+                    shutil.rmtree(entry)
+
+    def _ensure_temp_tablespace_location(self) -> bool:
+        """Ensure the temp tablespace points to the versioned temp directory.
+
+        DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction block, so this
+        method avoids using the connection as a context manager (which would create one in
+        psycopg2).  Instead it uses plain assignments and explicit close(), mirroring the
+        pattern in the single_kernel_postgresql set_up_database helper.
+        """
+        connection = None
+        cursor = None
+        try:
+            connection = self.postgresql._connect_to_database()
+            connection.autocommit = True  # DROP/CREATE TABLESPACE cannot run inside a transaction
+            cursor = connection.cursor()
+
+            cursor.execute(
+                "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+            )
+            row = cursor.fetchone()
+            if row is None:
+                # The tablespace may have been dropped by a previous partially-failed
+                # migration (DROP succeeded, CREATE failed).  If the versioned directory
+                # already exists, recreate the tablespace there.
+                pg_data_dir = Path(TEMP_DATA_DIR)
+                if pg_data_dir.exists():
+                    self._clear_pg_version_dirs(pg_data_dir)
+                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
+                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+                return True
+
+            current_location = row[0]
+            if current_location == TEMP_DATA_DIR:
+                return True
+
+            if current_location != TEMP_STORAGE_PATH:
+                logger.warning(
+                    "Skipping temp tablespace migration: unexpected location %s "
+                    "(expected %s or %s)",
+                    current_location,
+                    TEMP_STORAGE_PATH,
+                    TEMP_DATA_DIR,
+                )
+                return True
+
+            logger.info(
+                "Migrating temp tablespace location from %s to %s",
+                TEMP_STORAGE_PATH,
+                TEMP_DATA_DIR,
+            )
+            cursor.execute("DROP TABLESPACE temp;")
+            self._clear_pg_version_dirs(Path(TEMP_DATA_DIR))
+            cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
+            cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+        except psycopg2.Error:
+            logger.exception("Failed to migrate temp tablespace location")
+            return False
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+        return True
+
+    def _ensure_temp_tablespace_location_if_primary(self) -> bool:
+        """Ensure the temp tablespace is migrated when this unit is the primary."""
+        if not self.is_primary:
+            return True
+
+        return self._ensure_temp_tablespace_location()
 
     @cached_property
     def postgresql(self) -> PostgreSQL:
@@ -999,6 +1199,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self._start_stop_pgbackrest_service(event)
+
+        if not self._ensure_temp_tablespace_location_if_primary():
+            event.defer()
+            return
 
         # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
         if (
@@ -1660,6 +1864,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.tls.generate_internal_peer_cert()
 
         self.unit_peer_data.update({"ip": self._unit_ip})
+        try:
+            self._ensure_storage_layout()
+        except (OSError, RuntimeError):
+            logger.exception("Unable to migrate PostgreSQL storage layout")
+            self.set_unit_status(BlockedStatus("Failed to migrate PostgreSQL storage layout"))
+            return
 
         # Open port
         try:
@@ -1803,9 +2013,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
+        self.postgresql.set_up_database(temp_location=TEMP_DATA_DIR)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
@@ -1990,7 +2198,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except SwitchoverFailedError:
                 event.fail("Switchover failed or timed out, check the logs for details")
 
-    def _on_update_status(self, _) -> None:
+    def _on_update_status(self, event) -> None:
         """Update the unit status message and users list in the database."""
         if not self._can_run_on_update_status():
             return
@@ -2001,6 +2209,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self._handle_processes_failures():
+            return
+
+        if self.unit.is_leader() and not self._reconfigure_cluster(event):
+            return
+
+        if not self._ensure_temp_tablespace_location_if_primary():
             return
 
         self.postgresql_client_relation.oversee_users()
@@ -2129,11 +2343,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
-            data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
+            data_directory_contents = os.listdir(POSTGRESQL_DATA_DIR)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
                 os.rename(
-                    os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
-                    os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{datetime.now(UTC).isoformat()}"),
+                    os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
+                    os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{datetime.now(UTC).isoformat()}"),
                 )
                 logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True

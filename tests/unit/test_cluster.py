@@ -26,9 +26,10 @@ from cluster import (
     SwitchoverNotSyncError,
 )
 from constants import (
+    LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
-    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_DATA_DIR,
     POSTGRESQL_LOGS_PATH,
 )
 
@@ -290,9 +291,10 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
         expected_content = template.render(
             conf_path=PATRONI_CONF_PATH,
-            data_path=POSTGRESQL_DATA_PATH,
+            data_path=POSTGRESQL_DATA_DIR,
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
+            wal_dir=LOGS_DATA_DIR,
             member_name=member_name,
             partner_addrs=["2.2.2.2", "3.3.3.3"],
             peers_ips=sorted(peers_ips),
@@ -463,6 +465,7 @@ def test_set_max_timelines_history(peers_ips, patroni):
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
     with (
+        patch("os.makedirs") as _makedirs,
         patch("os.chmod") as _chmod,
         patch("builtins.open") as _open,
         patch("os.chown") as _chown,
@@ -474,17 +477,16 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         patroni.configure_patroni_on_unit()
 
         _getpwnam.assert_called_once_with("_daemon_")
+        _makedirs.assert_called_once_with(POSTGRESQL_DATA_DIR, exist_ok=True)
 
         _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            POSTGRESQL_DATA_DIR,
             uid=sentinel.uid,
             gid=sentinel.gid,
         )
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
-        _chmod.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 448
-        )
+        _chmod.assert_called_once_with(POSTGRESQL_DATA_DIR, 448)
 
 
 def test_member_started_true(peers_ips, patroni):
