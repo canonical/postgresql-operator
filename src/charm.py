@@ -742,6 +742,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._migrate_storage_mount(storage_path, target_path)
 
             self.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
+        else:
+            # The temp data directory may live on a tmpfs mount that is wiped on
+            # reboot, even after the one-time migration flag has been recorded.
+            # Create it WITHOUT setting owner/mode: set_up_database detects the
+            # root-owned directory as needing a permissions fix, which triggers its
+            # _handle_temp_tablespace_on_reboot path for the tmpfs case and ensures
+            # the tablespace directory structure is reinitialised by PostgreSQL.
+            Path(TEMP_DATA_DIR).mkdir(parents=True, exist_ok=True)
 
         self._repair_pg_wal_symlink()
         self._reconcile_storage_permissions()
@@ -815,6 +823,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
             current_location = row[0]
             if current_location == TEMP_DATA_DIR:
+                # After a tmpfs wipe TEMP_DATA_DIR is recreated empty.  PostgreSQL will
+                # not be able to use the tablespace until its internal PG_<ver>_<catver>/
+                # directory structure has been recreated.  Detect this and reinitialise
+                # by dropping and recreating the tablespace.
+                pg_data_dir = Path(TEMP_DATA_DIR)
+                if pg_data_dir.exists() and not any(
+                    d.is_dir() and d.name.startswith("PG_") for d in pg_data_dir.iterdir()
+                ):
+                    logger.info(
+                        "Temp tablespace directory is empty after tmpfs wipe; reinitialising"
+                    )
+                    cursor.execute("DROP TABLESPACE temp;")
+                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
+                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
                 return True
 
             if current_location != TEMP_STORAGE_PATH:
@@ -850,6 +872,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _ensure_temp_tablespace_location_if_primary(self) -> bool:
         """Ensure the temp tablespace is migrated when this unit is the primary."""
         if not self.is_primary:
+            return True
+
+        if not self.primary_endpoint:
+            logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
             return True
 
         return self._ensure_temp_tablespace_location()

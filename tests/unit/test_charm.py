@@ -707,9 +707,10 @@ def test_ensure_storage_layout(harness, tmp_path):
         harness.charm._ensure_storage_layout()
 
         assert (data_root / "stray.txt").read_text() == "stray"
-        # _migrate_storage_mount skipped (already migrated), but reconciliation always runs
-        assert not _change_owner.called
-        assert _chmod.call_count == 4
+        # Already migrated: only TEMP_DATA_DIR is re-created (tmpfs reboot guard) + reconciliation
+        # mkdir only — no _change_owner or chmod on TEMP_DATA_DIR (library detects root-owned dir)
+        _change_owner.assert_not_called()
+        assert _chmod.call_count == 4  # only the 4 storage root chmod calls
         _chmod.assert_any_call(str(data_root), 0o755)
         _lchown.assert_not_called()
 
@@ -754,13 +755,14 @@ def test_ensure_storage_layout_repairs_stale_pg_wal_symlink(harness, tmp_path):
         assert (logs_root / "16" / "main" / "000000010000000000000008").read_text() == "wal"
         assert not (logs_root / "000000010000000000000008").exists()
         assert (logs_root / "16" / "main" / "archive_status").exists()
-        # _migrate_storage_mount for logs (called by _repair_pg_wal_symlink)
+        # TEMP_DATA_DIR re-created (mkdir only) + _migrate_storage_mount for logs
+        assert _change_owner.call_count == 1
         _change_owner.assert_called_once_with(str(logs_root / "16" / "main"))
         _chmod.assert_any_call(str(logs_root / "16" / "main"), 0o700)
         # _reconcile_storage_permissions: chmod on all 4 storage roots
         _chmod.assert_any_call(str(data_root), 0o755)
         _chmod.assert_any_call(str(logs_root), 0o755)
-        assert _chmod.call_count == 5  # 1 target (logs/16/main) + 4 storage roots
+        assert _chmod.call_count == 5  # 1 target dir (logs) + 4 storage roots
         # pg_wal symlink ownership reconciled
         _lchown.assert_called_once_with(
             str(stale_pg_wal), _getpwnam.return_value.pw_uid, _getpwnam.return_value.pw_gid
@@ -811,7 +813,7 @@ def test_reconcile_storage_permissions_heals_already_migrated_units(harness, tmp
         _chmod.assert_any_call(str(archive_root), 0o755)
         _chmod.assert_any_call(str(logs_root), 0o755)
         _chmod.assert_any_call(str(temp_root), 0o755)
-        assert _chmod.call_count == 4
+        assert _chmod.call_count == 4  # only the 4 storage root chmod calls (no TEMP_DATA_DIR)
 
         # pg_wal symlink ownership reconciled (_daemon_)
         _lchown.assert_called_once_with(
@@ -874,7 +876,122 @@ def test_ensure_temp_tablespace_location_recovers_dropped_tablespace(harness, tm
     ])
 
 
-def test_post_snap_refresh_storage_layout_failure(harness):
+def test_ensure_temp_tablespace_location_reinitialises_after_tmpfs_wipe(harness, tmp_path):
+    """If tablespace dir is empty (tmpfs wipe), DROP+CREATE to reinitialise it."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_data_dir.mkdir(parents=True)
+    # No PG_version/ directory — simulates an empty dir after tmpfs wipe
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (str(temp_data_dir),)  # tablespace exists at correct location
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+    ):
+        assert harness.charm._ensure_temp_tablespace_location()
+
+    cursor.execute.assert_has_calls([
+        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
+        call("DROP TABLESPACE temp;"),
+        call(f"CREATE TABLESPACE temp LOCATION '{temp_data_dir}';"),
+        call("GRANT CREATE ON TABLESPACE temp TO public;"),
+    ])
+
+
+def test_ensure_temp_tablespace_location_skips_reinit_when_pg_dir_present(harness, tmp_path):
+    """If PG_version/ already exists in tablespace dir, no DROP+CREATE is performed."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_data_dir.mkdir(parents=True)
+    (temp_data_dir / "PG_16_202307071").mkdir()  # directory already initialised
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (str(temp_data_dir),)
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+    ):
+        assert harness.charm._ensure_temp_tablespace_location()
+
+    # Only the SELECT should have been executed — no DROP/CREATE
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+
+
+def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
+    """TEMP_DATA_DIR is recreated even when already migrated (e.g. after a tmpfs wipe on reboot)."""
+    temp_root = tmp_path / "temp"
+    temp_root.mkdir()
+    # Other storage roots are pre-created with versioned subdirs (persistent storage)
+    for path in (
+        tmp_path / "postgresql" / "16" / "main",
+        tmp_path / "archive" / "16" / "main",
+        tmp_path / "logs" / "16" / "main",
+    ):
+        path.mkdir(parents=True)
+
+    # Mark as already migrated — temp_root/16/main does NOT exist (simulating tmpfs wipe)
+    harness.charm.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
+
+    with (
+        patch("charm.POSTGRESQL_DATA_PATH", str(tmp_path / "postgresql")),
+        patch("charm.POSTGRESQL_DATA_DIR", str(tmp_path / "postgresql" / "16" / "main")),
+        patch("charm.ARCHIVE_STORAGE_PATH", str(tmp_path / "archive")),
+        patch("charm.ARCHIVE_DATA_DIR", str(tmp_path / "archive" / "16" / "main")),
+        patch("charm.LOGS_STORAGE_PATH", str(tmp_path / "logs")),
+        patch("charm.LOGS_DATA_DIR", str(tmp_path / "logs" / "16" / "main")),
+        patch("charm.TEMP_STORAGE_PATH", str(temp_root)),
+        patch("charm.TEMP_DATA_DIR", str(temp_root / "16" / "main")),
+        patch("charm._change_owner"),
+        patch("charm.os.chmod"),
+        patch("charm.os.lchown"),
+        patch("charm.pwd.getpwnam"),
+    ):
+        harness.charm._ensure_storage_layout()
+
+    assert (temp_root / "16" / "main").is_dir()
+
+
+def test_ensure_temp_tablespace_location_if_primary_skips_when_no_endpoint(harness):
+    """If primary_endpoint is not yet set, the tablespace check is skipped (not deferred)."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=None,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location"
+        ) as _ensure_temp_tablespace_location,
+    ):
+        result = harness.charm._ensure_temp_tablespace_location_if_primary()
+
+    assert result is True
+    _ensure_temp_tablespace_location.assert_not_called()
+
     refresh = MagicMock(unit_status_higher_priority=None)
     with (
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout", side_effect=OSError),
@@ -1020,6 +1137,11 @@ def test_on_update_status_skips_remainder_when_temp_tablespace_migration_fails(h
             "charm.PostgresqlOperatorCharm.is_primary",
             new_callable=PropertyMock,
             return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
         ),
         patch(
             "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location", return_value=False
