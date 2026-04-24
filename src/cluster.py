@@ -253,7 +253,7 @@ class Patroni:
             )
 
         # TODO we don't know the other cluster's ca
-        verify = bool(alternative_endpoints)
+        verify = not bool(alternative_endpoints)
         if alternative_endpoints:
             endpoints = alternative_endpoints
         else:
