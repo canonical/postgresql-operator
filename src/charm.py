@@ -242,7 +242,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     def refresh_snap(
         self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
     ) -> None:
-        if self._charm._role != "watcher":
+        if not self._charm.is_watcher_role:
             # Update the configuration.
             self._charm.set_unit_status(
                 MaintenanceStatus("updating configuration"), refresh=refresh
@@ -323,17 +323,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 f"invalid role '{configured_role}' (must be 'postgresql' or 'watcher')"
             )
             return
-
-        if configured_role == "postgresql":
-            self._role: Literal["postgresql", "watcher"] = "postgresql"
-        else:
-            self._role = "watcher"
+        elif isinstance(self.unit.status, BlockedStatus) and self.unit.status.message.startswith(
+            "invalid role"
+        ):
+            self.unit.status = ActiveStatus()
 
         if not self._validate_initial_role_unchanged():
             return
 
         # Watcher mode: lightweight Raft witness, no PostgreSQL
-        if self._role == "watcher":
+        if self.is_watcher_role:
             self._init_watcher_mode()
             # Set tracing_endpoint for @trace_charm decorator compatibility
             self.tracing_endpoint = None
@@ -358,23 +357,39 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 self.refresh.next_unit_allowed_to_refresh = True
 
-    @property
+    @cached_property
+    def get_role(self) -> str:
+        """Get cached role if available or configured role if not."""
+        configured_role = str(self.model.config.get("role", "postgresql"))
+        if not self._peers:
+            return configured_role
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None:
+            return configured_role
+        return stored_role
+
+    @cached_property
     def is_watcher_role(self) -> bool:
         """Return True if this charm is deployed in watcher mode."""
-        return self._role == "watcher"
+        return self.get_role == "watcher"
 
     def _validate_initial_role_unchanged(self) -> bool:
         """Validate configured role against persisted peer-role during startup."""
         if not self._peers:
             return True
 
+        configured_role = str(self.model.config.get("role", "postgresql"))
         stored_role = self._peers.data[self.app].get("role")
-        if stored_role is None or stored_role == self._role:
+        if stored_role is None or stored_role == configured_role:
+            if isinstance(self.unit.status, BlockedStatus) and self.unit.status.message.startswith(
+                "role change not supported"
+            ):
+                self.unit.status = ActiveStatus()
             return True
 
         logger.error(
             f"Role change is not supported. Deployed as '{stored_role}', "
-            f"but config now says '{self._role}'."
+            f"but config now says '{configured_role}'."
         )
         self.unit.status = BlockedStatus(
             f"role change not supported (deployed as '{stored_role}')"
@@ -389,16 +404,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if not self._peers:
             return True
+        configured_role = str(self.model.config.get("role", "postgresql"))
         stored_role = self._peers.data[self.app].get("role")
         if stored_role is None:
             # First time — persist the role (leader only)
             if self.unit.is_leader():
-                self._peers.data[self.app]["role"] = self._role
+                self._peers.data[self.app]["role"] = configured_role
             return True
-        if stored_role != self._role:
+        if stored_role != configured_role:
             logger.error(
                 f"Role change is not supported. Deployed as '{stored_role}', "
-                f"but config now says '{self._role}'."
+                f"but config now says '{configured_role}'."
             )
             self.unit.status = BlockedStatus(
                 f"role change not supported (deployed as '{stored_role}')"
@@ -533,7 +549,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         Called after snap refresh
         """
-        if self._role != "watcher":
+        if not self.is_watcher_role:
             try:
                 if (
                     (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
@@ -548,9 +564,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.exception("Unable to check or update internal cert")
 
             if not self._patroni.start_patroni():
-                self.set_unit_status(
-                    ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh
-                )
+                self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
                 return
 
             self._setup_exporter()
@@ -611,7 +625,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit.status = status
 
     def _reconcile_refresh_status(self, _=None):
-        if self._role != "watcher" and self.unit.is_leader():
+        if not self.is_watcher_role and self.unit.is_leader():
             self.async_replication.set_app_status()
 
         # Workaround for other unit statuses being set in a stateful way (i.e. unable to recompute
@@ -631,7 +645,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.unit.status = refresh_status
                 new_refresh_unit_status = refresh_status.message
-            elif self._role != "watcher":
+            elif not self.is_watcher_role:
                 # Clear refresh status from unit status
                 self._set_primary_status_message()
         elif (
