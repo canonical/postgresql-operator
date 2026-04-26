@@ -1,0 +1,48 @@
+[32mINFO    [0m integration.ha_tests.conftest:conftest.py:67 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:25:02Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active       1  data-integrator      latest/edge  398  no       
+postgresql           14.22    active       3  postgresql                          0  no       
+postgresql-test-app           blocked      1  postgresql-test-app  latest/edge  489  no       No database integration available
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+data-integrator/0*      active    idle       3        10.74.122.188             
+postgresql-test-app/0*  blocked   idle       4        10.74.122.218             No database integration available
+postgresql/0*           active    executing  0        10.74.122.147   5432/tcp  Primary (degraded)
+postgresql/1            waiting   executing  1        10.74.122.51    5432/tcp  waiting to start PostgreSQL
+postgresql/2            waiting   executing  2        10.74.122.223   5432/tcp  waiting to start PostgreSQL
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.74.122.147  juju-9632e9-0  ubuntu@22.04  runnervmrc6n4  Running
+1        started  10.74.122.51   juju-9632e9-1  ubuntu@22.04  runnervmrc6n4  Running
+2        started  10.74.122.223  juju-9632e9-2  ubuntu@22.04  runnervmrc6n4  Running
+3        started  10.74.122.188  juju-9632e9-3  ubuntu@24.04  runnervmrc6n4  Running
+4        started  10.74.122.218  juju-9632e9-4  ubuntu@22.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:15:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:15:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:18:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:18:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:21:29 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f931914ec50 state=finished raised Exception>]
+machine-2: 00:21:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:21:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:22:25 ERROR unit.postgresql/0.juju-log database:4: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 00:22:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:22:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:24:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:24:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
