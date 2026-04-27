@@ -82,6 +82,17 @@ SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 
 TRACING_PROTOCOL = "otlp_http"
 
+# Watcher constants
+WATCHER_OFFER_RELATION = "watcher-offer"
+WATCHER_RELATION = "watcher"
+WATCHER_USER = "watcher"
+
+# Labels are not confidential
+WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105
+WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
+
+RAFT_PORT = 2222
+
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
 
