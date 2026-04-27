@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 from ops import (
     Object,
     Relation,
-    RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
     RelationJoinedEvent,
@@ -71,31 +70,11 @@ class PostgreSQLWatcherRelation(Object):
             self.charm.on[WATCHER_OFFER_RELATION].relation_departed,
             self._on_watcher_relation_departed,
         )
-        self.framework.observe(
-            self.charm.on[WATCHER_OFFER_RELATION].relation_broken,
-            self._on_watcher_relation_broken,
-        )
 
     @property
     def _relation(self) -> Relation | None:
         """Return the watcher relation if it exists."""
         return self.model.get_relation(WATCHER_OFFER_RELATION)
-
-    @cached_property
-    def watcher_address(self) -> str | None:
-        """Return the watcher unit address if available.
-
-        Returns:
-            The IP address of the watcher unit, or None if not available.
-        """
-        if not (relation := self._relation):
-            return None
-
-        # Get the watcher unit address from the relation data
-        for unit in relation.units:
-            if unit_address := relation.data[unit].get("unit-address"):
-                return unit_address
-        return None
 
     @property
     def is_watcher_connected(self) -> bool:
@@ -104,29 +83,16 @@ class PostgreSQLWatcherRelation(Object):
         Returns:
             True if a watcher is connected, False otherwise.
         """
-        return self.watcher_address is not None
-
-    @cached_property
-    def watcher_raft_port(self) -> int | None:
-        """Return the watcher's Raft port from relation data.
-
-        The watcher shares its assigned port via relation data under
-        ``watcher-raft-port``. Falls back to the default RAFT_PORT if not set.
-
-        Returns:
-            The watcher's Raft port number.
-        """
-        if not (relation := self._relation):
-            return None
-
-        for unit in relation.units:
-            port_str = relation.data[unit].get("watcher-raft-port")
-            if port_str:
-                try:
-                    return int(port_str)
-                except ValueError:
-                    logger.warning(f"Invalid watcher-raft-port value: {port_str}")
-        return None
+        try:
+            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
+            if raft_status:
+                # Check if watcher is in the partner_node_status entries
+                member_key = f"partner_node_status_server_{self.watcher_raft_address}"
+                return member_key in raft_status
+        except Exception as e:
+            logger.debug(f"Error checking Raft membership: {e}")
+        return False
 
     @cached_property
     def watcher_raft_address(self) -> str | None:
@@ -135,8 +101,23 @@ class PostgreSQLWatcherRelation(Object):
         Returns:
             The watcher's Raft address (ip:port), or None if not available.
         """
-        if (watcher_ip := self.watcher_address) and self.watcher_raft_port is not None:
-            return f"{watcher_ip}:{self.watcher_raft_port}"
+        if not (relation := self._relation):
+            return None
+
+        unit_address = None
+        port = None
+        # Get the watcher unit address from the relation data
+        for unit in relation.units:
+            if unit_address := relation.data[unit].get("unit-address"):
+                port_str = relation.data[unit].get("watcher-raft-port")
+                if port_str:
+                    try:
+                        port = int(port_str)
+                    except ValueError:
+                        logger.warning(f"Invalid watcher-raft-port value: {port_str}")
+
+        if unit_address and port is not None:
+            return f"{unit_address}:{port}"
         return None
 
     def _on_watcher_relation_joined(self, event: RelationJoinedEvent) -> None:
@@ -200,20 +181,20 @@ class PostgreSQLWatcherRelation(Object):
 
         if watcher_address:
             logger.info(f"Watcher address updated: {watcher_address}")
-            # Update Patroni configuration to include watcher in Raft
-            self.charm.update_config()
             # Only the leader handles Raft membership changes and user management
             # to avoid race conditions between multiple PostgreSQL units
             if self.charm.unit.is_leader():
-                self._cleanup_old_watcher_from_raft(watcher_address)
+                self._cleanup_old_watcher_from_raft()
                 self._ensure_watcher_user()
-                self._add_watcher_to_raft(watcher_address)
+                self._add_watcher_to_raft()
+            # Update Patroni configuration to include watcher in Raft
+            self.charm.update_config()
 
         # Update relation data for the watcher
         if self.charm.unit.is_leader():
             self._update_relation_data(event.relation)
 
-    def _cleanup_old_watcher_from_raft(self, current_watcher_address: str) -> None:
+    def _cleanup_old_watcher_from_raft(self) -> None:
         """Remove any old watcher IPs from Raft that differ from the current watcher.
 
         When a watcher unit is replaced (e.g., destroyed and re-deployed), it gets
@@ -227,8 +208,6 @@ class PostgreSQLWatcherRelation(Object):
         # Get all PostgreSQL unit IPs (these should stay in the cluster)
         # Use _units_ips for fresh IPs from unit relation data
         pg_ips = set(self.charm._units_ips)
-
-        current_watcher_raft_addr = f"{current_watcher_address}:{self.watcher_raft_port}"
 
         # Get Raft cluster status to find all members
         try:
@@ -245,7 +224,7 @@ class PostgreSQLWatcherRelation(Object):
                         member_ip = member_addr.split(":")[0]
 
                         # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
-                        if member_ip not in pg_ips and member_addr != current_watcher_raft_addr:
+                        if member_ip not in pg_ips and member_addr != self.watcher_raft_address:
                             stale_members.append(member_addr)
 
                 # Remove stale watcher members
@@ -259,29 +238,6 @@ class PostgreSQLWatcherRelation(Object):
         except Exception as e:
             logger.debug(f"Error during Raft cleanup: {e}")
 
-    def _is_watcher_in_raft(self, watcher_address: str) -> bool:
-        """Check if the watcher is a member of the Raft cluster.
-
-        Args:
-            watcher_address: The watcher's IP address.
-
-        Returns:
-            True if the watcher is in the Raft cluster, False otherwise.
-        """
-        watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
-        try:
-            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
-            raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
-            if raft_status:
-                # Check if watcher is in the partner_node_status entries
-                member_key = f"partner_node_status_server_{watcher_raft_addr}"
-                return member_key in raft_status
-        except UtilityException as e:
-            logger.debug(f"Failed to check Raft membership: {e}")
-        except Exception as e:
-            logger.debug(f"Error checking Raft membership: {e}")
-        return False
-
     def _pg_unit_count_is_odd(self) -> bool:
         """Return True if the number of PostgreSQL units is odd.
 
@@ -294,7 +250,7 @@ class PostgreSQLWatcherRelation(Object):
         pg_count = 1 + len(self.charm._peers.units) if self.charm._peers else 1
         return pg_count % 2 == 1
 
-    def _add_watcher_to_raft(self, watcher_address: str) -> None:
+    def _add_watcher_to_raft(self) -> None:
         """Dynamically add the watcher to the running Raft cluster.
 
         Only adds the watcher when the PostgreSQL unit count is even. With an
@@ -303,35 +259,24 @@ class PostgreSQLWatcherRelation(Object):
 
         This is necessary because simply updating partner_addrs in the config
         file doesn't add the member to a running cluster.
-
-        Args:
-            watcher_address: The watcher's IP address.
         """
-        if not self.charm.is_cluster_initialised or not self.watcher_raft_port:
+        if not self.charm.is_cluster_initialised:
             logger.debug("Cluster not initialized, skipping Raft member addition")
             return
-
-        watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
 
         # Only add the watcher when the PG unit count is even (2, 4, …).
         # With an odd PG count, adding the watcher creates an even Raft total
         # which degrades partition tolerance — remove it instead.
         if self._pg_unit_count_is_odd():
             logger.info(
-                f"PG unit count is odd; watcher {watcher_raft_addr} should not vote. "
+                f"PG unit count is odd; watcher {self.watcher_raft_address} should not vote. "
                 "Removing from Raft if present."
             )
-            if self.watcher_raft_port:
-                self.charm._patroni.remove_raft_member(watcher_address, self.watcher_raft_port)
+            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
             return
 
-        # Check if watcher is already in the Raft cluster
-        if self._is_watcher_in_raft(watcher_address):
-            logger.info(f"Watcher {watcher_raft_addr} already in Raft cluster")
-            return
-
-        logger.info(f"Adding watcher to Raft cluster: {watcher_raft_addr}")
-        self.charm._patroni.add_raft_member(watcher_address, self.watcher_raft_port)
+        logger.info(f"Adding watcher to Raft cluster: {self.watcher_raft_address}")
+        self.charm._patroni.add_raft_member(self.watcher_raft_address)
 
     def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle watcher departing from the relation.
@@ -367,26 +312,13 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             watcher_address: The watcher's IP address.
         """
-        if self.watcher_raft_port:
-            watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
+        if self.watcher_raft_address:
+            watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_address.split(':')[-1]}"
             logger.info(f"Removing watcher from Raft cluster: {watcher_raft_addr}")
-            self.charm._patroni.remove_raft_member(watcher_address, self.watcher_raft_port)
+            self.charm._patroni.remove_raft_member(watcher_raft_addr)
 
-    def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handle watcher relation being broken.
-
-        Updates Patroni configuration to remove the watcher from the Raft cluster.
-
-        Args:
-            event: The relation broken event.
-        """
-        logger.info("Watcher relation broken, updating Patroni configuration")
-
-        if not self.charm.is_cluster_initialised:
-            return
-
-        # Update Patroni configuration without the watcher
-        self.charm.update_config()
+        if self.charm.is_cluster_initialised:
+            self.charm.update_config(watcher=False)
 
     def _ensure_watcher_user(self) -> str | None:
         """Ensure the watcher PostgreSQL user exists for health checks.
@@ -670,16 +602,12 @@ class PostgreSQLWatcherRelation(Object):
         if not self.charm.is_cluster_initialised:
             return
 
-        if not (watcher_address := self.watcher_address):
-            return
-
         # Only the leader handles Raft membership changes to avoid races
         if self.charm.unit.is_leader():
-            self._cleanup_old_watcher_from_raft(watcher_address)
+            self._cleanup_old_watcher_from_raft()
 
-            if not self._is_watcher_in_raft(watcher_address):
-                logger.info(f"Watcher {watcher_address} not in Raft cluster, adding it")
-                self._add_watcher_to_raft(watcher_address)
+            if not self.is_watcher_connected:
+                self._add_watcher_to_raft()
 
             # Update watcher relation data with fresh PostgreSQL IPs
             if relation := self._relation:

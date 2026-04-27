@@ -574,7 +574,9 @@ async def test_primary_network_isolation_with_watcher(
                 "Replica should remain primary after network restore"
             )
             # Old primary should not be primary anymore
-            assert primary not in final_roles["primaries"], "Old primary should now be a replica"
+            assert (
+                primary not in final_roles["primaries"] and primary in final_roles["sync_standbys"]
+            ), "Old primary should now be a sync standby"
 
     # Use use_ip_from_inside=True because the old primary got a new IP after network restore
     # and Juju's cached IP may be stale

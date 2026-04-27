@@ -113,6 +113,7 @@ from constants import (
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
+    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
@@ -902,7 +903,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # checked for none in the early exit method
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self._patroni.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(member_ip)
+                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -2814,6 +2815,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self,
         is_creating_backup: bool = False,
         no_peers: bool = False,
+        watcher=True,
         *,
         refresh: charm_refresh.Machines | None = None,
     ) -> bool:
@@ -2842,6 +2844,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
+            watcher=watcher,
             # slots=replication_slots,
         )
         if no_peers:

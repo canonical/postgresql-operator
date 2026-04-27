@@ -1035,6 +1035,7 @@ def test_update_config(harness):
             },
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            watcher=True,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with(True)
@@ -1075,6 +1076,7 @@ def test_update_config(harness):
             },
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            watcher=True,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
@@ -2578,7 +2580,7 @@ def test_on_peer_relation_departed(harness):
         mock_ip_address = "1.1.1.1"
         _get_member_ip.return_value = mock_ip_address
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2593,7 +2595,7 @@ def test_on_peer_relation_departed(harness):
         event.defer.reset_mock()
         _remove_raft_member.side_effect = None
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2608,7 +2610,7 @@ def test_on_peer_relation_departed(harness):
         with harness.hooks_disabled():
             harness.set_leader()
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2625,7 +2627,7 @@ def test_on_peer_relation_departed(harness):
                 rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
             )
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
@@ -2640,7 +2642,7 @@ def test_on_peer_relation_departed(harness):
         _updated_synchronous_node_count.reset_mock()
         harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/2")
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
@@ -2656,7 +2658,7 @@ def test_on_peer_relation_departed(harness):
         _updated_synchronous_node_count.reset_mock()
         _updated_synchronous_node_count.return_value = True
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2674,7 +2676,7 @@ def test_on_peer_relation_departed(harness):
         _get_ips_to_remove.return_value = ips_to_remove
         _are_all_members_ready.return_value = False
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2690,7 +2692,7 @@ def test_on_peer_relation_departed(harness):
         _get_ips_to_remove.reset_mock()
         _are_all_members_ready.return_value = True
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2709,7 +2711,7 @@ def test_on_peer_relation_departed(harness):
         _update_relation_endpoints.reset_mock()
         _primary_endpoint.return_value = None
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()

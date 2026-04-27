@@ -53,7 +53,6 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
@@ -660,6 +659,7 @@ class Patroni:
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
         user_databases_map: dict[str, str] | None = None,
+        watcher: bool = True,
         slots: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -679,6 +679,7 @@ class Patroni:
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
             user_databases_map: map of databases to be accessible by each user.
+            watcher: weather to include the watcher.
             slots: replication slots (keys) with assigned database name (values).
         """
         slots = slots or {}
@@ -737,7 +738,7 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
-            watcher=self.charm.watcher_offer.watcher_raft_address,
+            watcher=self.charm.watcher_offer.watcher_raft_address if watcher else None,
         )
         render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -937,13 +938,13 @@ class Patroni:
         except Exception:
             return []
 
-    def add_raft_member(self, member_ip: str, port: int = RAFT_PORT) -> None:
+    def add_raft_member(self, member_address: str | None) -> None:
         """Add a member to the raft cluster.
 
         Used to make the watcher rejoin the raft consensus.
         """
-        if self.charm.has_raft_keys():
-            logger.debug("Remove raft member: Raft already in recovery")
+        if not member_address:
+            logger.warning("Add raft member: No raft address provided")
             return
 
         # Get the status of the raft cluster.
@@ -953,19 +954,19 @@ class Patroni:
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
         except UtilityException:
-            logger.warning("Remove raft member: Cannot connect to raft cluster")
+            logger.warning("Add raft member: Cannot connect to raft cluster")
             raise AddRaftMemberFailedError() from None
         if not raft_status:
-            logger.warning("Remove raft member: No raft status")
+            logger.warning("Add raft member: No raft status")
             raise AddRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
-        if not member_ip or f"partner_node_status_server_{member_ip}:{port}" in raft_status:
+        if f"partner_node_status_server_{member_address}" in raft_status:
             return
 
         # Remove the member from the raft cluster.
         try:
-            result = syncobj_util.executeCommand(raft_host, ["add", f"{member_ip}:{port}"])
+            result = syncobj_util.executeCommand(raft_host, ["add", member_address])
         except UtilityException:
             logger.debug("add raft member: Remove call failed")
             raise AddRaftMemberFailedError() from None
@@ -974,7 +975,7 @@ class Patroni:
             logger.debug(f"Add raft member: Remove call not successful with {result}")
             raise AddRaftMemberFailedError()
 
-    def remove_raft_member(self, member_ip: str, port: int = RAFT_PORT) -> None:
+    def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -985,6 +986,10 @@ class Patroni:
             RaftMemberNotFoundError: if the member to be removed
                 is not part of the raft cluster.
         """
+        if not member_address:
+            logger.debug("Remove raft member: No address provided")
+            return
+
         if self.charm.has_raft_keys():
             logger.debug("Remove raft member: Raft already in recovery")
             return
@@ -1003,12 +1008,12 @@ class Patroni:
             raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
-        if not member_ip or f"partner_node_status_server_{member_ip}:{port}" not in raft_status:
+        if f"partner_node_status_server_{member_address}" not in raft_status:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
         if not raft_status["has_quorum"] and (
-            not raft_status["leader"] or raft_status["leader"].host == member_ip
+            not raft_status["leader"] or raft_status["leader"].address == member_address
         ):
             self.charm.set_unit_status(
                 BlockedStatus("Raft majority loss, run: promote-to-primary")
@@ -1028,7 +1033,7 @@ class Patroni:
 
         # Remove the member from the raft cluster.
         try:
-            result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:{port}"])
+            result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
         except UtilityException:
             logger.debug("Remove raft member: Remove call failed")
             raise RemoveRaftMemberFailedError() from None

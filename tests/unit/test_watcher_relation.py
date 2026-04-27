@@ -5,7 +5,6 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from src.constants import RAFT_PORT
 from src.relations.watcher import PostgreSQLWatcherRelation
 
 
@@ -48,7 +47,7 @@ class TestWatcherRelation:
             return_value=None,
         ):
             relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.watcher_address is None
+            assert relation.watcher_raft_address is None
 
     def test_watcher_address_with_relation(self):
         """Test watcher_address returns the watcher IP when available."""
@@ -58,7 +57,9 @@ class TestWatcherRelation:
         # Create a mock unit with unit-address
         mock_unit = MagicMock()
         mock_relation.units = {mock_unit}
-        mock_relation.data = {mock_unit: {"unit-address": "10.0.0.10"}}
+        mock_relation.data = {
+            mock_unit: {"unit-address": "10.0.0.10", "watcher-raft-port": "2222"}
+        }
 
         with patch.object(
             PostgreSQLWatcherRelation,
@@ -67,66 +68,7 @@ class TestWatcherRelation:
             return_value=mock_relation,
         ):
             relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.watcher_address == "10.0.0.10"
-
-    def test_is_watcher_connected_false(self):
-        """Test is_watcher_connected returns False when no watcher."""
-        mock_charm = create_mock_charm()
-
-        with patch.object(
-            PostgreSQLWatcherRelation,
-            "watcher_address",
-            new_callable=PropertyMock,
-            return_value=None,
-        ):
-            relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.is_watcher_connected is False
-
-    def test_is_watcher_connected_true(self):
-        """Test is_watcher_connected returns True when watcher exists."""
-        mock_charm = create_mock_charm()
-
-        with patch.object(
-            PostgreSQLWatcherRelation,
-            "watcher_address",
-            new_callable=PropertyMock,
-            return_value="10.0.0.10",
-        ):
-            relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.is_watcher_connected is True
-
-    def test_watcher_raft_address(self):
-        """Test get_watcher_raft_address returns formatted address."""
-        mock_charm = create_mock_charm()
-        with (
-            patch.object(
-                PostgreSQLWatcherRelation,
-                "watcher_address",
-                new_callable=PropertyMock,
-                return_value="10.0.0.10",
-            ),
-            patch.object(
-                PostgreSQLWatcherRelation,
-                "watcher_raft_port",
-                new_callable=PropertyMock,
-                return_value="2222",
-            ),
-        ):
-            relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.watcher_raft_address == f"10.0.0.10:{RAFT_PORT}"
-
-    def test_watcher_raft_address_no_watcher(self):
-        """Test get_watcher_raft_address returns None when no watcher."""
-        mock_charm = create_mock_charm()
-
-        with patch.object(
-            PostgreSQLWatcherRelation,
-            "watcher_address",
-            new_callable=PropertyMock,
-            return_value=None,
-        ):
-            relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.watcher_raft_address is None
+            assert relation.watcher_raft_address == "10.0.0.10:2222"
 
     def test_on_watcher_relation_joined_not_leader(self):
         """Test relation joined event is ignored for non-leader units."""
@@ -201,27 +143,6 @@ class TestWatcherRelation:
         with patch.object(relation, "_update_relation_data"):
             relation._on_watcher_relation_changed(mock_event)
             mock_charm.update_config.assert_called_once()
-
-    def test_on_watcher_relation_broken_updates_config(self):
-        """Test relation broken event updates Patroni config."""
-        mock_charm = create_mock_charm()
-        mock_event = MagicMock()
-
-        relation = PostgreSQLWatcherRelation(mock_charm)
-        relation._on_watcher_relation_broken(mock_event)
-
-        mock_charm.update_config.assert_called_once()
-
-    def test_on_watcher_relation_broken_not_initialized(self):
-        """Test relation broken is ignored when cluster not initialized."""
-        mock_charm = create_mock_charm()
-        mock_charm.is_cluster_initialised = False
-        mock_event = MagicMock()
-
-        relation = PostgreSQLWatcherRelation(mock_charm)
-        relation._on_watcher_relation_broken(mock_event)
-
-        mock_charm.update_config.assert_not_called()
 
     def test_update_relation_data_not_leader(self):
         """Test _update_relation_data does nothing for non-leader."""
