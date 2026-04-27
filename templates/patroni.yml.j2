@@ -37,14 +37,14 @@ raft:
   data_dir: {{ conf_path }}/raft
   self_addr: '{{ self_ip }}:2222'
   password: {{ raft_password }}
-  {% if partner_addrs or watcher_addr -%}
+  {% if partner_addrs or watcher -%}
   partner_addrs:
   {% endif -%}
   {% for partner_addr in partner_addrs -%}
   - {{ partner_addr }}:2222
   {% endfor %}
-  {%- if watcher_addr %}
-  - {{ watcher_addr }}:{{ watcher_port }}
+  {%- if watcher %}
+  - {{ watcher }}
   {% endif %}
 
 bootstrap:

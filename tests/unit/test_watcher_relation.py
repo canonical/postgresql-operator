@@ -95,20 +95,27 @@ class TestWatcherRelation:
             relation = PostgreSQLWatcherRelation(mock_charm)
             assert relation.is_watcher_connected is True
 
-    def test_get_watcher_raft_address(self):
+    def test_watcher_raft_address(self):
         """Test get_watcher_raft_address returns formatted address."""
         mock_charm = create_mock_charm()
-
-        with patch.object(
-            PostgreSQLWatcherRelation,
-            "watcher_address",
-            new_callable=PropertyMock,
-            return_value="10.0.0.10",
+        with (
+            patch.object(
+                PostgreSQLWatcherRelation,
+                "watcher_address",
+                new_callable=PropertyMock,
+                return_value="10.0.0.10",
+            ),
+            patch.object(
+                PostgreSQLWatcherRelation,
+                "watcher_raft_port",
+                new_callable=PropertyMock,
+                return_value="2222",
+            ),
         ):
             relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.get_watcher_raft_address() == f"10.0.0.10:{RAFT_PORT}"
+            assert relation.watcher_raft_address == f"10.0.0.10:{RAFT_PORT}"
 
-    def test_get_watcher_raft_address_no_watcher(self):
+    def test_watcher_raft_address_no_watcher(self):
         """Test get_watcher_raft_address returns None when no watcher."""
         mock_charm = create_mock_charm()
 
@@ -119,7 +126,7 @@ class TestWatcherRelation:
             return_value=None,
         ):
             relation = PostgreSQLWatcherRelation(mock_charm)
-            assert relation.get_watcher_raft_address() is None
+            assert relation.watcher_raft_address is None
 
     def test_on_watcher_relation_joined_not_leader(self):
         """Test relation joined event is ignored for non-leader units."""

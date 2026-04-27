@@ -14,7 +14,8 @@ import contextlib
 import json
 import logging
 import os
-import typing
+from functools import cached_property
+from typing import TYPE_CHECKING
 
 from ops import (
     Object,
@@ -40,7 +41,7 @@ from constants import (
 )
 from utils import new_password
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ class PostgreSQLWatcherRelation(Object):
         """Return the watcher relation if it exists."""
         return self.model.get_relation(WATCHER_OFFER_RELATION)
 
-    @property
+    @cached_property
     def watcher_address(self) -> str | None:
         """Return the watcher unit address if available.
 
@@ -105,8 +106,8 @@ class PostgreSQLWatcherRelation(Object):
         """
         return self.watcher_address is not None
 
-    @property
-    def watcher_raft_port(self) -> int:
+    @cached_property
+    def watcher_raft_port(self) -> int | None:
         """Return the watcher's Raft port from relation data.
 
         The watcher shares its assigned port via relation data under
@@ -116,7 +117,7 @@ class PostgreSQLWatcherRelation(Object):
             The watcher's Raft port number.
         """
         if not (relation := self._relation):
-            return RAFT_PORT
+            return None
 
         for unit in relation.units:
             port_str = relation.data[unit].get("watcher-raft-port")
@@ -125,15 +126,16 @@ class PostgreSQLWatcherRelation(Object):
                     return int(port_str)
                 except ValueError:
                     logger.warning(f"Invalid watcher-raft-port value: {port_str}")
-        return RAFT_PORT
+        return None
 
-    def get_watcher_raft_address(self) -> str | None:
+    @cached_property
+    def watcher_raft_address(self) -> str | None:
         """Return the watcher's Raft address for inclusion in partner_addrs.
 
         Returns:
             The watcher's Raft address (ip:port), or None if not available.
         """
-        if watcher_ip := self.watcher_address:
+        if (watcher_ip := self.watcher_address) and self.watcher_raft_port is not None:
             return f"{watcher_ip}:{self.watcher_raft_port}"
         return None
 
@@ -280,28 +282,6 @@ class PostgreSQLWatcherRelation(Object):
             logger.debug(f"Error checking Raft membership: {e}")
         return False
 
-    def _remove_member_from_raft(self, member_addr: str) -> bool:
-        """Remove a member from the running Raft cluster via TcpUtility.
-
-        Args:
-            member_addr: The member's Raft address (ip:port).
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        try:
-            utility = TcpUtility(password=self.charm._patroni.raft_password, timeout=10)
-            utility.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["remove", member_addr])
-            logger.info(f"Successfully removed member from Raft cluster: {member_addr}")
-            return True
-        except UtilityException as e:
-            # Member might not exist, which is fine
-            logger.debug(f"Failed to remove member {member_addr} from Raft: {e}")
-            return False
-        except Exception as e:
-            logger.warning(f"Error removing member {member_addr} from Raft: {e}")
-            return False
-
     def _pg_unit_count_is_odd(self) -> bool:
         """Return True if the number of PostgreSQL units is odd.
 
@@ -327,7 +307,7 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             watcher_address: The watcher's IP address.
         """
-        if not self.charm.is_cluster_initialised:
+        if not self.charm.is_cluster_initialised or not self.watcher_raft_port:
             logger.debug("Cluster not initialized, skipping Raft member addition")
             return
 
@@ -341,14 +321,17 @@ class PostgreSQLWatcherRelation(Object):
                 f"PG unit count is odd; watcher {watcher_raft_addr} should not vote. "
                 "Removing from Raft if present."
             )
-            if self._is_watcher_in_raft(watcher_address):
-                self._remove_member_from_raft(watcher_raft_addr)
+            if self.watcher_raft_port:
+                self.charm._patroni.remove_raft_member(watcher_address, self.watcher_raft_port)
             return
 
         # Check if watcher is already in the Raft cluster
         if self._is_watcher_in_raft(watcher_address):
             logger.info(f"Watcher {watcher_raft_addr} already in Raft cluster")
             return
+
+        logger.info(f"Adding watcher to Raft cluster: {watcher_raft_addr}")
+        self.charm._patroni.add_raft_member(watcher_address, self.watcher_raft_port)
 
     def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle watcher departing from the relation.
@@ -384,9 +367,10 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             watcher_address: The watcher's IP address.
         """
-        watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
-        logger.info(f"Removing watcher from Raft cluster: {watcher_raft_addr}")
-        self._remove_member_from_raft(watcher_raft_addr)
+        if self.watcher_raft_port:
+            watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_port}"
+            logger.info(f"Removing watcher from Raft cluster: {watcher_raft_addr}")
+            self.charm._patroni.remove_raft_member(watcher_address, self.watcher_raft_port)
 
     def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle watcher relation being broken.
