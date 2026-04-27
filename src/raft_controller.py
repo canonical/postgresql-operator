@@ -18,7 +18,7 @@ charm hook invocations.
 
 import logging
 from contextlib import suppress
-from ipaddress import IPv4Address
+from ipaddress import ip_address
 from shutil import rmtree
 from typing import TYPE_CHECKING, TypedDict
 
@@ -74,7 +74,7 @@ class ClusterStatus(TypedDict):
     members: list[str]
 
 
-def install_service() -> bool:
+def install_service() -> None:
     """Install the systemd template service for the Raft controller.
 
     Returns:
@@ -87,14 +87,8 @@ def install_service() -> bool:
     render_file(SERVICE_FILE, rendered, 0o644, change_owner=False)
 
     # Reload systemd to pick up the new service
-    try:
-        daemon_reload()
-        logger.info(f"Installed systemd service {SERVICE_FILE}")
-    except SystemdError as e:
-        logger.error(f"Failed to reload systemd: {e}")
-        return False
-
-    return True
+    daemon_reload()
+    logger.info(f"Installed systemd service {SERVICE_FILE}")
 
 
 class RaftController:
@@ -159,13 +153,13 @@ class RaftController:
 
         # Validate addresses to prevent injection into the systemd unit file
         try:
-            IPv4Address(self_addr)
+            ip_address(self_addr)
         except Exception:
             logger.error(f"Invalid self_addr format: {self_addr}")
             return False
         try:
             for addr in partner_addrs:
-                IPv4Address(addr)
+                ip_address(addr)
         except Exception:
             logger.error(f"Invalid partner address format: {addr}")
             return False
