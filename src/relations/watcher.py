@@ -216,7 +216,12 @@ class PostgreSQLWatcherRelation(Object):
             if self.charm.unit.is_leader():
                 self._cleanup_old_watcher_from_raft()
                 self._ensure_watcher_user()
-                self._add_watcher_to_raft()
+                try:
+                    self._add_watcher_to_raft()
+                except Exception:
+                    logger.debug("Unable to add member")
+                    event.defer()
+                    return
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
 
