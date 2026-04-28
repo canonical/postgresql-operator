@@ -13,6 +13,7 @@ The table below shows information for all minor releases of Charmed PostgreSQL 1
 
 | Revision</br>(`amd`,`arm`) | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [1090], [1091] | 14.22 | `3.6.21+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [1045], [1044] | 14.20 | `3.6.14+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [987], [986] | 14.20 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [936], [935] | 14.19 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
@@ -48,9 +49,13 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 | Revision | amd64 | arm64 |  Snap revision |
 |:--------:|:-----:|:-----:|:--------------:|
-|[986] |          |![check]  | 243 |
+|[1091]|          | ![check] | 280 |
+|[1090]| ![check] |          | 281 |
+|[1045]| ![check] |          | 247 |
+|[1044]| ![check] |          | 246 |
+|[986] | ![check] | ![check] | 243 |
 |[987] | ![check] |          | 245 |
-|[935] |          |![check]  | 230 |
+|[935] |          | ![check] | 230 |
 |[936] | ![check] |          | 229 |
 |[553] | ![check] |          | 143 |
 |[552] |          | ![check] | 142 |
@@ -70,6 +75,9 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
 
 <!-- LINKS-->
+[1090]: https://github.com/canonical/postgresql-operator/releases/tag/rev1090
+[1091]: https://github.com/canonical/postgresql-operator/releases/tag/rev1090
+
 [1044]: https://github.com/canonical/postgresql-operator/releases/tag/rev1044
 [1045]: https://github.com/canonical/postgresql-operator/releases/tag/rev1044
 
