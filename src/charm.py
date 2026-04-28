@@ -878,6 +878,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
             return True
 
+        # Do not migrate the temp tablespace while cross-cluster async replication is
+        # active.  The DROP/CREATE TABLESPACE generates WAL that is streamed to the
+        # standby cluster.  If the standby has not been upgraded to the versioned
+        # storage layout yet, it will not have the TEMP_DATA_DIR directory, causing
+        # PostgreSQL to crash with "FATAL: directory does not exist" during WAL replay.
+        if self.async_replication._relation is not None:
+            logger.debug("Skipping temp tablespace migration while async replication is active")
+            return True
+
         return self._ensure_temp_tablespace_location()
 
     @cached_property
