@@ -659,7 +659,6 @@ class Patroni:
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
         user_databases_map: dict[str, str] | None = None,
-        watcher: bool = True,
         slots: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -679,7 +678,6 @@ class Patroni:
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
             user_databases_map: map of databases to be accessible by each user.
-            watcher: weather to include the watcher.
             slots: replication slots (keys) with assigned database name (values).
         """
         slots = slots or {}
@@ -738,7 +736,9 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
-            watcher=self.charm.watcher_offer.watcher_raft_address if watcher else None,
+            watcher=self.charm.watcher_offer.watcher_raft_address
+            if self.charm.watcher_offer.is_active
+            else None,
         )
         render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

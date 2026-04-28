@@ -405,6 +405,7 @@ class PostgreSQLAsyncReplication(Object):
                         for unit in {*self.charm._peers.units, self.charm.unit}  # type: ignore
                     ):
                         self.charm.app_peer_data.update({"cluster_initialised": "True"})
+                        self.charm.watcher_offer.enable_watcher()
                     elif self._is_following_promoted_cluster():
                         self.charm.set_unit_status(
                             WaitingStatus("Waiting for the database to be started in all units")
@@ -764,6 +765,7 @@ class PostgreSQLAsyncReplication(Object):
             if not self.charm.unit.is_leader() and not os.path.exists(POSTGRESQL_DATA_PATH):
                 logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
                 return False
+            self.charm.watcher_offer.disable_watcher()
 
             try:
                 for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):

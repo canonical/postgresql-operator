@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING
 from ops import (
     Object,
     Relation,
+    RelationBrokenEvent,
     RelationChangedEvent,
-    RelationDepartedEvent,
     RelationJoinedEvent,
     Secret,
     SecretNotFoundError,
@@ -67,11 +67,11 @@ class PostgreSQLWatcherRelation(Object):
             self._on_watcher_relation_changed,
         )
         self.framework.observe(
-            self.charm.on[WATCHER_OFFER_RELATION].relation_departed,
-            self._on_watcher_relation_departed,
+            self.charm.on[WATCHER_OFFER_RELATION].relation_broken,
+            self._on_watcher_relation_broken,
         )
 
-    @property
+    @cached_property
     def _relation(self) -> Relation | None:
         """Return the watcher relation if it exists."""
         return self.model.get_relation(WATCHER_OFFER_RELATION)
@@ -94,6 +94,35 @@ class PostgreSQLWatcherRelation(Object):
             logger.debug(f"Error checking Raft membership: {e}")
         return False
 
+    def enable_watcher(self) -> None:
+        """Clear up disable flag."""
+        if not self._relation or not self.charm.unit.is_leader():
+            return None
+
+        self._relation.data[self.charm.app].pop("disable-watcher", None)
+
+    def disable_watcher(self) -> None:
+        """Inform watcher to stop service."""
+        if not self._relation or not self.charm.unit.is_leader():
+            return None
+
+        self._relation.data[self.charm.app].update({"disable-watcher": "True"})
+        try:
+            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
+        except Exception as e:
+            logger.warning(f"Error remove Raft watcher: {e}")
+
+    @cached_property
+    def is_active(self) -> bool:
+        """Check if the watcher should be added to peers."""
+        if not self._relation:
+            return False
+
+        return (
+            self._relation.data[self._relation.app].get("raft-status") == "connected"
+            and not self._pg_unit_count_is_odd()
+        )
+
     @cached_property
     def watcher_raft_address(self) -> str | None:
         """Return the watcher's Raft address for inclusion in partner_addrs.
@@ -101,20 +130,21 @@ class PostgreSQLWatcherRelation(Object):
         Returns:
             The watcher's Raft address (ip:port), or None if not available.
         """
-        if not (relation := self._relation):
+        if not self._relation:
             return None
 
         unit_address = None
         port = None
         # Get the watcher unit address from the relation data
-        for unit in relation.units:
-            if unit_address := relation.data[unit].get("unit-address"):
-                port_str = relation.data[unit].get("watcher-raft-port")
-                if port_str:
-                    try:
-                        port = int(port_str)
-                    except ValueError:
-                        logger.warning(f"Invalid watcher-raft-port value: {port_str}")
+        for unit in self._relation.units:
+            if unit_address := self._relation.data[unit].get("unit-address"):
+                break
+        port_str = self._relation.data[self._relation.app].get("watcher-raft-port")
+        if port_str:
+            try:
+                port = int(port_str)
+            except ValueError:
+                logger.warning(f"Invalid watcher-raft-port value: {port_str}")
 
         if unit_address and port is not None:
             return f"{unit_address}:{port}"
@@ -212,14 +242,13 @@ class PostgreSQLWatcherRelation(Object):
         # Get Raft cluster status to find all members
         try:
             syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
-            raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
-            if raft_status:
+            if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
                 # Find all partner nodes in the Raft cluster
                 # Keys look like: partner_node_status_server_10.131.50.142:2222
                 stale_members: list[str] = []
                 prefix = "partner_node_status_server_"
-                for key in list(raft_status):
-                    if isinstance(key, str) and key.startswith(prefix):
+                for key in raft_status:
+                    if key.startswith(prefix) and raft_status[key] != 2:
                         member_addr = key.replace(prefix, "")
                         member_ip = member_addr.split(":")[0]
 
@@ -230,8 +259,7 @@ class PostgreSQLWatcherRelation(Object):
                 # Remove stale watcher members
                 for stale_addr in stale_members:
                     logger.info(f"Removing stale watcher from Raft cluster: {stale_addr}")
-                    stale_ip = stale_addr.split(":")[0]
-                    self._remove_watcher_from_raft(stale_ip)
+                    self._remove_watcher_from_raft(stale_addr)
 
         except UtilityException as e:
             logger.debug(f"Failed to get Raft status for cleanup: {e}")
@@ -278,29 +306,22 @@ class PostgreSQLWatcherRelation(Object):
         logger.info(f"Adding watcher to Raft cluster: {self.watcher_raft_address}")
         self.charm._patroni.add_raft_member(self.watcher_raft_address)
 
-    def _on_watcher_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle watcher departing from the relation.
+    def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
+        """Handle watcher relation being broken.
 
-        Removes the departing watcher from the Raft cluster to maintain correct
-        quorum calculations. Without this, the dead watcher would still count
-        as a cluster member, making quorum harder to achieve.
+         Updates Patroni configuration to remove the watcher from the Raft cluster.
 
         Args:
-            event: The relation departed event.
+            event: The relation broken event.
         """
-        logger.info("Watcher unit departed from relation")
+        logger.info("Watcher relation broken, updating Patroni configuration")
 
-        # Skip if the departing unit is from our own app (e.g., PG unit scaling down)
-        if (
-            event.departing_unit and event.departing_unit.app == self.charm.app
-        ) or not self.charm.is_cluster_initialised:
+        if not self.charm.is_cluster_initialised:
             return
 
-        # Get the departing watcher's address from the event
-        if event.departing_unit and (
-            watcher_address := event.relation.data[event.departing_unit].get("unit-address")
-        ):
-            self._remove_watcher_from_raft(watcher_address)
+        self._cleanup_old_watcher_from_raft()
+        # Update Patroni configuration without the watcher
+        self.charm.update_config()
 
     def _remove_watcher_from_raft(self, watcher_address: str) -> None:
         """Remove the watcher from the Raft cluster.
@@ -313,12 +334,11 @@ class PostgreSQLWatcherRelation(Object):
             watcher_address: The watcher's IP address.
         """
         if self.watcher_raft_address:
-            watcher_raft_addr = f"{watcher_address}:{self.watcher_raft_address.split(':')[-1]}"
-            logger.info(f"Removing watcher from Raft cluster: {watcher_raft_addr}")
-            self.charm._patroni.remove_raft_member(watcher_raft_addr)
+            logger.info(f"Removing watcher from Raft cluster: {watcher_address}")
+            self.charm._patroni.remove_raft_member(watcher_address)
 
         if self.charm.is_cluster_initialised:
-            self.charm.update_config(watcher=False)
+            self.charm.update_config()
 
     def _ensure_watcher_user(self) -> str | None:
         """Ensure the watcher PostgreSQL user exists for health checks.
@@ -599,7 +619,7 @@ class PostgreSQLWatcherRelation(Object):
         changes, the watcher may have stale pg-endpoints and be unable to health
         check the PostgreSQL nodes properly.
         """
-        if not self.charm.is_cluster_initialised:
+        if not self.charm.is_cluster_initialised or not self.is_active:
             return
 
         # Only the leader handles Raft membership changes to avoid races

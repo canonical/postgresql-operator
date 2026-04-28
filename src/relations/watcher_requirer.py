@@ -118,6 +118,12 @@ class WatcherRequirerHandler(Object):
         """Save port allocations to persistent file."""
         self.charm.app_peer_data["port_allocations"] = json.dumps(allocations)
 
+    def _is_disabled(self, relation: Relation) -> bool:
+        """Is disabled flag set."""
+        if not relation:
+            return False
+        return "disable-watcher" in relation.data[relation.app]
+
     def _get_port_for_relation(self, relation_id: int) -> int:
         """Get or assign a port for a given relation ID.
 
@@ -281,7 +287,7 @@ class WatcherRequirerHandler(Object):
         unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
         for relation in self.model.relations.get(WATCHER_RELATION, []):
             current_address = relation.data[self.charm.unit].get("unit-address")
-            current_az = relation.data[self.charm.unit].get("unit-az")
+            current_az = relation.data[self.charm.app].get("unit-az")
             address_changed = current_address != new_address
             az_changed = bool(unit_az and current_az != unit_az)
 
@@ -296,7 +302,7 @@ class WatcherRequirerHandler(Object):
                 relation.data[self.charm.unit]["unit-address"] = new_address
 
             if az_changed:
-                relation.data[self.charm.unit]["unit-az"] = str(unit_az)
+                relation.data[self.charm.app]["unit-az"] = str(unit_az)
 
             if (
                 address_changed
@@ -408,7 +414,7 @@ class WatcherRequirerHandler(Object):
             event.relation.data[self.charm.unit]["unit-address"] = unit_ip
         unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
         if unit_az:
-            event.relation.data[self.charm.unit]["unit-az"] = unit_az
+            event.relation.data[self.charm.app]["unit-az"] = unit_az
 
     def _on_watcher_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle watcher relation changed event."""
@@ -436,6 +442,12 @@ class WatcherRequirerHandler(Object):
         port = self._get_port_for_relation(relation.id)
 
         raft_controller = RaftController(self.charm, f"rel{relation.id}")
+        if self._is_disabled(relation):
+            logger.debug("Postgresql requested to disable the watcher.")
+            raft_controller.remove_service()
+            relation.data[self.charm.app]["raft-status"] = "disabled"
+            return
+
         if raft_controller.configure(
             port, unit_ip, partner_addrs, raft_password, self._get_patroni_cas(relation)
         ):
@@ -445,12 +457,12 @@ class WatcherRequirerHandler(Object):
             raft_controller.restart()
 
         relation.data[self.charm.unit]["unit-address"] = unit_ip
-        relation.data[self.charm.unit]["watcher-raft-port"] = str(port)
+        relation.data[self.charm.app]["watcher-raft-port"] = str(port)
         if unit_az := os.environ.get("JUJU_AVAILABILITY_ZONE"):
-            relation.data[self.charm.unit]["unit-az"] = unit_az
+            relation.data[self.charm.app]["unit-az"] = unit_az
         # Only set raft-status and ActiveStatus after verifying the service is running
         if service_running(raft_controller.service_name):
-            relation.data[self.charm.unit]["raft-status"] = "connected"
+            relation.data[self.charm.app]["raft-status"] = "connected"
             # Check AZ co-location and enforce based on profile
             if (
                 az_warning := self._check_az_colocation(relation)

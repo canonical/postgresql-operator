@@ -58,7 +58,8 @@ class TestWatcherRelation:
         mock_unit = MagicMock()
         mock_relation.units = {mock_unit}
         mock_relation.data = {
-            mock_unit: {"unit-address": "10.0.0.10", "watcher-raft-port": "2222"}
+            mock_unit: {"unit-address": "10.0.0.10"},
+            mock_relation.app: {"watcher-raft-port": "2222"},
         }
 
         with patch.object(

@@ -1047,6 +1047,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
+                self.watcher_offer.disable_watcher()
+                if self.watcher_offer.is_active:
+                    logger.info("waiting for RAFT watcher to disconnect.")
+                    return
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_stopped_check()
@@ -2815,7 +2819,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self,
         is_creating_backup: bool = False,
         no_peers: bool = False,
-        watcher=True,
         *,
         refresh: charm_refresh.Machines | None = None,
     ) -> bool:
@@ -2844,7 +2847,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
-            watcher=watcher,
             # slots=replication_slots,
         )
         if no_peers:

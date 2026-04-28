@@ -1035,7 +1035,6 @@ def test_update_config(harness):
             },
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            watcher=True,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with(True)
@@ -1076,7 +1075,6 @@ def test_update_config(harness):
             },
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            watcher=True,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
