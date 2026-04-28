@@ -121,12 +121,13 @@ def juju(request: pytest.FixtureRequest):
     """
     model = request.config.getoption("--model")
     keep_models = bool(request.config.getoption("--keep-models"))
+    controller = request.config.getoption("--controller")
 
     if model:
         juju = jubilant.Juju(model=model)
         yield juju
     else:
-        with jubilant.temp_model(keep=keep_models) as juju:
+        with jubilant.temp_model(keep=keep_models, controller=controller) as juju:
             yield juju
 
 

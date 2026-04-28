@@ -30,9 +30,11 @@ from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
+    ARCHIVE_DATA_DIR,
     BACKUP_ID_FORMAT,
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
+    LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
     PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
@@ -42,7 +44,8 @@ from constants import (
     PGBACKREST_LOG_LEVEL_STDERR,
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
-    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_DATA_DIR,
+    TEMP_DATA_DIR,
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
@@ -245,7 +248,7 @@ class PostgreSQLBackups(Object):
 
             return_code, system_identifier_from_instance, error = self._execute_command([
                 f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
-                POSTGRESQL_DATA_PATH,
+                POSTGRESQL_DATA_DIR,
             ])
             if return_code != 0:
                 raise Exception(error)
@@ -353,10 +356,10 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
-            POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            ARCHIVE_DATA_DIR,
+            POSTGRESQL_DATA_DIR,
+            LOGS_DATA_DIR,
+            TEMP_DATA_DIR,
         ]
         path = None
         try:
@@ -1379,7 +1382,7 @@ Stderr:
             enable_tls=len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
-            data_path=f"{POSTGRESQL_DATA_PATH}",
+            data_path=POSTGRESQL_DATA_DIR,
             log_path=f"{PGBACKREST_LOGS_PATH}",
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
