@@ -325,7 +325,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
         elif isinstance(self.unit.status, BlockedStatus) and self.unit.status.message.startswith(
-            "invalid role"
+            "invalid role '"
         ):
             self.unit.status = ActiveStatus()
 
