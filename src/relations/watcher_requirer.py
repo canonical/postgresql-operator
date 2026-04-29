@@ -61,6 +61,7 @@ class WatcherRequirerHandler(Object):
 
         # Lifecycle events
         self.framework.observe(self.charm.on.install, self._on_install)
+        self.framework.observe(self.charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.charm.on.start, self._on_start)
         self.framework.observe(self.charm.on.update_status, self._on_update_status)
 
@@ -71,6 +72,10 @@ class WatcherRequirerHandler(Object):
         )
         self.framework.observe(
             self.charm.on[WATCHER_RELATION].relation_changed,
+            self._on_watcher_relation_changed,
+        )
+        self.framework.observe(
+            self.charm.on.secret_changed,
             self._on_watcher_relation_changed,
         )
         self.framework.observe(
@@ -276,6 +281,9 @@ class WatcherRequirerHandler(Object):
         # once Raft is actually connected
         self.charm.unit.status = WaitingStatus("Starting Raft connection")
 
+    def _on_leader_elected(self, _) -> None:
+        self._update_unit_address_if_changed()
+
     def _update_unit_address_if_changed(self) -> None:
         """Update unit-address in relation data if IP has changed, for ALL relations."""
         if not (new_address := self.unit_ip):
@@ -327,6 +335,12 @@ class WatcherRequirerHandler(Object):
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Handle update status event in watcher mode."""
+        if not self.charm.unit.is_leader():
+            if self.charm._peers and len(self.charm._peers.units) > 0:
+                self.charm.unit.status = BlockedStatus("Multiple watcher units. One expected.")
+            event.defer()
+            return
+
         if not (relations := self.model.relations.get(WATCHER_RELATION, [])):
             self.charm.unit.status = WaitingStatus("Waiting for relation to PostgreSQL")
             return
@@ -344,10 +358,8 @@ class WatcherRequirerHandler(Object):
             password = self._get_raft_password(relation)
             raft_controller = RaftController(self.charm, instance_id=f"rel{relation.id}")
             raft_status = raft_controller.get_status(port, password)
-            if self._is_disabled(relation):
-                disabled = True
-            if raft_status.get("connected"):
-                connected_count += 1
+            disabled = self._is_disabled(relation)
+            connected_count += 1 if raft_status.get("connected") else 0
 
             pg_endpoints = self._get_raft_partner_addrs(relation)
             total_endpoints += len(pg_endpoints)
@@ -420,6 +432,12 @@ class WatcherRequirerHandler(Object):
 
     def _on_watcher_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Handle watcher relation joined event."""
+        if not self.charm.unit.is_leader():
+            if self.charm._peers and len(self.charm._peers.units) > 0:
+                self.charm.unit.status = BlockedStatus("Multiple watcher units. One expected.")
+            event.defer()
+            return
+
         logger.info(f"Joined watcher relation {event.relation.id} with PostgreSQL cluster")
         if unit_ip := self.unit_ip:
             event.relation.data[self.charm.unit]["unit-address"] = unit_ip
@@ -433,6 +451,9 @@ class WatcherRequirerHandler(Object):
 
     def _on_watcher_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle watcher relation changed event."""
+        if not self.charm.unit.is_leader():
+            return
+
         relation = event.relation
         logger.info(f"Watcher relation {relation.id} data changed")
 
@@ -441,12 +462,10 @@ class WatcherRequirerHandler(Object):
             event.defer()
             return
 
-        if not (raft_password := self._get_raft_password(relation)):
-            logger.debug("Raft password not yet available")
-            return
-
-        if not (partner_addrs := self._get_raft_partner_addrs(relation)):
-            logger.debug("Raft partner addresses not yet available")
+        if not (raft_password := self._get_raft_password(relation)) or not (
+            partner_addrs := self._get_raft_partner_addrs(relation)
+        ):
+            logger.debug("Raft details are not yet available")
             return
 
         if not (unit_ip := self.unit_ip):
@@ -669,10 +688,8 @@ class WatcherRequirerHandler(Object):
         raft_status = raft_controller.get_status(port, password)
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
-        watcher_voting = (
-            "false"
-            if self._should_watcher_vote(pg_endpoints) and not self._is_disabled(relation)
-            else "true"
+        watcher_voting = self._should_watcher_vote(pg_endpoints) and not self._is_disabled(
+            relation
         )
         topology, primary_endpoint, cluster_role, timeline = self._build_postgresql_topology(
             relation, pg_endpoints, ip_to_unit
