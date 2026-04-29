@@ -20,7 +20,7 @@ import logging
 from contextlib import suppress
 from ipaddress import ip_address
 from shutil import rmtree
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import psycopg2
 from charmlibs.systemd import (
@@ -38,7 +38,7 @@ from pysyncobj.utility import TcpUtility
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from cluster import ClusterMember
-from constants import PATRONI_CLUSTER_STATUS_ENDPOINT
+from constants import PATRONI_CLUSTER_STATUS_ENDPOINT, RAFT_PARTNER_PREFIX
 from utils import create_directory, parallel_patroni_get_request, render_file
 
 if TYPE_CHECKING:
@@ -246,12 +246,18 @@ class RaftController:
             True if restarted successfully, False otherwise.
         """
         try:
+            service_enable(self.service_name)
             service_restart(self.service_name)
             logger.info(f"Restarted Raft controller service {self.service_name}")
             return True
         except SystemdError as e:
             logger.error(f"Failed to restart Raft controller: {e}")
             return False
+
+    def get_raft_status(self, addr: str, password: str) -> dict[str, Any]:
+        """Return raw RAFT status."""
+        utility = TcpUtility(password=password, timeout=3)
+        return utility.executeCommand(addr, ["status"])
 
     def get_status(self, self_port: int, password: str | None) -> ClusterStatus:
         """Get the Raft controller status.
@@ -273,8 +279,7 @@ class RaftController:
 
         # Query Raft status using pysyncobj TcpUtility
         try:
-            utility = TcpUtility(password=password, timeout=3)
-            raft_status = utility.executeCommand(f"localhost:{self_port}", ["status"])
+            raft_status = self.get_raft_status(f"localhost:{self_port}", password)
             status["connected"] = True
             status["has_quorum"] = raft_status.get("has_quorum", False)
             status["leader"] = (
@@ -282,11 +287,10 @@ class RaftController:
             )
 
             # Extract member addresses from partner_node_status_server_* keys
-            prefix = "partner_node_status_server_"
             members: list[str] = [str(raft_status["self"])]
             for key in raft_status:
-                if key.startswith(prefix):
-                    members.append(key[len(prefix) :])
+                if key.startswith(RAFT_PARTNER_PREFIX):
+                    members.append(key[len(RAFT_PARTNER_PREFIX) :])
             status["members"] = sorted(members)
             return status
         except Exception as e:

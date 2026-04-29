@@ -187,7 +187,7 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
             application_name=DATABASE_APP_NAME,
             num_units=2,
             base=CHARM_BASE,
-            config={"profile": "testing"},
+            config={"profile": "testing", "synchronous-mode-strict": False},
         )
         # Deploy watcher using the same charm with role=watcher
         logger.info("Deploying watcher (same charm, role=watcher)...")
@@ -548,7 +548,7 @@ async def test_primary_network_isolation_with_watcher(
                     f"Waiting for failover: replica {replica} should be promoted, "
                     f"but primary is still {new_primary}"
                 )
-
+                await are_writes_increasing(ops_test)
     finally:
         # Restore network
         logger.info(f"Restoring network for {primary_machine}")
@@ -623,8 +623,6 @@ async def test_replica_network_isolation_with_watcher(
         # Cut network from replica using iptables (preserves IP)
         cut_network_from_unit_without_ip_change(replica_machine)
 
-        # With synchronous_mode_strict=true, writes will pause when there's no sync_standby.
-        # That's expected behavior for data safety. We just verify the primary doesn't failover.
         # Give Patroni time to detect the network isolation.
         await asyncio.sleep(30)
 
@@ -632,7 +630,7 @@ async def test_replica_network_isolation_with_watcher(
         # Raft quorum is maintained with primary + watcher (2 out of 3)
         current_primary = await get_primary(ops_test, DATABASE_APP_NAME, down_unit=replica)
         assert current_primary == primary, "Primary should not change during replica isolation"
-
+        await are_writes_increasing(ops_test)
     finally:
         # Restore network
         logger.info(f"Restoring network for {replica_machine}")
@@ -721,7 +719,7 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
             application_name=second_pg_app,
             num_units=2,
             base=CHARM_BASE,
-            config={"profile": "testing"},
+            config={"profile": "testing", "synchronous-mode-strict": False},
         )
         await ops_test.model.wait_for_idle(
             apps=[second_pg_app],

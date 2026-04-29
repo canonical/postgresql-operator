@@ -26,9 +26,10 @@ from ops import (
     Secret,
     SecretNotFoundError,
 )
-from pysyncobj.utility import TcpUtility, UtilityException
+from pysyncobj.utility import TcpUtility
 
 from constants import (
+    RAFT_PARTNER_PREFIX,
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
@@ -88,7 +89,7 @@ class PostgreSQLWatcherRelation(Object):
             raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
             if raft_status:
                 # Check if watcher is in the partner_node_status entries
-                member_key = f"partner_node_status_server_{self.watcher_raft_address}"
+                member_key = f"{RAFT_PARTNER_PREFIX}{self.watcher_raft_address}"
                 return member_key in raft_status
         except Exception as e:
             logger.debug(f"Error checking Raft membership: {e}")
@@ -118,10 +119,7 @@ class PostgreSQLWatcherRelation(Object):
         if not self._relation:
             return False
 
-        return (
-            self._relation.data[self._relation.app].get("raft-status") == "connected"
-            and not self._pg_unit_count_is_odd()
-        )
+        return self._relation.data[self._relation.app].get("raft-status") == "connected"
 
     @cached_property
     def watcher_raft_address(self) -> str | None:
@@ -216,12 +214,6 @@ class PostgreSQLWatcherRelation(Object):
             if self.charm.unit.is_leader():
                 self._cleanup_old_watcher_from_raft()
                 self._ensure_watcher_user()
-                try:
-                    self._add_watcher_to_raft()
-                except Exception:
-                    logger.debug("Unable to add member")
-                    event.defer()
-                    return
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
 
@@ -251,10 +243,9 @@ class PostgreSQLWatcherRelation(Object):
                 # Find all partner nodes in the Raft cluster
                 # Keys look like: partner_node_status_server_10.131.50.142:2222
                 stale_members: list[str] = []
-                prefix = "partner_node_status_server_"
                 for key in raft_status:
-                    if key.startswith(prefix) and raft_status[key] != 2:
-                        member_addr = key.replace(prefix, "")
+                    if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+                        member_addr = key.replace(RAFT_PARTNER_PREFIX, "")
                         member_ip = member_addr.split(":")[0]
 
                         # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
@@ -265,51 +256,8 @@ class PostgreSQLWatcherRelation(Object):
                 for stale_addr in stale_members:
                     logger.info(f"Removing stale watcher from Raft cluster: {stale_addr}")
                     self._remove_watcher_from_raft(stale_addr)
-
-        except UtilityException as e:
-            logger.debug(f"Failed to get Raft status for cleanup: {e}")
         except Exception as e:
             logger.debug(f"Error during Raft cleanup: {e}")
-
-    def _pg_unit_count_is_odd(self) -> bool:
-        """Return True if the number of PostgreSQL units is odd.
-
-        When the PG unit count is odd (1, 3, 5…), adding the watcher as a Raft
-        voter would produce an even total, which degrades partition tolerance.
-        The watcher should participate in Raft only when the PG count is even
-        (2, 4, 6…), so that the total Raft member count is odd.
-        """
-        # self + peers
-        pg_count = 1 + len(self.charm._peers.units) if self.charm._peers else 1
-        return pg_count % 2 == 1
-
-    def _add_watcher_to_raft(self) -> None:
-        """Dynamically add the watcher to the running Raft cluster.
-
-        Only adds the watcher when the PostgreSQL unit count is even. With an
-        even number of PG nodes, adding the watcher brings the total Raft voter
-        count to odd, preserving partition tolerance.
-
-        This is necessary because simply updating partner_addrs in the config
-        file doesn't add the member to a running cluster.
-        """
-        if not self.charm.is_cluster_initialised:
-            logger.debug("Cluster not initialized, skipping Raft member addition")
-            return
-
-        # Only add the watcher when the PG unit count is even (2, 4, …).
-        # With an odd PG count, adding the watcher creates an even Raft total
-        # which degrades partition tolerance — remove it instead.
-        if self._pg_unit_count_is_odd():
-            logger.info(
-                f"PG unit count is odd; watcher {self.watcher_raft_address} should not vote. "
-                "Removing from Raft if present."
-            )
-            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
-            return
-
-        logger.info(f"Adding watcher to Raft cluster: {self.watcher_raft_address}")
-        self.charm._patroni.add_raft_member(self.watcher_raft_address)
 
     def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle watcher relation being broken.
@@ -527,7 +475,6 @@ class PostgreSQLWatcherRelation(Object):
             "patroni-cas": self.charm.tls.get_peer_ca_bundle(),
             "standby-clusters": json.dumps(self._get_standby_clusters()),
             "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
-            "watcher-voting": "false" if self._pg_unit_count_is_odd() else "true",
         })
 
         # Also share this unit's per-unit data.
@@ -630,9 +577,6 @@ class PostgreSQLWatcherRelation(Object):
         # Only the leader handles Raft membership changes to avoid races
         if self.charm.unit.is_leader():
             self._cleanup_old_watcher_from_raft()
-
-            if not self.is_watcher_connected:
-                self._add_watcher_to_raft()
 
             # Update watcher relation data with fresh PostgreSQL IPs
             if relation := self._relation:

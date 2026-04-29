@@ -53,6 +53,7 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    RAFT_PARTNER_PREFIX,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
@@ -96,10 +97,6 @@ class EndpointNotReadyError(Exception):
 
 class StandbyClusterAlreadyPromotedError(Exception):
     """Raised when a standby cluster is already promoted."""
-
-
-class AddRaftMemberFailedError(Exception):
-    """Raised when adding a raft member failed for some reason."""
 
 
 class RemoveRaftMemberFailedError(Exception):
@@ -555,35 +552,6 @@ class Patroni:
         member_name = self.member_name
         return any(member.get("name") == member_name for member in cluster_status)
 
-    def ensure_member_registered(self) -> bool:
-        """Ensure this member is properly registered in the Raft DCS cluster.
-
-        If the member is running but not registered (which can happen when a new
-        unit joins a Raft cluster), restart Patroni to trigger re-registration.
-
-        Returns:
-            True if member is registered or restart was triggered, False if check failed.
-        """
-        if not self.is_patroni_running():
-            return False
-
-        # Check if we're running but not in the cluster
-        try:
-            health = self.cached_patroni_health
-            if health.get("state") not in RUNNING_STATES:
-                # Not running yet, nothing to do
-                return True
-        except RetryError:
-            return False
-
-        # If we're running, check if we're registered in the cluster
-        if self.is_member_registered_in_cluster():
-            return True
-
-        # We're running but not registered - need to restart Patroni
-        logger.warning("Member is running but not registered in cluster - restarting Patroni")
-        return self.restart_patroni()
-
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
         try:
@@ -938,43 +906,6 @@ class Patroni:
         except Exception:
             return []
 
-    def add_raft_member(self, member_address: str | None) -> None:
-        """Add a member to the raft cluster.
-
-        Used to make the watcher rejoin the raft consensus.
-        """
-        if not member_address:
-            logger.warning("Add raft member: No raft address provided")
-            return
-
-        # Get the status of the raft cluster.
-        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
-
-        raft_host = "127.0.0.1:2222"
-        try:
-            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-        except UtilityException:
-            logger.warning("Add raft member: Cannot connect to raft cluster")
-            raise AddRaftMemberFailedError() from None
-        if not raft_status:
-            logger.warning("Add raft member: No raft status")
-            raise AddRaftMemberFailedError() from None
-
-        # Check whether the member is still part of the raft cluster.
-        if f"partner_node_status_server_{member_address}" in raft_status:
-            return
-
-        # Remove the member from the raft cluster.
-        try:
-            result = syncobj_util.executeCommand(raft_host, ["add", member_address])
-        except UtilityException:
-            logger.debug("add raft member: Remove call failed")
-            raise AddRaftMemberFailedError() from None
-
-        if not result or not result.startswith("SUCCESS"):
-            logger.debug(f"Add raft member: Remove call not successful with {result}")
-            raise AddRaftMemberFailedError()
-
     def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.
 
@@ -1008,7 +939,7 @@ class Patroni:
             raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
-        if f"partner_node_status_server_{member_address}" not in raft_status:
+        if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck

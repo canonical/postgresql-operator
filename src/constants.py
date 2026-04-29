@@ -92,6 +92,7 @@ WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105
 WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
 
 RAFT_PORT = 2222
+RAFT_PARTNER_PREFIX = "partner_node_status_server_"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
