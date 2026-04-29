@@ -101,6 +101,7 @@ class PostgreSQLWatcherRelation(Object):
             return None
 
         self._relation.data[self.charm.app].pop("disable-watcher", None)
+        self.update_watcher_secret()
 
     def disable_watcher(self) -> None:
         """Inform watcher to stop service."""
@@ -414,9 +415,7 @@ class PostgreSQLWatcherRelation(Object):
 
         # Create a new secret with the Raft password (and watcher password if available)
         try:
-            content = {
-                RAFT_PASSWORD_KEY: raft_password,
-            }
+            content = {RAFT_PASSWORD_KEY: raft_password}
             # Include watcher password if provided, or look it up from existing secret
             watcher_pw = watcher_password or self._get_existing_watcher_password()
             if watcher_pw:
@@ -481,6 +480,7 @@ class PostgreSQLWatcherRelation(Object):
             "standby-clusters": json.dumps(self._get_standby_clusters()),
             "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
         })
+        self.update_watcher_secret()
 
         # Also share this unit's per-unit data.
         self.update_unit_address(relation)
@@ -556,9 +556,10 @@ class PostgreSQLWatcherRelation(Object):
             if raft_password := self.charm._patroni.raft_password:
                 secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
                 content = secret.get_content(refresh=True)
-                content[RAFT_PASSWORD_KEY] = raft_password
-                secret.set_content(content)
-                logger.info("Updated watcher secret with new Raft password")
+                if content.get(RAFT_PASSWORD_KEY) != raft_password:
+                    content[RAFT_PASSWORD_KEY] = raft_password
+                    secret.set_content(content)
+                    logger.info("Updated watcher secret with new Raft password")
         except SecretNotFoundError:
             logger.debug("Watcher secret not found, nothing to update")
 

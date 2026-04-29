@@ -34,6 +34,7 @@ from ops import (
     RelationBrokenEvent,
     RelationChangedEvent,
     RelationJoinedEvent,
+    SecretChangedEvent,
     SecretNotFoundError,
     StartEvent,
     UpdateStatusEvent,
@@ -449,66 +450,69 @@ class WatcherRequirerHandler(Object):
         pg_num = len(partner_addrs)
         return pg_num < 3 or pg_num % 2 == 0
 
-    def _on_watcher_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_watcher_relation_changed(
+        self, event: RelationChangedEvent | SecretChangedEvent
+    ) -> None:
         """Handle watcher relation changed event."""
         if not self.charm.unit.is_leader():
             return
 
-        relation = event.relation
-        logger.info(f"Watcher relation {relation.id} data changed")
-
-        if self.charm._peers is None:
+        if self.charm._peers is None or not (unit_ip := self.unit_ip):
             logger.debug("Deferring watcher relation: Peer relation not yet joined")
             event.defer()
             return
 
-        if not (raft_password := self._get_raft_password(relation)) or not (
-            partner_addrs := self._get_raft_partner_addrs(relation)
-        ):
-            logger.debug("Raft details are not yet available")
-            return
+        relations = (
+            [event.relation]
+            if isinstance(event, RelationChangedEvent)
+            else self.model.relations.get(WATCHER_RELATION, [])
+        )
+        for relation in relations:
+            logger.info(f"Watcher relation {relation.id} data changed")
 
-        if not (unit_ip := self.unit_ip):
-            logger.debug("Unit IP not available yet")
-            return
+            if not (raft_password := self._get_raft_password(relation)) or not (
+                partner_addrs := self._get_raft_partner_addrs(relation)
+            ):
+                logger.debug("Raft details are not yet available")
+                return
 
-        # Get or assign a port for this relation
-        port = self._get_port_for_relation(relation.id)
+            # Get or assign a port for this relation
+            port = self._get_port_for_relation(relation.id)
 
-        raft_controller = RaftController(self.charm, f"rel{relation.id}")
-        if self._is_disabled(relation) or not self._should_watcher_vote(partner_addrs):
-            logger.debug("Disabling the watcher")
-            raft_controller.remove_service()
-            raft_controller.remove_raft_member(
-                f"{self.unit_ip}:{port}", raft_password, partner_addrs
-            )
-            relation.data[self.charm.app]["raft-status"] = "disabled"
-            return
+            raft_controller = RaftController(self.charm, f"rel{relation.id}")
+            if self._is_disabled(relation) or not self._should_watcher_vote(partner_addrs):
+                logger.debug("Disabling the watcher")
+                raft_controller.remove_service()
+                raft_controller.remove_raft_member(
+                    f"{self.unit_ip}:{port}", raft_password, partner_addrs
+                )
+                relation.data[self.charm.app]["raft-status"] = "disabled"
+                return
 
-        if raft_controller.configure(
-            port, unit_ip, partner_addrs, raft_password, self._get_patroni_cas(relation)
-        ):
-            logger.info(
-                f"Restarting Raft controller for relation {relation.id} to apply config changes"
-            )
-            raft_controller.restart()
+            if raft_controller.configure(
+                port, unit_ip, partner_addrs, raft_password, self._get_patroni_cas(relation)
+            ):
+                logger.info(
+                    f"Restarting Raft controller for relation {relation.id} to apply config changes"
+                )
+                raft_controller.restart()
 
-        relation.data[self.charm.unit]["unit-address"] = unit_ip
-        relation.data[self.charm.app]["watcher-raft-port"] = str(port)
-        if unit_az := os.environ.get("JUJU_AVAILABILITY_ZONE"):
-            relation.data[self.charm.app]["unit-az"] = unit_az
-        # Only set raft-status and ActiveStatus after verifying the service is running
-        if service_running(raft_controller.service_name):
-            relation.data[self.charm.app]["raft-status"] = "connected"
-            # Check AZ co-location and enforce based on profile
-            if (
-                az_warning := self._check_az_colocation(relation)
-            ) and self.charm.config.profile == "production":
-                self.charm.unit.status = BlockedStatus(f"AZ co-location: {az_warning}")
+            relation.data[self.charm.unit]["unit-address"] = unit_ip
+            relation.data[self.charm.app]["watcher-raft-port"] = str(port)
+            if unit_az := os.environ.get("JUJU_AVAILABILITY_ZONE"):
+                relation.data[self.charm.app]["unit-az"] = unit_az
+            # Only set raft-status and ActiveStatus after verifying the service is running
+            if service_running(raft_controller.service_name):
+                relation.data[self.charm.app]["raft-status"] = "connected"
+                # Check AZ co-location and enforce based on profile
+                if (
+                    az_warning := self._check_az_colocation(relation)
+                ) and self.charm.config.profile == "production":
+                    self.charm.unit.status = BlockedStatus(f"AZ co-location: {az_warning}")
+                else:
+                    self.charm.unit.status = ActiveStatus()
             else:
-                self.charm.unit.status = ActiveStatus()
-        else:
-            self.charm.unit.status = WaitingStatus("Raft controller not running")
+                self.charm.unit.status = WaitingStatus("Raft controller not running")
 
     def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle watcher relation broken event."""
