@@ -15,6 +15,7 @@ Test scenarios from acceptance criteria:
 """
 
 import asyncio
+import json
 import logging
 
 import pytest
@@ -158,8 +159,6 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
     Deploys 2 PostgreSQL units and a watcher (same charm, role=watcher),
     then relates them to form a 3-node Raft cluster for quorum.
     """
-    logger.info(f"DEBUG: charm={charm!r}")
-
     # Check if PostgreSQL is already deployed (e.g., from a previous test run)
     # If so, verify it's in the expected state or skip deployment
     if DATABASE_APP_NAME in ops_test.model.applications:
@@ -259,8 +258,6 @@ async def test_watcher_topology_action(ops_test: OpsTest) -> None:
 
     assert action.status == "completed"
     assert "status" in action.results
-
-    import json
 
     status = json.loads(action.results["status"])
     # Single cluster: status is the cluster dict directly
@@ -548,7 +545,7 @@ async def test_primary_network_isolation_with_watcher(
                     f"Waiting for failover: replica {replica} should be promoted, "
                     f"but primary is still {new_primary}"
                 )
-                await are_writes_increasing(ops_test)
+                await are_writes_increasing(ops_test, down_unit=primary_unit.name)
     finally:
         # Restore network
         logger.info(f"Restoring network for {primary_machine}")
@@ -630,7 +627,7 @@ async def test_replica_network_isolation_with_watcher(
         # Raft quorum is maintained with primary + watcher (2 out of 3)
         current_primary = await get_primary(ops_test, DATABASE_APP_NAME, down_unit=replica)
         assert current_primary == primary, "Primary should not change during replica isolation"
-        await are_writes_increasing(ops_test)
+        await are_writes_increasing(ops_test, down_unit=replica)
     finally:
         # Restore network
         logger.info(f"Restoring network for {replica_machine}")
@@ -760,8 +757,6 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
         assert action.status == "completed"
         assert "status" in action.results
 
-        import json
-
         status = json.loads(action.results["status"])
         # Multi-cluster: status has a "clusters" list
         assert "clusters" in status, "Status should contain clusters list"
@@ -822,8 +817,6 @@ async def test_health_check_action(ops_test: OpsTest) -> None:
 
             assert action.status == "completed", f"Action failed: {action.results}"
             assert "health-check" in action.results
-
-            import json
 
             health = json.loads(action.results["health-check"])
             assert "clusters" in health
@@ -950,8 +943,6 @@ async def test_odd_count_raft_exclusion(ops_test: OpsTest, continuous_writes) ->
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
     action = await watcher_unit.run_action("get-cluster-status")
     action = await action.wait()
-
-    import json
 
     status = json.loads(action.results["status"])
     watcher_topology = status["topology"].get(watcher_unit.name)

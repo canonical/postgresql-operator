@@ -10,7 +10,7 @@ Raft consensus as a lightweight witness for stereo mode (2-node clusters).
 
 Multi-cluster support:
 - Each watcher relation gets its own RaftController instance
-- Ports are assigned dynamically starting from RAFT_PORT (2222) and persisted
+- Ports are assigned dynamically starting from RAFT_PORT (2223) and persisted
   in a port allocation file at /var/snap/charmed-postgresql/common/watcher-raft/ports.json
 - Each RaftController uses instance-specific data directories and systemd services
 """
@@ -40,7 +40,7 @@ from ops import (
     WaitingStatus,
 )
 
-from constants import RAFT_PARTNER_PREFIX, RAFT_PORT, WATCHER_RELATION
+from constants import RAFT_PORT, WATCHER_RELATION
 from raft_controller import ClusterStatus, RaftController, install_service
 
 if typing.TYPE_CHECKING:
@@ -138,7 +138,7 @@ class WatcherRequirerHandler(Object):
 
         # Assign next available port starting from RAFT_PORT
         used_ports = set(allocations.values())
-        port = RAFT_PORT
+        port = RAFT_PORT + 1
         while port in used_ports:
             port += 1
 
@@ -320,6 +320,10 @@ class WatcherRequirerHandler(Object):
                         f"Restarting Raft controller for relation {relation.id} due to IP change"
                     )
                     raft_controller.restart()
+                for stale_addr in raft_controller.get_stale_watchers(
+                    new_address, raft_password, partner_addrs, port
+                ):
+                    raft_controller.remove_raft_member(stale_addr, raft_password, partner_addrs)
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Handle update status event in watcher mode."""
@@ -330,6 +334,7 @@ class WatcherRequirerHandler(Object):
         self._update_unit_address_if_changed()
 
         connected_count = 0
+        disabled = False
         total_endpoints = 0
         az_warnings: list[str] = []
         info_warnings: list[str] = []
@@ -339,6 +344,8 @@ class WatcherRequirerHandler(Object):
             password = self._get_raft_password(relation)
             raft_controller = RaftController(self.charm, instance_id=f"rel{relation.id}")
             raft_status = raft_controller.get_status(port, password)
+            if self._is_disabled(relation):
+                disabled = True
             if raft_status.get("connected"):
                 connected_count += 1
 
@@ -346,34 +353,36 @@ class WatcherRequirerHandler(Object):
             total_endpoints += len(pg_endpoints)
             partner_addrs = self._get_raft_partner_addrs(relation)
 
-            if password and self._should_watcher_vote(
-                raft_controller, port, password, partner_addrs
-            ):
-                # if relation.data[relation.app].get("watcher-voting") == "false":
+            if password and not self._should_watcher_vote(partner_addrs):
                 cluster_name = self._get_cluster_name(relation)
+                raft_controller.remove_raft_member(
+                    f"{self.unit_ip}:{port}", password, pg_endpoints
+                )
                 info_warnings.append(
                     f"WARNING: cluster '{cluster_name}' has odd number units;"
                     " adding a watcher creates even Raft membership,"
                     " which degrades partition tolerance"
                 )
                 raft_controller.remove_service()
+                disabled = True
 
             az_warning = self._check_az_colocation(relation)
             if az_warning:
                 az_warnings.append(az_warning)
 
-        if connected_count == 0:
+        if connected_count == 0 and not disabled:
             self.charm.unit.status = WaitingStatus("Connecting to Raft cluster")
             return
 
         cluster_count = len(relations)
-        if cluster_count == 1:
-            msg = f"Raft connected, monitoring {total_endpoints} PostgreSQL endpoints"
-        else:
-            msg = (
+        msg = (
+            f"Raft connected, monitoring {total_endpoints} PostgreSQL endpoints"
+            if cluster_count == 1
+            else (
                 f"Raft connected to {connected_count}/{cluster_count} clusters, "
                 f"monitoring {total_endpoints} PostgreSQL endpoints"
             )
+        )
 
         # AZ co-location blocks in production; odd-count warnings never block
         if az_warnings and self.charm.config.profile == "production":
@@ -418,34 +427,9 @@ class WatcherRequirerHandler(Object):
         if unit_az:
             event.relation.data[self.charm.app]["unit-az"] = unit_az
 
-    def _should_watcher_vote(
-        self, raft_controller: RaftController, port: int, password: str, partner_addrs: list[str]
-    ) -> bool:
-        watcher_addr = f"{self.unit_ip}:{port}"
-        watcher_prefix = f"{RAFT_PARTNER_PREFIX}{watcher_addr}"
-        addrs = [watcher_addr]
-        for addr in partner_addrs:
-            addrs.append(f"{addr}:{RAFT_PORT}")
-        for addr in addrs:
-            try:
-                status = raft_controller.get_raft_status(addr, password)
-            except Exception:
-                logger.debug(f"Unable to connect to RAFT in {addr}")
-                continue
-
-            if not status["has_quorum"]:
-                logger.debug("Raft has no quorum")
-                return False
-            num_partners = len([
-                key
-                for key in status
-                if key.startswith(RAFT_PARTNER_PREFIX)
-                and key != watcher_prefix
-                and status[key] == 2
-            ])
-            return num_partners % 2 == 1
-        logger.warning("No raft members active")
-        return False
+    def _should_watcher_vote(self, partner_addrs: list[str]) -> bool:
+        pg_num = len(partner_addrs)
+        return pg_num < 3 or pg_num % 2 == 0
 
     def _on_watcher_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle watcher relation changed event."""
@@ -473,11 +457,12 @@ class WatcherRequirerHandler(Object):
         port = self._get_port_for_relation(relation.id)
 
         raft_controller = RaftController(self.charm, f"rel{relation.id}")
-        if self._is_disabled(relation) or not self._should_watcher_vote(
-            raft_controller, port, raft_password, partner_addrs
-        ):
+        if self._is_disabled(relation) or not self._should_watcher_vote(partner_addrs):
             logger.debug("Disabling the watcher")
             raft_controller.remove_service()
+            raft_controller.remove_raft_member(
+                f"{self.unit_ip}:{port}", raft_password, partner_addrs
+            )
             relation.data[self.charm.app]["raft-status"] = "disabled"
             return
 
@@ -684,7 +669,11 @@ class WatcherRequirerHandler(Object):
         raft_status = raft_controller.get_status(port, password)
         self._resolve_raft_members(raft_status, ip_to_unit)
         has_quorum = raft_status.get("has_quorum", False)
-        watcher_voting = "false" if self._is_disabled(relation) else "true"
+        watcher_voting = (
+            "false"
+            if self._should_watcher_vote(pg_endpoints) and not self._is_disabled(relation)
+            else "true"
+        )
         topology, primary_endpoint, cluster_role, timeline = self._build_postgresql_topology(
             relation, pg_endpoints, ip_to_unit
         )

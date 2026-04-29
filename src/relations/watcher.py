@@ -235,6 +235,7 @@ class PostgreSQLWatcherRelation(Object):
         # Get all PostgreSQL unit IPs (these should stay in the cluster)
         # Use _units_ips for fresh IPs from unit relation data
         pg_ips = set(self.charm._units_ips)
+        port_postfix = str(RAFT_PORT)
 
         # Get Raft cluster status to find all members
         try:
@@ -244,7 +245,11 @@ class PostgreSQLWatcherRelation(Object):
                 # Keys look like: partner_node_status_server_10.131.50.142:2222
                 stale_members: list[str] = []
                 for key in raft_status:
-                    if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+                    if (
+                        key.startswith(RAFT_PARTNER_PREFIX)
+                        and not key.endswith(port_postfix)
+                        and raft_status[key] != 2
+                    ):
                         member_addr = key.replace(RAFT_PARTNER_PREFIX, "")
                         member_ip = member_addr.split(":")[0]
 
