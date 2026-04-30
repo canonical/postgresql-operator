@@ -508,7 +508,7 @@ async def test_primary_network_isolation_with_watcher(
 
     try:
         # Cut network from primary (this removes the eth0 interface entirely)
-        cut_network_from_unit_without_ip_change(primary_machine)
+        cut_network_from_unit(primary_machine)
 
         # Wait for failover to happen - Patroni needs time to detect leader failure
         # and elect a new leader. This can take 30-90 seconds depending on TTL settings.
@@ -526,7 +526,7 @@ async def test_primary_network_isolation_with_watcher(
     finally:
         # Restore network
         logger.info(f"Restoring network for {primary_machine}")
-        restore_network_for_unit_without_ip_change(primary_machine)
+        restore_network_for_unit(primary_machine)
 
     # Wait for cluster to stabilize with restored network
     # The old primary may take time to rejoin after getting a new IP address,
