@@ -48,7 +48,13 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, POSTGRESQL_DATA_PATH, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
+from constants import (
+    PEER,
+    POSTGRESQL_DATA_PATH,
+    SECRET_INTERNAL_LABEL,
+    UPDATE_CERTS_BIN_PATH,
+    RAFT_PORT,
+)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -1933,7 +1939,7 @@ def test_reconfigure_cluster(harness):
         relation_data = {mock_event.unit: {"ip-to-remove": ip_to_remove}}
         mock_event.relation.data = relation_data
         assert not (harness.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_not_called()
 
@@ -1944,7 +1950,7 @@ def test_reconfigure_cluster(harness):
         _add_members.reset_mock()
         mock_event.relation.data = relation_data
         assert harness.charm._reconfigure_cluster(mock_event)
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_called_once_with(mock_event)
 
@@ -1957,7 +1963,7 @@ def test_reconfigure_cluster(harness):
                 rel_id, harness.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
             )
         assert harness.charm._reconfigure_cluster(mock_event)
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_called_once_with(ip_to_remove)
         _add_members.assert_called_once_with(mock_event)
 
