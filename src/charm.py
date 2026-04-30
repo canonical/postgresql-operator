@@ -113,6 +113,7 @@ from constants import (
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
+    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
@@ -132,9 +133,12 @@ from constants import (
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
+from raft_controller import install_service
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
+from relations.watcher import PostgreSQLWatcherRelation
+from relations.watcher_requirer import WatcherRequirerHandler
 from rotate_logs import RotateLogs
 from utils import label2name, new_password, render_file
 
@@ -239,18 +243,21 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     def refresh_snap(
         self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
     ) -> None:
-        # Update the configuration.
-        self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
-        self._charm.update_config(refresh=refresh)
+        if not self._charm.is_watcher_role:
+            # Update the configuration.
+            self._charm.set_unit_status(
+                MaintenanceStatus("updating configuration"), refresh=refresh
+            )
+            self._charm.update_config(refresh=refresh)
 
-        # TODO add graceful shutdown before refreshing snap?
-        # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
-        # graceful shutdown, restart workload
+            # TODO add graceful shutdown before refreshing snap?
+            # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
+            # graceful shutdown, restart workload
 
-        self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
-        self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
+            self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
+            self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
 
-        self._charm._post_snap_refresh(refresh)
+            self._charm._post_snap_refresh(refresh)
 
 
 def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
@@ -308,6 +315,155 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
+        configured_role = self.model.config.get("role", "postgresql")
+        if not isinstance(configured_role, str) or configured_role not in (
+            "postgresql",
+            "watcher",
+        ):
+            self.unit.status = BlockedStatus(
+                f"invalid role '{configured_role}' (must be 'postgresql' or 'watcher')"
+            )
+            return
+        elif isinstance(self.unit.status, BlockedStatus) and self.unit.status.message.startswith(
+            "invalid role '"
+        ):
+            self.unit.status = ActiveStatus()
+
+        if not self._validate_initial_role_unchanged():
+            return
+
+        # Watcher mode: lightweight Raft witness, no PostgreSQL
+        if self.is_watcher_role:
+            self._init_watcher_mode()
+            # Set tracing_endpoint for @trace_charm decorator compatibility
+            self.tracing_endpoint = None
+        else:
+            # PostgreSQL mode: full database server
+            self._init_postgresql_mode()
+
+        self.refresh: charm_refresh.Machines | None
+        try:
+            self.refresh = charm_refresh.Machines(
+                _PostgreSQLRefresh(
+                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
+                )
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+        self._reconcile_refresh_status()
+
+        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
+            if self.refresh.in_progress:
+                self._post_snap_refresh(self.refresh)
+            else:
+                self.refresh.next_unit_allowed_to_refresh = True
+
+    @cached_property
+    def get_role(self) -> str:
+        """Get cached role if available or configured role if not."""
+        configured_role = str(self.model.config.get("role", "postgresql"))
+        if not self._peers:
+            return configured_role
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None:
+            return configured_role
+        return stored_role
+
+    @cached_property
+    def is_watcher_role(self) -> bool:
+        """Return True if this charm is deployed in watcher mode."""
+        return self.get_role == "watcher"
+
+    def _validate_initial_role_unchanged(self) -> bool:
+        """Validate configured role against persisted peer-role during startup."""
+        if not self._peers:
+            return True
+
+        configured_role = str(self.model.config.get("role", "postgresql"))
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None or stored_role == configured_role:
+            if isinstance(self.unit.status, BlockedStatus) and self.unit.status.message.startswith(
+                "role change not supported"
+            ):
+                self.unit.status = ActiveStatus()
+            return True
+
+        logger.error(
+            f"Role change is not supported. Deployed as '{stored_role}', "
+            f"but config now says '{configured_role}'."
+        )
+        self.unit.status = BlockedStatus(
+            f"role change not supported (deployed as '{stored_role}')"
+        )
+        return False
+
+    def _validate_role_unchanged(self) -> bool:
+        """Validate that the role has not changed since initial deployment.
+
+        Persists the role to the peer databag on first leader election and checks
+        for changes on config-changed. Returns True if valid, False if blocked.
+        """
+        if not self._peers:
+            return True
+        configured_role = str(self.model.config.get("role", "postgresql"))
+        stored_role = self._peers.data[self.app].get("role")
+        if stored_role is None:
+            # First time — persist the role (leader only)
+            if self.unit.is_leader():
+                self._peers.data[self.app]["role"] = configured_role
+            return True
+        if stored_role != configured_role:
+            logger.error(
+                f"Role change is not supported. Deployed as '{stored_role}', "
+                f"but config now says '{configured_role}'."
+            )
+            self.unit.status = BlockedStatus(
+                f"role change not supported (deployed as '{stored_role}')"
+            )
+            return False
+        return True
+
+    def _init_watcher_mode(self):
+        """Initialize the charm in watcher mode (lightweight Raft witness)."""
+        self.watcher_requirer = WatcherRequirerHandler(self)
+        # Watcher mode delegates all event handling to WatcherRequirerHandler.
+        # We still observe leader_elected to persist the role in peer data.
+        self.framework.observe(self.on.leader_elected, self._on_watcher_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_watcher_config_changed)
+
+        # Register handlers for PostgreSQL-specific actions so users get a
+        # clear message rather than a generic Juju "action not found" error.
+        _pg_only_actions = [
+            "create_backup",
+            "create_replication",
+            "get_primary",
+            "list_backups",
+            "pre_refresh_check",
+            "force_refresh_start",
+            "resume_refresh",
+            "promote_to_primary",
+            "restore",
+        ]
+        for action_name in _pg_only_actions:
+            self.framework.observe(
+                getattr(self.on, f"{action_name}_action"),
+                self._on_action_not_available_for_watcher,
+            )
+
+    def _on_action_not_available_for_watcher(self, event: ActionEvent) -> None:
+        """Fail any PG-specific action run against a watcher unit."""
+        event.fail("this action is not available for the role assigned to this application")
+
+    def _on_watcher_leader_elected(self, event):
+        """Persist the role in peer data on first leader election (watcher mode)."""
+        self._validate_role_unchanged()
+
+    def _on_watcher_config_changed(self, event):
+        """Block if role was changed after deployment (watcher mode)."""
+        self._validate_role_unchanged()
+
+    def _init_postgresql_mode(self):
+        """Initialize the charm in postgresql mode (full database server)."""
         self.peer_relation_app = DataPeerData(
             self.model,
             relation_name=PEER,
@@ -353,21 +509,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
+        self.watcher_offer = PostgreSQLWatcherRelation(self)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
-
-        self.refresh: charm_refresh.Machines | None
-        try:
-            self.refresh = charm_refresh.Machines(
-                _PostgreSQLRefresh(
-                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
-                )
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
-        self._reconcile_refresh_status()
 
         # Support for disabling the operator.
         disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
@@ -378,12 +524,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             self.unit.status = BlockedStatus("Disabled")
             sys.exit(0)
-
-        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
-            if self.refresh.in_progress:
-                self._post_snap_refresh(self.refresh)
-            else:
-                self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
         self._rotate_logs.start_log_rotation()
@@ -410,52 +550,59 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         Called after snap refresh
         """
-        try:
-            if (
-                (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
-                and (cert := load_pem_x509_certificate(raw_cert.encode()))
-                and (
-                    cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-                    != self._unit_ip
-                )
-            ):
-                self.tls.generate_internal_peer_cert()
-        except Exception:
-            logger.exception("Unable to check or update internal cert")
-
-        if not self._patroni.start_patroni():
-            self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
-            return
-
-        self._setup_exporter()
-        self.backup.start_stop_pgbackrest_service()
-        self._setup_pgbackrest_exporter()
-
-        # Wait until the database initialise.
-        self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
-                with attempt:
-                    # Check if the member hasn't started or hasn't joined the cluster yet.
-                    if (
-                        not self._patroni.member_started
-                        or self.unit.name.replace("/", "-") not in self._patroni.cluster_members
-                        or not self._patroni.is_replication_healthy()
-                    ):
-                        logger.debug(
-                            "Instance not yet back in the cluster."
-                            f" Retry {attempt.retry_state.attempt_number}/6"
-                        )
-                        raise Exception()
-        except RetryError:
-            logger.debug(
-                "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
-            )
-        else:
+        if not self.is_watcher_role:
             try:
-                self._patroni.set_max_timelines_history()
+                if (
+                    (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
+                    and (cert := load_pem_x509_certificate(raw_cert.encode()))
+                    and (
+                        cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+                        != self._unit_ip
+                    )
+                ):
+                    self.tls.generate_internal_peer_cert()
             except Exception:
-                logger.warning("Unable to patch in max_timelines_history")
+                logger.exception("Unable to check or update internal cert")
+
+            if not self._patroni.start_patroni():
+                self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
+                return
+
+            self._setup_exporter()
+            self.backup.start_stop_pgbackrest_service()
+            self._setup_pgbackrest_exporter()
+
+            # Wait until the database initialise.
+            self.set_unit_status(
+                WaitingStatus("waiting for database initialisation"), refresh=refresh
+            )
+            try:
+                for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+                    with attempt:
+                        # Check if the member hasn't started or hasn't joined the cluster yet.
+                        if (
+                            not self._patroni.member_started
+                            or self.unit.name.replace("/", "-")
+                            not in self._patroni.cluster_members
+                            or not self._patroni.is_replication_healthy()
+                        ):
+                            logger.debug(
+                                "Instance not yet back in the cluster."
+                                f" Retry {attempt.retry_state.attempt_number}/6"
+                            )
+                            raise Exception()
+            except RetryError:
+                logger.debug(
+                    "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
+                )
+            else:
+                try:
+                    self._patroni.set_max_timelines_history()
+                except Exception:
+                    logger.warning("Unable to patch in max_timelines_history")
+                refresh.next_unit_allowed_to_refresh = True
+        else:
+            install_service()
             refresh.next_unit_allowed_to_refresh = True
 
     def set_unit_status(
@@ -479,7 +626,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit.status = status
 
     def _reconcile_refresh_status(self, _=None):
-        if self.unit.is_leader():
+        if not self.is_watcher_role and self.unit.is_leader():
             self.async_replication.set_app_status()
 
         # Workaround for other unit statuses being set in a stateful way (i.e. unable to recompute
@@ -499,7 +646,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.unit.status = refresh_status
                 new_refresh_unit_status = refresh_status.message
-            else:
+            elif not self.is_watcher_role:
                 # Clear refresh status from unit status
                 self._set_primary_status_message()
         elif (
@@ -756,7 +903,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # checked for none in the early exit method
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self._patroni.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(member_ip)
+                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -900,6 +1047,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
+                self.watcher_offer.disable_watcher()
+                if self.watcher_offer.is_active:
+                    logger.info("waiting for RAFT watcher to disconnect.")
+                    return
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_stopped_check()
@@ -1000,25 +1151,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self._start_stop_pgbackrest_service(event)
-
-        # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
+        # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
+        # A new member may be running but not registered if it was added to Raft after starting.
         if (
-            "s3-initialization-start" in self.app_peer_data
-            and "s3-initialization-done" not in self.unit_peer_data
-            and self.is_primary
-            and not self.backup._on_s3_credential_changed_primary(event)
+            self.watcher_offer.is_watcher_connected
+            and not self._patroni.is_member_registered_in_cluster()
         ):
+            logger.info("Member running but not registered in Raft cluster - restarting Patroni")
+            self._patroni.restart_patroni()
+            event.defer()
             return
 
-        # Clean-up unit initialization data after successful sync to the leader.
-        if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
-            self.unit_peer_data.update({
-                "stanza": "",
-                "s3-initialization-block-message": "",
-                "s3-initialization-done": "",
-                "s3-initialization-start": "",
-            })
+        self._start_stop_pgbackrest_service(event)
+
+        if not self._handle_s3_initialization(event):
+            return
+
+        # Update watcher relation with fresh peer IPs when peer data changes
+        # This ensures pg-endpoints stay current when unit IPs change
+        if self.unit.is_leader():
+            self.watcher_offer.update_endpoints()
 
         self._update_new_unit_status()
 
@@ -1032,6 +1184,34 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._update_admin_password(admin_secret_id)
             except PostgreSQLUpdateUserPasswordError:
                 event.defer()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _handle_s3_initialization(self, event: HookEvent) -> bool:
+        """Handle S3 initialization during peer relation changes.
+
+        Returns:
+            True if processing should continue, False if we should return early.
+        """
+        # This is intended to be executed only when leader is reinitializing S3 connection
+        # due to the leader change.
+        if (
+            "s3-initialization-start" in self.app_peer_data
+            and "s3-initialization-done" not in self.unit_peer_data
+            and self.is_primary
+            and not self.backup._on_s3_credential_changed_primary(event)
+        ):
+            return False
+
+        # Clean-up unit initialization data after successful sync to the leader.
+        if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
+            self.unit_peer_data.update({
+                "stanza": "",
+                "s3-initialization-block-message": "",
+                "s3-initialization-done": "",
+                "s3-initialization-start": "",
+            })
+
+        return True
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
@@ -1058,6 +1238,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
+            # Update watcher relation with current cluster endpoints
+            self.watcher_offer.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
@@ -1075,7 +1257,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
-                self._patroni.remove_raft_member(ip_to_remove)
+                self._patroni.remove_raft_member(f"{ip_to_remove}:{RAFT_PORT}")
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
@@ -1110,6 +1292,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.update({"ip": current_ip})
             self._patroni.stop_patroni()
             self._update_certificate()
+            # Update watcher relation - unit address for all units, endpoints only for leader
+            self.watcher_offer.update_unit_address()
+            if self.unit.is_leader():
+                self.watcher_offer.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -1427,6 +1613,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:  # noqa: C901
         """Handle the leader-elected event."""
+        # Persist and validate role
+        if not self._validate_role_unchanged():
+            return
+
         # consider configured system user passwords
         system_user_passwords = {}
         if admin_secret_id := self.config.system_users:
@@ -1492,6 +1682,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_config_changed(self, event) -> None:  # noqa: C901
         """Handle configuration changes, like enabling plugins."""
+        # Block if role was changed after deployment
+        if not self._validate_role_unchanged():
+            return
+
         if not self._peers:
             # update endpoint addresses
             logger.debug("Defer on_config_changed: no peer relation")
@@ -2025,6 +2219,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        # Keep this unit data current for watcher AZ/IP checks.
+        self.watcher_offer.update_unit_address()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()

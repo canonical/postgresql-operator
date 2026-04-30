@@ -2,6 +2,14 @@
 # See LICENSE file for licensing details.
 
 options:
+  role:
+    description: |
+      Deployment role for this application. Set at deploy time and cannot be changed afterwards.
+      "postgresql" (default) runs the full PostgreSQL database server with Patroni.
+      "watcher" runs a lightweight Raft witness for stereo mode (2-node clusters),
+      providing quorum without running PostgreSQL.
+    type: string
+    default: "postgresql"
   synchronous-node-count:
     description: |
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
