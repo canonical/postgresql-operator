@@ -405,6 +405,7 @@ class PostgreSQLAsyncReplication(Object):
                         for unit in {*self.charm._peers.units, self.charm.unit}  # type: ignore
                     ):
                         self.charm.app_peer_data.update({"cluster_initialised": "True"})
+                        self.charm.watcher_offer.enable_watcher()
                     elif self._is_following_promoted_cluster():
                         self.charm.set_unit_status(
                             WaitingStatus("Waiting for the database to be started in all units")
@@ -541,10 +542,14 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
             self.charm.update_config()
 
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
+
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
         if self.charm.unit.is_leader():
             self.set_app_status()
+            self.charm.watcher_offer.update_endpoints()
 
         primary_cluster = self._get_primary_cluster()
         logger.debug("Primary cluster: %s", primary_cluster)
@@ -603,6 +608,9 @@ class PostgreSQLAsyncReplication(Object):
             self.charm.unit_peer_data.update({
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
+
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""
@@ -757,6 +765,7 @@ class PostgreSQLAsyncReplication(Object):
             if not self.charm.unit.is_leader() and not os.path.exists(POSTGRESQL_DATA_PATH):
                 logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
                 return False
+            self.charm.watcher_offer.disable_watcher()
 
             try:
                 for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):

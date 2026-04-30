@@ -18,7 +18,7 @@ charm hook invocations.
 
 import logging
 from contextlib import suppress
-from ipaddress import IPv4Address
+from ipaddress import ip_address
 from shutil import rmtree
 from typing import TYPE_CHECKING, TypedDict
 
@@ -38,7 +38,7 @@ from pysyncobj.utility import TcpUtility
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from cluster import ClusterMember
-from constants import PATRONI_CLUSTER_STATUS_ENDPOINT
+from constants import PATRONI_CLUSTER_STATUS_ENDPOINT, RAFT_PARTNER_PREFIX, RAFT_PORT
 from utils import create_directory, parallel_patroni_get_request, render_file
 
 if TYPE_CHECKING:
@@ -74,7 +74,7 @@ class ClusterStatus(TypedDict):
     members: list[str]
 
 
-def install_service() -> bool:
+def install_service() -> None:
     """Install the systemd template service for the Raft controller.
 
     Returns:
@@ -87,14 +87,8 @@ def install_service() -> bool:
     render_file(SERVICE_FILE, rendered, 0o644, change_owner=False)
 
     # Reload systemd to pick up the new service
-    try:
-        daemon_reload()
-        logger.info(f"Installed systemd service {SERVICE_FILE}")
-    except SystemdError as e:
-        logger.error(f"Failed to reload systemd: {e}")
-        return False
-
-    return True
+    daemon_reload()
+    logger.info(f"Installed systemd service {SERVICE_FILE}")
 
 
 class RaftController:
@@ -159,13 +153,13 @@ class RaftController:
 
         # Validate addresses to prevent injection into the systemd unit file
         try:
-            IPv4Address(self_addr)
+            ip_address(self_addr)
         except Exception:
             logger.error(f"Invalid self_addr format: {self_addr}")
             return False
         try:
             for addr in partner_addrs:
-                IPv4Address(addr)
+                ip_address(addr)
         except Exception:
             logger.error(f"Invalid partner address format: {addr}")
             return False
@@ -238,7 +232,8 @@ class RaftController:
             return False
 
         try:
-            rmtree(self.data_dir)
+            with suppress(FileNotFoundError):
+                rmtree(self.data_dir)
         except Exception as e:
             logger.error(f"Failed to remove Raft controller directory: {e}")
             return False
@@ -252,12 +247,97 @@ class RaftController:
             True if restarted successfully, False otherwise.
         """
         try:
+            service_enable(self.service_name)
             service_restart(self.service_name)
             logger.info(f"Restarted Raft controller service {self.service_name}")
             return True
         except SystemdError as e:
             logger.error(f"Failed to restart Raft controller: {e}")
             return False
+
+    def get_stale_watchers(
+        self, member_address: str, raft_password: str, partner_addrs: list[str], port: int
+    ) -> list[str]:
+        """Collect stale watcher raft members."""
+        port_postfix = str(port)
+        watcher_addr = f"{member_address}:{port}"
+        watcher_key = f"{RAFT_PARTNER_PREFIX}{watcher_addr}"
+
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=raft_password, timeout=3)
+
+        stale_addrs = []
+        addrs = [watcher_addr, *[f"{addr}:{RAFT_PORT}" for addr in partner_addrs]]
+        for raft_host in addrs:
+            try:
+                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            except Exception as e:
+                logger.warning(f"Collect stale addrs: Cannot connect to raft cluster: {e}")
+                continue
+            if not raft_status:
+                logger.warning("Collect stale addrs: No raft status")
+                continue
+            for key in raft_status:
+                if (
+                    key.startswith(RAFT_PARTNER_PREFIX)
+                    and key.endswith(port_postfix)
+                    and key != watcher_key
+                ):
+                    stale_addrs.append(key.split(RAFT_PARTNER_PREFIX)[-1])
+            return stale_addrs
+        logger.warning("Collect stale addrs: No member available")
+        return stale_addrs
+
+    def remove_raft_member(
+        self, member_address: str, raft_password: str, partner_addrs: list[str]
+    ) -> None:
+        """Remove a member from the raft cluster.
+
+        The raft cluster is a different cluster from the Patroni cluster.
+        It is responsible for defining which Patroni member can update
+        the primary member in the DCS.
+
+        Raises:
+            RaftMemberNotFoundError: if the member to be removed
+                is not part of the raft cluster.
+        """
+        if not member_address:
+            logger.debug("Remove raft member: No address provided")
+            return
+
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=raft_password, timeout=3)
+
+        for raft_host in [f"{addr}:{RAFT_PORT}" for addr in partner_addrs]:
+            try:
+                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            except Exception as e:
+                logger.warning(f"Remove raft watcher: Cannot connect to raft cluster: {e}")
+                continue
+            if not raft_status:
+                logger.warning("Remove raft watcher: No raft status")
+                continue
+
+            # Check whether the member is still part of the raft cluster.
+            if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
+                return
+
+            # If there's no quorum and the leader left raft cluster is stuck
+            if not raft_status["has_quorum"] or not raft_status["leader"]:
+                logger.warning("Remove raft watcher: No quorum or leader")
+                continue
+
+            # Remove the member from the raft cluster.
+            try:
+                result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
+            except Exception as e:
+                logger.debug(f"Remove raft watcher: Remove call failed {e}")
+                continue
+
+            if not result or not result.startswith("SUCCESS"):
+                logger.debug(f"Remove raft watcher: Remove call not successful with {result}")
+                continue
+            return
 
     def get_status(self, self_port: int, password: str | None) -> ClusterStatus:
         """Get the Raft controller status.
@@ -288,11 +368,10 @@ class RaftController:
             )
 
             # Extract member addresses from partner_node_status_server_* keys
-            prefix = "partner_node_status_server_"
             members: list[str] = [str(raft_status["self"])]
             for key in raft_status:
-                if key.startswith(prefix):
-                    members.append(key[len(prefix) :])
+                if key.startswith(RAFT_PARTNER_PREFIX):
+                    members.append(key[len(RAFT_PARTNER_PREFIX) :])
             status["members"] = sorted(members)
             return status
         except Exception as e:
