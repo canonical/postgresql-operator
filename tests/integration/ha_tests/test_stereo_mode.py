@@ -25,7 +25,6 @@ from yaml import safe_load
 
 from ..helpers import (
     APPLICATION_NAME,
-    CHARM_BASE,
     DATABASE_APP_NAME,
 )
 from .helpers import APPLICATION_NAME as TEST_APP_NAME
@@ -185,7 +184,7 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=2,
-            base=CHARM_BASE,
+            series="noble",
             config={"profile": "testing", "synchronous-mode-strict": False},
         )
         # Deploy watcher using the same charm with role=watcher
@@ -194,14 +193,14 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
             charm,
             application_name=WATCHER_APP_NAME,
             num_units=1,
-            base=CHARM_BASE,
+            series="noble",
             config={"role": "watcher", "profile": "testing"},
         )
         logger.info("Deploying test application...")
         await ops_test.model.deploy(
             APPLICATION_NAME,
             application_name=APPLICATION_NAME,
-            base=CHARM_BASE,
+            series="noble",
             channel="edge",
         )
 
@@ -715,7 +714,7 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
             charm,
             application_name=second_pg_app,
             num_units=2,
-            base=CHARM_BASE,
+            series="noble",
             config={"profile": "testing", "synchronous-mode-strict": False},
         )
         await ops_test.model.wait_for_idle(
@@ -855,7 +854,7 @@ async def test_watcher_production_profile_az_blocked(ops_test: OpsTest, charm) -
             charm,
             application_name=production_watcher,
             num_units=1,
-            base=CHARM_BASE,
+            series="noble",
             config={"role": "watcher", "profile": "production"},
         )
 
@@ -912,7 +911,7 @@ async def test_watcher_production_profile_az_blocked(ops_test: OpsTest, charm) -
             charm,
             application_name=WATCHER_APP_NAME,
             num_units=1,
-            base=CHARM_BASE,
+            series="noble",
             config={"role": "watcher", "profile": "testing"},
         )
         await ops_test.model.wait_for_idle(
