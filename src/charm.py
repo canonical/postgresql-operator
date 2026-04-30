@@ -1257,7 +1257,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
-                self._patroni.remove_raft_member(ip_to_remove)
+                self._patroni.remove_raft_member(f"{ip_to_remove}:{RAFT_PORT}")
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
@@ -2222,9 +2222,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Keep this unit data current for watcher AZ/IP checks.
         self.watcher_offer.update_unit_address()
-
-        # Ensure watcher is in Raft cluster (handles cases where relation events weren't delivered)
-        self.watcher_offer.ensure_watcher_in_raft()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()

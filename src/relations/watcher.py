@@ -562,28 +562,3 @@ class PostgreSQLWatcherRelation(Object):
                     logger.info("Updated watcher secret with new Raft password")
         except SecretNotFoundError:
             logger.debug("Watcher secret not found, nothing to update")
-
-    def ensure_watcher_in_raft(self) -> None:
-        """Ensure the connected watcher is in the Raft cluster and has fresh endpoint data.
-
-        Called periodically from update_status to handle cases where Juju
-        relation events weren't delivered (e.g., when a watcher unit is replaced).
-        This method:
-        1. Cleans up any stale watcher IPs from the Raft cluster
-        2. Adds the current watcher to Raft if not present
-        3. Updates the watcher relation data with fresh PostgreSQL IPs
-
-        The last point is critical because after network disruptions that cause IP
-        changes, the watcher may have stale pg-endpoints and be unable to health
-        check the PostgreSQL nodes properly.
-        """
-        if not self.charm.is_cluster_initialised or not self.is_active:
-            return
-
-        # Only the leader handles Raft membership changes to avoid races
-        if self.charm.unit.is_leader():
-            self._cleanup_old_watcher_from_raft()
-
-            # Update watcher relation data with fresh PostgreSQL IPs
-            if relation := self._relation:
-                self._update_relation_data(relation)
