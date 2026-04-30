@@ -359,7 +359,7 @@ class WatcherRequirerHandler(Object):
             password = self._get_raft_password(relation)
             raft_controller = RaftController(self.charm, instance_id=f"rel{relation.id}")
             raft_status = raft_controller.get_status(port, password)
-            disabled = self._is_disabled(relation)
+            disabled = disabled or self._is_disabled(relation)
             connected_count += 1 if raft_status.get("connected") else 0
 
             pg_endpoints = self._get_raft_partner_addrs(relation)
