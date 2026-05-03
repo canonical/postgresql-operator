@@ -1,0 +1,173 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:38:03Z
+
+App               Version  Status   Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           blocked      3  landscape-client  latest/edge   73  no       Failed to add PPA!
+pg                14.22    active       3  postgresql                       0  no       
+ubuntu-advantage           waiting    2/3  ubuntu-advantage  latest/edge  148  no       agent initialising
+
+Unit                   Workload     Agent       Machine  Public address  Ports     Message
+pg/0                   active       idle        0        10.34.206.59    5432/tcp  
+  landscape-client/0   blocked      idle                 10.34.206.59              Failed to add PPA!
+  ubuntu-advantage/0*  active       idle                 10.34.206.59              Attached (esm-apps,esm-infra)
+pg/1*                  active       idle        1        10.34.206.117   5432/tcp  Primary
+  landscape-client/1*  maintenance  executing            10.34.206.117             (install) Adding client PPA..
+  ubuntu-advantage/2   waiting      allocating           10.34.206.117             agent initialising
+pg/2                   active       idle        2        10.34.206.180   5432/tcp  
+  landscape-client/2   blocked      idle                 10.34.206.180             Failed to add PPA!
+  ubuntu-advantage/1   active       idle                 10.34.206.180             Attached (esm-apps,esm-infra)
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.34.206.59   juju-16d710-0  ubuntu@22.04  runnervmrc6n4  Running
+1        started  10.34.206.117  juju-16d710-1  ubuntu@22.04  runnervmrc6n4  Running
+2        started  10.34.206.180  juju-16d710-2  ubuntu@22.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:24:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:24:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-1: 00:25:39 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4925f8ed70 state=finished raised Exception>]
+machine-2: 00:25:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:25:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:26:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:26:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-landscape-client-0: 00:30:23 CRITICAL unit.landscape-client/0.juju-log   File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 368, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 548, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 527, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 516, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 147, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 348, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 860, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 950, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 301, in _on_install
+    self.add_ppa()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 256, in add_ppa
+    if not process_helper(
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 120, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-2: 00:30:23 CRITICAL unit.landscape-client/2.juju-log   File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 368, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/main.py", line 548, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/main.py", line 527, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/main.py", line 516, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/main.py", line 147, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 348, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 860, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 950, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 301, in _on_install
+    self.add_ppa()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 256, in add_ppa
+    if not process_helper(
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 120, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-0: 00:30:23 CRITICAL unit.landscape-client/0.juju-log Traceback (most recent call last):
+  File "/usr/bin/add-apt-repository", line 364, in <module>
+    sys.exit(0 if addaptrepo.main() else 1)
+  File "/usr/bin/add-apt-repository", line 347, in main
+    shortcut = handler(source, **shortcut_params)
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuts.py", line 40, in shortcut_handler
+    return handler(shortcut, **kwargs)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 82, in __init__
+    if self.lpppa.publish_debug_symbols:
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 120, in lpppa
+    self._lpppa = self.lpteam.getPPAByName(name=self.ppaname)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 107, in lpteam
+    self._lpteam = self.lp.people(self.teamname)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 98, in lp
+    self._lp = login_func("%s.%s" % (self.__module__, self.__class__.__name__),
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 494, in login_anonymously
+    return cls(
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 230, in __init__
+    super(Launchpad, self).__init__(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/resource.py", line 472, in __init__
+    self._wadl = self._browser.get_wadl_application(self._root_uri)
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 447, in get_wadl_application
+    response, content = self._request(url, media_type=wadl_type)
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 389, in _request
+    response, content = self._request_and_retry(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 359, in _request_and_retry
+    response, content = self._connection.request(
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1725, in request
+    (response, content) = self._request(
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 144, in _request
+    response, content = super(LaunchpadOAuthAwareHttp, self)._request(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 184, in _request
+    return super(RestfulHttp, self)._request(
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1441, in _request
+    (response, content) = self._conn_request(conn, request_uri, method, body, headers)
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1363, in _conn_request
+    conn.connect()
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1153, in connect
+    sock.connect((self.host, self.port))
+TimeoutError: [Errno 110] Connection timed out
+
+unit-landscape-client-2: 00:30:23 CRITICAL unit.landscape-client/2.juju-log Traceback (most recent call last):
+  File "/usr/bin/add-apt-repository", line 364, in <module>
+    sys.exit(0 if addaptrepo.main() else 1)
+  File "/usr/bin/add-apt-repository", line 347, in main
+    shortcut = handler(source, **shortcut_params)
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuts.py", line 40, in shortcut_handler
+    return handler(shortcut, **kwargs)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 82, in __init__
+    if self.lpppa.publish_debug_symbols:
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 120, in lpppa
+    self._lpppa = self.lpteam.getPPAByName(name=self.ppaname)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 107, in lpteam
+    self._lpteam = self.lp.people(self.teamname)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 98, in lp
+    self._lp = login_func("%s.%s" % (self.__module__, self.__class__.__name__),
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 494, in login_anonymously
+    return cls(
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 230, in __init__
+    super(Launchpad, self).__init__(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/resource.py", line 472, in __init__
+    self._wadl = self._browser.get_wadl_application(self._root_uri)
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 447, in get_wadl_application
+    response, content = self._request(url, media_type=wadl_type)
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 389, in _request
+    response, content = self._request_and_retry(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 359, in _request_and_retry
+    response, content = self._connection.request(
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1725, in request
+    (response, content) = self._request(
+  File "/usr/lib/python3/dist-packages/launchpadlib/launchpad.py", line 144, in _request
+    response, content = super(LaunchpadOAuthAwareHttp, self)._request(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 184, in _request
+    return super(RestfulHttp, self)._request(
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1441, in _request
+    (response, content) = self._conn_request(conn, request_uri, method, body, headers)
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1363, in _conn_request
+    conn.connect()
+  File "/usr/lib/python3/dist-packages/httplib2/__init__.py", line 1153, in connect
+    sock.connect((self.host, self.port))
+TimeoutError: [Errno 110] Connection timed out
+
+unit-landscape-client-0: 00:30:50 CRITICAL unit.landscape-client/0.juju-log Landscape client package not installed.
+unit-landscape-client-2: 00:30:50 CRITICAL unit.landscape-client/2.juju-log Landscape client package not installed.
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
