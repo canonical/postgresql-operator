@@ -1,0 +1,257 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:34:22Z
+
+App               Version  Status   Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           blocked      3  landscape-client  latest/edge   73  no       Failed to add PPA!
+pg                14.22    active       3  postgresql                       0  no       
+ubuntu-advantage           active       3  ubuntu-advantage  latest/edge  148  no       Attached (esm-apps,esm-infra)
+
+Unit                   Workload  Agent  Machine  Public address  Ports     Message
+pg/0*                  active    idle   0        10.196.106.10   5432/tcp  Primary
+  landscape-client/3   blocked   idle            10.196.106.10             Failed to add PPA!
+  ubuntu-advantage/2   active    idle            10.196.106.10             Attached (esm-apps,esm-infra)
+pg/1                   active    idle   1        10.196.106.31   5432/tcp  
+  landscape-client/1   blocked   idle            10.196.106.31             Failed to add PPA!
+  ubuntu-advantage/1   active    idle            10.196.106.31             Attached (esm-apps,esm-infra)
+pg/2                   active    idle   2        10.196.106.7    5432/tcp  
+  landscape-client/0*  blocked   idle            10.196.106.7              Failed to add PPA!
+  ubuntu-advantage/0*  active    idle            10.196.106.7              Attached (esm-apps,esm-infra)
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.196.106.10  juju-e35dcf-0  ubuntu@22.04  runnervmrc6n4  Running
+1        started  10.196.106.31  juju-e35dcf-1  ubuntu@22.04  runnervmrc6n4  Running
+2        started  10.196.106.7   juju-e35dcf-2  ubuntu@22.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:20:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:20:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-0: 00:21:41 ERROR unit.pg/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f84a9d4cfa0 state=finished raised Exception>]
+unit-pg-0: 00:21:53 ERROR unit.pg/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 00:22:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:22:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:22:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:22:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-landscape-client-3: 00:25:54 CRITICAL unit.landscape-client/3.juju-log   File "/var/lib/juju/agents/unit-landscape-client-3/charm/./src/charm.py", line 368, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/main.py", line 548, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/main.py", line 527, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/main.py", line 516, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/main.py", line 147, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/framework.py", line 348, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/framework.py", line 860, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/venv/ops/framework.py", line 950, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/./src/charm.py", line 301, in _on_install
+    self.add_ppa()
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/./src/charm.py", line 256, in add_ppa
+    if not process_helper(
+  File "/var/lib/juju/agents/unit-landscape-client-3/charm/./src/charm.py", line 120, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-3: 00:25:54 CRITICAL unit.landscape-client/3.juju-log Repository: 'deb https://ppa.launchpadcontent.net/landscape/self-hosted-beta/ubuntu/ jammy main'
+Description:
+Dependencies for Landscape Server Self-Hosted Beta.
+More info: https://launchpad.net/~landscape/+archive/ubuntu/self-hosted-beta
+Adding repository.
+Adding deb entry to /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Adding disabled deb-src entry to /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Traceback (most recent call last):
+  File "/usr/bin/add-apt-repository", line 364, in <module>
+    sys.exit(0 if addaptrepo.main() else 1)
+  File "/usr/bin/add-apt-repository", line 357, in main
+    shortcut.add()
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuthandler.py", line 222, in add
+    self.add_key()
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuthandler.py", line 398, in add_key
+    if not all((self.trustedparts_file, self.trustedparts_content)):
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 141, in trustedparts_content
+    key = self.lpppa.getSigningKeyData()
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/resource.py", line 592, in __call__
+    response, content = self.root._browser._request(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 429, in _request
+    raise error
+lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out
+Response headers:
+---
+-content-encoding: gzip
+cache-control: no-cache
+content-length: 92
+content-type: text/html
+date: Mon, 04 May 2026 00:25:04 GMT
+server: Apache/2.4.41 (Ubuntu)
+status: 504
+vary: Accept-Encoding
+---
+Response body:
+---
+b"<html><body><h1>504 Gateway Time-out</h1>\nThe server didn't respond in time.\n</body></html>\n"
+---
+
+
+unit-landscape-client-3: 00:25:58 CRITICAL unit.landscape-client/3.juju-log Landscape client package not installed.
+unit-ubuntu-advantage-2: 00:26:56 ERROR unit.ubuntu-advantage/2.juju-log Error running status. stderr 
+stdout: {"environment_vars": [], "errors": [{"message": "Failed to connect to https://contracts.canonical.com/v1/resources?architecture=amd64&kernel=6.8.0-1044-azure&series=jammy&virt=lxc\n[Errno 104] Connection reset by peer\n", "message_code": "connectivity-error", "service": null, "type": "system"}], "result": "failure", "services": [], "warnings": []}
+
+unit-ubuntu-advantage-2: 00:27:34 ERROR unit.ubuntu-advantage/2.juju-log Error running attach. stderr Failed to attach machine. See https://ubuntu.com/pro/dashboard
+
+stdout: 
+unit-ubuntu-advantage-2: 00:27:49 ERROR unit.ubuntu-advantage/2.juju-log Error running status. stderr 
+stdout: {"environment_vars": [], "errors": [{"message": "Failed to connect to https://contracts.canonical.com/v1/resources?architecture=amd64&kernel=6.8.0-1044-azure&series=jammy&virt=lxc\n[Errno 104] Connection reset by peer\n", "message_code": "connectivity-error", "service": null, "type": "system"}], "result": "failure", "services": [], "warnings": []}
+
+unit-ubuntu-advantage-1: 00:27:56 ERROR unit.ubuntu-advantage/1.juju-log Error running attach. stderr Failed to attach machine. See https://ubuntu.com/pro/dashboard
+
+stdout: 
+unit-ubuntu-advantage-0: 00:28:40 ERROR unit.ubuntu-advantage/0.juju-log Error running attach. stderr Failed to connect to https://contracts.canonical.com/v1/contracts/cAD0c6_4IRnMcAdUOmuq-yIzGntDnt2ELCaN1usqh8tg/machine-activity/68766c136e5540a39924665e2fcec8b6
+_ssl.c:990: The handshake operation timed out
+
+
+stdout: Enabling Ubuntu Pro: ESM Apps
+Ubuntu Pro: ESM Apps enabled
+Enabling Ubuntu Pro: ESM Infra
+Ubuntu Pro: ESM Infra enabled
+
+unit-landscape-client-1: 00:30:17 CRITICAL unit.landscape-client/1.juju-log   File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 368, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/main.py", line 548, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/main.py", line 527, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/main.py", line 516, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/main.py", line 147, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 348, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 860, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 950, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 321, in _on_config_changed
+    self.add_ppa()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 256, in add_ppa
+    if not process_helper(
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 120, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-1: 00:30:17 CRITICAL unit.landscape-client/1.juju-log Repository: 'deb https://ppa.launchpadcontent.net/landscape/self-hosted-beta/ubuntu/ jammy main'
+Description:
+Dependencies for Landscape Server Self-Hosted Beta.
+More info: https://launchpad.net/~landscape/+archive/ubuntu/self-hosted-beta
+Adding repository.
+Found existing deb entry in /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Adding deb entry to /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Found existing deb-src entry in /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Adding disabled deb-src entry to /etc/apt/sources.list.d/landscape-ubuntu-self-hosted-beta-jammy.list
+Traceback (most recent call last):
+  File "/usr/bin/add-apt-repository", line 364, in <module>
+    sys.exit(0 if addaptrepo.main() else 1)
+  File "/usr/bin/add-apt-repository", line 357, in main
+    shortcut.add()
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuthandler.py", line 222, in add
+    self.add_key()
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuthandler.py", line 398, in add_key
+    if not all((self.trustedparts_file, self.trustedparts_content)):
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 141, in trustedparts_content
+    key = self.lpppa.getSigningKeyData()
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/resource.py", line 592, in __call__
+    response, content = self.root._browser._request(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 429, in _request
+    raise error
+lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out
+Response headers:
+---
+-content-encoding: gzip
+cache-control: no-cache
+content-length: 92
+content-type: text/html
+date: Mon, 04 May 2026 00:29:27 GMT
+server: Apache/2.4.41 (Ubuntu)
+status: 504
+vary: Accept-Encoding
+---
+Response body:
+---
+b"<html><body><h1>504 Gateway Time-out</h1>\nThe server didn't respond in time.\n</body></html>\n"
+---
+
+
+unit-ubuntu-advantage-0: 00:30:38 ERROR unit.ubuntu-advantage/0.juju-log Error running attach. stderr Failed to attach machine. See https://ubuntu.com/pro/dashboard
+
+stdout: 
+unit-ubuntu-advantage-0: 00:30:49 ERROR unit.ubuntu-advantage/0.juju-log Error running status. stderr 
+stdout: {"environment_vars": [], "errors": [{"message": "Failed to connect to https://contracts.canonical.com/v1/resources?architecture=amd64&kernel=6.8.0-1044-azure&series=jammy&virt=lxc\n[Errno 104] Connection reset by peer\n", "message_code": "connectivity-error", "service": null, "type": "system"}], "result": "failure", "services": [], "warnings": []}
+
+unit-landscape-client-0: 00:32:49 CRITICAL unit.landscape-client/0.juju-log   File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 368, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 548, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 527, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 516, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 147, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 348, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 860, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 950, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 321, in _on_config_changed
+    self.add_ppa()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 256, in add_ppa
+    if not process_helper(
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 120, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-0: 00:32:49 CRITICAL unit.landscape-client/0.juju-log Traceback (most recent call last):
+  File "/usr/bin/add-apt-repository", line 364, in <module>
+    sys.exit(0 if addaptrepo.main() else 1)
+  File "/usr/bin/add-apt-repository", line 347, in main
+    shortcut = handler(source, **shortcut_params)
+  File "/usr/lib/python3/dist-packages/softwareproperties/shortcuts.py", line 40, in shortcut_handler
+    return handler(shortcut, **kwargs)
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 82, in __init__
+    if self.lpppa.publish_debug_symbols:
+  File "/usr/lib/python3/dist-packages/softwareproperties/ppa.py", line 120, in lpppa
+    self._lpppa = self.lpteam.getPPAByName(name=self.ppaname)
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/resource.py", line 592, in __call__
+    response, content = self.root._browser._request(
+  File "/usr/lib/python3/dist-packages/lazr/restfulclient/_browser.py", line 429, in _request
+    raise error
+lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out
+Response headers:
+---
+-content-encoding: gzip
+cache-control: no-cache
+content-length: 92
+content-type: text/html
+date: Mon, 04 May 2026 00:31:59 GMT
+server: Apache/2.4.41 (Ubuntu)
+status: 504
+vary: Accept-Encoding
+---
+Response body:
+---
+b"<html><body><h1>504 Gateway Time-out</h1>\nThe server didn't respond in time.\n</body></html>\n"
+---
+
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
