@@ -1030,17 +1030,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._update_new_unit_status()
 
-    def _on_secret_changed(self, event: SecretChangedEvent) -> None:
-        """Handle the secret_changed event."""
-        if not self.unit.is_leader():
-            return
-
-        if (admin_secret_id := self.config.system_users) and admin_secret_id == event.secret.id:
-            try:
-                self._update_admin_password(admin_secret_id)
-            except PostgreSQLUpdateUserPasswordError:
-                event.defer()
-
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _handle_s3_initialization(self, event: HookEvent) -> bool:
         """Handle S3 initialization during peer relation changes.
@@ -1068,6 +1057,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             })
 
         return True
+
+    def _on_secret_changed(self, event: SecretChangedEvent) -> None:
+        """Handle the secret_changed event."""
+        if not self.unit.is_leader():
+            return
+
+        if (admin_secret_id := self.config.system_users) and admin_secret_id == event.secret.id:
+            try:
+                self._update_admin_password(admin_secret_id)
+            except PostgreSQLUpdateUserPasswordError:
+                event.defer()
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
