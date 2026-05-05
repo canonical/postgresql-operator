@@ -571,6 +571,23 @@ def test_on_create_replication():
 
     assert result is None
 
+    # 5. No async-replication relation established (regression for #1675).
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    relation._get_primary_cluster = MagicMock(return_value=None)
+    type(relation)._relation = PropertyMock(return_value=None)
+
+    result = relation._on_create_replication(mock_event)
+
+    assert result is None
+    mock_event.fail.assert_called_once_with(
+        "No async-replication relation has been established."
+        " Create the offer and relate the two clusters before running this action."
+    )
+
 
 def test_promote_to_primary():
     # 1.
