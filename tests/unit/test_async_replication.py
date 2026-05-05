@@ -578,9 +578,11 @@ def test_on_create_replication():
     relation = PostgreSQLAsyncReplication(mock_charm)
 
     relation._get_primary_cluster = MagicMock(return_value=None)
-    type(relation)._relation = PropertyMock(return_value=None)
 
-    result = relation._on_create_replication(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        result = relation._on_create_replication(mock_event)
 
     assert result is None
     mock_event.fail.assert_called_once_with(
