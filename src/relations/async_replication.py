@@ -567,6 +567,13 @@ class PostgreSQLAsyncReplication(Object):
             event.fail("There is already a replication set up.")
             return
 
+        if self._relation is None:
+            event.fail(
+                "No async-replication relation has been established."
+                " Create the offer and relate the two clusters before running this action."
+            )
+            return
+
         if self._relation.name == REPLICATION_CONSUMER_RELATION:
             event.fail("This action must be run in the cluster where the offer was created.")
             return
