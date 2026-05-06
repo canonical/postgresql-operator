@@ -1,0 +1,264 @@
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:645 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.87.14.184:8008/patroni', 'host': '10.87.14.184', 'port': 5432, 'timeline': 3}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.87.14.93:8008/patroni', 'host': '10.87.14.93', 'port': 5432, 'timeline': 3, 'lag': 0}]
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:55:38Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.22    active      5  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  513  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   0        10.87.14.185              received database credentials of the first database
+postgresql/0*           active    idle   1        10.87.14.184    5432/tcp  Primary (read-only)
+postgresql/3            active    idle   4        10.87.14.93     5432/tcp  
+postgresql/4            active    idle   5        10.87.14.119    5432/tcp  
+postgresql/5            active    idle   6        10.87.14.68     5432/tcp  
+postgresql/6            active    idle   7        10.87.14.95     5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.87.14.185  juju-7353ad-0  ubuntu@24.04  runnervmrc6n4  Running
+1        started  10.87.14.184  juju-7353ad-1  ubuntu@22.04  runnervmrc6n4  Running
+4        started  10.87.14.93   juju-7353ad-4  ubuntu@22.04  runnervmrc6n4  Running
+5        started  10.87.14.119  juju-7353ad-5  ubuntu@22.04  runnervmrc6n4  Running
+6        started  10.87.14.68   juju-7353ad-6  ubuntu@22.04  runnervmrc6n4  Running
+7        started  10.87.14.95   juju-7353ad-7  ubuntu@22.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:20:18 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:20:18 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:21:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:21:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:22:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:22:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:22:44 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7950bb0af0 state=finished raised Exception>]
+unit-postgresql-1: 00:22:55 ERROR unit.postgresql/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-0: 00:23:54 ERROR unit.postgresql/0.juju-log database-peers:1: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  the database system is starting up
+
+controller-0: 00:24:46 ERROR juju.worker.provisioner failed to remove dead machine "2"
+machine-3: 00:28:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:28:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:29:55 ERROR unit.postgresql/2.juju-log database:4: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-3: 00:31:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 00:31:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+controller-0: 00:31:11 ERROR juju.worker.provisioner failed to remove dead machine "3"
+machine-4: 00:34:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:34:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:34:42 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:35:11 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-5: 00:39:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:39:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:39:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:39:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:39:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:39:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:43:06 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:48:24 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:48:24 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:28 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:32 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:36 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:40 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:44 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:48 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:52 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:48:56 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:00 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:04 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:08 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:12 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:16 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:20 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:24 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:28 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:32 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:36 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:40 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:44 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:49:48 ERROR unit.postgresql-test-app/0.juju-log Unable to create table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 361, in _on_start_continuous_writes_action
+    cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE TABLE in a read-only transaction
+
+unit-postgresql-4: 00:49:49 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-6: 00:50:05 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-5: 00:53:13 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:54:52 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 00:54:56 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:00 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:04 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:08 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:12 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:16 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:20 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:24 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:29 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 00:55:33 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/src/charm.py", line 331, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
