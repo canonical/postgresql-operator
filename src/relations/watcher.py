@@ -261,7 +261,7 @@ class PostgreSQLWatcherRelation(Object):
                 # Remove stale watcher members
                 for stale_addr in stale_members:
                     logger.info(f"Removing stale watcher from Raft cluster: {stale_addr}")
-                    self._remove_watcher_from_raft(stale_addr)
+                    self.charm._patroni.remove_raft_member(stale_addr)
         except Exception as e:
             logger.debug(f"Error during Raft cleanup: {e}")
 
@@ -273,31 +273,14 @@ class PostgreSQLWatcherRelation(Object):
         Args:
             event: The relation broken event.
         """
-        logger.info("Watcher relation broken, updating Patroni configuration")
-
         if not self.charm.is_cluster_initialised:
             return
 
+        logger.info("Watcher relation broken, updating Patroni configuration")
+        self.watcher_raft_address = None
         self._cleanup_old_watcher_from_raft()
         # Update Patroni configuration without the watcher
         self.charm.update_config()
-
-    def _remove_watcher_from_raft(self, watcher_address: str) -> None:
-        """Remove the watcher from the Raft cluster.
-
-        This is critical for maintaining correct quorum calculations. If a dead
-        watcher remains in the cluster membership, it counts toward the total
-        node count, making it harder to achieve quorum.
-
-        Args:
-            watcher_address: The watcher's IP address.
-        """
-        if self.watcher_raft_address:
-            logger.info(f"Removing watcher from Raft cluster: {watcher_address}")
-            self.charm._patroni.remove_raft_member(watcher_address)
-
-        if self.charm.is_cluster_initialised:
-            self.charm.update_config()
 
     def _ensure_watcher_user(self) -> str | None:
         """Ensure the watcher PostgreSQL user exists for health checks.
