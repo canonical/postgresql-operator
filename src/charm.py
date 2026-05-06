@@ -10,7 +10,6 @@ import logging
 import os
 import pathlib
 import platform
-import pwd
 import re
 import shutil
 import subprocess
@@ -62,7 +61,6 @@ from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
     PEER,
-    POSTGRESQL_STORAGE_PERMISSIONS,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
@@ -105,7 +103,6 @@ from constants import (
     APP_SCOPE,
     ARCHIVE_DATA_DIR,
     ARCHIVE_STORAGE_PATH,
-    DATA_DIR_SUBFOLDER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
@@ -130,7 +127,6 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
-    STORAGE_LAYOUT_MIGRATED_KEY,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
     TLS_CA_BUNDLE_FILE,
@@ -148,14 +144,13 @@ from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from rotate_logs import RotateLogs
-from utils import _change_owner, label2name, new_password, render_file
+from utils import label2name, new_password, render_file
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 logging.getLogger("boto3").setLevel(logging.WARNING)
-STORAGE_LAYOUT_IGNORED_ENTRIES = {DATA_DIR_SUBFOLDER.split("/", maxsplit=1)[0], "lost+found"}
 logging.getLogger("botocore").setLevel(logging.WARNING)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
@@ -255,6 +250,11 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Update the configuration.
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
+
+        # Create versioned storage directories before the snap refresh.
+        # The snap's post-refresh hook runs confined and may be unable to
+        # create subdirectories inside daemon-owned storage roots.
+        self._charm._ensure_storage_layout()
 
         # TODO add graceful shutdown before refreshing snap?
         # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
@@ -437,15 +437,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Called after snap refresh
         """
         self._check_and_update_internal_cert()
-
-        try:
-            self._ensure_storage_layout()
-        except (OSError, RuntimeError):
-            logger.exception("Unable to migrate PostgreSQL storage layout")
-            self.set_unit_status(
-                ops.BlockedStatus("Failed to migrate PostgreSQL storage layout"), refresh=refresh
-            )
-            return
+        self._ensure_storage_layout()
 
         if not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
@@ -458,7 +450,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
         try:
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+            for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(10)):
                 with attempt:
                     # Check if the member hasn't started or hasn't joined the cluster yet.
                     if (
@@ -681,102 +673,60 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
-    def is_storage_layout_migrated(self) -> bool:
-        """Returns whether this unit already migrated to the versioned storage layout."""
-        return self.unit_peer_data.get(STORAGE_LAYOUT_MIGRATED_KEY) == "True"
-
-    def _migrate_storage_mount(self, storage_path: str, target_path: str) -> None:
-        """Move a storage mount root into the versioned PostgreSQL data layout."""
-        Path(storage_path).mkdir(parents=True, exist_ok=True)
-        Path(target_path).mkdir(parents=True, exist_ok=True)
-        _change_owner(target_path)
-        os.chmod(target_path, POSTGRESQL_STORAGE_PERMISSIONS)
-
-        for item in os.listdir(storage_path):
-            if item in STORAGE_LAYOUT_IGNORED_ENTRIES:
-                continue
-
-            source = os.path.join(storage_path, item)
-            destination = os.path.join(target_path, item)
-            logger.info("Moving %s to %s", source, destination)
-            os.rename(source, destination)
-
-    def _repair_pg_wal_symlink(self) -> None:
-        """Ensure pg_wal points to the versioned WAL directory for migrated deployments."""
-        pg_wal_path = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
-        if not pg_wal_path.is_symlink():
-            return
-
-        current_target = Path(os.path.realpath(pg_wal_path))
-        new_target = Path(LOGS_DATA_DIR)
-        if current_target == new_target:
-            return
-
-        old_target = Path(LOGS_STORAGE_PATH)
-        if current_target != old_target:
-            logger.warning(
-                "Skipping pg_wal repair: unexpected target %s (expected %s or %s)",
-                current_target,
-                old_target,
-                new_target,
-            )
-            return
-
-        self._migrate_storage_mount(LOGS_STORAGE_PATH, LOGS_DATA_DIR)
-        pg_wal_path.unlink()
-        pg_wal_path.symlink_to(LOGS_DATA_DIR)
-        logger.info("Updated pg_wal symlink to %s", LOGS_DATA_DIR)
+    _daemon_uid = 584792
 
     def _ensure_storage_layout(self) -> None:
-        """Ensure the PostgreSQL storage layout is prepared or migrated exactly once."""
-        if self._peers is None:
-            raise RuntimeError("Peer relation not ready")
-        if not self.is_storage_layout_migrated:
-            for storage_path, target_path in (
-                (POSTGRESQL_DATA_PATH, POSTGRESQL_DATA_DIR),
-                (ARCHIVE_STORAGE_PATH, ARCHIVE_DATA_DIR),
-                (LOGS_STORAGE_PATH, LOGS_DATA_DIR),
-                (TEMP_STORAGE_PATH, TEMP_DATA_DIR),
-            ):
-                self._migrate_storage_mount(storage_path, target_path)
+        """Ensure versioned storage directories exist and migrate data.
 
-            self.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
-        else:
-            # The temp data directory may live on a tmpfs mount that is wiped on
-            # reboot, even after the one-time migration flag has been recorded.
-            # Create it WITHOUT setting owner/mode: set_up_database detects the
-            # root-owned directory as needing a permissions fix, which triggers its
-            # _handle_temp_tablespace_on_reboot path for the tmpfs case and ensures
-            # the tablespace directory structure is reinitialised by PostgreSQL.
-            Path(TEMP_DATA_DIR).mkdir(parents=True, exist_ok=True)
-
-        self._repair_pg_wal_symlink()
-        self._reconcile_storage_permissions()
-
-    def _reconcile_storage_permissions(self) -> None:
-        """Reconcile storage root permissions and pg_wal symlink ownership.
-
-        Storage roots (e.g. common/var/lib/postgresql/) are container directories
-        after migration and must be 0755, not the 0700 of a PostgreSQL data dir.
-        The pg_wal symlink must be owned by _daemon_ — it is created by Patroni on
-        fresh deploys, but recreated as root when the charm repairs it during upgrade.
-        This method is idempotent and always runs so it heals units migrated before
-        these fixes were applied.
+        Snap hooks run confined and cannot access daemon-owned storage
+        roots. The charm runs unconfined — directory creation and forward
+        data migration are done here, before the snap refresh.
         """
-        for storage_path in (
-            POSTGRESQL_DATA_PATH,
-            ARCHIVE_STORAGE_PATH,
-            LOGS_STORAGE_PATH,
-            TEMP_STORAGE_PATH,
-        ):
-            if os.path.exists(storage_path):
-                os.chmod(storage_path, 0o755)  # noqa: S103
+        for path in (POSTGRESQL_DATA_DIR, ARCHIVE_DATA_DIR, LOGS_DATA_DIR, TEMP_DATA_DIR):
+            p = Path(path)
+            p.mkdir(parents=True, exist_ok=True)
+            shutil.chown(p, user=self._daemon_uid, group=0)
+            # Also chown the parent 16/ directory created by mkdir -p.
+            if p.parent.name == "16":
+                shutil.chown(p.parent, user=self._daemon_uid, group=0)
+        os.chmod(POSTGRESQL_DATA_DIR, 0o700)
 
-        pg_wal_path = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
-        if pg_wal_path.is_symlink():
-            user_database = pwd.getpwnam("_daemon_")
-            os.lchown(str(pg_wal_path), user_database.pw_uid, user_database.pw_gid)
+        if (
+            Path(POSTGRESQL_DATA_PATH, "PG_VERSION").exists()
+            and not Path(POSTGRESQL_DATA_DIR, "PG_VERSION").exists()
+        ):
+            self._migrate_storage_roots_to_versioned()
+            # Ensure PostgreSQL can access the migrated data.
+            shutil.chown(POSTGRESQL_DATA_DIR, user=self._daemon_uid, group=0)
+            os.chmod(POSTGRESQL_DATA_DIR, 0o700)
+
+    @staticmethod
+    def _migrate_storage_roots_to_versioned() -> None:
+        """Move data from storage roots into versioned 16/main subdirectories."""
+        storage_pairs = [
+            (POSTGRESQL_DATA_PATH, POSTGRESQL_DATA_DIR),
+            (ARCHIVE_STORAGE_PATH, ARCHIVE_DATA_DIR),
+            (LOGS_STORAGE_PATH, LOGS_DATA_DIR),
+            (TEMP_STORAGE_PATH, TEMP_DATA_DIR),
+        ]
+        for storage_root, versioned_path in storage_pairs:
+            for item in os.listdir(storage_root):
+                if item in ("16", "lost+found"):
+                    continue
+                src = os.path.join(storage_root, item)
+                dst = os.path.join(versioned_path, item)
+                if os.path.exists(dst):
+                    continue
+                os.rename(src, dst)
+
+        pg_wal = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
+        if pg_wal.is_symlink():
+            current_target = Path(os.path.realpath(pg_wal))
+            if current_target != Path(LOGS_DATA_DIR):
+                pg_wal.unlink()
+                pg_wal.symlink_to(LOGS_DATA_DIR)
+        elif not pg_wal.exists():
+            pg_wal.symlink_to(LOGS_DATA_DIR)
 
     @staticmethod
     def _clear_pg_version_dirs(path: Path) -> None:
@@ -1899,12 +1849,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.tls.generate_internal_peer_cert()
 
         self.unit_peer_data.update({"ip": self._unit_ip})
-        try:
-            self._ensure_storage_layout()
-        except (OSError, RuntimeError):
-            logger.exception("Unable to migrate PostgreSQL storage layout")
-            self.set_unit_status(BlockedStatus("Failed to migrate PostgreSQL storage layout"))
-            return
+        self._ensure_storage_layout()
 
         # Open port
         try:

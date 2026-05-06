@@ -22,6 +22,11 @@ JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
 
 
+def bracket_ipv6(addr: str) -> str:
+    """Wrap an IPv6 address in brackets for URL use."""
+    return f"[{addr}]" if ":" in addr else addr
+
+
 def check_db_units_writes_increment(
     juju: Juju,
     app_name: str,
@@ -178,9 +183,9 @@ def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
     """Get the current standby node of the cluster."""
     unit_address = get_unit_ip(juju, app_name, get_app_leader(juju, app_name))
 
-    for member in requests.get(f"https://{unit_address}:8008/cluster", verify=False).json()[
-        "members"
-    ]:
+    for member in requests.get(
+        f"https://{bracket_ipv6(unit_address)}:8008/cluster", verify=False
+    ).json()["members"]:
         if member["role"] == "standby_leader":
             return member["name"][::-1].replace("-", "/")[::-1]
 
@@ -255,5 +260,7 @@ def count_switchovers(juju: Juju, app_name: str) -> int:
     """Return the number of performed switchovers."""
     app_primary = get_db_primary_unit(juju, app_name)
     unit_address = get_unit_ip(juju, app_name, app_primary)
-    switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
+    switchover_history_info = requests.get(
+        f"https://{bracket_ipv6(unit_address)}:8008/history", verify=False
+    )
     return len(switchover_history_info.json())

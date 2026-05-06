@@ -98,4 +98,3 @@ SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
 TRACING_RELATION_NAME = "tracing"
 
 PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"
-STORAGE_LAYOUT_MIGRATED_KEY = "storage_layout_migrated"

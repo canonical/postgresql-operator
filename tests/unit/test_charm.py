@@ -52,9 +52,6 @@ from constants import (
     PEER,
     POSTGRESQL_DATA_DIR,
     SECRET_INTERNAL_LABEL,
-    STORAGE_LAYOUT_MIGRATED_KEY,
-    TEMP_DATA_DIR,
-    TEMP_STORAGE_PATH,
     UPDATE_CERTS_BIN_PATH,
 )
 
@@ -650,197 +647,23 @@ def test_on_start_after_blocked_state(harness):
 
 
 def test_ensure_storage_layout(harness, tmp_path):
-    data_root = tmp_path / "postgresql"
-    archive_root = tmp_path / "archive"
-    logs_root = tmp_path / "logs"
-    temp_root = tmp_path / "temp"
-
-    data_root.mkdir()
-    archive_root.mkdir()
-    logs_root.mkdir()
-    temp_root.mkdir()
-
-    (data_root / "data.txt").write_text("data")
-    (archive_root / "archive.txt").write_text("archive")
-    (logs_root / "logs.txt").write_text("logs")
-    (temp_root / "temp.txt").write_text("temp")
-    (logs_root / "lost+found").mkdir()
-
+    """_ensure_storage_layout creates all four versioned storage dirs."""
+    data_root = tmp_path / "data" / "16" / "main"
+    archive_root = tmp_path / "archive" / "16" / "main"
+    logs_root = tmp_path / "logs" / "16" / "main"
+    temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.POSTGRESQL_DATA_PATH", str(data_root)),
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root / "16" / "main")),
-        patch("charm.ARCHIVE_STORAGE_PATH", str(archive_root)),
-        patch("charm.ARCHIVE_DATA_DIR", str(archive_root / "16" / "main")),
-        patch("charm.LOGS_STORAGE_PATH", str(logs_root)),
-        patch("charm.LOGS_DATA_DIR", str(logs_root / "16" / "main")),
-        patch("charm.TEMP_STORAGE_PATH", str(temp_root)),
-        patch("charm.TEMP_DATA_DIR", str(temp_root / "16" / "main")),
-        patch("charm._change_owner") as _change_owner,
-        patch("charm.os.chmod") as _chmod,
-        patch("charm.os.lchown") as _lchown,
-        patch("charm.pwd.getpwnam"),
+        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
+        patch("charm.ARCHIVE_DATA_DIR", str(archive_root)),
+        patch("charm.LOGS_DATA_DIR", str(logs_root)),
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil.chown"),
     ):
         harness.charm._ensure_storage_layout()
-
-        assert (data_root / "16" / "main" / "data.txt").read_text() == "data"
-        assert (archive_root / "16" / "main" / "archive.txt").read_text() == "archive"
-        assert (logs_root / "16" / "main" / "logs.txt").read_text() == "logs"
-        assert (temp_root / "16" / "main" / "temp.txt").read_text() == "temp"
-        assert not (data_root / "data.txt").exists()
-        assert (logs_root / "lost+found").exists()
-        assert harness.charm.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] == "True"
-        # 4 calls from _migrate_storage_mount (target dirs) + 4 from _reconcile_storage_permissions (roots)
-        assert _change_owner.call_count == 4
-        assert _chmod.call_count == 8
-        _chmod.assert_any_call(str(data_root), 0o755)
-        _chmod.assert_any_call(str(archive_root), 0o755)
-        _chmod.assert_any_call(str(logs_root), 0o755)
-        _chmod.assert_any_call(str(temp_root), 0o755)
-        # No pg_wal symlink in this test
-        _lchown.assert_not_called()
-
-        (data_root / "stray.txt").write_text("stray")
-        _change_owner.reset_mock()
-        _chmod.reset_mock()
-        _lchown.reset_mock()
-
-        harness.charm._ensure_storage_layout()
-
-        assert (data_root / "stray.txt").read_text() == "stray"
-        # Already migrated: only TEMP_DATA_DIR is re-created (tmpfs reboot guard) + reconciliation
-        # mkdir only — no _change_owner or chmod on TEMP_DATA_DIR (library detects root-owned dir)
-        _change_owner.assert_not_called()
-        assert _chmod.call_count == 4  # only the 4 storage root chmod calls
-        _chmod.assert_any_call(str(data_root), 0o755)
-        _lchown.assert_not_called()
-
-
-def test_ensure_storage_layout_repairs_stale_pg_wal_symlink(harness, tmp_path):
-    data_root = tmp_path / "postgresql"
-    archive_root = tmp_path / "archive"
-    logs_root = tmp_path / "logs"
-    temp_root = tmp_path / "temp"
-
-    for path in (
-        data_root / "16" / "main",
-        archive_root / "16" / "main",
-        logs_root / "16" / "main",
-        temp_root / "16" / "main",
-    ):
-        path.mkdir(parents=True)
-
-    stale_pg_wal = data_root / "16" / "main" / "pg_wal"
-    stale_pg_wal.symlink_to(logs_root)
-    (logs_root / "000000010000000000000008").write_text("wal")
-    (logs_root / "archive_status").mkdir()
-    harness.charm.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
-
-    with (
-        patch("charm.POSTGRESQL_DATA_PATH", str(data_root)),
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root / "16" / "main")),
-        patch("charm.ARCHIVE_STORAGE_PATH", str(archive_root)),
-        patch("charm.ARCHIVE_DATA_DIR", str(archive_root / "16" / "main")),
-        patch("charm.LOGS_STORAGE_PATH", str(logs_root)),
-        patch("charm.LOGS_DATA_DIR", str(logs_root / "16" / "main")),
-        patch("charm.TEMP_STORAGE_PATH", str(temp_root)),
-        patch("charm.TEMP_DATA_DIR", str(temp_root / "16" / "main")),
-        patch("charm._change_owner") as _change_owner,
-        patch("charm.os.chmod") as _chmod,
-        patch("charm.os.lchown") as _lchown,
-        patch("charm.pwd.getpwnam") as _getpwnam,
-    ):
-        harness.charm._ensure_storage_layout()
-
-        assert os.readlink(stale_pg_wal) == str(logs_root / "16" / "main")
-        assert (logs_root / "16" / "main" / "000000010000000000000008").read_text() == "wal"
-        assert not (logs_root / "000000010000000000000008").exists()
-        assert (logs_root / "16" / "main" / "archive_status").exists()
-        # TEMP_DATA_DIR re-created (mkdir only) + _migrate_storage_mount for logs
-        assert _change_owner.call_count == 1
-        _change_owner.assert_called_once_with(str(logs_root / "16" / "main"))
-        _chmod.assert_any_call(str(logs_root / "16" / "main"), 0o700)
-        # _reconcile_storage_permissions: chmod on all 4 storage roots
-        _chmod.assert_any_call(str(data_root), 0o755)
-        _chmod.assert_any_call(str(logs_root), 0o755)
-        assert _chmod.call_count == 5  # 1 target dir (logs) + 4 storage roots
-        # pg_wal symlink ownership reconciled
-        _lchown.assert_called_once_with(
-            str(stale_pg_wal), _getpwnam.return_value.pw_uid, _getpwnam.return_value.pw_gid
-        )
-        _getpwnam.assert_called_with("_daemon_")
-
-
-def test_reconcile_storage_permissions_heals_already_migrated_units(harness, tmp_path):
-    """Reconciliation runs even when already migrated, fixing ownership/perms from before the fix."""
-    data_root = tmp_path / "postgresql"
-    archive_root = tmp_path / "archive"
-    logs_root = tmp_path / "logs"
-    temp_root = tmp_path / "temp"
-
-    for path in (
-        data_root / "16" / "main",
-        archive_root / "16" / "main",
-        logs_root / "16" / "main",
-        temp_root / "16" / "main",
-    ):
-        path.mkdir(parents=True)
-
-    # Simulate pg_wal symlink with wrong root:root ownership (the bug)
-    pg_wal = data_root / "16" / "main" / "pg_wal"
-    pg_wal.symlink_to(logs_root / "16" / "main")
-
-    # Unit was already migrated before this fix was applied
-    harness.charm.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
-
-    with (
-        patch("charm.POSTGRESQL_DATA_PATH", str(data_root)),
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root / "16" / "main")),
-        patch("charm.ARCHIVE_STORAGE_PATH", str(archive_root)),
-        patch("charm.ARCHIVE_DATA_DIR", str(archive_root / "16" / "main")),
-        patch("charm.LOGS_STORAGE_PATH", str(logs_root)),
-        patch("charm.LOGS_DATA_DIR", str(logs_root / "16" / "main")),
-        patch("charm.TEMP_STORAGE_PATH", str(temp_root)),
-        patch("charm.TEMP_DATA_DIR", str(temp_root / "16" / "main")),
-        patch("charm._change_owner"),
-        patch("charm.os.chmod") as _chmod,
-        patch("charm.os.lchown") as _lchown,
-        patch("charm.pwd.getpwnam") as _getpwnam,
-    ):
-        harness.charm._ensure_storage_layout()
-
-        # Storage root permissions reconciled (0755) even though migration was already done
-        _chmod.assert_any_call(str(data_root), 0o755)
-        _chmod.assert_any_call(str(archive_root), 0o755)
-        _chmod.assert_any_call(str(logs_root), 0o755)
-        _chmod.assert_any_call(str(temp_root), 0o755)
-        assert _chmod.call_count == 4  # only the 4 storage root chmod calls (no TEMP_DATA_DIR)
-
-        # pg_wal symlink ownership reconciled (_daemon_)
-        _lchown.assert_called_once_with(
-            str(pg_wal), _getpwnam.return_value.pw_uid, _getpwnam.return_value.pw_gid
-        )
-        _getpwnam.assert_called_with("_daemon_")
-
-    connection = MagicMock()
-    cursor = MagicMock()
-    cursor.fetchone.return_value = (TEMP_STORAGE_PATH,)
-    connection.cursor.return_value = cursor
-    postgresql = MagicMock()
-    postgresql._connect_to_database.return_value = connection
-
-    with patch(
-        "charm.PostgresqlOperatorCharm.postgresql",
-        new_callable=PropertyMock,
-        return_value=postgresql,
-    ):
-        assert harness.charm._ensure_temp_tablespace_location()
-
-    cursor.execute.assert_has_calls([
-        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
-        call("DROP TABLESPACE temp;"),
-        call(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';"),
-        call("GRANT CREATE ON TABLESPACE temp TO public;"),
-    ])
+    assert data_root.is_dir()
+    assert archive_root.is_dir()
+    assert logs_root.is_dir()
+    assert temp_root.is_dir()
 
 
 def test_ensure_temp_tablespace_location_recovers_dropped_tablespace(harness, tmp_path):
@@ -937,37 +760,20 @@ def test_ensure_temp_tablespace_location_skips_reinit_when_pg_dir_present(harnes
 
 
 def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
-    """TEMP_DATA_DIR is recreated even when already migrated (e.g. after a tmpfs wipe on reboot)."""
-    temp_root = tmp_path / "temp"
-    temp_root.mkdir()
-    # Other storage roots are pre-created with versioned subdirs (persistent storage)
-    for path in (
-        tmp_path / "postgresql" / "16" / "main",
-        tmp_path / "archive" / "16" / "main",
-        tmp_path / "logs" / "16" / "main",
-    ):
-        path.mkdir(parents=True)
-
-    # Mark as already migrated — temp_root/16/main does NOT exist (simulating tmpfs wipe)
-    harness.charm.unit_peer_data[STORAGE_LAYOUT_MIGRATED_KEY] = "True"
-
+    """All versioned dirs, including TEMP_DATA_DIR, are recreated after a tmpfs wipe on reboot."""
+    data_root = tmp_path / "data" / "16" / "main"
+    archive_root = tmp_path / "archive" / "16" / "main"
+    logs_root = tmp_path / "logs" / "16" / "main"
+    temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.POSTGRESQL_DATA_PATH", str(tmp_path / "postgresql")),
-        patch("charm.POSTGRESQL_DATA_DIR", str(tmp_path / "postgresql" / "16" / "main")),
-        patch("charm.ARCHIVE_STORAGE_PATH", str(tmp_path / "archive")),
-        patch("charm.ARCHIVE_DATA_DIR", str(tmp_path / "archive" / "16" / "main")),
-        patch("charm.LOGS_STORAGE_PATH", str(tmp_path / "logs")),
-        patch("charm.LOGS_DATA_DIR", str(tmp_path / "logs" / "16" / "main")),
-        patch("charm.TEMP_STORAGE_PATH", str(temp_root)),
-        patch("charm.TEMP_DATA_DIR", str(temp_root / "16" / "main")),
-        patch("charm._change_owner"),
-        patch("charm.os.chmod"),
-        patch("charm.os.lchown"),
-        patch("charm.pwd.getpwnam"),
+        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
+        patch("charm.ARCHIVE_DATA_DIR", str(archive_root)),
+        patch("charm.LOGS_DATA_DIR", str(logs_root)),
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil.chown"),
     ):
         harness.charm._ensure_storage_layout()
-
-    assert (temp_root / "16" / "main").is_dir()
+    assert temp_root.is_dir()
 
 
 def test_ensure_temp_tablespace_location_if_primary_skips_when_no_endpoint(harness):
@@ -991,18 +797,6 @@ def test_ensure_temp_tablespace_location_if_primary_skips_when_no_endpoint(harne
 
     assert result is True
     _ensure_temp_tablespace_location.assert_not_called()
-
-    refresh = MagicMock(unit_status_higher_priority=None)
-    with (
-        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout", side_effect=OSError),
-        patch("charm.PostgresqlOperatorCharm.get_secret", return_value=None),
-        patch("charm.Patroni.start_patroni") as _start_patroni,
-    ):
-        harness.charm._post_snap_refresh(refresh)
-
-        _start_patroni.assert_not_called()
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-        assert harness.charm.unit.status.message == "Failed to migrate PostgreSQL storage layout"
 
 
 def test_on_update_status(harness):

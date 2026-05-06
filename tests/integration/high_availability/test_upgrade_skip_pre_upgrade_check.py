@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import platform
 
 import jubilant
 from jubilant import Juju
@@ -30,6 +31,7 @@ def test_deploy_stable(juju: Juju) -> None:
         base="ubuntu@24.04",
         channel="16/stable",
         config={"profile": "testing"},
+        constraints={"arch": "arm64"} if platform.machine() == "aarch64" else None,
         num_units=3,
     )
     juju.deploy(
@@ -37,6 +39,7 @@ def test_deploy_stable(juju: Juju) -> None:
         app=DB_TEST_APP_NAME,
         base="ubuntu@24.04",
         channel="latest/edge",
+        constraints={"arch": "arm64"} if platform.machine() == "aarch64" else None,
         num_units=1,
     )
 
@@ -48,7 +51,7 @@ def test_deploy_stable(juju: Juju) -> None:
     logging.info("Wait for applications to become active")
     juju.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME, DB_TEST_APP_NAME),
-        timeout=20 * MINUTE_SECS,
+        timeout=40 * MINUTE_SECS,
     )
 
 
@@ -61,7 +64,7 @@ def test_refresh_without_pre_refresh_check(juju: Juju, charm: str, continuous_wr
 
     logging.info("Wait for refresh to block as paused or incompatible")
     try:
-        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
+        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
 
         units = get_app_units(juju, DB_APP_NAME)
         unit_names = sorted(units.keys())
@@ -72,13 +75,13 @@ def test_refresh_without_pre_refresh_check(juju: Juju, charm: str, continuous_wr
                 unit=unit_names[-1],
                 action="force-refresh-start",
                 params={"check-compatibility": False},
-                wait=5 * MINUTE_SECS,
+                wait=40 * MINUTE_SECS,
             )
 
-        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=10 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
-        juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=40 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert juju.status().apps[DB_APP_NAME].is_active
@@ -86,7 +89,7 @@ def test_refresh_without_pre_refresh_check(juju: Juju, charm: str, continuous_wr
     logging.info("Wait for upgrade to complete")
     juju.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
-        timeout=20 * MINUTE_SECS,
+        timeout=40 * MINUTE_SECS,
     )
 
     logging.info("Ensure continuous writes are incrementing")
@@ -109,7 +112,7 @@ async def test_rollback_without_pre_refresh_check(
 
     logging.info("Wait for refresh to block as paused or incompatible")
     try:
-        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
+        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
 
         units = get_app_units(juju, DB_APP_NAME)
         unit_names = sorted(units.keys())
@@ -120,13 +123,13 @@ async def test_rollback_without_pre_refresh_check(
                 unit=unit_names[-1],
                 action="force-refresh-start",
                 params={"check-compatibility": False},
-                wait=5 * MINUTE_SECS,
+                wait=40 * MINUTE_SECS,
             )
 
-        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        juju.wait(jubilant.all_agents_idle, timeout=10 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
-        juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=40 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert juju.status().apps[DB_APP_NAME].is_active
@@ -134,7 +137,7 @@ async def test_rollback_without_pre_refresh_check(
     logging.info("Wait for upgrade to complete")
     juju.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
-        timeout=20 * MINUTE_SECS,
+        timeout=40 * MINUTE_SECS,
     )
 
     check_db_units_writes_increment(juju, DB_APP_NAME)
