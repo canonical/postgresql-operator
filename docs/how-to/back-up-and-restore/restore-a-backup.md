@@ -76,10 +76,10 @@ When the user needs to restore a specific backup that was made, they can use the
 juju run postgresql/leader restore backup-id=YYYY-MM-DDTHH:MM:SSZ
 ```
 
-However, if the user needs to restore to a specific point in time between different backups (e.g. to restore only specific transactions made between those backups), they can use the `restore-to-time` parameter to pass a timestamp related to the moment they want to restore.
+However, if the user needs to restore to a specific point in time between different backups (e.g. to restore only specific transactions made between those backups), they can use the `restore-to-time` parameter to pass a timestamp related to the moment they want to restore. The format matches PostgreSQL's `SELECT current_timestamp` output (`YYYY-MM-DD HH:MM:SS` with a space separator, optional fractional seconds, and an optional `+HH` / `-HH:MM` timezone offset):
 
 ```shell
-juju run postgresql/leader restore restore-to-time="YYYY-MM-DDTHH:MM:SSZ"
+juju run postgresql/leader restore restore-to-time="YYYY-MM-DD HH:MM:SS"
 ```
 
 Your restore will then be in progress.
