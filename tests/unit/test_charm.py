@@ -647,23 +647,23 @@ def test_on_start_after_blocked_state(harness):
 
 
 def test_ensure_storage_layout(harness, tmp_path):
-    """_ensure_storage_layout creates all four versioned storage dirs."""
-    data_root = tmp_path / "data" / "16" / "main"
-    archive_root = tmp_path / "archive" / "16" / "main"
-    logs_root = tmp_path / "logs" / "16" / "main"
+    """_ensure_storage_layout creates TEMP_DATA_DIR only.
+
+    Data migration between storage roots and versioned paths is handled
+    by the snap hooks — the charm only ensures TEMP_DATA_DIR exists
+    (it may live on a tmpfs mount that is wiped on reboot).
+    """
     temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
-        patch("charm.ARCHIVE_DATA_DIR", str(archive_root)),
-        patch("charm.LOGS_DATA_DIR", str(logs_root)),
         patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.shutil.chown"),
+        patch("charm.shutil"),
     ):
         harness.charm._ensure_storage_layout()
-    assert data_root.is_dir()
-    assert archive_root.is_dir()
-    assert logs_root.is_dir()
     assert temp_root.is_dir()
+    # No other dirs should be created by the charm.
+    assert not (tmp_path / "data").exists()
+    assert not (tmp_path / "archive").exists()
+    assert not (tmp_path / "logs").exists()
 
 
 def test_ensure_temp_tablespace_location_recovers_dropped_tablespace(harness, tmp_path):
@@ -760,17 +760,11 @@ def test_ensure_temp_tablespace_location_skips_reinit_when_pg_dir_present(harnes
 
 
 def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
-    """All versioned dirs, including TEMP_DATA_DIR, are recreated after a tmpfs wipe on reboot."""
-    data_root = tmp_path / "data" / "16" / "main"
-    archive_root = tmp_path / "archive" / "16" / "main"
-    logs_root = tmp_path / "logs" / "16" / "main"
+    """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
     temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
-        patch("charm.ARCHIVE_DATA_DIR", str(archive_root)),
-        patch("charm.LOGS_DATA_DIR", str(logs_root)),
         patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.shutil.chown"),
+        patch("charm.shutil"),
     ):
         harness.charm._ensure_storage_layout()
     assert temp_root.is_dir()

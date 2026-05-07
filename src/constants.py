@@ -25,6 +25,7 @@ PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
+SNAP_DAEMON_USER = "_daemon_"
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 # pgBackRest logging configuration
 # We use stderr for all error/warning output to have a consistent, predictable error extraction

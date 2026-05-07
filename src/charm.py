@@ -101,13 +101,9 @@ from cluster_topology_observer import (
 from config import CharmConfig
 from constants import (
     APP_SCOPE,
-    ARCHIVE_DATA_DIR,
-    ARCHIVE_STORAGE_PATH,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
-    LOGS_DATA_DIR,
-    LOGS_STORAGE_PATH,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -117,7 +113,6 @@ from constants import (
     PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_DIR,
-    POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
@@ -126,6 +121,7 @@ from constants import (
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
+    SNAP_DAEMON_USER,
     SPI_MODULE,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
@@ -251,9 +247,10 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
 
-        # Create versioned storage directories before the snap refresh.
-        # The snap's post-refresh hook runs confined and may be unable to
-        # create subdirectories inside daemon-owned storage roots.
+        # Ensure the temp tablespace directory exists before the snap refresh.
+        # Data migration between storage roots and versioned paths is handled
+        # by the snap's post-refresh hook (forward) and pre-refresh hook
+        # (reverse), which start a one-shot daemon running as _daemon_.
         self._charm._ensure_storage_layout()
 
         # TODO add graceful shutdown before refreshing snap?
@@ -675,60 +672,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    _daemon_uid = 584792
-
     def _ensure_storage_layout(self) -> None:
-        """Ensure versioned storage directories exist and migrate data.
+        """Ensure the temp tablespace directory exists.
 
-        Snap hooks run confined and cannot access daemon-owned storage
-        roots. The charm runs unconfined — directory creation and forward
-        data migration are done here, before the snap refresh.
+        Data migration between storage roots and versioned 16/main
+        subdirectories is handled by the snap hooks (pre-refresh for
+        reverse, post-refresh for forward).  TEMP_DATA_DIR may live on
+        a tmpfs mount that is wiped on reboot, so we recreate it
+        unconditionally.  CREATE TABLESPACE requires the directory to
+        be writable by the PostgreSQL _daemon_ user, so we chown it.
         """
-        for path in (POSTGRESQL_DATA_DIR, ARCHIVE_DATA_DIR, LOGS_DATA_DIR, TEMP_DATA_DIR):
-            p = Path(path)
-            p.mkdir(parents=True, exist_ok=True)
-            shutil.chown(p, user=self._daemon_uid, group=0)
-            # Also chown the parent 16/ directory created by mkdir -p.
-            if p.parent.name == "16":
-                shutil.chown(p.parent, user=self._daemon_uid, group=0)
-        os.chmod(POSTGRESQL_DATA_DIR, 0o700)
-
-        if (
-            Path(POSTGRESQL_DATA_PATH, "PG_VERSION").exists()
-            and not Path(POSTGRESQL_DATA_DIR, "PG_VERSION").exists()
-        ):
-            self._migrate_storage_roots_to_versioned()
-            # Ensure PostgreSQL can access the migrated data.
-            shutil.chown(POSTGRESQL_DATA_DIR, user=self._daemon_uid, group=0)
-            os.chmod(POSTGRESQL_DATA_DIR, 0o700)
-
-    @staticmethod
-    def _migrate_storage_roots_to_versioned() -> None:
-        """Move data from storage roots into versioned 16/main subdirectories."""
-        storage_pairs = [
-            (POSTGRESQL_DATA_PATH, POSTGRESQL_DATA_DIR),
-            (ARCHIVE_STORAGE_PATH, ARCHIVE_DATA_DIR),
-            (LOGS_STORAGE_PATH, LOGS_DATA_DIR),
-            (TEMP_STORAGE_PATH, TEMP_DATA_DIR),
-        ]
-        for storage_root, versioned_path in storage_pairs:
-            for item in os.listdir(storage_root):
-                if item in ("16", "lost+found"):
-                    continue
-                src = os.path.join(storage_root, item)
-                dst = os.path.join(versioned_path, item)
-                if os.path.exists(dst):
-                    continue
-                os.rename(src, dst)
-
-        pg_wal = Path(POSTGRESQL_DATA_DIR) / "pg_wal"
-        if pg_wal.is_symlink():
-            current_target = Path(os.path.realpath(pg_wal))
-            if current_target != Path(LOGS_DATA_DIR):
-                pg_wal.unlink()
-                pg_wal.symlink_to(LOGS_DATA_DIR)
-        elif not pg_wal.exists():
-            pg_wal.symlink_to(LOGS_DATA_DIR)
+        temp_dir = Path(TEMP_DATA_DIR)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
     @staticmethod
     def _clear_pg_version_dirs(path: Path) -> None:
