@@ -46,11 +46,15 @@ from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay,
 from cluster import ClusterNotPromotedError, NotReadyError, StandbyClusterAlreadyPromotedError
 from constants import (
     APP_SCOPE,
+    ARCHIVE_DATA_DIR,
+    LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
     PEER,
+    POSTGRESQL_DATA_DIR,
     POSTGRESQL_DATA_PATH,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
+    TEMP_DATA_DIR,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,7 +216,7 @@ class PostgreSQLAsyncReplication(Object):
             logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
             # Input is hardcoded
-            subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split())  # noqa: S603
+            subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_DIR}".split())  # noqa: S603
             logger.warning("Please review the backup file %s and handle its removal", filename)
         self.charm.app_peer_data["suppress-oversee-users"] = "true"
         return True
@@ -370,7 +374,7 @@ class PostgreSQLAsyncReplication(Object):
         process = run(  # noqa: S603
             [
                 f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
-                POSTGRESQL_DATA_PATH,
+                POSTGRESQL_DATA_DIR,
             ],
             capture_output=True,
             preexec_fn=demote(),
@@ -701,10 +705,10 @@ class PostgreSQLAsyncReplication(Object):
     def _reinitialise_pgdata(self) -> None:
         """Reinitialise the data folder."""
         paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
-            POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
+            ARCHIVE_DATA_DIR,
+            POSTGRESQL_DATA_DIR,
+            LOGS_DATA_DIR,
+            TEMP_DATA_DIR,
         ]
         path = None
         try:
@@ -754,7 +758,7 @@ class PostgreSQLAsyncReplication(Object):
     def _stop_database(self, event: RelationChangedEvent) -> bool:
         """Stop the database."""
         if not self.charm.is_unit_stopped and not self._is_following_promoted_cluster():
-            if not self.charm.unit.is_leader() and not os.path.exists(POSTGRESQL_DATA_PATH):
+            if not self.charm.unit.is_leader() and not os.path.exists(POSTGRESQL_DATA_DIR):
                 logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
                 return False
 
