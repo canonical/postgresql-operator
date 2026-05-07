@@ -1,18 +1,9 @@
+(troubleshooting)=
 # Troubleshooting
-
-## Summary
 
 This page goes over some recommended tools and approaches to troubleshooting the charm.
 
 Before anything, always run `juju status` to check the [list of charm statuses](/reference/statuses) and the recommended fixes. This alone may already solve your issue. 
-
-Otherwise, this reference goes over how to troubleshoot this charm via:
-- [Troubleshooting](#troubleshooting)
-  - [Summary](#summary)
-  - [Juju logs](#juju-logs)
-  - [Snap-based charm](#snap-based-charm)
-  - [Install extra software](#install-extra-software)
-
 
 ```{caution}
 At the moment, there is no support for [pausing an operator](https://warthogs.atlassian.net/browse/DPE-2545).
@@ -143,33 +134,26 @@ ubuntu@juju-fd7874-0:~$
 
 The list of running snap/`systemd` services will depend on configured (enabled) [COS integration](/how-to/monitoring-cos/enable-monitoring) and/or [backup](/how-to/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
-To access PostgreSQL, check the [charm users concept](/explanation/users) and request `operator` credentials to use `psql`:
+Access PostgreSQL with the `psql` CLI tool and continue troubleshooting your database-related issues from here. 
 
-```text
-> juju show-unit postgresql/0 | awk '/private-address:/{print $2;exit}' 
-10.47.228.200
+```shell
+juju show-unit postgresql/0 | awk '/private-address:/{print $2;exit}'
 
-> juju run postgresql/leader get-password username=operator
-password: rV0Xn4l65KtQsHSq
+juju secrets # to find secret ID
 
-> juju ssh postgresql/0 bash
-
-> > psql -h 10.47.228.200 -U operator -d postgres -W
-> > Password for user operator: rV0Xn4l65KtQsHSq
->
-> > postgres=# \l
-> > postgres | operator | UTF8 | C.UTF-8 | C.UTF-8 | operator=CTc/operator    +
-> >          |          |      |         |         | backup=CTc/operator      +
-> ...
+juju show-secret --reveal <secret ID> | grep operator
 ```
-Continue troubleshooting your database/SQL related issues from here.<br/>
+
+```{seealso}
+* {ref}`users`
+* {ref}`manage-passwords`
+```
 
 ```{caution}
 To avoid split-brain scenarios:
 
 * Do not manage users, credentials, databases, and schema directly. 
 * Avoid restarting services directly. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to/scale-replicas) to recover the cluster state.
-
 ```
 
 As a last resort, [contact us](/reference/contacts) if you cannot determine the source of your issue.
@@ -183,6 +167,7 @@ We recommend you do **not** install any additional software. This may affect sta
 Sometimes, however, it is necessary to install some extra troubleshooting software. 
 
 Use the common approach:
+
 ```text
 ubuntu@juju-fd7874-0:~$ sudo apt update && sudo apt install gdb
 ...

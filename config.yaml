@@ -7,6 +7,12 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
+  synchronous-mode-strict:
+    description: |
+      Enforce transactions to be committed on Primary and at least one more synchronous node.
+      Default is true.
+    type: boolean
+    default: true
   connection-authentication-timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -72,6 +78,12 @@ options:
       Default is on (true).
     type: boolean
     default: true
+  durability-maximum-lag-on-failover:
+    description: |
+      The amount of transactions that can be lost in bytes to consider failover is safe.
+      Default is 1048576.
+    type: int
+    default: 1048576
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -376,6 +388,38 @@ options:
       Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
       Allowed values are: from 0 to 1.80E+308.
     type: float
+  optimizer-pg-stat-statements-track:
+    description: |
+      Controls which statements are counted by the pg_stat_statements.
+      Allowed values are: none, top, all.
+    type: string
+    default: top
+  optimizer-pg-stat-statements-track-utility:
+    description: |
+      Controls whether utility commands are tracked by pg_stat_statements.
+    type: boolean
+    default: True
+  optimizer-pg-stat-statements-save:
+    description: |
+      Specifies whether to save statement statistics across server shutdowns.
+    type: boolean
+    default: False
+  optimizer-track-io-timing:
+    description: |
+      Enables timing of database I/O calls.
+    type: boolean
+    default: False
+  optimizer-track-wal-io-timing:
+    description: |
+      Enables timing of WAL I/O calls.
+    type: boolean
+    default: False
+  optimizer-track-functions:
+    description: |
+      Enables tracking of function call counts and time used.
+      Allowed values are: pl, all, none.
+    type: string
+    default: "none"
   pause-after-unit-refresh:
     description: |
       Wait for manual confirmation to resume refresh after these units refresh
@@ -478,6 +522,10 @@ options:
   plugin-pgstattuple-enable:
     type: boolean
     description: Enable pgstattuple extension
+  plugin-pg-stat-statements-enable:
+    type: boolean
+    description: Enable pg_stat_statements extension
+    default: False
   plugin-plperl-enable:
     type: boolean
     description: Enable plperl extension
@@ -687,6 +735,14 @@ options:
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
+  storage-hot-standby-feedback:
+    description: |
+      Send feedback to the primary or upstream standby about queries currently executing on
+      the standby.
+      Warning: enabling can cause database bloat on the Primary for some workloads.
+      Default is false.
+    type: boolean
+    default: false
   storage-old-snapshot-threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.

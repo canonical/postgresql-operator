@@ -13,7 +13,13 @@ from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
 from tenacity import RetryError, wait_fixed
 
-from backups import ListBackupsError, PostgreSQLBackups
+from backups import (
+    STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE,
+    STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE,
+    STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE,
+    ListBackupsError,
+    PostgreSQLBackups,
+)
 from charm import PostgresqlOperatorCharm
 from constants import PEER
 
@@ -157,6 +163,7 @@ def test_can_initialise_stanza(harness):
 def test_can_unit_perform_backup(harness):
     with (
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
+        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("ops.model.Application.planned_units") as _planned_units,
         patch(
@@ -164,6 +171,14 @@ def test_can_unit_perform_backup(harness):
         ) as _is_primary,
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
+        # Test when unit belongs to a standby cluster.
+        _is_standby_cluster.return_value = True
+        assert harness.charm.backup._can_unit_perform_backup() == (
+            False,
+            STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE,
+        )
+
+        _is_standby_cluster.return_value = False
         # Test when the charm fails to retrieve the primary.
         _is_primary.side_effect = RetryError(last_attempt=1)
         assert harness.charm.backup._can_unit_perform_backup() == (
@@ -216,6 +231,33 @@ def test_can_unit_perform_backup(harness):
         # Test when everything is ok to run a backup.
         _are_backup_settings_ok.return_value = (True, None)
         assert harness.charm.backup._can_unit_perform_backup() == (True, None)
+
+
+def test_is_standby_cluster(harness):
+    with (
+        patch.object(harness.charm.backup.model, "get_relation") as _get_relation,
+        patch.object(harness.charm.async_replication, "is_primary_cluster") as _is_primary_cluster,
+    ):
+        # Test when async replication relation is not present.
+        _get_relation.side_effect = [None, None]
+        assert not harness.charm.backup._is_standby_cluster()
+        _is_primary_cluster.assert_not_called()
+
+        # Test when relation is present and this is the primary cluster.
+        _get_relation.reset_mock()
+        _is_primary_cluster.reset_mock()
+        _get_relation.side_effect = [object()]
+        _is_primary_cluster.return_value = True
+        assert not harness.charm.backup._is_standby_cluster()
+        _is_primary_cluster.assert_called_once()
+
+        # Test when relation is present and this is the standby cluster.
+        _get_relation.reset_mock()
+        _is_primary_cluster.reset_mock()
+        _get_relation.side_effect = [object()]
+        _is_primary_cluster.return_value = False
+        assert harness.charm.backup._is_standby_cluster()
+        _is_primary_cluster.assert_called_once()
 
 
 def test_can_use_s3_repository(harness):
@@ -676,7 +718,7 @@ backup-id            | action              | status   | reference-backup-id  | L
             ),
             (
                 0,
-                '{".":{"type":"path"},"archive/None.postgresql/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
+                '{"None.postgresql/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
                 "",
             ),
         ]
@@ -1369,10 +1411,21 @@ def test_on_list_backups_action(harness):
         patch(
             "charm.PostgreSQLBackups._generate_backup_list_output"
         ) as _generate_backup_list_output,
+        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
-        # Test when not all backup settings are ok.
+        # Test when unit belongs to a standby cluster.
         mock_event = MagicMock()
+        _is_standby_cluster.return_value = True
+        harness.charm.backup._on_list_backups_action(mock_event)
+        mock_event.fail.assert_called_once_with(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
+        _are_backup_settings_ok.assert_not_called()
+        _generate_backup_list_output.assert_not_called()
+        mock_event.set_results.assert_not_called()
+
+        # Test when not all backup settings are ok.
+        mock_event.reset_mock()
+        _is_standby_cluster.return_value = False
         _are_backup_settings_ok.return_value = (False, "fake validation message")
         harness.charm.backup._on_list_backups_action(mock_event)
         mock_event.fail.assert_called_once()
@@ -1415,7 +1468,7 @@ def test_list_timelines(harness):
 
         _execute_command.return_value = (
             0,
-            '{".":{"type":"path"},"archive/test-stanza/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
+            '{"test-stanza/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
             "",
         )
         assert harness.charm.backup._list_timelines() == dict[str, tuple[str, str]]([
@@ -1698,10 +1751,19 @@ def test_on_restore_action(harness):
 def test_pre_restore_checks(harness):
     with (
         patch("ops.model.Application.planned_units") as _planned_units,
+        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
-        # Test when S3 parameters are not ok.
+        # Test when unit belongs to a standby cluster.
         mock_event = MagicMock(params={})
+        _is_standby_cluster.return_value = True
+        assert not harness.charm.backup._pre_restore_checks(mock_event)
+        mock_event.fail.assert_called_once_with(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
+        _are_backup_settings_ok.assert_not_called()
+
+        # Test when S3 parameters are not ok.
+        mock_event.reset_mock()
+        _is_standby_cluster.return_value = False
         _are_backup_settings_ok.return_value = (False, "fake error message")
         assert not harness.charm.backup._pre_restore_checks(mock_event)
         mock_event.fail.assert_called_once()
@@ -1748,7 +1810,7 @@ def test_pre_restore_checks(harness):
 )
 def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
     with (
-        patch("charm.Patroni.render_file") as _render_file,
+        patch("backups.render_file") as _render_file,
         patch(
             "charm.PostgreSQLBackups._tls_ca_chain_filename",
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),

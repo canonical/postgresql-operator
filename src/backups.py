@@ -46,6 +46,7 @@ from constants import (
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+from utils import render_file
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,18 @@ S3_BLOCK_MESSAGES = [
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
 ]
+STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE = (
+    "Backups are not supported on a standby cluster. "
+    "Run create-backup on the primary cluster instead."
+)
+STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE = (
+    "Backups are not supported on a standby cluster. "
+    "Run list-backups on the primary cluster instead."
+)
+STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE = (
+    "Restoring backups is not supported on a standby cluster. "
+    "Run restore on the primary cluster instead."
+)
 
 
 class ListBackupsError(Exception):
@@ -147,6 +160,9 @@ class PostgreSQLBackups(Object):
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
+        if self._is_standby_cluster():
+            return False, STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE
+
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
 
@@ -168,6 +184,16 @@ class PostgreSQLBackups(Object):
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
+
+    def _is_standby_cluster(self) -> bool:
+        """Return whether this unit belongs to a standby cluster."""
+        if (
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
+            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
+        ):
+            return False
+
+        return not self.charm.async_replication.is_primary_cluster()
 
     def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
@@ -280,8 +306,7 @@ class PostgreSQLBackups(Object):
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
-        # Boto3 doesn't have typedefs
-        bucket = s3.Bucket(bucket_name)  # type: ignore
+        bucket = s3.Bucket(bucket_name)
         try:
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
@@ -553,7 +578,10 @@ class PostgreSQLBackups(Object):
             PGBACKREST_CONFIGURATION_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
+            "archive",
             "--recurse",
+            "--filter",
+            "\\.history$",
             "--output=json",
         ])
         if return_code != 0:
@@ -561,20 +589,18 @@ class PostgreSQLBackups(Object):
             raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
-        if repository is None:
-            return dict[str, tuple[str, str]]()
-
-        return dict[str, tuple[str, str]]({
-            datetime.strftime(
-                datetime.fromtimestamp(timeline_object["time"], UTC),
-                BACKUP_ID_FORMAT,
-            ): (
-                timeline.split("/")[1],
-                timeline.split("/")[-1].split(".")[0].lstrip("0"),
-            )
-            for timeline, timeline_object in repository
-            if timeline.endswith(".history") and not timeline.endswith("backup.history")
-        })
+        output = dict[str, tuple[str, str]]()
+        if repository:
+            for timeline, timeline_object in repository:
+                if not timeline.endswith("backup.history"):
+                    # 0 is the stanza -1 is the timeline file
+                    path = timeline.split("/")
+                    output[
+                        datetime.strftime(
+                            datetime.fromtimestamp(timeline_object["time"], UTC), BACKUP_ID_FORMAT
+                        )
+                    ] = (path[0], path[-1].split(".")[0].lstrip("0"))
+        return output
 
     def _get_nearest_timeline(self, timestamp: str) -> tuple[str, str] | None:
         """Finds the nearest timeline or backup prior to the specified timeline.
@@ -1066,6 +1092,11 @@ Stderr:
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
+        if self._is_standby_cluster():
+            logger.warning(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
+            event.fail(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
+            return
+
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.warning(validation_message)
@@ -1114,12 +1145,11 @@ Stderr:
             elif is_backup_id_timeline:
                 restore_stanza_timeline = timelines[backup_id]
             else:
-                backups_list = list(self._list_backups(show_failed=False).values())
-                timelines_list = self._list_timelines()
+                backups_list = list(backups.values())
                 if (
                     restore_to_time == "latest"
-                    and timelines_list is not None
-                    and max(timelines_list.values() or [backups_list[0]]) not in backups_list
+                    and timelines is not None
+                    and max(timelines.values() or [backups_list[0]]) not in backups_list
                 ):
                     error_message = "There is no base backup created from the latest timeline"
                     logger.error(f"Restore failed: {error_message}")
@@ -1248,6 +1278,11 @@ Stderr:
         Returns:
             a boolean indicating whether restore should be run.
         """
+        if self._is_standby_cluster():
+            logger.error(f"Restore failed: {STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE}")
+            event.fail(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
+            return False
+
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.error(f"Restore failed: {validation_message}")
@@ -1333,7 +1368,7 @@ Stderr:
             return False
 
         if self._tls_ca_chain_filename != "":
-            self.charm._patroni.render_file(
+            render_file(
                 self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
             )
 
@@ -1360,14 +1395,12 @@ Stderr:
             process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
-        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
+        render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
-            self.charm._patroni.render_file(
-                PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
-            )
+        render_file(PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False)
 
         return True
 
@@ -1472,8 +1505,7 @@ Stderr:
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            # Boto3 doesn't have typedefs
-            bucket = s3.Bucket(bucket_name)  # type: ignore
+            bucket = s3.Bucket(bucket_name)
 
             with tempfile.NamedTemporaryFile() as temp_file:
                 temp_file.write(content.encode("utf-8"))
@@ -1501,13 +1533,14 @@ Stderr:
             a string with the content if object is successfully downloaded and None if file is not existing or error
             occurred during download.
         """
-        bucket_name = s3_parameters["bucket"]
+        if not (bucket_name := s3_parameters.get("bucket")):
+            logger.info("No bucket set")
+            return
         processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            # Boto3 doesn't have typedefs
-            bucket = s3.Bucket(bucket_name)  # type: ignore
+            bucket = s3.Bucket(bucket_name)
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")

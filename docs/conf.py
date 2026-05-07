@@ -1,5 +1,4 @@
 import datetime
-import ast
 import os
 import yaml
 
@@ -22,10 +21,20 @@ import yaml
 #######################
 
 # Project name
+#
+# TODO: Update with the official name of your project or product
 
 project = "Charmed PostgreSQL"
 author = "Canonical Ltd."
 
+# The year in the copyright statement defaults to the current year, so
+# individual document versions show when they were built.
+# TODO: If the date must be a range, like in a software license, replace 
+# 2026 with the starting year of development and use:
+#
+copyright = f"2025-{datetime.date.today().year}"
+
+# copyright = f"{datetime.date.today().year}"
 
 # Sidebar documentation title; best kept reasonably short
 #
@@ -35,33 +44,6 @@ author = "Canonical Ltd."
 
 html_title = project + " 16 documentation"
 
-
-# Copyright string; shown at the bottom of the page
-#
-# Now, the starter pack uses CC-BY-SA as the license
-# and the current year as the copyright year.
-#
-# TODO: If your docs need another license, specify it instead of 'CC-BY-SA'.
-#
-# TODO: If your documentation is a part of the code repository of your project,
-#       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
-#
-# NOTE: For static works, it is common to provide the first publication year.
-#       Another option is to provide both the first year of publication
-#       and the current year, especially for docs that frequently change,
-#       e.g. 2022–2023 (note the en-dash).
-#
-#       A way to check a repo's creation date is to get a classic GitHub token
-#       with 'repo' permissions; see https://github.com/settings/tokens
-#       Next, use 'curl' and 'jq' to extract the date from the API's output:
-#
-#       curl -H 'Authorization: token <TOKEN>' \
-#         -H 'Accept: application/vnd.github.v3.raw' \
-#         https://api.github.com/repos/canonical/<REPO> | jq '.created_at'
-
-copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
-
-
 # Documentation website URL
 #
 # TODO: Update with the official URL of your docs or leave empty if unsure.
@@ -69,7 +51,7 @@ copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
 # NOTE: The Open Graph Protocol (OGP) enhances page display in a social graph
 #       and is used by social media platforms; see https://ogp.me/
 
-ogp_site_url = "https://canonical-starter-pack.readthedocs-hosted.com/"
+ogp_site_url = "https://canonical-charmed-postgresql.readthedocs-hosted.com/"
 
 
 # Preview name of the documentation website
@@ -83,7 +65,7 @@ ogp_site_name = project
 #
 # TODO: To customise the preview image, update as needed.
 
-ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg"
+ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
@@ -106,12 +88,10 @@ html_context = {
     #       remove the {{ product_page }} link from the page header template
     #       (usually .sphinx/_templates/header.html; also, see README.rst).
     "product_page": "canonical.com/data/postgresql",
-
     # Product tag image; the orange part of your logo, shown in the page header
     #
     # TODO: To add a tag image, uncomment and update as needed.
     # 'product_tag': '_static/tag.png',
-
     # Your Discourse instance URL
     #
     # TODO: Change to your Discourse instance URL or leave empty.
@@ -119,16 +99,14 @@ html_context = {
     # NOTE: If set, adding ':discourse: 123' to an .rst file
     #       will add a link to Discourse topic 123 at the bottom of the page.
     "discourse": "https://discourse.charmhub.io",
-
     # Your Mattermost channel URL
     #
     # TODO: Change to your Mattermost channel URL or leave empty.
     "mattermost": "",
-
     # Your Matrix channel URL
     #
+    # TODO: Change to your Matrix channel URL or leave empty.
     "matrix": "https://matrix.to/#/#charmhub-data-platform:ubuntu.com",
-
     # Your documentation GitHub repository URL
     #
     # TODO: Change to your documentation GitHub repository URL or leave empty.
@@ -136,24 +114,52 @@ html_context = {
     # NOTE: If set, links for viewing the documentation source files
     #       and creating GitHub issues are added at the bottom of each page.
     "github_url": "https://github.com/canonical/postgresql-operator",
-    
     # Docs branch in the repo; used in links for viewing the source files
-    # TODO: Update when default branch changes to 14 or 16
-    'repo_default_branch': 'main',
-
+    #
+    # TODO: To customise the branch, uncomment and update as needed.
+    'repo_default_branch': '16/edge',
     # Docs location in the repo; used in links for viewing the source files
+    #
+
+
+    # TODO: To customise the directory, uncomment and update as needed.
     "repo_folder": "/docs/",
-
-    # Enable or disable the Previous / Next buttons at the bottom of pages
+    # TODO: To enable or disable the Previous / Next buttons at the bottom of pages
     # Valid options: none, prev, next, both
-    "sequential_nav": "none",
-
-    # Enable listing contributors on individual pages, set to True
+    # "sequential_nav": "both",
+    # TODO: To enable listing contributors on individual pages, set to True
     "display_contributors": True,
 
-    # Required for feedback button
+    # Required for feedback button    
     'github_issues': 'enabled',
+
+    # Inherit the author value
+    "author": author,
+
+    # The starter pack uses CC-BY-SA as the license
+    #
+    # TODO: If your docs need another license, specify it instead of 'CC-BY-SA'.
+    # For the name, we recommend using the standard shorthand identifier from
+    # https://spdx.org/licenses
+    #
+    # For the URL, link directly to the license statement, typically found on
+    # the product's home page or in its GitHub project.
+    #
+    # TODO: If your documentation is a part of the code repository of your project,
+    #       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
+
+    "license": {
+        "name": "Apache License 2.0",
+        "url": "https://github.com/canonical/postgresql-operator/blob/16/edge/LICENSE",
+    },
 }
+
+# html_extra_path = []
+
+# Allow opt-in build of the OpenAPI "Hello" example so docs stay clean by default.
+# if os.getenv("OPENAPI", ""):
+#     tags.add("openapi")
+#     html_extra_path.append("how-to/assets/openapi.yaml")
 
 # TODO: To enable the edit button on pages, uncomment and change the link to a
 # public repository on GitHub or Launchpad. Any of the following link domains
@@ -166,11 +172,6 @@ html_theme_options = {
 'source_edit_link': 'https://github.com/canonical/postgresql-operator',
 }
 
-# Syntax highlighting settings
-
-highlight_language = "none" # default
-pygments_style = "autumn" # see https://pygments.org/styles for more
-
 # Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
 #
 # TODO: If your documentation is hosted on https://docs.ubuntu.com/,
@@ -178,29 +179,55 @@ pygments_style = "autumn" # see https://pygments.org/styles for more
 
 # slug = ''
 
+#######################
+# Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
+#######################
 
+# Use RTD canonical URL to ensure duplicate pages have a specific canonical URL
+
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
+
+# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
+
+sitemap_url_scheme = '{link}'
+
+# Include `lastmod` dates in the sitemap:
+
+sitemap_show_lastmod = True
+
+# Exclude generated pages from the sitemap:
+
+sitemap_excludes = [
+    '404/',
+    'genindex/',
+    'search/',
+]
+
+# TODO: Add more pages to sitemap_excludes if needed. Wildcards are supported.
+#       For example, to exclude module pages generated by autodoc, add '_modules/*'.
+
+#######################
 # Template and asset locations
+#######################
 
-#html_static_path = ["_static"]
-#templates_path = ["_templates"]
+# html_static_path = ["_static"]
+templates_path = ["_templates"]
 
 
 #############
 # Redirects #
 #############
 
-# To set up redirects: https://documatt.gitlab.io/sphinx-reredirects/usage.html
-# For example: 'explanation/old-name.html': '../how-to/prettify.html',
+# Add redirects to the 'redirects.txt' file
+# https://sphinxext-rediraffe.readthedocs.io/en/latest/
 
 # To set up redirects in the Read the Docs project dashboard:
 # https://docs.readthedocs.io/en/stable/guides/redirects.html
 
-# NOTE: If undefined, set to None, or empty,
-#       the sphinx_reredirects extension will be disabled.
-
-# redirects = {}
-
 rediraffe_redirects = "redirects.txt"
+
+# Strips '/index.html' from destination URLs when building with 'dirhtml'
+rediraffe_dir_only = True
 
 ###########################
 # Link checker exceptions #
@@ -214,21 +241,20 @@ linkcheck_ignore = [
     "http://127.0.0.1:8000",
     "https://github.com/canonical/ACME/*",
     "https://matrix.to/*",
+    # Domains below often reject link checkers
     "https://portal.azure.com/*",
     "https://microsoft.com/*",
     "https://developer.hashicorp.com/*",
     "https://www.terraform.io/*"
     ]
 
+
 # A regex list of URLs where anchors are ignored by 'make linkcheck'
 
-linkcheck_anchors_ignore_for_url = [
-    r"https://github\.com/.*",
-    r"https://canonical-juju.readthedocs-hosted.com/en/latest/*"
-    ]
+linkcheck_anchors_ignore_for_url = [r"https://github\.com/.*"]
 
 # give linkcheck multiple tries on failure
-# linkcheck_timeout = 30
+linkcheck_timeout = 90
 linkcheck_retries = 3
 
 ########################
@@ -249,43 +275,48 @@ myst_heading_anchors = 3
 # https://www.sphinx-doc.org/en/master/usage/extensions/index.html
 
 # NOTE: The canonical_sphinx extension is required for the starter pack.
-#       It automatically enables the following extensions:
-#       - custom-rst-roles
-#       - myst_parser
-#       - notfound.extension
-#       - related-links
-#       - sphinx_copybutton
-#       - sphinx_design
-#       - sphinx_reredirects
-#       - sphinx_tabs.tabs
-#       - sphinxcontrib.jquery
-#       - sphinxext.opengraph
-#       - terminal-output
-#       - youtube-links
 
 extensions = [
     "canonical_sphinx",
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_rerediraffe",
+    "sphinx_reredirects",
+    "sphinx_tabs.tabs",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    "sphinx_config_options",
+    "sphinx_contributor_listing",
+    "sphinx_filtered_toctree",
+    "sphinx_related_links",
+    "sphinx_roles",
+    "sphinx_terminal",
+    "sphinx_ubuntu_images",
+    "sphinx_youtube_links",
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
-    "sphinxext.rediraffe"
+    "sphinx_sitemap",
+    "sphinx_new_tab_link"
 ]
+
+new_tab_link_show_external_link_icon = True
 
 # Excludes files or directories from processing
 
-exclude_patterns = [
-    "doc-cheat-sheet*",
-]
+exclude_patterns = [".venv*"]
 
 # Adds custom CSS files, located under 'html_static_path'
 
-# html_css_files = []
-
+html_css_files = [
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
+]
 
 # Adds custom JavaScript files, located under 'html_static_path'
 
-# html_js_files = []
-
+html_js_files = [
+    "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
+]
 
 # Specifies a reST snippet to be appended to each .rst file
 
@@ -332,7 +363,7 @@ rst_prolog = """
 # Workaround for https://github.com/canonical/canonical-sphinx/issues/34
 
 if "discourse_prefix" not in html_context and "discourse" in html_context:
-    html_context["discourse_prefix"] = html_context["discourse"] + "/t/"
+    html_context["discourse_prefix"] = f"{html_context['discourse']}/t/"
 
 # Workaround for substitutions.yaml
 
@@ -341,7 +372,7 @@ if os.path.exists('./reuse/substitutions.yaml'):
         myst_substitutions = yaml.safe_load(fd.read())
 
 # Add configuration for intersphinx mapping
-
+# Map only the Sphinx documentation sets that you need to link to from your docs set.
 intersphinx_mapping = {
     'postgresql-14': ('https://canonical-charmed-postgresql.readthedocs-hosted.com/14/', None)
 }

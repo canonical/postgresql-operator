@@ -42,6 +42,8 @@ def second_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
 
     logging.info(f"Creating model: {model_name}")
     juju.add_model(model_name)
+    model_2 = Juju(model=model_name)
+    model_2.cli("set-model-constraints", f"arch={architecture.architecture}")
 
     yield model_name
     if request.config.getoption("--keep-models"):
@@ -84,22 +86,23 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture.architecture}
 
-    # TODO Deploy from edge
     logging.info("Deploying postgresql clusters")
     model_1 = Juju(model=first_model)
     model_1.deploy(
-        charm=charm,
+        charm=DB_APP_NAME,
         app=DB_APP_1,
         base="ubuntu@24.04",
+        channel="16/stable",
         config=configuration,
         constraints=constraints,
         num_units=3,
     )
     model_2 = Juju(model=second_model)
     model_2.deploy(
-        charm=charm,
+        charm=DB_APP_NAME,
         app=DB_APP_2,
         base="ubuntu@24.04",
+        channel="16/stable",
         config=configuration,
         constraints=constraints,
         num_units=3,
@@ -110,7 +113,7 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     model_1.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_NAME,
-        base="ubuntu@22.04",
+        base="ubuntu@24.04",
         channel="latest/edge",
         constraints=constraints,
         num_units=1,

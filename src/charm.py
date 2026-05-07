@@ -18,19 +18,19 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
 import ops.log
 import psycopg2
+import psycopg2.errors
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, ProtocolNotFoundError
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 from ops import (
@@ -55,7 +55,7 @@ from ops import (
     WaitingStatus,
     main,
 )
-from pydantic import ValidationError
+from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -66,6 +66,7 @@ from single_kernel_postgresql.config.literals import (
     USER,
     Substrates,
 )
+from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -125,6 +126,7 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
     USER_PASSWORD_KEY,
@@ -133,14 +135,15 @@ from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
-from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
-from utils import label2name, new_password
+from utils import label2name, new_password, render_file
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
+logging.getLogger("botocore").setLevel(logging.WARNING)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
@@ -240,7 +243,6 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Update the configuration.
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
-        self._charm.updated_synchronous_node_count()
 
         # TODO add graceful shutdown before refreshing snap?
         # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
@@ -252,22 +254,30 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         self._charm._post_snap_refresh(refresh)
 
 
-@trace_charm(
-    tracing_endpoint="tracing_endpoint",
-    extra_types=(
-        ClusterTopologyObserver,
-        COSAgentProvider,
-        Patroni,
-        PostgreSQL,
-        PostgreSQLAsyncReplication,
-        PostgreSQLBackups,
-        PostgreSQLLDAP,
-        PostgreSQLProvider,
-        TLS,
-        TLSTransfer,
-        RollingOpsManager,
-    ),
-)
+def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
+    """Utility function to set tracing destination."""
+    if not endpoint_requirer.is_ready():
+        return
+
+    try:
+        if not (endpoint := endpoint_requirer.get_tracing_endpoint(TRACING_PROTOCOL)):
+            return
+    except ProtocolNotFoundError:
+        logger.warning(
+            "Endpoint for tracing wasn't provided as tracing backend isn't ready yet. If grafana-agent isn't connected to a tracing backend, integrate it. Otherwise this issue should resolve itself in a few events."
+        )
+        return
+
+    endpoint = f"{endpoint}/v1/traces"
+
+    if endpoint.startswith("https://"):
+        # if endpoint is https BUT we don't have a server_cert yet:
+        # disable charm tracing until we do to prevent tls errors
+        logger.warning("Cannot send traces to an https endpoint without a certificate.")
+        return
+    set_destination(endpoint, None)
+
+
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -277,7 +287,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     # Override data_models.py TypedCharmBase config
     @cached_property
-    def config(self):
+    def config(self) -> CharmConfig:
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
             # Prefer value of option name with dash (-) and fallback to name with underscore (_)
@@ -286,10 +296,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             for config_option in self.config_type.keys()  # noqa: SIM118
         }
-        config = {
+        config: dict[str, Any] = {
             config_option: value for config_option, value in config.items() if value is not None
         }
-        return self.config_type(**config)  # type: ignore
+        return self.config_type(**config)
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -393,7 +403,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
+        charm_tracing_config(self._grafana_agent)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
@@ -401,13 +412,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Called after snap refresh
         """
         try:
-            if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
-                cert = load_pem_x509_certificate(raw_cert.encode())
-                if (
+            if (
+                (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
+                and (cert := load_pem_x509_certificate(raw_cert.encode()))
+                and (
                     cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
                     != self._unit_ip
-                ):
-                    self.tls.generate_internal_peer_cert()
+                )
+            ):
+                self.tls.generate_internal_peer_cert()
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
@@ -440,6 +453,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
             )
         else:
+            try:
+                self._patroni.set_max_timelines_history()
+            except Exception:
+                logger.warning("Unable to patch in max_timelines_history")
             refresh.next_unit_allowed_to_refresh = True
 
     def set_unit_status(
@@ -661,9 +678,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            primary = self._patroni.get_primary()
-            if primary is None and (standby_leader := self._patroni.get_standby_leader()):
-                primary = standby_leader
+            primary = self._patroni.get_primary() or self._patroni.get_standby_leader()
             primary_endpoint = self._patroni.get_member_ip(primary) if primary else None
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
@@ -1515,11 +1530,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
-        if not self.updated_synchronous_node_count():
-            logger.debug("Defer on_config_changed: unable to set synchronous node count")
-            event.defer()
-            return
-
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
 
@@ -1573,7 +1583,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(WaitingStatus("Updating extensions"))
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
-        except psycopg2.errors.DependentObjectsStillExist as e:
+        except psycopg2.errors.DependentObjectsStillExist as e:  # type: ignore
             logger.error(
                 "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql plugin-<plugin_name>-enable=True`",
                 str(e),
@@ -1904,7 +1914,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 alternative_endpoints=other_cluster_endpoints
             )
             other_cluster_primary_ip = next(
-                replication_offer_relation.data[unit].get("private-address")
+                replication_offer_relation.data[unit].get("ip")
+                or replication_offer_relation.data[unit].get("private-address")
                 for unit in replication_offer_relation.units
                 if unit.name.replace("/", "-") == other_cluster_primary
             )
@@ -2264,21 +2275,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         key, ca, cert = self.tls.get_peer_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
-        self._patroni.render_file(
+        render_file(
             f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}", self.tls.get_peer_ca_bundle(), 0o600
         )
 
@@ -2391,20 +2402,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return str(min(8, 2 * self.cpu_count))
         elif self.config.cpu_max_worker_processes is not None:
             value = self.config.cpu_max_worker_processes
-            if value < 2:
-                from pydantic_core import InitErrorDetails
-
-                raise ValidationError.from_exception_data(
-                    "ValidationError",
-                    [
-                        InitErrorDetails(
-                            type="greater_than_equal",
-                            ctx={"ge": 2},
-                            input=value,
-                            loc=("cpu_max_worker_processes",),
-                        )
-                    ],
-                )
             cap = 10 * self.cpu_count
             if value > cap:
                 raise ValueError(
@@ -2428,20 +2425,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ValidationError: If value is less than 2
             ValueError: If value exceeds 10 * vCores
         """
-        if value < 2:
-            from pydantic_core import InitErrorDetails
-
-            raise ValidationError.from_exception_data(
-                "ValidationError",
-                [
-                    InitErrorDetails(
-                        type="greater_than_equal",
-                        ctx={"ge": 2},
-                        input=value,
-                        loc=(param_name,),
-                    )
-                ],
-            )
         cap = 10 * self.cpu_count
         if value > cap:
             raise ValueError(
@@ -2561,14 +2544,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return result
 
-    def _api_update_config(self) -> None:
+    def _api_update_config(self) -> bool:
         # Use config value if set, calculate otherwise
         max_connections = (
             self.config.experimental_max_connections
             if self.config.experimental_max_connections
             else max(4 * self.cpu_count, 100)
         )
-        cfg_patch = {
+        cfg_patch: dict[str, int | str | None] = {
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "max_replication_slots": 25,
@@ -2586,10 +2569,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "max_logical_replication_workers"
             ]
 
-        base_patch = {}
+        base_patch = {
+            **self._patroni.synchronous_configuration,
+            "maximum_lag_on_failover": self.config.durability_maximum_lag_on_failover,
+        }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
-        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        try:
+            self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
+        except RetryError:
+            return False
+        return True
 
     def _build_postgresql_parameters(self) -> dict[str, str] | None:
         """Build PostgreSQL configuration parameters.
@@ -2690,7 +2680,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        self._api_update_config()
+        if not self._api_update_config():
+            logger.warning("Early exit update_config: Unable to patch Patroni API")
+            return False
 
         # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
@@ -2875,7 +2867,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def generate_config_hash(self) -> str:
         """Generate current configuration hash."""
-        return shake_128(str(self.config.dict()).encode()).hexdigest(16)
+        return shake_128(str(self.config.model_dump()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
@@ -3022,14 +3014,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "ldapbindpasswd": data.bind_password,
             "ldaptls": data.starttls,
             "ldapurl": data.urls[0],
-        }
-
-        # LDAP authentication parameters that are exclusive to
-        # one of the two supported modes (simple bind or search+bind)
-        # must be put at the very end of the parameters string
-        params.update({
+            # LDAP authentication parameters that are exclusive to
+            # one of the two supported modes (simple bind or search+bind)
+            # must be put at the very end of the parameters string
             "ldapsearchfilter": self.config.ldap_search_filter,
-        })
+        }
 
         return params
 
@@ -3038,7 +3027,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         connection = None
         try:
             with (
-                self.postgresql._connect_to_database() as connection,
+                self.postgresql._connect_to_database(
+                    database_host=self.postgresql.current_host
+                ) as connection,
                 connection.cursor() as cursor,
             ):
                 cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")

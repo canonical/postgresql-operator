@@ -7,10 +7,9 @@ from pathlib import Path
 import psycopg2
 import pytest
 import yaml
+from constants import DATABASE_DEFAULT_NAME
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
-
-from constants import DATABASE_DEFAULT_NAME
 
 from ..helpers import (
     CHARM_BASE,
@@ -22,10 +21,7 @@ from ..helpers import (
     start_machine,
     stop_machine,
 )
-from .helpers import (
-    build_connection_string,
-    get_application_relation_data,
-)
+from .helpers import build_connection_string, get_application_relation_data
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +50,8 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
-                base=CHARM_BASE,
                 channel="latest/edge",
+                series="noble",
             ),
             ops_test.model.deploy(
                 charm,
@@ -239,7 +235,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         APPLICATION_APP_NAME,
         application_name=another_application_app_name,
         channel="latest/edge",
-        base=CHARM_BASE,
+        series="noble",
     )
 
     # Relate the new application with the database

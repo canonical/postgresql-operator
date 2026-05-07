@@ -10,11 +10,10 @@ from typing import get_args
 import psycopg2
 import pytest
 import requests
+from locales import SNAP_LOCALES
 from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
-
-from locales import SNAP_LOCALES
 
 from .ha_tests.helpers import get_cluster_roles
 from .helpers import (

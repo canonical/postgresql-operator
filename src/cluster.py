@@ -9,22 +9,18 @@ import json
 import logging
 import os
 import pathlib
-import pwd
 import re
 import shutil
 import subprocess
-from asyncio import as_completed, create_task, run, wait
-from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
-from ssl import CERT_NONE, create_default_context
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import psutil
 import requests
 import tomli
 from charmlibs import snap
-from httpx import AsyncClient, BasicAuth, HTTPError
+from httpx import BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -59,7 +55,7 @@ from constants import (
     POSTGRESQL_LOGS_PATH,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import label2name
+from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +219,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(POSTGRESQL_DATA_PATH)
+        _change_owner(POSTGRESQL_DATA_PATH)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
@@ -232,35 +228,11 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-    def _change_owner(self, path: str) -> None:
-        """Change the ownership of a file or a directory to the postgres user.
-
-        Args:
-            path: path to a file or directory.
-        """
-        # Get the uid/gid for the _daemon_ user.
-        user_database = pwd.getpwnam("_daemon_")
-        # Set the correct ownership for the file or directory.
-        os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
-
     @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
         return {member["name"] for member in self.cached_cluster_status}
-
-    def _create_directory(self, path: str, mode: int) -> None:
-        """Creates a directory.
-
-        Args:
-            path: the path of the directory that should be created.
-            mode: access permission mask applied to the
-              directory using chmod (e.g. 0o640).
-        """
-        os.makedirs(path, mode=mode, exist_ok=True)
-        # Ensure correct permissions are set on the directory.
-        os.chmod(path, mode)
-        self._change_owner(path)
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -274,9 +246,28 @@ class Patroni:
 
     def cluster_status(self, alternative_endpoints: list | None = None) -> list[ClusterMember]:
         """Query the cluster status."""
+        if not self._patroni_async_auth:
+            raise RetryError(
+                last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
+            )
+
+        # TODO we don't know the other cluster's ca
+        verify = not bool(alternative_endpoints)
+        if alternative_endpoints:
+            endpoints = alternative_endpoints
+        else:
+            endpoints = []
+            if self.unit_ip:
+                endpoints.append(self.unit_ip)
+                for peer_ip in self.peers_ips:
+                    endpoints.append(peer_ip)
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(
-            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
+        if response := parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+            endpoints,
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            self._patroni_async_auth,
+            verify,
         ):
             logger.debug("API cluster_status: %s", response["members"])
             return response["members"]
@@ -319,54 +310,6 @@ class Patroni:
                 if member["name"] == member_name:
                     return member["state"]
         return ""
-
-    async def _httpx_get_request(self, url: str, verify: bool = True) -> dict[str, Any] | None:
-        if not self._patroni_async_auth:
-            return None
-        ssl_ctx = create_default_context()
-        if verify:
-            with suppress(FileNotFoundError):
-                ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-        else:
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = CERT_NONE
-        async with AsyncClient(
-            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
-        ) as client:
-            try:
-                return (await client.get(url)).json()
-            except (HTTPError, ValueError):
-                return None
-
-    async def _async_get_request(
-        self, uri: str, endpoints: list[str], verify: bool = True
-    ) -> dict[str, Any] | None:
-        tasks = [
-            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}", verify))
-            for ip in endpoints
-        ]
-        for task in as_completed(tasks):
-            if result := await task:
-                for task in tasks:
-                    task.cancel()
-                await wait(tasks)
-                return result
-
-    def parallel_patroni_get_request(
-        self, uri: str, endpoints: list[str] | None = None
-    ) -> dict[str, Any] | None:
-        """Call all possible patroni endpoints in parallel."""
-        if not endpoints:
-            endpoints = []
-            if self.unit_ip:
-                endpoints.append(self.unit_ip)
-            for peer_ip in self.peers_ips:
-                endpoints.append(peer_ip)
-            verify = True
-        else:
-            # TODO we don't know the other cluster's ca
-            verify = False
-        return run(self._async_get_request(uri, endpoints, verify))
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
@@ -493,7 +436,7 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    primary = self.get_primary()
+                    primary = self.get_primary() or self.get_standby_leader()
                     if not primary:
                         logger.debug("Failed replication check no primary reported")
                         raise Exception
@@ -635,26 +578,15 @@ class Patroni:
                 if self.get_primary() is None:
                     raise ClusterNotPromotedError("cluster not promoted")
 
-    def render_file(self, path: str, content: str, mode: int, change_owner: bool = True) -> None:
-        """Write a content rendered from a template to a file.
-
-        Args:
-            path: the path to the file.
-            content: the data to be written to the file.
-            mode: access permission mask applied to the
-              file using chmod (e.g. 0o640).
-            change_owner: whether to change the file owner
-              to the _daemon_ user.
-        """
-        # TODO: keep this method to use it also for generating replication configuration files and
-        # move it to an utils / helpers file.
-        # Write the content to the file.
-        with open(path, "w+") as file:
-            file.write(content)
-        # Ensure correct permissions are set on the file.
-        os.chmod(path, mode)
-        if change_owner:
-            self._change_owner(path)
+    def set_max_timelines_history(self) -> None:
+        """Patch the DCS with max_timelines_history limit."""
+        requests.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"max_timelines_history": 50},
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
     def render_patroni_yml_file(
         self,
@@ -739,6 +671,7 @@ class Patroni:
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             synchronous_node_count=self._synchronous_node_count,
+            maximum_lag_on_failover=self.charm.config.durability_maximum_lag_on_failover,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
@@ -749,7 +682,7 @@ class Patroni:
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -768,7 +701,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def patroni_logs(self, num_lines: int | str | None = 10) -> str:
+    def patroni_logs(self, num_lines: int | Literal["all"] = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
 
         Args:
@@ -1103,6 +1036,7 @@ class Patroni:
             r,
             r.elapsed.total_seconds(),
         )
+        r.raise_for_status()
 
     def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
         """Synchronises slots controlled by Patroni with the provided state by removing unneeded slots and creating new ones.
@@ -1163,19 +1097,25 @@ class Patroni:
             else planned_units - 1
         )
 
-    def update_synchronous_node_count(self) -> None:
-        """Update synchronous_node_count to the minority of the planned cluster."""
+    @cached_property
+    def synchronous_configuration(self) -> dict[str, Any]:
+        """Synchronous mode configuration."""
         # Try to update synchronous_node_count.
         member_units = json.loads(self.charm.app_peer_data.get("members_ips", "[]"))
+        return {
+            "synchronous_node_count": self._synchronous_node_count,
+            "synchronous_mode_strict": len(member_units) > 1
+            and self.charm.config.synchronous_mode_strict
+            and self._synchronous_node_count > 0,
+        }
+
+    def update_synchronous_node_count(self) -> None:
+        """Update synchronous_node_count to the minority of the planned cluster."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={
-                        "synchronous_node_count": self._synchronous_node_count,
-                        "synchronous_mode_strict": len(member_units) > 1
-                        and self._synchronous_node_count > 0,
-                    },
+                    json=self.synchronous_configuration,
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,

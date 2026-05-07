@@ -1,3 +1,4 @@
+(charm-versions)=
 # PostgreSQL major versions
 
 Charmed PostgreSQL is available in multiple versions to support different deployment requirements and lifecycle stages. It is shipped in the following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track):
@@ -6,7 +7,7 @@ Charmed PostgreSQL is available in multiple versions to support different deploy
 | Charm name              | Charmhub channel | Type   | Status                                                            |
 | ----------------------- | ---------------- | ------ | ----------------------------------------------------------------- |
 | PostgreSQL 16           | `16/stable`      | modern | ![check] Latest version - new features are released here          |
-| PostgreSQL 14           | `14/stable`      | modern | ![check] In maintenance mode - bug fixes and security updates only |
+| PostgreSQL 14           | `14/stable`      | modern | ![check] In maintenance mode - bug fixes and security updates only. See: [PostgreSQL 14 documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/) |
 | Legacy PostgreSQL charm | `latest/stable`  | legacy | ![cross] Deprecated                                               |
 
 ## Legacy vs. modern

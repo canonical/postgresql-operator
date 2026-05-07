@@ -94,7 +94,7 @@ def patroni(harness, peers_ips):
 
 def test_get_member_ip(peers_ips, patroni):
     with patch(
-        "charm.Patroni.parallel_patroni_get_request", return_value=None
+        "cluster.parallel_patroni_get_request", return_value=None
     ) as _parallel_patroni_get_request:
         # No IP if no members
         assert patroni.get_member_ip(patroni.member_name) is None
@@ -139,7 +139,7 @@ def test_get_patroni_health(peers_ips, patroni):
 
 
 def test_get_postgresql_version(peers_ips, patroni):
-    assert patroni.get_postgresql_version() == "16.11"
+    assert patroni.get_postgresql_version() == "16.13"
 
 
 def test_dict_to_hba_string(harness, patroni):
@@ -163,7 +163,7 @@ def test_dict_to_hba_string(harness, patroni):
 def test_get_primary(peers_ips, patroni):
     with (
         patch(
-            "charm.Patroni.parallel_patroni_get_request", return_value=None
+            "cluster.parallel_patroni_get_request", return_value=None
         ) as _parallel_patroni_get_request,
     ):
         # No primary if no members
@@ -206,7 +206,8 @@ def test_is_creating_backup(peers_ips, patroni):
 def test_is_replication_healthy(peers_ips, patroni):
     with (
         patch("requests.get") as _get,
-        patch("charm.Patroni.get_primary"),
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.Patroni.get_standby_leader") as _get_standby_leader,
         patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
@@ -221,6 +222,17 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=503),
         ]
         assert not patroni.is_replication_healthy()
+
+        # Test no primary
+        _get.side_effect = None
+        _get.return_value.status_code = 200
+        _get_primary.return_value = None
+        _get_standby_leader.return_value = None
+        assert not patroni.is_replication_healthy()
+
+        # Standby leader
+        _get_standby_leader.return_value = "standby"
+        assert patroni.is_replication_healthy()
 
 
 def test_is_member_isolated(peers_ips, patroni):
@@ -243,56 +255,14 @@ def test_is_member_isolated(peers_ips, patroni):
         assert patroni.is_member_isolated
 
 
-def test_render_file(peers_ips, patroni):
-    with (
-        patch("os.chmod") as _chmod,
-        patch("os.chown") as _chown,
-        patch("pwd.getpwnam") as _pwnam,
-        patch("tempfile.NamedTemporaryFile") as _temp_file,
-    ):
-        # Set a mocked temporary filename.
-        filename = "/tmp/temporaryfilename"
-        _temp_file.return_value.name = filename
-        # Setup a mock for the `open` method.
-        mock = mock_open()
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            # Set the uid/gid return values for lookup of 'postgres' user.
-            _pwnam.return_value.pw_uid = 35
-            _pwnam.return_value.pw_gid = 35
-            # Call the method using a temporary configuration file.
-            patroni.render_file(filename, "rendered-content", 0o640)
-
-        # Check the rendered file is opened with "w+" mode.
-        assert mock.call_args_list[0][0] == (filename, "w+")
-        # Ensure that the correct user is lookup up.
-        _pwnam.assert_called_with("_daemon_")
-        # Ensure the file is chmod'd correctly.
-        _chmod.assert_called_with(filename, 0o640)
-        # Ensure the file is chown'd correctly.
-        _chown.assert_called_with(filename, uid=35, gid=35)
-
-        # Test when it's requested to not change the file owner.
-        mock.reset_mock()
-        _pwnam.reset_mock()
-        _chmod.reset_mock()
-        _chown.reset_mock()
-        with patch("builtins.open", mock, create=True):
-            patroni.render_file(filename, "rendered-content", 0o640, change_owner=False)
-        _pwnam.assert_not_called()
-        _chmod.assert_called_once_with(filename, 0o640)
-        _chown.assert_not_called()
-
-
 def test_render_patroni_yml_file(peers_ips, patroni):
     with (
         patch(
             "relations.async_replication.PostgreSQLAsyncReplication.get_partner_addresses",
             return_value=["2.2.2.2", "3.3.3.3"],
-        ) as _get_partner_addresses,
+        ),
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
-        patch("charm.Patroni.render_file") as _render_file,
-        patch("charm.Patroni._create_directory"),
+        patch("cluster.render_file") as _render_file,
         patch(
             "charm.PostgresqlOperatorCharm.listen_ips",
             new_callable=PropertyMock,
@@ -336,6 +306,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_password=rewind_password,
             version=postgresql_version,
             synchronous_node_count=0,
+            maximum_lag_on_failover=1048576,
             raft_password=raft_password,
             patroni_password=patroni_password,
             instance_password_encryption="scram-sha-256",
@@ -358,10 +329,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
 
 def test_start_patroni(peers_ips, patroni):
-    with (
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni._create_directory") as _create_directory,
-    ):
+    with patch("charm.snap.SnapCache") as _snap_cache:
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
@@ -376,10 +344,7 @@ def test_start_patroni(peers_ips, patroni):
 
 
 def test_stop_patroni(peers_ips, patroni):
-    with (
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni._create_directory") as _create_directory,
-    ):
+    with patch("charm.snap.SnapCache") as _snap_cache:
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.stop.side_effect = [None, snap.SnapError]
@@ -479,6 +444,21 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         with pytest.raises(RetryError):
             patroni.update_synchronous_node_count()
             assert False
+
+
+def test_set_max_timelines_history(peers_ips, patroni):
+    with (
+        patch("requests.patch") as _patch,
+    ):
+        patroni.set_max_timelines_history()
+
+        _patch.assert_called_once_with(
+            f"{patroni._patroni_url}/config",
+            json={"max_timelines_history": 50},
+            verify=patroni.verify,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
 
 def test_configure_patroni_on_unit(peers_ips, patroni):

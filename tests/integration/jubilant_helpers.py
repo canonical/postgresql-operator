@@ -1,3 +1,6 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import json
 import logging
 import subprocess
@@ -6,7 +9,6 @@ from enum import Enum
 
 import jubilant
 import psycopg2
-
 from constants import PEER
 
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError

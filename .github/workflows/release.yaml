@@ -18,10 +18,11 @@ on:
 jobs:
   tag:
     name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v49.0.1
     with:
       track: '16'
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to create git tag
 
   ci-tests:
@@ -29,8 +30,16 @@ jobs:
     needs:
       - tag
     uses: ./.github/workflows/ci.yaml
-    secrets: inherit
+    secrets:
+      AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      GCP_ACCESS_KEY: ${{ secrets.GCP_ACCESS_KEY }}
+      GCP_SECRET_KEY: ${{ secrets.GCP_SECRET_KEY }}
+      UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
+      LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
+      LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed for Allure Report
 
   release:
@@ -38,11 +47,12 @@ jobs:
     needs:
       - tag
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v49.0.1
     with:
       track: 16
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
       contents: write  # Needed to create git tags

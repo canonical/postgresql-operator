@@ -44,6 +44,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "durability_synchronous_commit": [test_string, "on"]
         },  # config option is one of `on`, `remote_apply` or `remote_write`
+        {"durability-maximum-lag-on-failover": ["-1", "1024"]},  # config option is integer
         {
             "instance_default_text_search_config": [test_string, "pg_catalog.simple"]
         },  # config option is validated against the db
@@ -115,6 +116,8 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
         {
             "optimizer_parallel_tuple_cost": ["-1", "0.1"]
         },  # config option is between 0 and 1.80E+308
+        {"optimizer-pg-stat-statements-track": [test_string, "top"]},
+        {"optimizer-track-functions": [test_string, "all"]},
         {"profile": [test_string, "testing"]},  # config option is one of `testing` or `production`
         {"profile_limit_memory": ["127", "128"]},  # config option is between 128 and 9999999
         {

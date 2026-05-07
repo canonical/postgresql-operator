@@ -1,4 +1,5 @@
-# Migrate data
+(data-migration)=
+# How to migrate data
 
 For guidance about moving data from a Charmed PostgreSQL 14 database to Charmed PostgreSQL 16, start here:
 

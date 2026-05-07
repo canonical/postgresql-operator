@@ -293,7 +293,7 @@ class PostgreSQLAsyncReplication(Object):
             }.items():
                 databag = relation_data[app]
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
-                if relation_promoted_cluster_counter > promoted_cluster_counter:
+                if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
         return primary_cluster
@@ -465,12 +465,23 @@ class PostgreSQLAsyncReplication(Object):
             return False
 
         relation = self._relation
+        if relation is None:
+            event.fail("Replication relation not found")
+            return False
+
+        # Ensure the relation has at least one remote unit before trying to process unit data.
+        remote_units = [unit for unit in relation.units if unit.app == relation.app]
+        if len(remote_units) == 0:
+            event.fail(
+                "All units from the other cluster must publish their unit addresses in the relation data."
+            )
+            return False
 
         # Check if all units from the other cluster published their IPs in the relation data.
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
-        for unit in relation.units:  # type: ignore
-            if "unit-address" not in relation.data[unit]:  # type: ignore
+        for unit in remote_units:
+            if "unit-address" not in relation.data[unit]:
                 event.fail(
                     "All units from the other cluster must publish their unit addresses in the relation data."
                 )
@@ -673,10 +684,18 @@ class PostgreSQLAsyncReplication(Object):
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
         if relation := self._relation:
+            relation_unit = next(
+                (unit for unit in relation.units if unit.app == relation.app), None
+            )
+            if relation_unit is None:
+                logger.debug(
+                    "Skipping re-emitting relation-changed event: no related units found yet."
+                )
+                return
             getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
                 relation,
                 app=relation.app,
-                unit=next(unit for unit in relation.units if unit.app == relation.app),
+                unit=relation_unit,
             )
 
     def _reinitialise_pgdata(self) -> None:
@@ -816,7 +835,7 @@ class PostgreSQLAsyncReplication(Object):
         async_relation = self._relation
 
         if promoted_cluster_counter is not None:
-            for relation in [async_relation, self.charm._peers]:  # type: ignore
+            for relation in [async_relation, self.charm._peers]:
                 relation.data[self.charm.app].update({  # type: ignore
                     "promoted-cluster-counter": str(promoted_cluster_counter)
                 })
@@ -827,8 +846,9 @@ class PostgreSQLAsyncReplication(Object):
         # Retrieve the secrets that will be shared between the clusters.
         if async_relation.name == REPLICATION_OFFER_RELATION:  # type: ignore
             secret = self._get_secret()
-            secret.grant(async_relation)  # type: ignore
-            primary_cluster_data["secret-id"] = secret.id  # type: ignore
+            if secret is not None:
+                secret.grant(async_relation)  # type: ignore
+                primary_cluster_data["secret-id"] = secret.id
 
         if system_identifier is not None:
             primary_cluster_data["system-id"] = system_identifier

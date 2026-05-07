@@ -26,10 +26,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Check libs
         uses: canonical/charming-actions/check-libraries@2.7.0
         with:
-          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+          credentials: ''  # `charmcraft fetch-lib` no longer requires authentication; but action still requires input
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-
+    permissions:
+      pull-requests: write  # Add label to prs

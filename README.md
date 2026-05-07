@@ -3,7 +3,6 @@
 [![CharmHub Badge](https://charmhub.io/postgresql/badge.svg)](https://charmhub.io/postgresql)
 [![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/canonical/postgresql-operator/graph/badge.svg?token=4V2mu7aWmu)](https://codecov.io/gh/canonical/postgresql-operator)
 
 
 This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines via the [Juju orchestration engine](https://juju.is/).
@@ -74,19 +73,6 @@ juju remove-unit postgresql <name_of_unit_1> <name_of_unit_2>
 ```
 
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
-
-### Password rotation
-
-#### Charm users
-
-To rotate the password of users internal to the Charmed PostgreSQL operator, use the `set-password` action as follows:
-
-```shell
-juju run postgresql/leader set-password username=<user> password=<password>
-```
-
->[!NOTE]
->Currently, internal users are `operator`, `replication`, `backup` and `rewind`. These users should not be used outside the operator.
 
 #### Integrated (related) application users
 

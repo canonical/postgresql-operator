@@ -1,10 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from unittest.mock import (
-    MagicMock,
-    patch,
-)
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from charms.glauth_k8s.v0.ldap import LdapProviderData
@@ -53,24 +50,28 @@ def test_on_ldap_unavailable(harness):
 
 
 def test_get_relation_data(harness):
-    mock_data = LdapProviderData(
-        auth_method="simple",
-        base_dn="dc=example,dc=net",
-        bind_dn="cn=serviceuser,dc=example,dc=net",
-        bind_password="password",
-        bind_password_secret=None,
-        starttls=False,
-        ldaps_urls=[],
-        urls=[],
-    )
+    with patch("charm.PostgresqlOperatorCharm.model", new_callable=PropertyMock()) as _model:
+        mock_data = LdapProviderData(
+            auth_method="simple",
+            base_dn="dc=example,dc=net",
+            bind_dn="cn=serviceuser,dc=example,dc=net",
+            bind_password="password",
+            bind_password_secret="secret_id",
+            starttls=False,
+            ldaps_urls=[],
+            urls=[],
+        )
 
-    mock_data_dict = mock_data.model_dump(exclude_none=True)
-    mock_data_dict["bind_password"] = mock_data.bind_password
+        mock_data_dict = mock_data.model_dump(exclude_none=True)
 
-    assert harness.charm.ldap.get_relation_data() is None
+        _model.get_secret.return_value.get_content.return_value = {
+            "password": mock_data.bind_password
+        }
 
-    with harness.hooks_disabled():
-        ldap_relation_id = harness.add_relation("ldap", "glauth-k8s")
-        harness.update_relation_data(ldap_relation_id, "glauth-k8s", mock_data_dict)
+        assert harness.charm.ldap.get_relation_data() is None
 
-    assert harness.charm.ldap.get_relation_data() == mock_data
+        with harness.hooks_disabled():
+            ldap_relation_id = harness.add_relation("ldap", "glauth-k8s")
+            harness.update_relation_data(ldap_relation_id, "glauth-k8s", mock_data_dict)
+
+        assert harness.charm.ldap.get_relation_data() == mock_data

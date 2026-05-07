@@ -43,7 +43,7 @@ backends:
       CONCIERGE_EXTRA_SNAPS: charmcraft
       CONCIERGE_EXTRA_DEBS: pipx
     systems:
-      - ubuntu-24.04:
+      - ubuntu-22.04:
           username: runner
     prepare: |
       systemctl disable --now unattended-upgrades.service
@@ -76,15 +76,15 @@ backends:
     allocate: |
       sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
       PasswordAuthentication yes
-      PermitEmptyPasswords yes
       EOF
 
-      sudo passwd -d runner
+      echo "runner:$SPREAD_PASSWORD" | sudo chpasswd
+
+      # Remove the preinstalled lxd
+      sudo snap remove --purge --terminate lxd
 
       ADDRESS localhost
 
-      sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
-      sudo mount --bind /mnt /var/snap/lxd/common/lxd/storage-pools
     # HACK: spread does not pass environment variables set on runner
     # Manually pass specific environment variables
     environment:
@@ -97,7 +97,7 @@ backends:
       LANDSCAPE_ACCOUNT_NAME: '$(HOST: echo $LANDSCAPE_ACCOUNT_NAME)'
       LANDSCAPE_REGISTRATION_KEY: '$(HOST: echo $LANDSCAPE_REGISTRATION_KEY)'
     systems:
-      - ubuntu-24.04:
+      - ubuntu-22.04:
           username: runner
       - ubuntu-24.04-arm:
           username: runner

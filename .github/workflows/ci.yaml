@@ -20,15 +20,49 @@ on:
   workflow_dispatch:
   # Triggered on push by .github/workflows/release.yaml
   workflow_call:
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      GCP_ACCESS_KEY:
+        required: true
+      GCP_SECRET_KEY:
+        required: true
+      UBUNTU_PRO_TOKEN:
+        required: true
+      LANDSCAPE_ACCOUNT_NAME:
+        required: true
+      LANDSCAPE_REGISTRATION_KEY:
+        required: true
     outputs:
       artifact-prefix:
         description: build_charm.yaml `artifact-prefix` output
         value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
+  lint-workflows:
+    name: Lint .github/workflows/
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v49.0.1
+    permissions:
+      contents: read
+
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v40.0.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
+      - name: tox run -e lint
+        run: tox run -e lint
+    permissions: {}
 
   unit-test:
     name: Unit test charm
@@ -37,16 +71,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Install tox & poetry
         run: |
           pipx install tox
           pipx install poetry
       - name: Run tests
         run: tox run -e unit
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    permissions: {}
 
   alert-test:
     name: Test Prometheus Alert Rules
@@ -55,26 +88,40 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Install prometheus snap
         run: sudo snap install prometheus
       - name: Check validity of prometheus alert rules
         run: promtool check rules src/prometheus_alert_rules/*
       - name: Run unit tests for prometheus alert rules
         run: promtool test rules tests/alerts/*.yaml
+    permissions: {}
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
+      contents: read
 
   integration-test:
     name: Integration test charm
     needs:
+      - lint-workflows
       - lint
       - unit-test
       - build
     uses: ./.github/workflows/integration_test.yaml
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-    secrets: inherit
+    secrets:
+      AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      GCP_ACCESS_KEY: ${{ secrets.GCP_ACCESS_KEY }}
+      GCP_SECRET_KEY: ${{ secrets.GCP_SECRET_KEY }}
+      UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
+      LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
+      LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
       contents: write  # Needed for Allure Report

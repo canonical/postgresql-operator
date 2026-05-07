@@ -230,9 +230,6 @@ def test_on_config_changed(harness):
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
-        ) as _updated_synchronous_node_count,
-        patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
         patch(
@@ -261,7 +258,6 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         assert not _update_config.called
         _validate_config_options.side_effect = None
-        _updated_synchronous_node_count.assert_called_once_with()
 
         # Test after the cluster was initialised.
         with harness.hooks_disabled():
@@ -362,178 +358,6 @@ def test_enable_disable_extensions(harness, caplog):
         postgresql_mock.reset_mock()
         postgresql_mock.enable_disable_extensions.side_effect = None
         with caplog.at_level(logging.ERROR):
-            config = """options:
-  synchronous_node_count:
-    type: string
-    default: "all"
-  # logical_replication_subscription_request:
-  #   type: string
-  #   default: "{}"
-  plugin_citext_enable:
-    default: false
-    type: boolean
-  plugin_hstore_enable:
-    default: false
-    type: boolean
-  plugin_pg_trgm_enable:
-    default: false
-    type: boolean
-  plugin_plpython3u_enable:
-    default: false
-    type: boolean
-  plugin_unaccent_enable:
-    default: false
-    type: boolean
-  plugin_debversion_enable:
-    default: false
-    type: boolean
-  plugin_bloom_enable:
-    default: false
-    type: boolean
-  plugin_btree_gin_enable:
-    default: false
-    type: boolean
-  plugin_btree_gist_enable:
-    default: false
-    type: boolean
-  plugin_cube_enable:
-    default: false
-    type: boolean
-  plugin_dict_int_enable:
-    default: false
-    type: boolean
-  plugin_dict_xsyn_enable:
-    default: false
-    type: boolean
-  plugin_earthdistance_enable:
-    default: false
-    type: boolean
-  plugin_fuzzystrmatch_enable:
-    default: false
-    type: boolean
-  plugin_intarray_enable:
-    default: false
-    type: boolean
-  plugin_isn_enable:
-    default: false
-    type: boolean
-  plugin_lo_enable:
-    default: false
-    type: boolean
-  plugin_ltree_enable:
-    default: false
-    type: boolean
-  plugin_old_snapshot_enable:
-    default: false
-    type: boolean
-  plugin_pg_freespacemap_enable:
-    default: false
-    type: boolean
-  plugin_pgrowlocks_enable:
-    default: false
-    type: boolean
-  plugin_pgstattuple_enable:
-    default: false
-    type: boolean
-  plugin_pg_visibility_enable:
-    default: false
-    type: boolean
-  plugin_seg_enable:
-    default: false
-    type: boolean
-  plugin_tablefunc_enable:
-    default: false
-    type: boolean
-  plugin_tcn_enable:
-    default: false
-    type: boolean
-  plugin_tsm_system_rows_enable:
-    default: false
-    type: boolean
-  plugin_tsm_system_time_enable:
-    default: false
-    type: boolean
-  plugin_uuid_ossp_enable:
-    default: false
-    type: boolean
-  plugin_spi_enable:
-    default: false
-    type: boolean
-  plugin_bool_plperl_enable:
-    default: false
-    type: boolean
-  plugin_hll_enable:
-    default: false
-    type: boolean
-  plugin_hypopg_enable:
-    default: false
-    type: boolean
-  plugin_ip4r_enable:
-    default: false
-    type: boolean
-  plugin_plperl_enable:
-    default: false
-    type: boolean
-  plugin_jsonb_plperl_enable:
-    default: false
-    type: boolean
-  plugin_orafce_enable:
-    default: false
-    type: boolean
-  plugin_pg_similarity_enable:
-    default: false
-    type: boolean
-  plugin_prefix_enable:
-    default: false
-    type: boolean
-  plugin_rdkit_enable:
-    default: false
-    type: boolean
-  plugin_tds_fdw_enable:
-    default: false
-    type: boolean
-  plugin_icu_ext_enable:
-    default: false
-    type: boolean
-  plugin_pltcl_enable:
-    default: false
-    type: boolean
-  plugin_postgis_enable:
-    default: false
-    type: boolean
-  plugin_postgis_raster_enable:
-    default: false
-    type: boolean
-  plugin_address_standardizer_enable:
-    default: false
-    type: boolean
-  plugin_address_standardizer_data_us_enable:
-    default: false
-    type: boolean
-  plugin_postgis_tiger_geocoder_enable:
-    default: false
-    type: boolean
-  plugin_postgis_topology_enable:
-    default: false
-    type: boolean
-  plugin_vector_enable:
-    default: false
-    type: boolean
-  plugin_timescaledb_enable:
-    default: false
-    type: boolean
-  plugin_audit_enable:
-    default: true
-    type: boolean
-  profile:
-    default: production
-    type: string"""
-            new_harness = Harness(PostgresqlOperatorCharm, config=config)
-            new_harness.cleanup()
-            new_harness.begin()
-            new_harness.charm.enable_disable_extensions()
-            assert postgresql_mock.enable_disable_extensions.call_count == 1
-
             # Block if extension-dependent object error is raised
             postgresql_mock.reset_mock()
             postgresql_mock.enable_disable_extensions.side_effect = [
@@ -1838,18 +1662,21 @@ def test_config_validation_invalid_worker_values(harness):
     # Pydantic should reject this
     assert "validation error" in str(e.value).lower()
 
-    # Test negative number - should be accepted at config level but fail during calculation
+    # Test negative number
     with harness.hooks_disabled():
         harness.update_config({"cpu-max-worker-processes": "-5"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
-    # The config should accept it (as it gets validated later in the calculation method)
-    assert harness.charm.config.cpu_max_worker_processes == -5
+    with pytest.raises(ValueError) as e:
+        _ = harness.charm.config
+
+    # Pydantic should reject this
+    assert "validation error" in str(e.value).lower()
 
     # Test value less than 2 - should be accepted at config level but fail during calculation
     with harness.hooks_disabled():
-        harness.update_config({"cpu-max-parallel-workers": "7"})
+        harness.update_config({"cpu-max-worker-processes": "2", "cpu-max-parallel-workers": "7"})
     with contextlib.suppress(AttributeError):
         del harness.charm.config
 
@@ -2177,7 +2004,7 @@ def test_update_member_ip(harness):
 def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.Patroni.render_file") as _render_file,
+        patch("charm.render_file") as _render_file,
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
         patch(

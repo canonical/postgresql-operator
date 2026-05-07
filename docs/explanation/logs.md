@@ -1,6 +1,7 @@
+(logs)=
 # Logs
 
-The list of all the charm components are well described in the [](/explanation/architecture).
+The list of all the charm components are well described in {ref}`architecture`.
 
 It is a dedicated section to highlight logs for each component to simplify troubleshooting.
 
