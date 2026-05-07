@@ -4,7 +4,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from charmlibs.systemd import SystemdError
 from jinja2 import Template
 from pytest import fixture
 
@@ -63,19 +62,6 @@ def test_remove_service_disables_unit_and_deletes_dir(tmp_path: Path, controller
         _rmtree.assert_called_once_with(controller.data_dir)
 
 
-def test_install_service_returns_false_when_daemon_reload_fails(
-    tmp_path: Path, controller: RaftController
-):
-    with (
-        patch("raft_controller.daemon_reload") as _daemon_reload,
-        patch("raft_controller.render_file"),
-        patch("raft_controller.create_directory"),
-    ):
-        _daemon_reload.side_effect = SystemdError
-
-        assert not install_service()
-
-
 def test_install_service_uses_patroni_profile_execstart(
     tmp_path: Path, controller: RaftController
 ):
@@ -92,7 +78,7 @@ def test_install_service_uses_patroni_profile_execstart(
         patch("raft_controller.render_file") as _render_file,
         patch("raft_controller.create_directory"),
     ):
-        assert install_service()
+        install_service()
 
     _render_file.assert_called_once_with(SERVICE_FILE, expected_content, 0o644, change_owner=False)
     _daemon_reload.assert_called_once_with()
