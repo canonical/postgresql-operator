@@ -667,112 +667,22 @@ def test_ensure_storage_layout(harness, tmp_path):
     assert not (tmp_path / "logs").exists()
 
 
-def test_ensure_temp_tablespace_location_recovers_dropped_tablespace(harness, tmp_path):
-    """If the tablespace was previously dropped but TEMP_DATA_DIR exists, recreate it."""
-    temp_data_dir = tmp_path / "temp" / "16" / "main"
-    temp_data_dir.mkdir(parents=True)
-    stale_pg_dir = temp_data_dir / "PG_16_202307071"
-    stale_pg_dir.mkdir()
-
-    connection = MagicMock()
-    cursor = MagicMock()
-    cursor.fetchone.return_value = None  # tablespace was previously dropped
-    connection.cursor.return_value = cursor
-    postgresql = MagicMock()
-    postgresql._connect_to_database.return_value = connection
-
+def test_migrate_temp_tablespace_location_skips_when_not_primary(harness):
+    """If the unit is not primary, the migration is skipped."""
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.postgresql",
+            "charm.PostgresqlOperatorCharm.is_primary",
             new_callable=PropertyMock,
-            return_value=postgresql,
+            return_value=False,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
     ):
-        assert harness.charm._ensure_temp_tablespace_location()
+        result = harness.charm._migrate_temp_tablespace_location()
 
-    # Stale PG version directory should have been removed
-    assert not stale_pg_dir.exists()
-    cursor.execute.assert_has_calls([
-        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
-        call(f"CREATE TABLESPACE temp LOCATION '{temp_data_dir}';"),
-        call("GRANT CREATE ON TABLESPACE temp TO public;"),
-    ])
+    assert result is True
 
 
-def test_ensure_temp_tablespace_location_reinitialises_after_tmpfs_wipe(harness, tmp_path):
-    """If tablespace dir is empty (tmpfs wipe), DROP+CREATE to reinitialise it."""
-    temp_data_dir = tmp_path / "temp" / "16" / "main"
-    temp_data_dir.mkdir(parents=True)
-    # No PG_version/ directory — simulates an empty dir after tmpfs wipe
-
-    connection = MagicMock()
-    cursor = MagicMock()
-    cursor.fetchone.return_value = (str(temp_data_dir),)  # tablespace exists at correct location
-    connection.cursor.return_value = cursor
-    postgresql = MagicMock()
-    postgresql._connect_to_database.return_value = connection
-
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.postgresql",
-            new_callable=PropertyMock,
-            return_value=postgresql,
-        ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
-    ):
-        assert harness.charm._ensure_temp_tablespace_location()
-
-    cursor.execute.assert_has_calls([
-        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
-        call("DROP TABLESPACE temp;"),
-        call(f"CREATE TABLESPACE temp LOCATION '{temp_data_dir}';"),
-        call("GRANT CREATE ON TABLESPACE temp TO public;"),
-    ])
-
-
-def test_ensure_temp_tablespace_location_skips_reinit_when_pg_dir_present(harness, tmp_path):
-    """If PG_version/ already exists in tablespace dir, no DROP+CREATE is performed."""
-    temp_data_dir = tmp_path / "temp" / "16" / "main"
-    temp_data_dir.mkdir(parents=True)
-    (temp_data_dir / "PG_16_202307071").mkdir()  # directory already initialised
-
-    connection = MagicMock()
-    cursor = MagicMock()
-    cursor.fetchone.return_value = (str(temp_data_dir),)
-    connection.cursor.return_value = cursor
-    postgresql = MagicMock()
-    postgresql._connect_to_database.return_value = connection
-
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.postgresql",
-            new_callable=PropertyMock,
-            return_value=postgresql,
-        ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
-    ):
-        assert harness.charm._ensure_temp_tablespace_location()
-
-    # Only the SELECT should have been executed — no DROP/CREATE
-    cursor.execute.assert_called_once_with(
-        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
-    )
-
-
-def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
-    """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
-    temp_root = tmp_path / "temp" / "16" / "main"
-    with (
-        patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.shutil"),
-    ):
-        harness.charm._ensure_storage_layout()
-    assert temp_root.is_dir()
-
-
-def test_ensure_temp_tablespace_location_if_primary_skips_when_no_endpoint(harness):
-    """If primary_endpoint is not yet set, the tablespace check is skipped (not deferred)."""
+def test_migrate_temp_tablespace_location_skips_when_no_endpoint(harness):
+    """If primary_endpoint is not yet set, the migration is skipped."""
     with (
         patch(
             "charm.PostgresqlOperatorCharm.is_primary",
@@ -784,14 +694,199 @@ def test_ensure_temp_tablespace_location_if_primary_skips_when_no_endpoint(harne
             new_callable=PropertyMock,
             return_value=None,
         ),
-        patch(
-            "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location"
-        ) as _ensure_temp_tablespace_location,
     ):
-        result = harness.charm._ensure_temp_tablespace_location_if_primary()
+        result = harness.charm._migrate_temp_tablespace_location()
 
     assert result is True
-    _ensure_temp_tablespace_location.assert_not_called()
+
+
+def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_path):
+    """When temp tablespace is at old TEMP_STORAGE_PATH, it is migrated to TEMP_DATA_DIR."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_storage_path = str(tmp_path / "temp")
+    temp_data_dir.mkdir(parents=True)
+    stale_pg_dir = temp_data_dir / "PG_16_202307071"
+    stale_pg_dir.mkdir()
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (temp_storage_path,)  # still at old path
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    # Stale PG version directory should have been removed before CREATE
+    assert not stale_pg_dir.exists()
+    cursor.execute.assert_has_calls([
+        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
+        call("DROP TABLESPACE temp;"),
+        call(f"CREATE TABLESPACE temp LOCATION '{temp_data_dir}';"),
+        call("GRANT CREATE ON TABLESPACE temp TO public;"),
+    ])
+
+
+def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(harness, tmp_path):
+    """When temp tablespace is already at TEMP_DATA_DIR, no migration is performed."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_data_dir.mkdir(parents=True)
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (str(temp_data_dir),)  # already at versioned path
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    # Only the SELECT should have been executed — no DROP/CREATE
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+
+
+def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness, tmp_path):
+    """When the tablespace doesn't exist in pg_catalog, no migration is needed."""
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = None  # tablespace was never created or already dropped
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    # Only the SELECT should have been executed
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+
+
+def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness, tmp_path):
+    """When the tablespace is at an unexpected location, migration is skipped with a warning."""
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = ("/some/unexpected/path",)
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.logger") as logger,
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+    logger.warning.assert_called_once()
+
+
+def test_migrate_temp_tablespace_location_returns_false_on_db_error(harness):
+    """When a psycopg2 error occurs, the method returns False."""
+    postgresql = MagicMock()
+    postgresql._connect_to_database.side_effect = psycopg2.Error("connection failed")
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+    ):
+        assert not harness.charm._migrate_temp_tablespace_location()
+
+
+def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
+    """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
+    temp_root = tmp_path / "temp" / "16" / "main"
+    with (
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil"),
+    ):
+        harness.charm._ensure_storage_layout()
+    assert temp_root.is_dir()
 
 
 def test_on_update_status(harness):
@@ -829,9 +924,6 @@ def test_on_update_status(harness):
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
         patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
-        patch(
-            "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location", return_value=True
-        ) as _ensure_temp_tablespace_location,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test before the cluster is initialised.
@@ -876,11 +968,9 @@ def test_on_update_status(harness):
                 {"cluster_initialised": "True", "restoring-backup": "", "restore-to-time": ""},
             )
         harness.charm.unit.status = ActiveStatus()
-        _ensure_temp_tablespace_location.reset_mock()
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
         _reconfigure_cluster.assert_called_once()
-        _ensure_temp_tablespace_location.assert_called_once()
 
         # Test call to restart when the member is isolated from the cluster.
         _set_primary_status_message.reset_mock()
@@ -917,35 +1007,6 @@ def test_on_update_status_skips_remainder_when_reconfigure_cluster_fails(harness
         _oversee_users.assert_not_called()
 
 
-def test_on_update_status_skips_remainder_when_temp_tablespace_migration_fails(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm._can_run_on_update_status", return_value=True),
-        patch("charm.PostgresqlOperatorCharm._handle_processes_failures", return_value=False),
-        patch("charm.PostgresqlOperatorCharm._reconfigure_cluster", return_value=True),
-        patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-            return_value="10.0.0.1",
-        ),
-        patch(
-            "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location", return_value=False
-        ) as _ensure_temp_tablespace_location,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
-    ):
-        with harness.hooks_disabled():
-            harness.set_leader()
-
-        harness.charm.on.update_status.emit()
-
-        _ensure_temp_tablespace_location.assert_called_once()
-        _oversee_users.assert_not_called()
-
-
 def test_on_update_status_after_restore_operation(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer"),
@@ -978,7 +1039,6 @@ def test_on_update_status_after_restore_operation(harness):
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
         patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
-        patch("charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location", return_value=True),
     ):
         _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
@@ -2048,10 +2108,6 @@ def test_on_peer_relation_changed(harness):
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.start_patroni") as _start_patroni,
-        patch(
-            "charm.PostgresqlOperatorCharm._ensure_temp_tablespace_location_if_primary",
-            return_value=True,
-        ) as _ensure_temp_tablespace_location_if_primary,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster") as _reconfigure_cluster,
@@ -2096,7 +2152,6 @@ def test_on_peer_relation_changed(harness):
         _reconfigure_cluster.assert_called_once_with(mock_event)
         _update_config.assert_called_once()
         _start_patroni.assert_called_once()
-        _ensure_temp_tablespace_location_if_primary.assert_called_once()
         _update_new_unit_status.assert_called_once()
 
         # Test when the unit fails to update the Patroni configuration.

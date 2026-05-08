@@ -470,7 +470,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
             )
         else:
-            self._ensure_temp_tablespace_location_if_primary()
+            self._migrate_temp_tablespace_location()
             try:
                 self._patroni.set_max_timelines_history()
             except Exception:
@@ -702,14 +702,41 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 if entry.name.startswith("PG_"):
                     shutil.rmtree(entry)
 
-    def _ensure_temp_tablespace_location(self) -> bool:
-        """Ensure the temp tablespace points to the versioned temp directory.
+    def _migrate_temp_tablespace_location(self) -> bool:
+        """One-shot migration of the temp tablespace to the versioned directory.
 
-        DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction block, so this
-        method avoids using the connection as a context manager (which would create one in
-        psycopg2).  Instead it uses plain assignments and explicit close(), mirroring the
-        pattern in the single_kernel_postgresql set_up_database helper.
+        During a snap upgrade, the snap hooks migrate temp data from the old
+        non-versioned storage root (TEMP_STORAGE_PATH) to the versioned
+        subdirectory (TEMP_DATA_DIR).  This method updates the PostgreSQL catalog
+        entry to match.
+
+        Other temp tablespace recovery scenarios (missing catalog entry after a
+        partially-failed migration, empty directory after a tmpfs wipe) are
+        handled by the single-kernel library's set_up_database during the
+        leader-elected event.
+
+        DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction
+        block, so this method avoids using the connection as a context manager
+        (which would create one in psycopg2).  Instead it uses plain assignments
+        and explicit close(), mirroring the pattern in the single_kernel_postgresql
+        set_up_database helper.
         """
+        if not self.is_primary:
+            return True
+
+        if not self.primary_endpoint:
+            logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
+            return True
+
+        # Do not migrate the temp tablespace while cross-cluster async replication is
+        # active.  The DROP/CREATE TABLESPACE generates WAL that is streamed to the
+        # standby cluster.  If the standby has not been upgraded to the versioned
+        # storage layout yet, it will not have the TEMP_DATA_DIR directory, causing
+        # PostgreSQL to crash with "FATAL: directory does not exist" during WAL replay.
+        if self.async_replication._relation is not None:
+            logger.debug("Skipping temp tablespace migration while async replication is active")
+            return True
+
         connection = None
         cursor = None
         try:
@@ -722,32 +749,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             row = cursor.fetchone()
             if row is None:
-                # The tablespace may have been dropped by a previous partially-failed
-                # migration (DROP succeeded, CREATE failed).  If the versioned directory
-                # already exists, recreate the tablespace there.
-                pg_data_dir = Path(TEMP_DATA_DIR)
-                if pg_data_dir.exists():
-                    self._clear_pg_version_dirs(pg_data_dir)
-                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
-                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+                # Tablespace was already dropped by a previous migration or was
+                # never created (e.g. fresh deploy).  Nothing to migrate.
                 return True
 
             current_location = row[0]
             if current_location == TEMP_DATA_DIR:
-                # After a tmpfs wipe TEMP_DATA_DIR is recreated empty.  PostgreSQL will
-                # not be able to use the tablespace until its internal PG_<ver>_<catver>/
-                # directory structure has been recreated.  Detect this and reinitialise
-                # by dropping and recreating the tablespace.
-                pg_data_dir = Path(TEMP_DATA_DIR)
-                if pg_data_dir.exists() and not any(
-                    d.is_dir() and d.name.startswith("PG_") for d in pg_data_dir.iterdir()
-                ):
-                    logger.info(
-                        "Temp tablespace directory is empty after tmpfs wipe; reinitialising"
-                    )
-                    cursor.execute("DROP TABLESPACE temp;")
-                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
-                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+                # Already at the versioned path.  Nothing to migrate.
                 return True
 
             if current_location != TEMP_STORAGE_PATH:
@@ -779,26 +787,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 connection.close()
 
         return True
-
-    def _ensure_temp_tablespace_location_if_primary(self) -> bool:
-        """Ensure the temp tablespace is migrated when this unit is the primary."""
-        if not self.is_primary:
-            return True
-
-        if not self.primary_endpoint:
-            logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
-            return True
-
-        # Do not migrate the temp tablespace while cross-cluster async replication is
-        # active.  The DROP/CREATE TABLESPACE generates WAL that is streamed to the
-        # standby cluster.  If the standby has not been upgraded to the versioned
-        # storage layout yet, it will not have the TEMP_DATA_DIR directory, causing
-        # PostgreSQL to crash with "FATAL: directory does not exist" during WAL replay.
-        if self.async_replication._relation is not None:
-            logger.debug("Skipping temp tablespace migration while async replication is active")
-            return True
-
-        return self._ensure_temp_tablespace_location()
 
     @cached_property
     def postgresql(self) -> PostgreSQL:
@@ -1152,10 +1140,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self._start_stop_pgbackrest_service(event)
-
-        if not self._ensure_temp_tablespace_location_if_primary():
-            event.defer()
-            return
 
         if not self._handle_s3_initialization(event):
             return
@@ -2196,9 +2180,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
-            return
-
-        if not self._ensure_temp_tablespace_location_if_primary():
             return
 
         self.postgresql_client_relation.oversee_users()
