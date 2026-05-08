@@ -1,0 +1,56 @@
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  self-signed-certificates/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: Primary
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:30:40Z
+
+App                       Version  Status  Scale  Charm                     Channel   Rev  Exposed  Message
+postgresql                14.22    active      3  postgresql                            0  no       
+self-signed-certificates           active      1  self-signed-certificates  1/stable  586  no       
+
+Unit                         Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*                active    idle   0        10.173.157.121  5432/tcp  
+postgresql/1                 active    idle   1        10.173.157.161  5432/tcp  Primary
+postgresql/2                 active    idle   2        10.173.157.109  5432/tcp  
+self-signed-certificates/0*  active    idle   3        10.173.157.182            
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.173.157.121  juju-bc93be-0  ubuntu@22.04  runnervmrc6n4  Running
+1        started  10.173.157.161  juju-bc93be-1  ubuntu@22.04  runnervmrc6n4  Running
+2        started  10.173.157.109  juju-bc93be-2  ubuntu@22.04  runnervmrc6n4  Running
+3        started  10.173.157.182  juju-bc93be-3  ubuntu@24.04  runnervmrc6n4  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:22:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:22:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:23:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:23:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:24:01 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb5cd0c10c0 state=finished raised Exception>]
+unit-postgresql-0: 00:24:13 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 00:24:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:24:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
