@@ -114,6 +114,7 @@ from constants import (
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_DIR,
     RAFT_PASSWORD_KEY,
+    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
@@ -139,6 +140,7 @@ from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
+from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 from utils import label2name, new_password, render_file
 
@@ -363,6 +365,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, PEER)
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
+        self.watcher_offer = PostgreSQLWatcherRelation(self)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -439,7 +442,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._ensure_storage_layout()
 
         if not self._patroni.start_patroni():
-            self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
+            self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
 
         self._setup_exporter()
@@ -897,7 +900,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # checked for none in the early exit method
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self._patroni.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(member_ip)
+                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -1041,6 +1044,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
+                self.watcher_offer.disable_watcher()
+                if self.watcher_offer.is_active:
+                    logger.info("waiting for RAFT watcher to disconnect.")
+                    return
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_stopped_check()
@@ -1141,20 +1148,53 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not self._check_member_registration(event):
+            return
+
         self._start_stop_pgbackrest_service(event)
 
         if not self._ensure_temp_tablespace_location_if_primary():
             event.defer()
             return
 
-        # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
+        if not self._handle_s3_initialization(event):
+            return
+
+        self._update_new_unit_status()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _check_member_registration(self, event: HookEvent) -> bool:
+        """Check and ensure the member is registered in the Raft/replication cluster.
+
+        Returns:
+            True if processing should continue, False if we should return early.
+        """
+        if (
+            self.watcher_offer.is_watcher_connected
+            and not self._patroni.is_member_registered_in_cluster()
+        ):
+            logger.info("Member running but not registered in Raft cluster - restarting Patroni")
+            self._patroni.restart_patroni()
+            event.defer()
+            return False
+        return True
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _handle_s3_initialization(self, event: HookEvent) -> bool:
+        """Handle S3 initialization during peer relation changes.
+
+        Returns:
+            True if processing should continue, False if we should return early.
+        """
+        # This is intended to be executed only when leader is reinitializing S3 connection
+        # due to the leader change.
         if (
             "s3-initialization-start" in self.app_peer_data
             and "s3-initialization-done" not in self.unit_peer_data
             and self.is_primary
             and not self.backup._on_s3_credential_changed_primary(event)
         ):
-            return
+            return False
 
         # Clean-up unit initialization data after successful sync to the leader.
         if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
@@ -1165,7 +1205,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "s3-initialization-start": "",
             })
 
-        self._update_new_unit_status()
+        return True
 
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         """Handle the secret_changed event."""
@@ -1203,6 +1243,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
+            # Update watcher relation with current cluster endpoints
+            self.watcher_offer.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
@@ -1220,7 +1262,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
-                self._patroni.remove_raft_member(ip_to_remove)
+                self._patroni.remove_raft_member(f"{ip_to_remove}:{RAFT_PORT}")
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
@@ -1255,6 +1297,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.update({"ip": current_ip})
             self._patroni.stop_patroni()
             self._update_certificate()
+            # Update watcher relation - unit address for all units, endpoints only for leader
+            self.watcher_offer.update_unit_address()
+            if self.unit.is_leader():
+                self.watcher_offer.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -2175,6 +2221,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        # Keep this unit data current for watcher AZ/IP checks.
+        self.watcher_offer.update_unit_address()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()
