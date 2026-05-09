@@ -121,10 +121,7 @@ async def verify_raft_cluster_health(
                 # Verify quorum
                 assert status["has_quorum"] is True, f"Unit {unit.name} does not have Raft quorum"
 
-                assert (
-                    len([key for key in status if key.startswith(RAFT_PARTNER_PREFIX)])
-                    == expected_members
-                )
+                assert status["partner_nodes_count"] + 1 == expected_members
 
                 # Verify watcher is in the cluster (if requested)
                 # After network isolation tests, the watcher may have been redeployed
