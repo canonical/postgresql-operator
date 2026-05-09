@@ -3085,7 +3085,7 @@ def test_on_databases_change(harness):
         harness.charm._on_databases_change(Mock())
 
         _update_config.assert_called_once_with()
-        assert "pg_hba_needs_update_timestamp" in harness.charm.unit_peer_data
+        assert "timestamp" in harness.charm.unit_peer_data
 
 
 def test_generate_user_hash(harness):

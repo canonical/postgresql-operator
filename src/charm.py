@@ -205,6 +205,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                         self._charm.async_replication.get_primary_cluster_endpoint()
                     ),
                 )
+                self._charm._update_relation_endpoints()
             except SwitchoverFailedError as e:
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
@@ -519,7 +520,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.update_config()
         logger.debug("databases changed")
         timestamp = datetime.now()
-        self.unit_peer_data.update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        self.unit_peer_data.update({"timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
 
     def patroni_scrape_config(self) -> list[dict]:
@@ -2029,6 +2030,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
             try:
                 self._patroni.switchover(self._member_name)
+                self.unit_peer_data.update({"timestamp": str(datetime.now())})
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
             except SwitchoverFailedError:
