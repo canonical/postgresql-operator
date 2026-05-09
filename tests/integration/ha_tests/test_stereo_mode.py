@@ -18,6 +18,8 @@ import asyncio
 import logging
 
 import pytest
+from constants import RAFT_PARTNER_PREFIX
+from pysyncobj.utility import TcpUtility
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 from yaml import safe_load
@@ -108,40 +110,31 @@ async def verify_raft_cluster_health(
 
                 conf = safe_load(stdout)
                 password = conf.get("raft", {}).get("password")
+                self_addr = conf.get("raft", {}).get("self_addr")
                 assert password, f"Could not find Raft password in patroni.yaml on {unit.name}"
 
-                # Check Raft status using the password via juju exec directly
-                complete_command = [
-                    "exec",
-                    "--unit",
-                    unit.name,
-                    "--",
-                    "charmed-postgresql.syncobj-admin",
-                    "-conn",
-                    conf["raft"]["self_addr"],
-                    "-pass",
-                    password,
-                    "-status",
-                ]
-                return_code, output, _ = await ops_test.juju(*complete_command)
-                if return_code != 0:
-                    logger.warning(f"Raft status check failed on {unit.name}: {output}")
-                    raise AssertionError(f"Raft status check failed on {unit.name}")
-                logger.info(f"Raft status on {unit.name}: {output[:200]}...")
+                # Check Raft status using the password
+                syncobj_util = TcpUtility(password=password, timeout=3)
+                status = syncobj_util.executeCommand(self_addr, ["status"])
+                logger.info(f"Raft status on {unit.name}: {status}...")
 
                 # Verify quorum
-                assert "has_quorum: True" in output or "has_quorum:True" in output, (
-                    f"Unit {unit.name} does not have Raft quorum"
+                assert status["has_quorum"] is True, f"Unit {unit.name} does not have Raft quorum"
+
+                assert (
+                    len([key for key in status if key.startswith(RAFT_PARTNER_PREFIX)])
+                    == expected_members
                 )
 
                 # Verify watcher is in the cluster (if requested)
                 # After network isolation tests, the watcher may have been redeployed
                 # with a new IP that isn't yet updated in the Raft configuration
                 if check_watcher_ip:
-                    assert watcher_ip in output, (
-                        f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}\n"
-                        f"Raft output: {output}"
-                    )
+                    assert watcher_ip in [
+                        key.split(":")[0].split(RAFT_PARTNER_PREFIX)[-1]
+                        for key in status
+                        if key.startswith(RAFT_PARTNER_PREFIX)
+                    ], f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}"
 
     logger.info("Raft cluster health verified successfully")
 
@@ -310,6 +303,7 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
             assert new_roles["primaries"][0] == primary, "Primary should not have changed"
             assert len(new_roles["sync_standbys"]) == 1, "New replica should become sync_standby"
 
+    await verify_raft_cluster_health(ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME)
     await check_writes(ops_test)
 
 
@@ -420,7 +414,7 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
 
     # Verify writes continue on the new primary
     await are_writes_increasing(ops_test, down_unit=original_primary)
-
+    await verify_raft_cluster_health(ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME)
     await check_writes(ops_test)
 
 
@@ -552,6 +546,7 @@ async def test_primary_network_isolation_with_watcher(
     # Use use_ip_from_inside=True because the old primary got a new IP after network restore
     # and Juju's cached IP may be stale
     await check_writes(ops_test, use_ip_from_inside=True)
+    await verify_raft_cluster_health(ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME)
 
 
 @pytest.mark.abort_on_fail
@@ -626,6 +621,7 @@ async def test_replica_network_isolation_with_watcher(
     # Use use_ip_from_inside=True because previous tests may have caused IP changes
     await are_writes_increasing(ops_test, use_ip_from_inside=True)
     await check_writes(ops_test, use_ip_from_inside=True)
+    await verify_raft_cluster_health(ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME)
 
 
 @pytest.mark.abort_on_fail
@@ -667,6 +663,7 @@ async def test_watcher_network_isolation(ops_test: OpsTest, continuous_writes) -
 
     # Wait for full recovery
     await ops_test.model.wait_for_idle(status="active", timeout=600)
+    await verify_raft_cluster_health(ops_test, DATABASE_APP_NAME, WATCHER_APP_NAME)
 
     # Use use_ip_from_inside=True because the watcher got a new IP after network restore
     await check_writes(ops_test, use_ip_from_inside=True)
