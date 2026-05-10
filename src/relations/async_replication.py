@@ -563,6 +563,7 @@ class PostgreSQLAsyncReplication(Object):
         # Return if this is a new unit.
         if not self.charm.unit.is_leader() and self._is_following_promoted_cluster():
             logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
+            self.charm.update_config()
             return
 
         if not self._stop_database(event):
