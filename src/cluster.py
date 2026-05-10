@@ -906,6 +906,20 @@ class Patroni:
         except Exception:
             return []
 
+    def _set_stuck_raft_flag(self) -> None:
+        self.charm.set_unit_status(BlockedStatus("Raft majority loss, run: promote-to-primary"))
+        logger.warning("Remove raft member: Stuck raft cluster detected")
+        data_flags = {"raft_stuck": "True"}
+        self.charm.unit_peer_data.update(data_flags)
+
+        # Leader doesn't always trigger when changing it's own peer data.
+        if self.charm.unit.is_leader():
+            self.charm.on[PEER].relation_changed.emit(
+                unit=self.charm.unit,
+                app=self.charm.app,
+                relation=self.charm.model.get_relation(PEER),
+            )
+
     def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.
 
@@ -931,9 +945,9 @@ class Patroni:
         raft_host = "127.0.0.1:2222"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-        except UtilityException:
+        except UtilityException as e:
             logger.warning("Remove raft member: Cannot connect to raft cluster")
-            raise RemoveRaftMemberFailedError() from None
+            raise RemoveRaftMemberFailedError() from e
         if not raft_status:
             logger.warning("Remove raft member: No raft status")
             raise RemoveRaftMemberFailedError() from None
@@ -943,35 +957,25 @@ class Patroni:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
+        if raft_status["has_quorum"] and not raft_status["leader"]:
+            logger.warning("Remove raft member: No raft leader")
+            raise RemoveRaftMemberFailedError() from None
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].address == member_address
         ):
-            self.charm.set_unit_status(
-                BlockedStatus("Raft majority loss, run: promote-to-primary")
-            )
-            logger.warning("Remove raft member: Stuck raft cluster detected")
-            data_flags = {"raft_stuck": "True"}
-            self.charm.unit_peer_data.update(data_flags)
-
-            # Leader doesn't always trigger when changing it's own peer data.
-            if self.charm.unit.is_leader():
-                self.charm.on[PEER].relation_changed.emit(
-                    unit=self.charm.unit,
-                    app=self.charm.app,
-                    relation=self.charm.model.get_relation(PEER),
-                )
+            self._set_stuck_raft_flag()
             return
 
         # Remove the member from the raft cluster.
         try:
             result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
-        except UtilityException:
+        except UtilityException as e:
             logger.debug("Remove raft member: Remove call failed")
-            raise RemoveRaftMemberFailedError() from None
+            raise RemoveRaftMemberFailedError() from e
 
         if not result or not result.startswith("SUCCESS"):
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
-            raise RemoveRaftMemberFailedError()
+            raise RemoveRaftMemberFailedError() from None
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):

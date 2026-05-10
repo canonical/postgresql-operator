@@ -1106,20 +1106,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
-        if (
-            isinstance(event, RelationEvent)
-            and event.unit
-            and event.relation.data.get(event.unit) is not None
-            and (ip_to_remove := event.relation.data[event.unit].get("ip-to-remove"))
-        ):
-            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
+        # Remove departing units when the leader changes.
+        for ip in self._get_ips_to_remove():
+            logger.info("Removing %s from the cluster", ip)
             try:
-                self._patroni.remove_raft_member(f"{ip_to_remove}:{RAFT_PORT}")
+                self._patroni.remove_raft_member(f"{ip}:{RAFT_PORT}")
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
-            if ip_to_remove in self.members_ips:
-                self._remove_from_members_ips(ip_to_remove)
+            self._remove_from_members_ips(ip)
         try:
             self._add_members(event)
         except Exception:
@@ -1510,10 +1505,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._unit_ip and self._unit_ip not in self.members_ips:
             self._add_to_members_ips(self._unit_ip)
 
-        # Remove departing units when the leader changes.
-        for ip in self._get_ips_to_remove():
-            logger.info("Removing %s from the cluster", ip)
-            self._remove_from_members_ips(ip)
+        if not self._reconfigure_cluster(event):
+            logger.debug("On leader elected failed to reconfigure cluster.")
+            event.defer()
+            return
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
