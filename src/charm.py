@@ -1028,6 +1028,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # This ensures pg-endpoints stay current when unit IPs change
         if self.unit.is_leader():
             self.watcher_offer.update_endpoints()
+            self.async_replication.update_async_replication_data()
 
         self._update_new_unit_status()
 
@@ -1439,6 +1440,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self._set_primary_status_message()
+            self.async_replication.update_async_replication_data()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -1525,6 +1527,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
+            self.async_replication.update_async_replication_data()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
