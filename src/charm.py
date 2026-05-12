@@ -1210,7 +1210,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         try:
             if self._peers:
-                return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+                if relation_name == PEER:
+                    return str(self._peers.data[unit].get("ip", ""))
+                else:
+                    return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
         except KeyError:
             return None
 

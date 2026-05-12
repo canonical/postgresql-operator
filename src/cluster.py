@@ -939,7 +939,7 @@ class Patroni:
                             member_ip not in self.charm._units_ips
                             and member_addr != self.charm.watcher_offer.watcher_raft_address
                         ):
-                            logger.info(f"Removing stale watcher from Raft cluster: {member_addr}")
+                            logger.info(f"Removing stale Raft member: {member_addr}")
                             self.charm._patroni.remove_raft_member(member_addr)
                             self.charm._remove_from_members_ips(member_ip)
                 return True
