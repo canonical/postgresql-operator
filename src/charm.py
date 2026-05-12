@@ -83,7 +83,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
-from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
+from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import (
@@ -559,16 +559,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if cpus := os.cpu_count():
             return cpus
         return 0
-
-    def _peer_data(self, scope: SCOPES) -> dict[str, str]:
-        """Return corresponding databag for app/unit."""
-        return self.all_peer_data[self._scope_obj(scope)]
-
-    def _scope_obj(self, scope: SCOPES):
-        if scope == APP_SCOPE:
-            return self.app
-        if scope == UNIT_SCOPE:
-            return self.unit
 
     def peer_relation_data(self, scope: SCOPES) -> DataPeerData:
         """Returns the peer relation data per scope."""
@@ -1353,33 +1343,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         elif ip_to_remove:
             ips.remove(ip_to_remove)
         self.app_peer_data["members_ips"] = json.dumps(ips)
-
-    @retry(
-        stop=stop_after_delay(60),
-        wait=wait_fixed(5),
-        reraise=True,
-    )
-    def _change_primary(self) -> None:
-        """Change the primary member of the cluster."""
-        # Try to switchover to another member and raise an exception if it doesn't succeed.
-        # If it doesn't happen on time, Patroni will automatically run a fail-over.
-        try:
-            # Get the current primary to check if it has changed later.
-            if not (current_primary := self._patroni.get_primary()):
-                logger.warning("switchover failed: cannot get primary")
-                return
-
-            # Trigger the switchover.
-            self._patroni.switchover()
-
-            # Wait for the switchover to complete.
-            self._patroni.primary_changed(current_primary)
-
-            logger.info("successful switchover")
-        except (RetryError, SwitchoverFailedError) as e:
-            logger.warning(
-                f"switchover failed with reason: {e} - an automatic failover will be triggered"
-            )
 
     @property
     def _unit_ip(self) -> str | None:

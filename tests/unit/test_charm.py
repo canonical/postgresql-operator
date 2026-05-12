@@ -2341,12 +2341,6 @@ def test_raft_reinitialisation(harness):
 #
 
 
-def test_scope_obj(harness):
-    assert harness.charm._scope_obj("app") == harness.charm.framework.model.app
-    assert harness.charm._scope_obj("unit") == harness.charm.framework.model.unit
-    assert harness.charm._scope_obj("test") is None
-
-
 @pytest.mark.parametrize("scope,field", [("app", "operator-password"), ("unit", "csr")])
 def test_get_secret_secrets(harness, scope, field):
     with (
