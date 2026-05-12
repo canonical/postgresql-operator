@@ -17,7 +17,7 @@ import psycopg2
 import pytest
 import tomli
 from charmlibs import snap
-from ops import JujuVersion, RelationEvent, Unit
+from ops import JujuVersion, Unit
 from ops.framework import EventBase
 from ops.model import (
     ActiveStatus,
@@ -51,7 +51,6 @@ from cluster import (
 from constants import (
     PEER,
     POSTGRESQL_DATA_PATH,
-    RAFT_PORT,
     SECRET_INTERNAL_LABEL,
     UPDATE_CERTS_BIN_PATH,
 )
