@@ -1108,14 +1108,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             Whether it was possible to reconfigure the cluster.
         """
         # Remove departing units when the leader changes.
-        for ip in self._get_ips_to_remove():
-            logger.info("Removing %s from the cluster", ip)
-            try:
-                self._patroni.remove_raft_member(f"{ip}:{RAFT_PORT}")
-            except RemoveRaftMemberFailedError:
-                logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
-                return False
-            self._remove_from_members_ips(ip)
+        if not self._patroni.cleanup_raft_cluster():
+            logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
+            return False
         try:
             self._add_members(event)
         except Exception:

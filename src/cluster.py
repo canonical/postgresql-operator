@@ -54,6 +54,7 @@ from constants import (
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
     RAFT_PARTNER_PREFIX,
+    RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
 from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
@@ -919,6 +920,32 @@ class Patroni:
                 app=self.charm.app,
                 relation=self.charm.model.get_relation(PEER),
             )
+
+    def cleanup_raft_cluster(self) -> bool:
+        """Cleanup RAFT members not belonging to the current cluster or not a related watcher."""
+        # Get Raft cluster status to find all members
+        try:
+            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
+                # Find all partner nodes in the Raft cluster
+                # Keys look like: partner_node_status_server_10.131.50.142:2222
+                for key in raft_status:
+                    if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+                        member_addr = key.replace(RAFT_PARTNER_PREFIX, "")
+                        member_ip = member_addr.split(":")[0]
+
+                        # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
+                        if (
+                            member_ip not in self.charm._units_ips
+                            and member_addr != self.charm.watcher_offer.watcher_raft_address
+                        ):
+                            logger.info(f"Removing stale watcher from Raft cluster: {member_addr}")
+                            self.charm._patroni.remove_raft_member(member_addr)
+                            self.charm._remove_from_members_ips(member_ip)
+            return True
+        except Exception as e:
+            logger.debug(f"Error during Raft cleanup: {e}")
+            return False
 
     def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.
