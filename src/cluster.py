@@ -942,7 +942,8 @@ class Patroni:
                             logger.info(f"Removing stale watcher from Raft cluster: {member_addr}")
                             self.charm._patroni.remove_raft_member(member_addr)
                             self.charm._remove_from_members_ips(member_ip)
-            return True
+                return True
+            return False
         except Exception as e:
             logger.debug(f"Error during Raft cleanup: {e}")
             return False
