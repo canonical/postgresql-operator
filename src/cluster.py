@@ -911,7 +911,7 @@ class Patroni:
         """Cleanup RAFT members not belonging to the current cluster or not a related watcher."""
         # Get Raft cluster status to find all members
         try:
-            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
             if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
                 # Find all partner nodes in the Raft cluster
                 # Keys look like: partner_node_status_server_10.131.50.142:2222
@@ -926,7 +926,7 @@ class Patroni:
                             and member_addr != self.charm.watcher_offer.watcher_raft_address
                         ):
                             logger.info(f"Removing stale Raft member: {member_addr}")
-                            self.charm._patroni.remove_raft_member(member_addr)
+                            self.remove_raft_member(member_addr)
                             self.charm._remove_from_members_ips(member_ip)
                 return True
             return False
