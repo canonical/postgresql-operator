@@ -907,20 +907,6 @@ class Patroni:
         except Exception:
             return []
 
-    def _set_stuck_raft_flag(self) -> None:
-        self.charm.set_unit_status(BlockedStatus("Raft majority loss, run: promote-to-primary"))
-        logger.warning("Remove raft member: Stuck raft cluster detected")
-        data_flags = {"raft_stuck": "True"}
-        self.charm.unit_peer_data.update(data_flags)
-
-        # Leader doesn't always trigger when changing it's own peer data.
-        if self.charm.unit.is_leader():
-            self.charm.on[PEER].relation_changed.emit(
-                unit=self.charm.unit,
-                app=self.charm.app,
-                relation=self.charm.model.get_relation(PEER),
-            )
-
     def cleanup_raft_cluster(self) -> bool:
         """Cleanup RAFT members not belonging to the current cluster or not a related watcher."""
         # Get Raft cluster status to find all members
@@ -947,6 +933,20 @@ class Patroni:
         except Exception as e:
             logger.debug(f"Error during Raft cleanup: {e}")
             return False
+
+    def _set_stuck_raft_flag(self) -> None:
+        self.charm.set_unit_status(BlockedStatus("Raft majority loss, run: promote-to-primary"))
+        logger.warning("Remove raft member: Stuck raft cluster detected")
+        data_flags = {"raft_stuck": "True"}
+        self.charm.unit_peer_data.update(data_flags)
+
+        # Leader doesn't always trigger when changing it's own peer data.
+        if self.charm.unit.is_leader():
+            self.charm.on[PEER].relation_changed.emit(
+                unit=self.charm.unit,
+                app=self.charm.app,
+                relation=self.charm.model.get_relation(PEER),
+            )
 
     def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.

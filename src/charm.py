@@ -1136,8 +1136,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         elif current_ip != stored_ip:
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
-            self.unit_peer_data.update({"ip-to-remove": stored_ip})
-            self.unit_peer_data.update({"ip": current_ip})
+            self.unit_peer_data.update({
+                "ip-to-remove": stored_ip,
+                "ip": current_ip,
+                f"{PEER}-address": current_ip,
+            })
             self._patroni.stop_patroni()
             self._update_certificate()
             # Update watcher relation - unit address for all units, endpoints only for leader
@@ -1210,10 +1213,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         try:
             if self._peers:
-                if relation_name == PEER:
-                    return str(self._peers.data[unit].get("ip", ""))
-                else:
-                    return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+                return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
         except KeyError:
             return None
 
