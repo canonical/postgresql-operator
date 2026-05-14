@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
@@ -47,6 +48,7 @@ from ops import (
     Relation,
     RelationDepartedEvent,
     RelationEvent,
+    RelationNotFoundError,
     SecretChangedEvent,
     SecretNotFoundError,
     SecretRemoveEvent,
@@ -1124,6 +1126,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             Whether the IP was updated.
         """
+        self.update_endpoint_addresses()
         # Stop Patroni (and update the member IP) if it was previously isolated
         # from the cluster network. Patroni will start back when its IP address is
         # updated in all the units through the peer relation changed event (in that
@@ -1136,11 +1139,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         elif current_ip != stored_ip:
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
-            self.unit_peer_data.update({
-                "ip-to-remove": stored_ip,
-                "ip": current_ip,
-                f"{PEER}-address": current_ip,
-            })
+            self.unit_peer_data.update({"ip-to-remove": stored_ip, "ip": current_ip})
             self._patroni.stop_patroni()
             self._update_certificate()
             # Update watcher relation - unit address for all units, endpoints only for leader
@@ -1213,7 +1212,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         try:
             if self._peers:
-                return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+                return str(self._peers.data[unit].get(f"{relation_name}-address"))
         except KeyError:
             return None
 
@@ -1384,20 +1383,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def _database_ip(self) -> str | None:
         """Database endpoint address."""
-        if binding := self.model.get_binding(DATABASE):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(DATABASE):
+                return str(binding.network.bind_address)
 
     @property
     def _replication_offer_ip(self) -> str | None:
         """Async replication offer endpoint address."""
-        if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
+                return str(binding.network.bind_address)
 
     @property
     def _replication_consumer_ip(self) -> str | None:
         """Async replication consumer endpoint address."""
-        if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
+                return str(binding.network.bind_address)
 
     @property
     def listen_ips(self) -> list[str]:
