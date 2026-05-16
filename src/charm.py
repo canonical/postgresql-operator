@@ -1472,8 +1472,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._reconfigure_cluster(event):
             logger.debug("On leader elected failed to reconfigure cluster.")
-            event.defer()
-            return
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
