@@ -1,0 +1,30 @@
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.141.192.97:8008/patroni', 'host': '10.141.192.97', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.141.192.102:8008/patroni', 'host': '10.141.192.102', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:432 Removing watcher unit
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-2': 7, 'testing.postgresql-3': 7}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-2': 10, 'testing.postgresql-3': 10}
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary
+  postgresql/3 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.141.192.97:8008/patroni', 'host': '10.141.192.97', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.141.192.102:8008/patroni', 'host': '10.141.192.102', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:454 Re-deploying watcher
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary
+  postgresql/3 [idle] active: 
+  postgresql-watcher/1 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-watcher/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-watcher/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-watcher/1 [executing] maintenance: installing RAFT controller
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary
+  postgresql/3 [idle] active: 
+  postgresql-watcher/1 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:85 Verifying Raft cluster health with 3 expected members
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:119 Raft status on postgresql/2: {'version': '0.3.12', 'revision': 'deprecated', 'self': TCPNode('10.141.192.97:2222'), 'state': 2, 'leader': TCPNode('10.141.192.97:2222'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.141.192.173:2223': 2, 'partner_node_status_server_10.141.192.102:2222': 2, 'readonly_nodes_count': 0, 'log_len': 18, 'last_applied': 570, 'commit_idx': 570, 'raft_term': 4, 'next_node_idx_count': 2, 'next_node_idx_server_10.141.192.102:2222': 571, 'next_node_idx_server_10.141.192.173:2223': 571, 'match_idx_count': 2, 'match_idx_server_10.141.192.102:2222': 570, 'match_idx_server_10.141.192.173:2223': 570, 'leader_commit_idx': 570, 'uptime': 634, 'self_code_version': 0, 'enabled_code_version': 0}...
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:119 Raft status on postgresql/3: {'version': '0.3.12', 'revision': 'deprecated', 'self': TCPNode('10.141.192.102:2222'), 'state': 0, 'leader': TCPNode('10.141.192.97:2222'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.141.192.173:2223': 2, 'partner_node_status_server_10.141.192.97:2222': 2, 'readonly_nodes_count': 0, 'log_len': 181, 'last_applied': 570, 'commit_idx': 570, 'raft_term': 4, 'next_node_idx_count': 1, 'next_node_idx_server_10.141.192.173:2223': 562, 'match_idx_count': 1, 'match_idx_server_10.141.192.173:2223': 0, 'leader_commit_idx': 570, 'uptime': 294, 'self_code_version': 0, 'enabled_code_version': 0}...
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:136 Raft cluster health verified successfully
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 329, max_number_written: 329, total_expected_writes: 329
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-3, count: 329, max_number_written: 329, total_expected_writes: 329
