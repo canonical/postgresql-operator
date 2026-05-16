@@ -1925,7 +1925,7 @@ def test_reconfigure_cluster(harness):
         assert not harness.charm._reconfigure_cluster(mock_event)
 
         _cleanup_raft_cluster.assert_called_once_with()
-        _add_members.assert_called_once_with(mock_event)
+        assert not _add_members.called
         _cleanup_raft_cluster.reset_mock()
         _add_members.reset_mock()
 

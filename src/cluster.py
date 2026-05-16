@@ -911,6 +911,9 @@ class Patroni:
         """Cleanup RAFT members not belonging to the current cluster or not a related watcher."""
         # Get Raft cluster status to find all members
         try:
+            if not self.charm._is_workload_running:
+                logger.warning("Raft cleanup: Patroni service not running.")
+                return True
             syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
             if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
                 # Find all partner nodes in the Raft cluster

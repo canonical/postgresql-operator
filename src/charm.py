@@ -1099,14 +1099,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
+        # Remove departing units when the leader changes.
+        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
+            logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
+            return False
         try:
             self._add_members(event)
         except Exception:
             logger.debug("Deferring on_peer_relation_changed: Unable to add members")
-            return False
-        # Remove departing units when the leader changes.
-        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
-            logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
             return False
         return True
 
@@ -1168,6 +1168,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
         except RetryError:
             logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
+            event.defer()
 
     def add_cluster_member(self, member: str) -> None:
         """Add member to the cluster if all members are already up and running.
@@ -1468,6 +1469,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # (the cluster should start with only this member).
         if self._unit_ip and self._unit_ip not in self.members_ips:
             self._add_to_members_ips(self._unit_ip)
+
+        # Remove departing units when the leader changes.
+        for ip in self._get_ips_to_remove():
+            logger.info("Removing %s from the cluster", ip)
+            self._remove_from_members_ips(ip)
 
         if not self._reconfigure_cluster(event):
             logger.debug("On leader elected failed to reconfigure cluster.")
