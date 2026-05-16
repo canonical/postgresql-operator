@@ -1,0 +1,44 @@
+[32mINFO    [0m integration.ha_tests.conftest:conftest.py:67 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.21   unsupported  00:30:33Z
+
+App                  Version  Status       Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               blocked          1  data-integrator      latest/edge  398  no       Please relate the data-integrator with the desired product
+postgresql           14.22    maintenance    2/3  postgresql                          0  no       installing PostgreSQL
+postgresql-test-app           waiting        0/1  postgresql-test-app  latest/edge  523  no       waiting for machine
+
+Unit                   Workload     Agent       Machine  Public address  Ports     Message
+data-integrator/0*     blocked      idle        3        10.83.36.161              Please relate the data-integrator with the desired product
+postgresql-test-app/0  waiting      allocating  4        10.83.36.18               waiting for machine
+postgresql/0*          active       executing   0        10.83.36.166    5432/tcp  Primary (degraded)
+postgresql/1           waiting      allocating  1        10.83.36.225              agent initialising
+postgresql/2           maintenance  executing   2        10.83.36.24               (install) installing PostgreSQL
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.83.36.166  juju-b8fc14-0  ubuntu@22.04  runnervm9vjqi  Running
+1        started  10.83.36.225  juju-b8fc14-1  ubuntu@22.04  runnervm9vjqi  Running
+2        started  10.83.36.24   juju-b8fc14-2  ubuntu@22.04  runnervm9vjqi  Running
+3        started  10.83.36.161  juju-b8fc14-3  ubuntu@24.04  runnervm9vjqi  Running
+4        down     10.83.36.18   juju-b8fc14-4  ubuntu@22.04  runnervm9vjqi  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:22:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:22:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:25:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:25:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:28:42 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f939086aad0 state=finished raised Exception>]
+machine-2: 00:29:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:29:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:30:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:30:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
