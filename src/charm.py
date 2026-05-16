@@ -1168,7 +1168,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
         except RetryError:
             logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
-            event.defer()
 
     def add_cluster_member(self, member: str) -> None:
         """Add member to the cluster if all members are already up and running.
