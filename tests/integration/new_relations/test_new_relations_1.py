@@ -7,10 +7,9 @@ from pathlib import Path
 import psycopg2
 import pytest
 import yaml
+from constants import DATABASE_DEFAULT_NAME
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
-
-from constants import DATABASE_DEFAULT_NAME
 
 from ..helpers import (
     CHARM_BASE,

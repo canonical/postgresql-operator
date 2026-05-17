@@ -20,6 +20,7 @@ import psycopg2
 import pytest
 import requests
 import yaml
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 from tenacity import (
     RetryError,
     Retrying,
@@ -30,8 +31,6 @@ from tenacity import (
     wait_exponential,
     wait_fixed,
 )
-
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
 from .ha_tests.helpers import ProcessError

@@ -217,7 +217,7 @@ class TLS(Object):
         operator_ca = str(certs[0].ca) if certs else ""
         old_operator_ca = self.charm.get_secret(UNIT_SCOPE, "old-ca") or ""
         internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca") or ""
-        return "\n".join((operator_ca, old_operator_ca, internal_ca))
+        return "\n".join((operator_ca, old_operator_ca, internal_ca)).strip()
 
     def generate_internal_peer_ca(self) -> None:
         """Generate internal peer CA using the tls lib."""

@@ -1,7 +1,7 @@
 (how-to)=
 # How-to guides
 
-The following guides cover key processes and common tasks for setting up and managing Charmed PostgreSQL on machines.
+The following guides cover key processes and common tasks for setting up and managing Charmed PostgreSQL on bare metal and virtual machines.
 
 ## Deployment and setup
 
@@ -14,26 +14,33 @@ Available deployment methods and specialised setups:
 Deploy <deploy/index>
 ```
 
-## Usage and maintenance
+## Operations and maintenance
 
-Most common operations during the initial setup of a PostgreSQL cluster:
+Essential operations to configure and manage a PostgreSQL cluster:
 
 ```{toctree}
 :titlesonly:
 
-Integrate <integrate-with-another-application>
 Scale <scale-replicas>
+Integrate <integrate-with-another-application>
 Manage passwords <manage-passwords>
 Enable TLS <enable-tls>
+Enable plugins/extensions <enable-plugins-extensions/index>
+```
+
+Advanced networking, credential management, and disaster recovery:
+
+```{toctree}
+:titlesonly:
+
 External network access <external-network-access>
 Enable LDAP <enable-ldap>
-Enable plugins/extensions <enable-plugins-extensions/index>
 Switchover/failover <switchover-failover>
 ```
 
-## Backup and restore
+### Backups and data migration
 
-Configuration of storage providers and backup management:
+Configuration of storage providers and backup management for safety and data migration from a different cluster:
 
 ```{toctree}
 :titlesonly:
@@ -42,9 +49,18 @@ Configuration of storage providers and backup management:
 Back up and restore <back-up-and-restore/index>
 ```
 
-## Monitoring (COS)
+Other data migration guides:
 
-Observability and monitoring with the Canonical Observability Stack:
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+
+Data migration <data-migration/index>
+```
+
+### Monitoring (COS)
+
+Set up observability services like Grafana, Prometheus, Loki, and Tempo through the Canonical Observability Stack (COS):
 
 ```{toctree}
 :maxdepth: 2
@@ -52,7 +68,7 @@ Observability and monitoring with the Canonical Observability Stack:
 Monitoring (COS) <monitoring-cos/index>
 ```
 
-## Refresh (upgrade)
+### Refresh (upgrade)
 
 Instructions for performing an in-place application refresh:
 
@@ -62,18 +78,7 @@ Instructions for performing an in-place application refresh:
 Refresh (upgrade) <refresh>
 ```
 
-## Data migration
-
-For charm developers looking to support PostgreSQL integrations with their charm:
-
-```{toctree}
-:maxdepth: 2
-:titlesonly:
-
-Data migration <data-migration/index>
-```
-
-## Cross-regional (cluster-cluster) async replication
+### Cross-regional (cluster-cluster) async replication
 
 Walkthrough of a cluster-cluster deployment and its essential operations:
 
@@ -84,9 +89,9 @@ Walkthrough of a cluster-cluster deployment and its essential operations:
 Cross-regional async replication <cross-regional-async-replication/index>
 ```
 
-## Logical replication
+### Logical replication
 
-How to replicate a subset of data to another PostgreSQL cluster:
+Replicate a subset of data to another PostgreSQL cluster:
 
 ```{toctree}
 :maxdepth: 2

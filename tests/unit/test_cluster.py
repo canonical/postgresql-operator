@@ -94,7 +94,7 @@ def patroni(harness, peers_ips):
 
 def test_get_member_ip(peers_ips, patroni):
     with patch(
-        "charm.Patroni.parallel_patroni_get_request", return_value=None
+        "cluster.parallel_patroni_get_request", return_value=None
     ) as _parallel_patroni_get_request:
         # No IP if no members
         assert patroni.get_member_ip(patroni.member_name) is None
@@ -163,7 +163,7 @@ def test_dict_to_hba_string(harness, patroni):
 def test_get_primary(peers_ips, patroni):
     with (
         patch(
-            "charm.Patroni.parallel_patroni_get_request", return_value=None
+            "cluster.parallel_patroni_get_request", return_value=None
         ) as _parallel_patroni_get_request,
     ):
         # No primary if no members
@@ -255,47 +255,6 @@ def test_is_member_isolated(peers_ips, patroni):
         assert patroni.is_member_isolated
 
 
-def test_render_file(peers_ips, patroni):
-    with (
-        patch("os.chmod") as _chmod,
-        patch("os.chown") as _chown,
-        patch("pwd.getpwnam") as _pwnam,
-        patch("tempfile.NamedTemporaryFile") as _temp_file,
-    ):
-        # Set a mocked temporary filename.
-        filename = "/tmp/temporaryfilename"
-        _temp_file.return_value.name = filename
-        # Setup a mock for the `open` method.
-        mock = mock_open()
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            # Set the uid/gid return values for lookup of 'postgres' user.
-            _pwnam.return_value.pw_uid = 35
-            _pwnam.return_value.pw_gid = 35
-            # Call the method using a temporary configuration file.
-            patroni.render_file(filename, "rendered-content", 0o640)
-
-        # Check the rendered file is opened with "w+" mode.
-        assert mock.call_args_list[0][0] == (filename, "w+")
-        # Ensure that the correct user is lookup up.
-        _pwnam.assert_called_with("_daemon_")
-        # Ensure the file is chmod'd correctly.
-        _chmod.assert_called_with(filename, 0o640)
-        # Ensure the file is chown'd correctly.
-        _chown.assert_called_with(filename, uid=35, gid=35)
-
-        # Test when it's requested to not change the file owner.
-        mock.reset_mock()
-        _pwnam.reset_mock()
-        _chmod.reset_mock()
-        _chown.reset_mock()
-        with patch("builtins.open", mock, create=True):
-            patroni.render_file(filename, "rendered-content", 0o640, change_owner=False)
-        _pwnam.assert_not_called()
-        _chmod.assert_called_once_with(filename, 0o640)
-        _chown.assert_not_called()
-
-
 def test_render_patroni_yml_file(peers_ips, patroni):
     with (
         patch(
@@ -303,8 +262,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             return_value=["2.2.2.2", "3.3.3.3"],
         ),
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
-        patch("charm.Patroni.render_file") as _render_file,
-        patch("charm.Patroni._create_directory"),
+        patch("cluster.render_file") as _render_file,
         patch(
             "charm.PostgresqlOperatorCharm.listen_ips",
             new_callable=PropertyMock,
@@ -371,10 +329,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
 
 def test_start_patroni(peers_ips, patroni):
-    with (
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni._create_directory") as _create_directory,
-    ):
+    with patch("charm.snap.SnapCache") as _snap_cache:
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
@@ -389,10 +344,7 @@ def test_start_patroni(peers_ips, patroni):
 
 
 def test_stop_patroni(peers_ips, patroni):
-    with (
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni._create_directory") as _create_directory,
-    ):
+    with patch("charm.snap.SnapCache") as _snap_cache:
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.stop.side_effect = [None, snap.SnapError]
@@ -492,6 +444,21 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         with pytest.raises(RetryError):
             patroni.update_synchronous_node_count()
             assert False
+
+
+def test_set_max_timelines_history(peers_ips, patroni):
+    with (
+        patch("requests.patch") as _patch,
+    ):
+        patroni.set_max_timelines_history()
+
+        _patch.assert_called_once_with(
+            f"{patroni._patroni_url}/config",
+            json={"max_timelines_history": 50},
+            verify=patroni.verify,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
@@ -705,7 +672,7 @@ def test_remove_raft_member(patroni):
         # Member already removed
         _tcp_utility.return_value.executeCommand.return_value = "Response message"
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         _tcp_utility.return_value.executeCommand.assert_called_once_with(
@@ -719,7 +686,7 @@ def test_remove_raft_member(patroni):
             "SUCCESS",
         ]
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         assert _tcp_utility.return_value.executeCommand.call_count == 2
@@ -736,7 +703,7 @@ def test_remove_raft_member(patroni):
         ]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
         # Raises on remove error
@@ -746,16 +713,14 @@ def test_remove_raft_member(patroni):
         ]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
         # Raises on status error
-        _tcp_utility.return_value.executeCommand.side_effect = [
-            UtilityException,
-        ]
+        _tcp_utility.return_value.executeCommand.side_effect = [UtilityException]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
 
@@ -778,7 +743,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "members": [{"role": "async_replica", "name": "postgresql-0"}]
         }
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 
         # No health
@@ -790,14 +755,14 @@ def test_remove_raft_member_no_quorum(patroni, harness):
         }
         _get.side_effect = Exception
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 
         # Sync replica
         _unit_peer_data.return_value = {}
         leader_mock = Mock()
-        leader_mock.host = "1.2.3.4"
+        leader_mock.address = "1.2.3.4:2222"
         _tcp_utility.return_value.executeCommand.return_value = {
             "partner_node_status_server_1.2.3.4:2222": 0,
             "has_quorum": False,
@@ -808,7 +773,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "members": [{"role": "sync_standby", "name": "postgresql-0"}]
         }
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 

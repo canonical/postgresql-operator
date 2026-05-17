@@ -4,6 +4,7 @@
 import logging
 
 import jubilant
+import requests
 from jubilant import Juju
 
 from .high_availability_helpers_new import (
@@ -11,6 +12,7 @@ from .high_availability_helpers_new import (
     count_switchovers,
     get_app_leader,
     get_app_units,
+    get_unit_ip,
     wait_for_apps_status,
 )
 
@@ -111,3 +113,8 @@ def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
     assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
         "Number of switchovers is greater than 2"
     )
+
+    leader = get_app_leader(juju, DB_APP_NAME)
+    leader_ip = get_unit_ip(juju, DB_APP_NAME, leader)
+    config = requests.get(f"https://{leader_ip}:8008/config", verify=False).json()
+    assert config.get("max_timelines_history") == 50

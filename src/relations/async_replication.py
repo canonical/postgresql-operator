@@ -293,7 +293,7 @@ class PostgreSQLAsyncReplication(Object):
             }.items():
                 databag = relation_data[app]
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
-                if relation_promoted_cluster_counter > promoted_cluster_counter:
+                if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
         return primary_cluster
@@ -405,6 +405,7 @@ class PostgreSQLAsyncReplication(Object):
                         for unit in {*self.charm._peers.units, self.charm.unit}  # type: ignore
                     ):
                         self.charm.app_peer_data.update({"cluster_initialised": "True"})
+                        self.charm.watcher_offer.enable_watcher()
                     elif self._is_following_promoted_cluster():
                         self.charm.set_unit_status(
                             WaitingStatus("Waiting for the database to be started in all units")
@@ -465,12 +466,23 @@ class PostgreSQLAsyncReplication(Object):
             return False
 
         relation = self._relation
+        if relation is None:
+            event.fail("Replication relation not found")
+            return False
+
+        # Ensure the relation has at least one remote unit before trying to process unit data.
+        remote_units = [unit for unit in relation.units if unit.app == relation.app]
+        if len(remote_units) == 0:
+            event.fail(
+                "All units from the other cluster must publish their unit addresses in the relation data."
+            )
+            return False
 
         # Check if all units from the other cluster published their IPs in the relation data.
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
-        for unit in relation.units:  # type: ignore
-            if "unit-address" not in relation.data[unit]:  # type: ignore
+        for unit in remote_units:
+            if "unit-address" not in relation.data[unit]:
                 event.fail(
                     "All units from the other cluster must publish their unit addresses in the relation data."
                 )
@@ -530,10 +542,14 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
             self.charm.update_config()
 
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
+
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
         if self.charm.unit.is_leader():
             self.set_app_status()
+            self.charm.watcher_offer.update_endpoints()
 
         primary_cluster = self._get_primary_cluster()
         logger.debug("Primary cluster: %s", primary_cluster)
@@ -547,6 +563,7 @@ class PostgreSQLAsyncReplication(Object):
         # Return if this is a new unit.
         if not self.charm.unit.is_leader() and self._is_following_promoted_cluster():
             logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
+            self.charm.update_config()
             return
 
         if not self._stop_database(event):
@@ -592,6 +609,9 @@ class PostgreSQLAsyncReplication(Object):
             self.charm.unit_peer_data.update({
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
+
+        if self.charm.unit.is_leader():
+            self.charm.watcher_offer.update_endpoints()
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""
@@ -673,10 +693,18 @@ class PostgreSQLAsyncReplication(Object):
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
         if relation := self._relation:
+            relation_unit = next(
+                (unit for unit in relation.units if unit.app == relation.app), None
+            )
+            if relation_unit is None:
+                logger.debug(
+                    "Skipping re-emitting relation-changed event: no related units found yet."
+                )
+                return
             getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
                 relation,
                 app=relation.app,
-                unit=next(unit for unit in relation.units if unit.app == relation.app),
+                unit=relation_unit,
             )
 
     def _reinitialise_pgdata(self) -> None:
@@ -738,6 +766,7 @@ class PostgreSQLAsyncReplication(Object):
             if not self.charm.unit.is_leader() and not os.path.exists(POSTGRESQL_DATA_PATH):
                 logger.debug("Early exit on_async_relation_changed: following promoted cluster.")
                 return False
+            self.charm.watcher_offer.disable_watcher()
 
             try:
                 for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):

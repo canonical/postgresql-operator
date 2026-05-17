@@ -48,7 +48,13 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, POSTGRESQL_DATA_PATH, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
+from constants import (
+    PEER,
+    POSTGRESQL_DATA_PATH,
+    RAFT_PORT,
+    SECRET_INTERNAL_LABEL,
+    UPDATE_CERTS_BIN_PATH,
+)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -1916,7 +1922,7 @@ def test_reconfigure_cluster(harness):
         relation_data = {mock_event.unit: {"ip-to-remove": ip_to_remove}}
         mock_event.relation.data = relation_data
         assert not (harness.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_not_called()
 
@@ -1927,7 +1933,7 @@ def test_reconfigure_cluster(harness):
         _add_members.reset_mock()
         mock_event.relation.data = relation_data
         assert harness.charm._reconfigure_cluster(mock_event)
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_called_once_with(mock_event)
 
@@ -1940,7 +1946,7 @@ def test_reconfigure_cluster(harness):
                 rel_id, harness.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
             )
         assert harness.charm._reconfigure_cluster(mock_event)
-        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_raft_member.assert_called_once_with(f"{ip_to_remove}:{RAFT_PORT}")
         _remove_from_members_ips.assert_called_once_with(ip_to_remove)
         _add_members.assert_called_once_with(mock_event)
 
@@ -1967,6 +1973,10 @@ def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(harness.charm.watcher_offer, "update_unit_address"),
+        patch.object(harness.charm.watcher_offer, "update_endpoints"),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test when the IP address of the unit hasn't changed.
@@ -2004,7 +2014,7 @@ def test_update_member_ip(harness):
 def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.Patroni.render_file") as _render_file,
+        patch("charm.render_file") as _render_file,
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
         patch(
@@ -2331,12 +2341,6 @@ def test_raft_reinitialisation(harness):
 #
 
 
-def test_scope_obj(harness):
-    assert harness.charm._scope_obj("app") == harness.charm.framework.model.app
-    assert harness.charm._scope_obj("unit") == harness.charm.framework.model.unit
-    assert harness.charm._scope_obj("test") is None
-
-
 @pytest.mark.parametrize("scope,field", [("app", "operator-password"), ("unit", "csr")])
 def test_get_secret_secrets(harness, scope, field):
     with (
@@ -2557,7 +2561,7 @@ def test_on_peer_relation_departed(harness):
         mock_ip_address = "1.1.1.1"
         _get_member_ip.return_value = mock_ip_address
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2572,7 +2576,7 @@ def test_on_peer_relation_departed(harness):
         event.defer.reset_mock()
         _remove_raft_member.side_effect = None
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2587,7 +2591,7 @@ def test_on_peer_relation_departed(harness):
         with harness.hooks_disabled():
             harness.set_leader()
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
@@ -2604,7 +2608,7 @@ def test_on_peer_relation_departed(harness):
                 rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
             )
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
@@ -2619,7 +2623,7 @@ def test_on_peer_relation_departed(harness):
         _updated_synchronous_node_count.reset_mock()
         harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/2")
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
@@ -2635,7 +2639,7 @@ def test_on_peer_relation_departed(harness):
         _updated_synchronous_node_count.reset_mock()
         _updated_synchronous_node_count.return_value = True
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2653,7 +2657,7 @@ def test_on_peer_relation_departed(harness):
         _get_ips_to_remove.return_value = ips_to_remove
         _are_all_members_ready.return_value = False
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2669,7 +2673,7 @@ def test_on_peer_relation_departed(harness):
         _get_ips_to_remove.reset_mock()
         _are_all_members_ready.return_value = True
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -2688,7 +2692,7 @@ def test_on_peer_relation_departed(harness):
         _update_relation_endpoints.reset_mock()
         _primary_endpoint.return_value = None
         harness.charm._on_peer_relation_departed(event)
-        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        _remove_raft_member.assert_called_once_with(f"{mock_ip_address}:2222")
         event.defer.assert_not_called()
         _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
@@ -3075,7 +3079,7 @@ def test_on_databases_change(harness):
         harness.charm._on_databases_change(Mock())
 
         _update_config.assert_called_once_with()
-        assert "pg_hba_needs_update_timestamp" in harness.charm.unit_peer_data
+        assert "timestamp" in harness.charm.unit_peer_data
 
 
 def test_generate_user_hash(harness):

@@ -3,7 +3,6 @@
 [![CharmHub Badge](https://charmhub.io/postgresql/badge.svg)](https://charmhub.io/postgresql)
 [![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/canonical/postgresql-operator/graph/badge.svg?token=4V2mu7aWmu)](https://codecov.io/gh/canonical/postgresql-operator)
 
 
 This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines via the [Juju orchestration engine](https://juju.is/).

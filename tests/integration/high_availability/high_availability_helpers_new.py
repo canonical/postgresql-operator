@@ -8,11 +8,10 @@ from collections.abc import Callable
 
 import jubilant
 import requests
+from constants import PEER
 from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
 from tenacity import Retrying, stop_after_delay, wait_fixed
-
-from constants import PEER
 
 from ..helpers import execute_queries_on_unit
 

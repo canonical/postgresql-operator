@@ -8,7 +8,7 @@ The following are the minimum software and hardware requirements to run Charmed 
 
 ### Juju
 
-Charmed PostgreSQL 16 supports several Juju releases from 3.6 LTS onwards. The table below shows which minor versions of each major Juju release are supported by the stable Charmhub releases of PostgreSQL.
+Charmed PostgreSQL 16 supports several Juju releases from 3.6 LTS onward. The table below shows which minor versions of each major Juju release are supported by the stable Charmhub releases of PostgreSQL.
 
 | Juju major release | Supported minor versions | Compatible charm revisions |Comment |
 |:--------|:-----|:-----|:-----|

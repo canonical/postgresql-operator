@@ -1,24 +1,37 @@
-#
-name: Automatic doc checks
+# Temporary hardened version of https://github.com/canonical/documentation-workflows/blob/main/.github/workflows/documentation-checks.yaml
+# Replace with https://github.com/canonical/documentation-workflows/issues/44#issuecomment-4170829133 once it is available
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    paths:
-      - 'docs/**'   # Only run on changes to the docs directory
-
-  workflow_dispatch:
-    # Manual trigger
-
+name: Check docs
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
 jobs:
-  documentation-checks:
-    uses: canonical/documentation-workflows/.github/workflows/documentation-checks.yaml@main
-    with:
-      working-directory: "docs"
-      fetch-depth: 0
+  check-docs:
+    name: Check docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: make install
+      - name: Spell check
+        run: make spelling
+      - name: Inclusive language check
+        run: make woke
+      #- name: Link check
+      #  run: make linkcheck
+    permissions:
+      contents: read
