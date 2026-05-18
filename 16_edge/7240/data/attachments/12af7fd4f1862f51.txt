@@ -1,0 +1,23 @@
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.158.37.183:8008/patroni', 'host': '10.158.37.183', 'port': 5432, 'timeline': 3, 'lag': 0}, {'name': 'postgresql-3', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.158.37.194:8008/patroni', 'host': '10.158.37.194', 'port': 5432, 'timeline': 3}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:583 Isolating replica network: postgresql/2 on juju-6594a9-4
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-3': 5}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-3': 5}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-3': 11}
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:599 Restoring network for juju-6594a9-4
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] active: 
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: 
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.158.37.183:8008/patroni', 'host': '10.158.37.183', 'port': 5432, 'timeline': 3, 'lag': 0}, {'name': 'postgresql-3', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.158.37.194:8008/patroni', 'host': '10.158.37.194', 'port': 5432, 'timeline': 3}]
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-2': 137, 'testing.postgresql-3': 137}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-2': 139, 'testing.postgresql-3': 139}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 139, max_number_written: 139, total_expected_writes: 139
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-3, count: 139, max_number_written: 139, total_expected_writes: 139
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:85 Verifying Raft cluster health with 3 expected members
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:119 Raft status on postgresql/2: {'version': '0.3.12', 'revision': 'deprecated', 'self': TCPNode('10.158.37.183:2222'), 'state': 0, 'leader': TCPNode('10.158.37.121:2223'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.158.37.194:2222': 2, 'partner_node_status_server_10.158.37.121:2223': 2, 'readonly_nodes_count': 0, 'log_len': 120, 'last_applied': 807, 'commit_idx': 807, 'raft_term': 15, 'next_node_idx_count': 0, 'match_idx_count': 0, 'leader_commit_idx': 807, 'uptime': 149, 'self_code_version': 0, 'enabled_code_version': 0}...
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:119 Raft status on postgresql/3: {'version': '0.3.12', 'revision': 'deprecated', 'self': TCPNode('10.158.37.194:2222'), 'state': 0, 'leader': TCPNode('10.158.37.121:2223'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.158.37.183:2222': 2, 'partner_node_status_server_10.158.37.121:2223': 2, 'readonly_nodes_count': 0, 'log_len': 120, 'last_applied': 807, 'commit_idx': 807, 'raft_term': 15, 'next_node_idx_count': 2, 'next_node_idx_server_10.158.37.121:2223': 765, 'next_node_idx_server_10.158.37.183:2222': 753, 'match_idx_count': 2, 'match_idx_server_10.158.37.121:2223': 764, 'match_idx_server_10.158.37.183:2222': 0, 'leader_commit_idx': 807, 'uptime': 852, 'self_code_version': 0, 'enabled_code_version': 0}...
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:136 Raft cluster health verified successfully
