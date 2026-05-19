@@ -1334,7 +1334,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if ip_to_add and ip_to_add not in ips:
             ips.append(ip_to_add)
         elif ip_to_remove:
-            ips.remove(ip_to_remove)
+            with suppress(ValueError):
+                ips.remove(ip_to_remove)
         self.app_peer_data["members_ips"] = json.dumps(ips)
 
     @property
