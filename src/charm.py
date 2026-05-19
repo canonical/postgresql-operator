@@ -684,10 +684,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         a tmpfs mount that is wiped on reboot, so we recreate it
         unconditionally.  CREATE TABLESPACE requires the directory to
         be writable by the PostgreSQL _daemon_ user, so we chown it.
+
+        The 16/ parent dir must also be _daemon_-owned: the snap daemon
+        runs as _daemon_ and needs write permission to clean up the
+        versioned subdirectory and run DROP/CREATE TABLESPACE during
+        rollback (handled by the snap's pre-refresh hook).
         """
         temp_dir = Path(TEMP_DATA_DIR)
         temp_dir.mkdir(parents=True, exist_ok=True)
         shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+        if temp_dir.parent.exists():
+            shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
     @staticmethod
     def _clear_pg_version_dirs(path: Path) -> None:
@@ -705,10 +712,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _migrate_temp_tablespace_location(self) -> bool:
         """One-shot migration of the temp tablespace to the versioned directory.
 
-        During a snap upgrade, the snap hooks migrate temp data from the old
-        non-versioned storage root (TEMP_STORAGE_PATH) to the versioned
+        During a snap upgrade, the post-refresh hook migrates temp data from the
+        old non-versioned storage root (TEMP_STORAGE_PATH) to the versioned
         subdirectory (TEMP_DATA_DIR).  This method updates the PostgreSQL catalog
         entry to match.
+
+        During a snap downgrade (rollback), the pre-refresh hook handles both
+        file migration and catalog migration (DROP/CREATE TABLESPACE) back to
+        the non-versioned root.  This method only handles the forward case.
 
         Other temp tablespace recovery scenarios (missing catalog entry after a
         partially-failed migration, empty directory after a tmpfs wipe) are
