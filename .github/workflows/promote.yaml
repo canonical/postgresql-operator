@@ -5,14 +5,15 @@ name: Promote charm
 on:
   workflow_dispatch:
     inputs:
-      from-risk:
-        description: Promote from this Charmhub risk
+      revisions:
+        description: |
+          Comma-separated list of git revision tags to promote.
+          These must match the tags created by canonical/data-platform-workflows release_charm_edge.yaml
+
+          Single-charm repo example: 'rev123,rev124'
+          Monorepo example: 'mysql/rev123,mysql-k8s/rev124'
         required: true
-        type: choice
-        options:
-          - edge
-          - beta
-          - candidate
+        type: string
       to-risk:
         description: Promote to this Charmhub risk
         required: true
@@ -25,10 +26,10 @@ on:
 jobs:
   promote:
     name: Promote charm
-    uses: canonical/data-platform-workflows/.github/workflows/_promote_charm_legacy.yaml@v48.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/_promote_charms.yaml@v49.0.1
     with:
       track: '14'
-      from-risk: ${{ inputs.from-risk }}
+      revisions: ${{ inputs.revisions }}
       to-risk: ${{ inputs.to-risk }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
