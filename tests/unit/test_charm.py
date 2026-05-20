@@ -53,8 +53,6 @@ from cluster import (
 from constants import (
     PEER,
     POSTGRESQL_DATA_DIR,
-    POSTGRESQL_DATA_PATH,
-    RAFT_PORT,
     SECRET_INTERNAL_LABEL,
     UPDATE_CERTS_BIN_PATH,
 )
