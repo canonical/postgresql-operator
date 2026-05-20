@@ -213,7 +213,7 @@ class PostgreSQLWatcherRelation(Object):
             # Only the leader handles Raft membership changes and user management
             # to avoid race conditions between multiple PostgreSQL units
             if self.charm.unit.is_leader():
-                self._cleanup_old_watcher_from_raft()
+                self.charm._patroni.cleanup_raft_cluster()
                 self._ensure_watcher_user()
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
@@ -221,49 +221,6 @@ class PostgreSQLWatcherRelation(Object):
         # Update relation data for the watcher
         if self.charm.unit.is_leader():
             self._update_relation_data(event.relation)
-
-    def _cleanup_old_watcher_from_raft(self) -> None:
-        """Remove any old watcher IPs from Raft that differ from the current watcher.
-
-        When a watcher unit is replaced (e.g., destroyed and re-deployed), it gets
-        a new IP address. The old IP remains in the Raft cluster membership, which
-        prevents the new watcher from being recognized as a valid cluster member.
-        This method finds and removes any such stale watcher entries.
-
-        Args:
-            current_watcher_address: The current watcher's IP address.
-        """
-        # Get all PostgreSQL unit IPs (these should stay in the cluster)
-        # Use _units_ips for fresh IPs from unit relation data
-        pg_ips = set(self.charm._units_ips)
-        port_postfix = str(RAFT_PORT)
-
-        # Get Raft cluster status to find all members
-        try:
-            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
-            if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
-                # Find all partner nodes in the Raft cluster
-                # Keys look like: partner_node_status_server_10.131.50.142:2222
-                stale_members: list[str] = []
-                for key in raft_status:
-                    if (
-                        key.startswith(RAFT_PARTNER_PREFIX)
-                        and not key.endswith(port_postfix)
-                        and raft_status[key] != 2
-                    ):
-                        member_addr = key.replace(RAFT_PARTNER_PREFIX, "")
-                        member_ip = member_addr.split(":")[0]
-
-                        # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
-                        if member_ip not in pg_ips and member_addr != self.watcher_raft_address:
-                            stale_members.append(member_addr)
-
-                # Remove stale watcher members
-                for stale_addr in stale_members:
-                    logger.info(f"Removing stale watcher from Raft cluster: {stale_addr}")
-                    self.charm._patroni.remove_raft_member(stale_addr)
-        except Exception as e:
-            logger.debug(f"Error during Raft cleanup: {e}")
 
     def _on_watcher_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle watcher relation being broken.
@@ -278,7 +235,8 @@ class PostgreSQLWatcherRelation(Object):
 
         logger.info("Watcher relation broken, updating Patroni configuration")
         self.watcher_raft_address = None
-        self._cleanup_old_watcher_from_raft()
+        if self.charm.unit.is_leader():
+            self.charm._patroni.cleanup_raft_cluster()
         # Update Patroni configuration without the watcher
         self.charm.update_config()
 

@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
@@ -47,6 +48,7 @@ from ops import (
     Relation,
     RelationDepartedEvent,
     RelationEvent,
+    RelationNotFoundError,
     SecretChangedEvent,
     SecretNotFoundError,
     SecretRemoveEvent,
@@ -1097,20 +1099,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
-        if (
-            isinstance(event, RelationEvent)
-            and event.unit
-            and event.relation.data.get(event.unit) is not None
-            and (ip_to_remove := event.relation.data[event.unit].get("ip-to-remove"))
-        ):
-            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
-            try:
-                self._patroni.remove_raft_member(f"{ip_to_remove}:{RAFT_PORT}")
-            except RemoveRaftMemberFailedError:
-                logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
-                return False
-            if ip_to_remove in self.members_ips:
-                self._remove_from_members_ips(ip_to_remove)
+        # Remove departing units when the leader changes.
+        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
+            logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
+            return False
         try:
             self._add_members(event)
         except Exception:
@@ -1124,6 +1116,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             Whether the IP was updated.
         """
+        self.update_endpoint_addresses()
         # Stop Patroni (and update the member IP) if it was previously isolated
         # from the cluster network. Patroni will start back when its IP address is
         # updated in all the units through the peer relation changed event (in that
@@ -1136,8 +1129,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         elif current_ip != stored_ip:
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
-            self.unit_peer_data.update({"ip-to-remove": stored_ip})
-            self.unit_peer_data.update({"ip": current_ip})
+            self.unit_peer_data.update({"ip-to-remove": stored_ip, "ip": current_ip})
             self._patroni.stop_patroni()
             self._update_certificate()
             # Update watcher relation - unit address for all units, endpoints only for leader
@@ -1210,7 +1202,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         try:
             if self._peers:
-                return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+                return self._peers.data[unit].get(f"{relation_name}-address")
         except KeyError:
             return None
 
@@ -1342,7 +1334,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if ip_to_add and ip_to_add not in ips:
             ips.append(ip_to_add)
         elif ip_to_remove:
-            ips.remove(ip_to_remove)
+            with suppress(ValueError):
+                ips.remove(ip_to_remove)
         self.app_peer_data["members_ips"] = json.dumps(ips)
 
     @property
@@ -1354,20 +1347,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def _database_ip(self) -> str | None:
         """Database endpoint address."""
-        if binding := self.model.get_binding(DATABASE):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(DATABASE):
+                return str(binding.network.bind_address)
 
     @property
     def _replication_offer_ip(self) -> str | None:
         """Async replication offer endpoint address."""
-        if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
+                return str(binding.network.bind_address)
 
     @property
     def _replication_consumer_ip(self) -> str | None:
         """Async replication consumer endpoint address."""
-        if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
-            return str(binding.network.bind_address)
+        with suppress(RelationNotFoundError):
+            if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
+                return str(binding.network.bind_address)
 
     @property
     def listen_ips(self) -> list[str]:
@@ -1479,6 +1475,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for ip in self._get_ips_to_remove():
             logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
+
+        if not self._reconfigure_cluster(event):
+            logger.debug("On leader elected failed to reconfigure cluster.")
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
