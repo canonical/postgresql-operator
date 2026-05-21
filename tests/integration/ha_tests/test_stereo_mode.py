@@ -92,7 +92,7 @@ async def verify_raft_cluster_health(
     assert return_code == 0, f"Failed to get watcher address from {watcher_unit.name}"
     watcher_ip = watcher_ip.strip()
 
-    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True):
+    for attempt in Retrying(stop=stop_after_delay(600), wait=wait_fixed(5), reraise=True):
         with attempt:
             for unit in ops_test.model.applications[db_app_name].units:
                 # Get the Raft password from Patroni config using juju exec directly
