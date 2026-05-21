@@ -4,8 +4,8 @@
 import logging
 
 import pytest
-from pytest_operator.plugin import OpsTest
 
+from .adapters import JujuFixture
 from .backup_helpers import pitr_backup_operations
 from .conftest import ConnectionInformation
 
@@ -38,12 +38,10 @@ def cloud_configs(microceph: ConnectionInformation):
 
 
 @pytest.mark.abort_on_fail
-async def test_pitr_backup_ceph(
-    ops_test: OpsTest, cloud_configs, cloud_credentials, charm
-) -> None:
+def test_pitr_backup_ceph(juju: JujuFixture, cloud_configs, cloud_credentials, charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
-    await pitr_backup_operations(
-        ops_test,
+    pitr_backup_operations(
+        juju,
         S3_INTEGRATOR_APP_NAME,
         None,
         None,

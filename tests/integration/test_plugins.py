@@ -5,10 +5,9 @@ import logging
 
 import psycopg2 as psycopg2
 import pytest as pytest
-from pytest_operator.plugin import OpsTest
 
-from .helpers import (
-    CHARM_BASE,
+from .adapters import JujuFixture
+from .jubilant_helpers import (
     DATABASE_APP_NAME,
     db_connect,
     get_password,
@@ -94,17 +93,16 @@ PG_STAT_STATEMENTS_STATEMENT = (
 
 
 @pytest.mark.abort_on_fail
-async def test_plugins(ops_test: OpsTest, charm) -> None:
+def test_plugins(juju: JujuFixture, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
     # Build and deploy the PostgreSQL charm.
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
+    with juju.ext.fast_forward():
+        juju.ext.model.deploy(
             charm,
             num_units=2,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     sql_tests = {
         "plugin_citext_enable": CITEXT_EXTENSION_STATEMENT,
@@ -173,13 +171,13 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
         return config
 
     # Check that the available plugins are disabled.
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test)
-    address = get_unit_address(ops_test, primary)
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    password = get_password()
+    address = get_unit_address(juju, primary)
 
     config = enable_disable_config(False)
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config(config)
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     logger.info("checking that the plugins are disabled")
     with db_connect(host=address, password=password) as connection:
@@ -198,8 +196,8 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
     logger.info("enabling the plugins")
 
     config = enable_disable_config(True)
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config(config)
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     # Check that the available plugins are enabled.
     logger.info("checking that the plugins are enabled")
@@ -214,11 +212,11 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
     connection.close()
 
 
-async def test_plugin_objects(ops_test: OpsTest) -> None:
+def test_plugin_objects(juju: JujuFixture) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test)
-    address = get_unit_address(ops_test, primary)
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    password = get_password()
+    address = get_unit_address(juju, primary)
 
     logger.info("Creating an index object which depends on the pg_trgm config")
     with db_connect(host=address, password=password) as connection:
@@ -230,26 +228,20 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
     connection.close()
 
     logger.info("Disabling the plugin on charm config, waiting for blocked status")
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_pg_trgm_enable": "False"
-    })
-    await ops_test.model.block_until(
-        lambda: ops_test.model.units[primary].workload_status == "blocked",
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"plugin_pg_trgm_enable": "False"})
+    juju.ext.model.block_until(
+        lambda: juju.ext.model.units[primary].workload_status == "blocked",
         timeout=100,
     )
 
     logger.info("Enabling the plugin back on charm config, status should resolve")
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_pg_trgm_enable": "True"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"plugin_pg_trgm_enable": "True"})
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     logger.info("Re-disabling plugin, waiting for blocked status to come back")
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_pg_trgm_enable": "False"
-    })
-    await ops_test.model.block_until(
-        lambda: ops_test.model.units[primary].workload_status == "blocked",
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"plugin_pg_trgm_enable": "False"})
+    juju.ext.model.block_until(
+        lambda: juju.ext.model.units[primary].workload_status == "blocked",
         timeout=100,
     )
 
@@ -260,5 +252,5 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
     connection.close()
 
     logger.info("Waiting for status to resolve again")
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    with juju.ext.fast_forward(fast_interval="60s"):
+        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")

@@ -7,10 +7,9 @@ from time import sleep
 
 import psycopg2
 import pytest
-from pytest_operator.plugin import OpsTest
 
-from .helpers import (
-    CHARM_BASE,
+from .adapters import JujuFixture
+from .jubilant_helpers import (
     DATABASE_APP_NAME,
     db_connect,
     get_primary,
@@ -28,18 +27,17 @@ PASSWORD = "test-password"
 
 
 @pytest.mark.abort_on_fail
-async def test_pg_hba(ops_test: OpsTest, charm):
-    async with ops_test.fast_forward():
+def test_pg_hba(juju: JujuFixture, charm):
+    with juju.ext.fast_forward():
         logger.info("Deploying charms")
-        if DATABASE_APP_NAME not in ops_test.model.applications:
-            await ops_test.model.deploy(
+        if DATABASE_APP_NAME not in juju.ext.model.applications:
+            juju.ext.model.deploy(
                 charm,
                 num_units=2,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             )
-        if DATA_INTEGRATOR_APP_NAME not in ops_test.model.applications:
-            await ops_test.model.deploy(
+        if DATA_INTEGRATOR_APP_NAME not in juju.ext.model.applications:
+            juju.ext.model.deploy(
                 DATA_INTEGRATOR_APP_NAME,
                 config={"database-name": FIRST_DATABASE, "extra-user-roles": "SUPERUSER"},
             )
@@ -47,23 +45,23 @@ async def test_pg_hba(ops_test: OpsTest, charm):
         logger.info("Adding relation between charms")
         relations = [
             relation
-            for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
+            for relation in juju.ext.model.applications[DATABASE_APP_NAME].relations
             if not relation.is_peer
             and f"{relation.requires.application_name}:{relation.requires.name}"
             == f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
         ]
         if not relations:
-            await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
+            juju.ext.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
 
-        await ops_test.model.wait_for_idle(
+        juju.ext.model.wait_for_idle(
             apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1000
         )
 
-        primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-        address = get_unit_address(ops_test, primary)
-        data_integrator_unit = ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].units[0]
-        action = await data_integrator_unit.run_action(action_name="get-credentials")
-        result = await action.wait()
+        primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+        address = get_unit_address(juju, primary)
+        data_integrator_unit = juju.ext.model.applications[DATA_INTEGRATOR_APP_NAME].units[0]
+        action = data_integrator_unit.run_action(action_name="get-credentials")
+        result = action.wait()
         credentials = result.results
         connection = None
         try:
@@ -107,9 +105,9 @@ async def test_pg_hba(ops_test: OpsTest, charm):
 
         sleep(90)
 
-        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+        for unit in juju.ext.model.applications[DATABASE_APP_NAME].units:
             try:
-                address = get_unit_address(ops_test, unit.name)
+                address = get_unit_address(juju, unit.name)
 
                 logger.info(
                     f"Checking that the user {FIRST_RELATION_USER} can connect to the database {FIRST_DATABASE} on {unit.name}"

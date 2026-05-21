@@ -4,8 +4,8 @@
 import logging
 
 import pytest
-from pytest_operator.plugin import OpsTest
 
+from .adapters import JujuFixture
 from .backup_helpers import pitr_backup_operations
 from .conftest import AWS
 
@@ -17,14 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_pitr_backup_aws(
-    ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict], charm
-) -> None:
+def test_pitr_backup_aws(juju: JujuFixture, aws_cloud_configs: tuple[dict, dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
     config, credentials = aws_cloud_configs
 
-    await pitr_backup_operations(
-        ops_test,
+    pitr_backup_operations(
+        juju,
         S3_INTEGRATOR_APP_NAME,
         TLS_CERTIFICATES_APP_NAME,
         TLS_CHANNEL,
