@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 import logging
 
 import psycopg2 as psycopg2
 import pytest as pytest
-from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .helpers import (
+from .adapters import JujuFixture
+from .jubilant_helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
     run_command_on_unit,
 )
-from .new_relations.helpers import build_connection_string
+from .new_relations.jubilant_helpers import build_connection_string
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +21,16 @@ RELATION_ENDPOINT = "database"
 
 
 @pytest.mark.abort_on_fail
-async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
+def test_audit_plugin(juju: JujuFixture, charm) -> None:
     """Test the audit plugin."""
-    await asyncio.gather(
-        ops_test.model.deploy(charm, config={"profile": "testing"}),
-        ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", series="noble"),
-    )
-    await ops_test.model.relate(f"{APPLICATION_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME)
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[APPLICATION_NAME, DATABASE_APP_NAME], status="active"
-        )
+    juju.ext.model.deploy(charm, config={"profile": "testing"})
+    juju.ext.model.deploy(APPLICATION_NAME, channel="latest/edge", series="noble")
+    juju.ext.model.relate(f"{APPLICATION_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME)
+    with juju.ext.fast_forward():
+        juju.ext.model.wait_for_idle(apps=[APPLICATION_NAME, DATABASE_APP_NAME], status="active")
 
     logger.info("Checking that the audit plugin is enabled")
-    connection_string = await build_connection_string(
-        ops_test, APPLICATION_NAME, RELATION_ENDPOINT
-    )
+    connection_string = build_connection_string(juju, APPLICATION_NAME, RELATION_ENDPOINT)
     connection = None
     try:
         connection = psycopg2.connect(connection_string)
@@ -52,8 +45,8 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
     for attempt in Retrying(stop=stop_after_delay(90), wait=wait_fixed(10), reraise=True):
         with attempt:
             try:
-                logs = await run_command_on_unit(
-                    ops_test,
+                logs = run_command_on_unit(
+                    juju,
                     unit_name,
                     "sudo grep AUDIT /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
                 )
@@ -67,14 +60,12 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
                 assert False, "Audit logs were not found when the plugin is enabled."
 
     logger.info("Disabling the audit plugin")
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_audit_enable": "False"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"plugin_audit_enable": "False"})
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     logger.info("Removing the previous logs")
-    await run_command_on_unit(
-        ops_test,
+    run_command_on_unit(
+        juju,
         unit_name,
         "rm /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
     )
@@ -90,8 +81,8 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
         if connection is not None:
             connection.close()
     try:
-        logs = await run_command_on_unit(
-            ops_test,
+        logs = run_command_on_unit(
+            juju,
             unit_name,
             "sudo grep AUDIT /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
