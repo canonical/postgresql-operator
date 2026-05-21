@@ -18,11 +18,12 @@ import asyncio
 import logging
 
 import pytest
-from constants import RAFT_PARTNER_PREFIX
 from pysyncobj.utility import TcpUtility
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 from yaml import safe_load
+
+from constants import RAFT_PARTNER_PREFIX
 
 from ..helpers import APPLICATION_NAME, DATABASE_APP_NAME
 from .helpers import APPLICATION_NAME as TEST_APP_NAME
