@@ -436,6 +436,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
         self._setup_pgbackrest_exporter()
+        self.watcher_offer.update_unit_address()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
@@ -1996,6 +1997,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 self._patroni.switchover(self._member_name)
                 self.unit_peer_data.update({"timestamp": str(datetime.now())})
+                if self.unit.is_leader():
+                    self.postgresql_client_relation.update_endpoints()
+                    self.async_replication.update_async_replication_data()
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
             except SwitchoverFailedError:
