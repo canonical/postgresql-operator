@@ -1996,6 +1996,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 self._patroni.switchover(self._member_name)
                 self.unit_peer_data.update({"timestamp": str(datetime.now())})
+                if self.unit.is_leader():
+                    self.postgresql_client_relation.update_endpoints()
+                    self.async_replication.update_async_replication_data()
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
             except SwitchoverFailedError:
