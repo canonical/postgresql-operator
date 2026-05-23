@@ -6,6 +6,7 @@
 import json
 import logging
 
+from charmlibs import snap
 from charms.data_platform_libs.v0.upgrade import (
     ClusterNotReadyError,
     DataUpgrade,
@@ -18,15 +19,17 @@ from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
+from cluster import SwitchoverFailedError
 from constants import (
     APP_SCOPE,
     MONITORING_PASSWORD_KEY,
     MONITORING_USER,
     PATRONI_PASSWORD_KEY,
+    POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     SNAP_PACKAGES,
 )
-from utils import new_password
+from utils import new_password, snap_refreshed
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +144,48 @@ class PostgreSQLUpgrade(DataUpgrade):
                 self._prepare_upgrade_from_legacy()
             self.on.upgrade_charm.emit()
 
+    def _pre_upgrade_switchover(self, event: UpgradeGrantedEvent) -> bool:
+        """Switchover primary before upgrading, to minimize client write downtime.
+
+        Returns True if the event was deferred after the switchover (caller should return).
+        """
+        if len(self.peer_relation.units) == 0:
+            return False
+
+        if snap_refreshed(snap.SnapCache()[POSTGRESQL_SNAP_NAME].revision):
+            logger.info("Snap is already at the target revision, skipping pre-upgrade switchover")
+            return False
+
+        if self.unit_upgrade_data.get("pre-upgrade-switchover-done"):
+            self.unit_upgrade_data.update({"pre-upgrade-switchover-done": ""})
+            return False
+
+        old_primary = self.charm._patroni.get_primary()
+        if old_primary is None or old_primary != self.charm.unit.name.replace("/", "-"):
+            return False
+
+        logger.info("Switching over primary before upgrading")
+        self.charm.unit.status = MaintenanceStatus("switching over primary")
+        self.charm._patroni.switchover()
+        self.charm._patroni.primary_changed(old_primary)
+        logger.info("Primary switchover completed")
+
+        if self.charm.unit.is_leader():
+            self.charm._update_relation_endpoints()
+
+        self.unit_upgrade_data.update({"pre-upgrade-switchover-done": "true"})
+        logger.info("Deferring upgrade to let Juju commit endpoint changes to client relations")
+        event.defer()
+        return True
+
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
+        try:
+            if self._pre_upgrade_switchover(event):
+                return
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning("Pre-upgrade switchover failed: %s. Proceeding with upgrade.", e)
+
         # Refresh the charmed PostgreSQL snap and restart the database.
         # Update the configuration.
         self.charm.unit.status = MaintenanceStatus("updating configuration")
