@@ -27,6 +27,7 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
+from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
@@ -46,7 +47,6 @@ from constants import (
     UNIT_SCOPE,
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
-from utils import render_file
 
 logger = logging.getLogger(__name__)
 

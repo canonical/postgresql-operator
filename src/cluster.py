@@ -26,10 +26,17 @@ from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.literals import (
+    API_REQUEST_TIMEOUT,
     PEER,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
+)
+from single_kernel_postgresql.utils import (
+    _change_owner,
+    label2name,
+    parallel_patroni_get_request,
+    render_file,
 )
 from tenacity import (
     Future,
@@ -44,7 +51,6 @@ from tenacity import (
 )
 
 from constants import (
-    API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -57,7 +63,6 @@ from constants import (
     RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
 
 logger = logging.getLogger(__name__)
 

@@ -69,6 +69,7 @@ from single_kernel_postgresql.config.literals import (
     Substrates,
 )
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
+from single_kernel_postgresql.utils import label2name, new_password, render_file
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -140,7 +141,6 @@ from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
-from utils import label2name, new_password, render_file
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
