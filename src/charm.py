@@ -2290,22 +2290,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         key, ca, cert = self.tls.get_peer_tls_files()
         if key is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
         render_file(
-            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}", self.tls.get_peer_ca_bundle(), 0o600
+            Substrates.VM,
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            self.tls.get_peer_ca_bundle(),
+            0o600,
         )
 
         try:

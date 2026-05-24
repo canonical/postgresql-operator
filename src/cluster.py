@@ -31,6 +31,7 @@ from single_kernel_postgresql.config.literals import (
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
+    Substrates,
 )
 from single_kernel_postgresql.utils import (
     _change_owner,
@@ -226,7 +227,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        _change_owner(POSTGRESQL_DATA_PATH)
+        _change_owner(Substrates.VM, POSTGRESQL_DATA_PATH)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
@@ -714,7 +715,7 @@ class Patroni:
             if self.charm.watcher_offer.is_active
             else None,
         )
-        render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.

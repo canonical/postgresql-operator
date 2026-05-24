@@ -27,6 +27,7 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
+from single_kernel_postgresql.config.literals import Substrates
 from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -1369,7 +1370,10 @@ Stderr:
 
         if self._tls_ca_chain_filename != "":
             render_file(
-                self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
+                Substrates.VM,
+                self._tls_ca_chain_filename,
+                "\n".join(s3_parameters["tls-ca-chain"]),
+                0o644,
             )
 
         with open("templates/pgbackrest.conf.j2") as file:
@@ -1395,12 +1399,14 @@ Stderr:
             process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
-        render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
+        render_file(Substrates.VM, f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
-        render_file(PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False)
+        render_file(
+            Substrates.VM, PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
+        )
 
         return True
 
