@@ -1819,24 +1819,21 @@ name = "postgresql-charms-single-kernel"
 version = "16.2.1"
 description = "Shared and reusable code for PostgreSQL-related charms"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "a4ac8b49b99b961940084dc7d62baa7dc55904f1.zip", hash = "sha256:b75cf08a74a5890f711ef71ae8bb8c83c2c646b964512588c3f3a9fab47d939c"},
+    {file = "postgresql_charms_single_kernel-16.2.1-py3-none-any.whl", hash = "sha256:6936d06e225a9b8f1bc6da1b22b9cdc6f96fa5c4db7c47a3dbdc5ba5f956abad"},
+    {file = "postgresql_charms_single_kernel-16.2.1.tar.gz", hash = "sha256:5551abb62e7248218a009a0cb5da171de6d0a2919d349c5133bf4ac26cb6fe3c"},
 ]
 
 [package.dependencies]
-httpx = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+httpx = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 ops = ">=2.0.0"
 psycopg2 = ">=2.9.10"
 tenacity = ">=9.0.0"
 
 [package.extras]
-postgresql = ["httpx ; python_version >= \"3.12\""]
-
-[package.source]
-type = "url"
-url = "https://github.com/canonical/postgresql-single-kernel-library/archive/a4ac8b49b99b961940084dc7d62baa7dc55904f1.zip"
+postgresql = ["httpx ; python_full_version >= \"3.12.0\""]
 
 [[package]]
 name = "prompt-toolkit"
@@ -3110,4 +3107,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "87bbdc06aabf617cbd00a6c119b091f3bf1d509b6c41db990fd7f3fa4dea9286"
+content-hash = "39ad43e91ff98d2831d59cd92f3ac1967437e879a98ece59594ab8ea719b9985"
