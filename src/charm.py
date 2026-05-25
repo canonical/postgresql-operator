@@ -500,7 +500,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 key=lambda u: int(u.name.split("/")[1]),
             )
             if self.unit == all_units[0]:
-                self._migrate_temp_tablespace_location()
+                for attempt in Retrying(
+                    stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True
+                ):
+                    with attempt:
+                        if not self._migrate_temp_tablespace_location(required=True):
+                            raise Exception("Temp tablespace migration not yet complete")
             refresh.next_unit_allowed_to_refresh = True
             self.set_unit_status(ActiveStatus(), refresh=refresh)
 
@@ -717,31 +722,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Wait for Patroni to settle and return the primary host.
 
         After a snap refresh, Patroni may briefly report this unit as the
-        primary before discovering the real cluster topology.  Retry until
-        primary_endpoint points to a different host or this unit truly is
-        the primary.
+        primary before discovering the real cluster topology.  Query the
+        Patroni API directly (bypassing primary_endpoint, which can return
+        stale data from the peer databag) and retry until the primary
+        points to a different host or this unit truly is the primary.
         """
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    target_host = self.primary_endpoint
+                    primary = self._patroni.get_primary()
+                    if not primary:
+                        raise Exception("No primary found yet")
+                    target_host = self._patroni.get_member_ip(primary)
                     if not target_host:
-                        raise Exception("primary_endpoint not available yet")
+                        raise Exception("Primary IP not available yet")
                     if target_host != self._unit_ip or self.is_primary:
                         return target_host
-                    logger.info(
-                        "primary_endpoint=%s matches unit_ip but unit is not primary; "
-                        "Patroni may not have settled yet (attempt %d)",
-                        target_host,
-                        attempt.retry_state.attempt_number,
-                    )
                     raise Exception("Patroni not settled yet")
         except RetryError:
             logger.warning("Patroni did not settle within 60s")
             return None
         return None
 
-    def _migrate_temp_tablespace_location(self) -> bool:
+    def _migrate_temp_tablespace_location(self, *, required: bool = False) -> bool:
         """One-shot migration of the temp tablespace to the versioned directory.
 
         During a snap upgrade, the post-refresh hook migrates temp data from the
@@ -758,19 +761,27 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         (which would create one in psycopg2).  Instead it uses plain assignments
         and explicit close(), mirroring the pattern in the single_kernel_postgresql
         set_up_database helper.
+
+        Args:
+            required: If True (used during upgrade), return False when the
+                primary is unavailable so the caller can retry.  If False
+                (default, used during install), return True to skip gracefully
+                when no cluster exists yet.
         """
         if not self.primary_endpoint:
-            logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
-            return True
+            return not required
 
         if self.async_replication._relation is not None:
-            logger.debug("Skipping temp tablespace migration while async replication is active")
             return True
 
         target_host = self._resolve_primary_host()
         if target_host is None:
             return False
 
+        return self._execute_temp_tablespace_migration(target_host)
+
+    def _execute_temp_tablespace_migration(self, target_host: str) -> bool:
+        """Execute the temp tablespace DDL migration on the given host."""
         connection = None
         cursor = None
         try:
@@ -807,6 +818,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             cursor.execute("DROP TABLESPACE temp;")
             cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
             cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+            # Flush WAL past the CREATE TABLESPACE record so replicas won't
+            # need to replay it during a future rollback (the versioned
+            # directory may not exist after the snap's pre-refresh hook).
+            cursor.execute("CHECKPOINT;")
         except psycopg2.Error:
             logger.exception("Failed to migrate temp tablespace location")
             return False

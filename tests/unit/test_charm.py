@@ -717,15 +717,11 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
 
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
@@ -758,15 +754,11 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
 
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
@@ -793,15 +785,11 @@ def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness,
 
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
@@ -827,15 +815,11 @@ def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness
 
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
@@ -858,15 +842,11 @@ def test_migrate_temp_tablespace_location_returns_false_on_db_error(harness):
 
     with (
         patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
