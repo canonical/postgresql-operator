@@ -824,6 +824,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             cursor.execute("CHECKPOINT;")
         except psycopg2.Error:
             logger.exception("Failed to migrate temp tablespace location")
+            try:
+                check_conn = self.postgresql._connect_to_database(database_host=target_host)
+                check_conn.autocommit = True
+                check_cur = check_conn.cursor()
+                check_cur.execute(
+                    "SELECT count(*) FROM pg_class WHERE reltablespace = "
+                    "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp')"
+                )
+                obj_count = check_cur.fetchone()[0]
+                check_cur.close()
+                check_conn.close()
+                if obj_count > 0:
+                    logger.error(
+                        "Temp tablespace has %d object(s). "
+                        "Please move or drop all objects from the temp tablespace, "
+                        "then run 'juju resolved postgresql/<unit-number>' to retry.",
+                        obj_count,
+                    )
+            except Exception:
+                logger.debug("Could not query temp tablespace for blocking objects")
             return False
         finally:
             if cursor is not None:
