@@ -170,7 +170,7 @@ async def main():
             )
 
         # Wait some time before checking again for a cluster topology change.
-        sleep(30)
+        sleep(10)
 
 
 if __name__ == "__main__":

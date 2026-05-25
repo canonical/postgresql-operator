@@ -414,7 +414,6 @@ class PostgreSQLWatcherRelation(Object):
         relation.data[self.charm.app].update({
             "cluster-name": self.charm.cluster_name,
             "raft-secret-id": secret_id,
-            "version": self.charm._patroni.get_postgresql_version(),
             "raft-partner-addrs": json.dumps(pg_endpoints),
             "raft-port": str(RAFT_PORT),
             "patroni-cas": self.charm.tls.get_peer_ca_bundle(),
@@ -439,27 +438,23 @@ class PostgreSQLWatcherRelation(Object):
         if not relation:
             return
 
-        unit_ip = self.charm._unit_ip
-        if unit_ip is None:
+        if not (unit_ip := self.charm._unit_ip):
             return
 
-        changed = False
+        relation.data[self.charm.unit]["version"] = self.charm._patroni.get_postgresql_version()
+        if self.charm.refresh:
+            relation.data[self.charm.unit]["snap"] = self.charm.refresh.pinned_snap_revision
         current_address = relation.data[self.charm.unit].get("unit-address")
         if current_address != unit_ip:
             logger.info(
                 f"Updating unit-address in watcher relation from {current_address} to {unit_ip}"
             )
             relation.data[self.charm.unit]["unit-address"] = unit_ip
-            changed = True
 
         unit_az = os.environ.get("JUJU_AVAILABILITY_ZONE")
         current_az = relation.data[self.charm.unit].get("unit-az")
         if unit_az and current_az != unit_az:
             relation.data[self.charm.unit]["unit-az"] = unit_az
-            changed = True
-
-        if changed:
-            logger.debug("Updated watcher relation unit data")
 
     def update_endpoints(self) -> None:
         """Update the watcher with current cluster endpoints.
