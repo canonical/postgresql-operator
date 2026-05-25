@@ -173,9 +173,30 @@ class StorageUnavailableError(Exception):
 class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     _charm: "PostgresqlOperatorCharm"
 
-    @staticmethod
-    def run_pre_refresh_checks_after_1_unit_refreshed() -> None:
-        pass
+    def _check_temp_tablespace_objects(self) -> None:
+        try:
+            connection = self._charm.postgresql._connect_to_database()
+            connection.autocommit = True
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT count(*) FROM pg_class WHERE reltablespace = "
+                "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp');"
+            )
+            count = cursor.fetchone()[0]
+            cursor.close()
+            connection.close()
+            if count > 0:
+                raise charm_refresh.PrecheckFailed(
+                    f"Temp tablespace has {count} active object(s). "
+                    "Please ensure no sessions are using temp tables before refreshing."
+                )
+        except charm_refresh.PrecheckFailed:
+            raise
+        except Exception:
+            logger.debug("Unable to check temp tablespace objects", exc_info=True)
+
+    def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
+        self._check_temp_tablespace_objects()
 
     def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
         for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
@@ -184,6 +205,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                     raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
+        self._check_temp_tablespace_objects()
 
         # Switch primary to last unit to refresh
 
@@ -251,12 +273,6 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Update the configuration.
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
-
-        # Ensure the temp tablespace directory exists before the snap refresh.
-        # Data migration between storage roots and versioned paths is handled
-        # by the snap's post-refresh hook (forward) and pre-refresh hook
-        # (reverse), which start a one-shot daemon running as _daemon_.
-        self._charm._ensure_storage_layout()
 
         # TODO add graceful shutdown before refreshing snap?
         # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
@@ -399,6 +415,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.refresh.in_progress:
                 self._post_snap_refresh(self.refresh)
             else:
+                self._migrate_temp_tablespace_location()
                 self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
@@ -442,7 +459,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Called after snap refresh
         """
         self._check_and_update_internal_cert()
-        self._ensure_storage_layout()
 
         if not self._patroni.start_patroni():
             self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
@@ -473,12 +489,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
             )
         else:
-            self._migrate_temp_tablespace_location()
             try:
                 self._patroni.set_max_timelines_history()
             except Exception:
                 logger.warning("Unable to patch in max_timelines_history")
+            peer_relation = self.model.get_relation("database-peers")
+            all_units = sorted(
+                [self.unit, *(peer_relation.units if peer_relation else [])],
+                key=lambda u: int(u.name.split("/")[1]),
+            )
+            if self.unit == all_units[0]:
+                self._migrate_temp_tablespace_location()
             refresh.next_unit_allowed_to_refresh = True
+            self.set_unit_status(ActiveStatus(), refresh=refresh)
 
     def set_unit_status(
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
@@ -689,18 +712,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if temp_dir.parent.exists():
             shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
-    @staticmethod
-    def _clear_pg_version_dirs(path: Path) -> None:
-        """Remove PostgreSQL version subdirectories (PG_<ver>_<catalog>) from a directory.
+    def _resolve_primary_host(self) -> str | None:
+        """Wait for Patroni to settle and return the primary host.
 
-        These directories are created by PostgreSQL when a tablespace is created and must not
-        exist at a target path before CREATE TABLESPACE is called.  Temp tablespace data is
-        ephemeral, so removal is safe.
+        After a snap refresh, Patroni may briefly report this unit as the
+        primary before discovering the real cluster topology.  Retry until
+        primary_endpoint points to a different host or this unit truly is
+        the primary.
         """
-        if path.exists():
-            for entry in path.iterdir():
-                if entry.name.startswith("PG_"):
-                    shutil.rmtree(entry)
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    target_host = self.primary_endpoint
+                    if not target_host:
+                        raise Exception("primary_endpoint not available yet")
+                    if target_host != self._unit_ip or self.is_primary:
+                        return target_host
+                    logger.info(
+                        "primary_endpoint=%s matches unit_ip but unit is not primary; "
+                        "Patroni may not have settled yet (attempt %d)",
+                        target_host,
+                        attempt.retry_state.attempt_number,
+                    )
+                    raise Exception("Patroni not settled yet")
+        except RetryError:
+            logger.warning("Patroni did not settle within 60s")
+            return None
+        return None
 
     def _migrate_temp_tablespace_location(self) -> bool:
         """One-shot migration of the temp tablespace to the versioned directory.
@@ -714,38 +752,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         file migration and catalog migration (DROP/CREATE TABLESPACE) back to
         the non-versioned root.  This method only handles the forward case.
 
-        Other temp tablespace recovery scenarios (missing catalog entry after a
-        partially-failed migration, empty directory after a tmpfs wipe) are
-        handled by the single-kernel library's set_up_database during the
-        leader-elected event.
-
         DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction
         block, so this method avoids using the connection as a context manager
         (which would create one in psycopg2).  Instead it uses plain assignments
         and explicit close(), mirroring the pattern in the single_kernel_postgresql
         set_up_database helper.
         """
-        if not self.is_primary:
-            return True
-
         if not self.primary_endpoint:
             logger.debug("Primary endpoint not yet available; skipping temp tablespace check")
             return True
 
-        # Do not migrate the temp tablespace while cross-cluster async replication is
-        # active.  The DROP/CREATE TABLESPACE generates WAL that is streamed to the
-        # standby cluster.  If the standby has not been upgraded to the versioned
-        # storage layout yet, it will not have the TEMP_DATA_DIR directory, causing
-        # PostgreSQL to crash with "FATAL: directory does not exist" during WAL replay.
         if self.async_replication._relation is not None:
             logger.debug("Skipping temp tablespace migration while async replication is active")
             return True
 
+        target_host = self._resolve_primary_host()
+        if target_host is None:
+            return False
+
         connection = None
         cursor = None
         try:
-            connection = self.postgresql._connect_to_database()
-            connection.autocommit = True  # DROP/CREATE TABLESPACE cannot run inside a transaction
+            connection = self.postgresql._connect_to_database(database_host=target_host)
+            connection.autocommit = True
             cursor = connection.cursor()
 
             cursor.execute(
@@ -753,13 +782,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             row = cursor.fetchone()
             if row is None:
-                # Tablespace was already dropped by a previous migration or was
-                # never created (e.g. fresh deploy).  Nothing to migrate.
                 return True
 
             current_location = row[0]
             if current_location == TEMP_DATA_DIR:
-                # Already at the versioned path.  Nothing to migrate.
                 return True
 
             if current_location != TEMP_STORAGE_PATH:
@@ -778,7 +804,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 TEMP_DATA_DIR,
             )
             cursor.execute("DROP TABLESPACE temp;")
-            self._clear_pg_version_dirs(Path(TEMP_DATA_DIR))
             cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
             cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
         except psycopg2.Error:
@@ -1140,7 +1165,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        if not self._check_member_registration(event):
+        # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
+        # A new member may be running but not registered if it was added to Raft after starting.
+        if (
+            self.watcher_offer.is_watcher_connected
+            and not self._patroni.is_member_registered_in_cluster()
+        ):
+            logger.info("Member running but not registered in Raft cluster - restarting Patroni")
+            self._patroni.restart_patroni()
+            event.defer()
             return
 
         self._start_stop_pgbackrest_service(event)
@@ -1155,23 +1188,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.async_replication.update_async_replication_data()
 
         self._update_new_unit_status()
-
-    # Split off into separate function, because of complexity _on_peer_relation_changed
-    def _check_member_registration(self, event: HookEvent) -> bool:
-        """Check and ensure the member is registered in the Raft/replication cluster.
-
-        Returns:
-            True if processing should continue, False if we should return early.
-        """
-        if (
-            self.watcher_offer.is_watcher_connected
-            and not self._patroni.is_member_registered_in_cluster()
-        ):
-            logger.info("Member running but not registered in Raft cluster - restarting Patroni")
-            self._patroni.restart_patroni()
-            event.defer()
-            return False
-        return True
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _handle_s3_initialization(self, event: HookEvent) -> bool:
@@ -2149,7 +2165,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except SwitchoverFailedError:
                 event.fail("Switchover failed or timed out, check the logs for details")
 
-    def _on_update_status(self, event) -> None:
+    def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
         if not self._can_run_on_update_status():
             return
@@ -2160,9 +2176,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self._handle_processes_failures():
-            return
-
-        if self.unit.is_leader() and not self._reconfigure_cluster(event):
             return
 
         self.postgresql_client_relation.oversee_users()

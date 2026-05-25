@@ -707,8 +707,6 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
     temp_data_dir = tmp_path / "temp" / "16" / "main"
     temp_storage_path = str(tmp_path / "temp")
     temp_data_dir.mkdir(parents=True)
-    stale_pg_dir = temp_data_dir / "PG_16_202307071"
-    stale_pg_dir.mkdir()
 
     connection = MagicMock()
     cursor = MagicMock()
@@ -738,8 +736,6 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
     ):
         assert harness.charm._migrate_temp_tablespace_location()
 
-    # Stale PG version directory should have been removed before CREATE
-    assert not stale_pg_dir.exists()
     cursor.execute.assert_has_calls([
         call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
         call("DROP TABLESPACE temp;"),
@@ -897,9 +893,6 @@ def test_on_update_status(harness):
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
-        patch(
-            "charm.PostgresqlOperatorCharm._reconfigure_cluster", return_value=True
-        ) as _reconfigure_cluster,
         patch("charm.Patroni.restart_patroni") as _restart_patroni,
         patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
@@ -931,7 +924,6 @@ def test_on_update_status(harness):
         # Test before the cluster is initialised.
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
-        _reconfigure_cluster.assert_not_called()
 
         # Test after the cluster was initialised, but with the unit in a blocked state.
         with harness.hooks_disabled():
@@ -942,7 +934,6 @@ def test_on_update_status(harness):
         harness.charm.unit.status = BlockedStatus("fake blocked status")
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
-        _reconfigure_cluster.assert_not_called()
 
         # Test the point-in-time-recovery fail.
         with harness.hooks_disabled():
@@ -959,7 +950,6 @@ def test_on_update_status(harness):
         _patroni_logs.return_value = "2022-02-24 02:00:00 UTC patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
-        _reconfigure_cluster.assert_not_called()
         assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
 
         # Test with the unit in a status different that blocked.
@@ -972,12 +962,10 @@ def test_on_update_status(harness):
         harness.charm.unit.status = ActiveStatus()
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
-        _reconfigure_cluster.assert_called_once()
 
         # Test call to restart when the member is isolated from the cluster.
         _set_primary_status_message.reset_mock()
         _start_observer.reset_mock()
-        _reconfigure_cluster.reset_mock()
         _member_started.return_value = False
         _is_member_isolated.return_value = True
         with harness.hooks_disabled():
@@ -985,28 +973,9 @@ def test_on_update_status(harness):
                 rel_id, harness.charm.unit.name, {"postgresql_restarted": ""}
             )
         harness.charm.on.update_status.emit()
-        _reconfigure_cluster.assert_called_once()
         _restart_patroni.assert_called_once()
         _start_observer.assert_called_once_with()
         _drop_hba_triggers.assert_called_once_with()
-
-
-def test_on_update_status_skips_remainder_when_reconfigure_cluster_fails(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm._can_run_on_update_status", return_value=True),
-        patch("charm.PostgresqlOperatorCharm._handle_processes_failures", return_value=False),
-        patch(
-            "charm.PostgresqlOperatorCharm._reconfigure_cluster", return_value=False
-        ) as _reconfigure_cluster,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
-    ):
-        with harness.hooks_disabled():
-            harness.set_leader()
-
-        harness.charm.on.update_status.emit()
-
-        _reconfigure_cluster.assert_called_once()
-        _oversee_users.assert_not_called()
 
 
 def test_on_update_status_after_restore_operation(harness):
@@ -1015,9 +984,6 @@ def test_on_update_status_after_restore_operation(harness):
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
-        patch(
-            "charm.PostgresqlOperatorCharm._reconfigure_cluster", return_value=True
-        ) as _reconfigure_cluster,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
@@ -1064,7 +1030,6 @@ def test_on_update_status_after_restore_operation(harness):
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
         _enable_disable_extensions.assert_not_called()
-        _reconfigure_cluster.assert_not_called()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
 
         # Test when the restore operation hasn't finished yet.
@@ -1078,7 +1043,6 @@ def test_on_update_status_after_restore_operation(harness):
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
         _enable_disable_extensions.assert_not_called()
-        _reconfigure_cluster.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Assert that the backup id is still in the application relation databag.
@@ -1095,7 +1059,6 @@ def test_on_update_status_after_restore_operation(harness):
         harness.charm.on.update_status.emit()
         _update_config.assert_called_once()
         _handle_processes_failures.assert_called_once()
-        _reconfigure_cluster.assert_called_once()
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
         _set_primary_status_message.assert_called_once()
