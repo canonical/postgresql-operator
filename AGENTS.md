@@ -28,6 +28,8 @@ PostgreSQL 16 on virtual machines via Patroni for high availability.
 - **`grafana_dashboards/`** — Grafana dashboard JSON definitions for COS integration.
 - **`prometheus_alert_rules/`** — Prometheus alerting rule definitions (YAML).
 - **`loki_alert_rules/`** — Loki alerting rule definitions.
+- **`lib/`** — Vendored charm libraries managed by `charmcraft fetch-lib`. Never modify
+  these files directly — changes will be overwritten on the next fetch.
 
 The following directories are at the **repository root** (not under `src/`):
 
@@ -93,6 +95,13 @@ all substrates (VM and K8s). It provides:
 12. **Retry patterns** — transient operations (database connections, Patroni API calls) use
     `tenacity` for retry logic. Use `Retrying` context manager or `@retry` decorator with
     appropriate stop/wait strategies. Catch `RetryError` when all retries are exhausted.
+
+13. **Juju secrets** — sensitive data (passwords, TLS keys) must be stored using Juju secrets
+    via `self.set_secret` / `self.get_secret`. Never store passwords or credentials in plain
+    relation data.
+
+14. **Vendored libraries** — the `lib/` directory contains charm libraries managed by
+    `charmcraft fetch-lib`. Never modify these files — submit fixes upstream instead.
 
 ## Code Quality Rules
 
