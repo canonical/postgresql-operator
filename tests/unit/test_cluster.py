@@ -119,8 +119,10 @@ def test_get_patroni_health(peers_ips, patroni):
         patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay,
         patch("cluster.wait_fixed", new_callable=PropertyMock) as _wait_fixed,
         patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
+        patch.object(patroni, "_session") as _session,
     ):
+        _session.get.side_effect = mocked_requests_get
+        _get = _session.get
         # Test when the Patroni API is reachable.
         _patroni_url.return_value = "http://server1"
         health = patroni.get_patroni_health()
@@ -205,12 +207,13 @@ def test_is_creating_backup(peers_ips, patroni):
 
 def test_is_replication_healthy(peers_ips, patroni):
     with (
-        patch("requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("charm.Patroni.get_primary") as _get_primary,
         patch("charm.Patroni.get_standby_leader") as _get_standby_leader,
         patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
+        _get = _session.get
         # Test when replication is healthy.
         _get.return_value.status_code = 200
         assert patroni.is_replication_healthy()
@@ -239,9 +242,11 @@ def test_is_member_isolated(peers_ips, patroni):
     with (
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
+        patch.object(patroni, "_session") as _session,
         patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
+        _session.get.side_effect = mocked_requests_get
+        _get = _session.get
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
         assert not patroni.is_member_isolated
@@ -411,7 +416,8 @@ def test_stop_patroni(peers_ips, patroni):
 
 
 def test_reinitialize_postgresql(peers_ips, patroni):
-    with patch("requests.post") as _post:
+    with patch.object(patroni, "_session") as _session:
+        _post = _session.post
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
             f"https://{patroni.unit_ip}:8008/reinitialize",
@@ -423,9 +429,10 @@ def test_reinitialize_postgresql(peers_ips, patroni):
 
 def test_switchover(peers_ips, patroni):
     with (
-        patch("requests.post") as _post,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.Patroni.get_primary", return_value="primary"),
     ):
+        _post = _session.post
         response = _post.return_value
         response.status_code = 200
 
@@ -472,8 +479,9 @@ def test_update_synchronous_node_count(peers_ips, patroni):
     with (
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed,
         patch("cluster.wait_fixed", return_value=wait_fixed(0)) as _wait_fixed,
-        patch("requests.patch") as _patch,
+        patch.object(patroni, "_session") as _session,
     ):
+        _patch = _session.patch
         response = _patch.return_value
         response.status_code = 200
 
@@ -522,11 +530,12 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 
 def test_member_started_true(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
+        _get = _session.get
         _get.return_value.json.return_value = {"state": "running"}
 
         assert patroni.member_started
@@ -541,11 +550,12 @@ def test_member_started_true(peers_ips, patroni):
 
 def test_member_started_false(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
+        _get = _session.get
         _get.return_value.json.return_value = {"state": "stopped"}
 
         assert not patroni.member_started
@@ -560,11 +570,12 @@ def test_member_started_false(peers_ips, patroni):
 
 def test_member_started_error(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
+        _get = _session.get
         _get.side_effect = Exception
 
         assert not patroni.member_started
@@ -579,10 +590,11 @@ def test_member_started_error(peers_ips, patroni):
 
 def test_member_inactive_true(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
+        _get = _session.get
         _get.return_value.json.return_value = {"state": "stopped"}
 
         assert patroni.member_inactive
@@ -597,10 +609,11 @@ def test_member_inactive_true(peers_ips, patroni):
 
 def test_member_inactive_false(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
+        _get = _session.get
         _get.return_value.json.return_value = {"state": "starting"}
 
         assert not patroni.member_inactive
@@ -615,10 +628,11 @@ def test_member_inactive_false(peers_ips, patroni):
 
 def test_member_inactive_error(peers_ips, patroni):
     with (
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
+        _get = _session.get
         _get.side_effect = Exception
 
         assert patroni.member_inactive
@@ -762,11 +776,12 @@ def test_remove_raft_member(patroni):
 def test_remove_raft_member_no_quorum(patroni, harness):
     with (
         patch("cluster.TcpUtility") as _tcp_utility,
-        patch("cluster.requests.get") as _get,
+        patch.object(patroni, "_session") as _session,
         patch(
             "charm.PostgresqlOperatorCharm.unit_peer_data", new_callable=PropertyMock
         ) as _unit_peer_data,
     ):
+        _get = _session.get
         # Async replica
         _unit_peer_data.return_value = {}
         _tcp_utility.return_value.executeCommand.return_value = {

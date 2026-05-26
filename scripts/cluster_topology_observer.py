@@ -35,7 +35,7 @@ async def _httpx_get_request(url: str):
     ssl_ctx = create_default_context()
     with suppress(FileNotFoundError):
         ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-    async with AsyncClient(timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx) as client:
+    async with AsyncClient(timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx, trust_env=False) as client:
         try:
             return (await client.get(url)).json()
         except Exception as e:

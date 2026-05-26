@@ -178,7 +178,7 @@ async def test_main():
             ]
         with pytest.raises(UnreachableUnitsError):
             await main()
-        _async_client.assert_any_call(timeout=5, verify=_context.return_value)
+        _async_client.assert_any_call(timeout=5, verify=_context.return_value, trust_env=False)
         _get.assert_any_call("http://server1:8008/cluster")
         _get.assert_any_call("http://server3:8008/cluster")
 
