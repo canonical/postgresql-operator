@@ -73,7 +73,6 @@ files = [
 ]
 
 [package.dependencies]
-exceptiongroup = {version = ">=1.0.2", markers = "python_version < \"3.11\""}
 idna = ">=2.8"
 typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
@@ -915,7 +914,7 @@ version = "1.3.1"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
-groups = ["main", "integration", "unit"]
+groups = ["integration", "unit"]
 markers = "python_version == \"3.10\""
 files = [
     {file = "exceptiongroup-1.3.1-py3-none-any.whl", hash = "sha256:a7a39a3bd276781e98394987d3a5701d0c4edffb633bb7a5144577f82c773598"},
@@ -1817,20 +1816,24 @@ testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "postgresql-charms-single-kernel"
-version = "16.1.12"
+version = "16.2.1"
 description = "Shared and reusable code for PostgreSQL-related charms"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "postgresql_charms_single_kernel-16.1.12-py3-none-any.whl", hash = "sha256:229c952c216537382f1842b14a2f0163f4b8ea976d5bc6507f48dbc4f7c90a9a"},
-    {file = "postgresql_charms_single_kernel-16.1.12.tar.gz", hash = "sha256:a05f2355916ac91d52f709f52d28731087508d9b6683acfdf220638b6a5a3a20"},
+    {file = "postgresql_charms_single_kernel-16.2.1-py3-none-any.whl", hash = "sha256:6936d06e225a9b8f1bc6da1b22b9cdc6f96fa5c4db7c47a3dbdc5ba5f956abad"},
+    {file = "postgresql_charms_single_kernel-16.2.1.tar.gz", hash = "sha256:5551abb62e7248218a009a0cb5da171de6d0a2919d349c5133bf4ac26cb6fe3c"},
 ]
 
 [package.dependencies]
+httpx = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 ops = ">=2.0.0"
 psycopg2 = ">=2.9.10"
 tenacity = ">=9.0.0"
+
+[package.extras]
+postgresql = ["httpx ; python_full_version >= \"3.12.0\""]
 
 [[package]]
 name = "prompt-toolkit"
@@ -3104,4 +3107,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "2b780e63599381bb41f43c0da631815ce0f841400beb9f1a1fe77fbff10d5ffc"
+content-hash = "39ad43e91ff98d2831d59cd92f3ac1967437e879a98ece59594ab8ea719b9985"
