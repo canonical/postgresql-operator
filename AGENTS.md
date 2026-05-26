@@ -25,6 +25,12 @@ PostgreSQL 16 on virtual machines via Patroni for high availability.
 - **`rotate_logs.py`** — Background process management for log rotation (pgBackRest logs).
 - **`constants.py`** — Global shared constants (paths, ports, password keys). Domain-specific
   constants (error messages, local state values) live in their respective modules.
+- **`grafana_dashboards/`** — Grafana dashboard JSON definitions for COS integration.
+- **`prometheus_alert_rules/`** — Prometheus alerting rule definitions (YAML).
+- **`loki_alert_rules/`** — Loki alerting rule definitions.
+
+The following directories are at the **repository root** (not under `src/`):
+
 - **`templates/`** — Jinja2 templates: `patroni.yml.j2`, `pgbackrest.conf.j2`,
   `pgbackrest.logrotate.j2`.
 
