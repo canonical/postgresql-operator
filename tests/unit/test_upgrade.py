@@ -113,6 +113,7 @@ def test_on_upgrade_granted(harness):
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
         patch("upgrade.PostgreSQLUpgrade._set_up_new_access_roles_for_legacy"),
+        patch("upgrade.PostgreSQLUpgrade._patch_max_timelines_history"),
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()
