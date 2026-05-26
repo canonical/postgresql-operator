@@ -27,6 +27,7 @@ from ops import (
     SecretNotFoundError,
 )
 from pysyncobj.utility import TcpUtility
+from single_kernel_postgresql.utils import new_password
 
 from constants import (
     RAFT_PARTNER_PREFIX,
@@ -39,7 +40,6 @@ from constants import (
     WATCHER_SECRET_LABEL,
     WATCHER_USER,
 )
-from utils import new_password
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm

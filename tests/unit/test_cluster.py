@@ -10,7 +10,7 @@ from charmlibs import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
-from single_kernel_postgresql.config.literals import REWIND_USER
+from single_kernel_postgresql.config.literals import REWIND_USER, Substrates
 from tenacity import (
     RetryError,
     stop_after_delay,
@@ -323,6 +323,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2",)
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
+            Substrates.VM,
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
             0o600,
