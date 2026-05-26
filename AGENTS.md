@@ -23,8 +23,8 @@ PostgreSQL 16 on virtual machines via Patroni for high availability.
 - **`ldap.py`** — LDAP integration via the `LdapRequirer` interface.
 - **`locales.py`** — Literal type definition of all locales available in the snap.
 - **`rotate_logs.py`** — Background process management for log rotation (pgBackRest logs).
-- **`constants.py`** — Global shared constants (paths, ports, password keys). Domain-specific
-  constants (error messages, local state values) live in their respective modules.
+- **`constants.py`** — All shared constants (paths, ports, password keys, error messages,
+  local state values).
 - **`grafana_dashboards/`** — Grafana dashboard JSON definitions for COS integration.
 - **`prometheus_alert_rules/`** — Prometheus alerting rule definitions (YAML).
 - **`loki_alert_rules/`** — Loki alerting rule definitions.
@@ -70,9 +70,7 @@ all substrates (VM and K8s). It provides:
    config. Config file rendering happens in `cluster.py` (Patroni YAML) and `backups.py`
    (pgBackRest conf) using Jinja2 templates from `templates/`.
 
-6. **Constants placement** — global constants shared across modules go in `constants.py`.
-   Domain-specific constants (error messages, local state values) stay in the module that
-   uses them.
+6. **Constants placement** — all constants go in `constants.py`.
 
 7. **TYPE_CHECKING guard** — use `if TYPE_CHECKING:` for imports needed only by type checkers
    (especially the charm class in relation handlers to avoid circular imports).
@@ -152,10 +150,11 @@ Every file must start with:
 
 ### Integration Tests
 
-- **Framework**: pytest-operator + jubilant.
+- **Framework**: jubilant (preferred for new tests) and pytest-operator (legacy).
 - **Location**: `tests/integration/`.
 - **Run**: `tox run -e integration -- tests/integration/test_file.py`
-- **Requirements**: running Juju controller + cloud credentials (AWS, GCP, or similar).
+- **Requirements**: running Juju controller. Cloud credentials (AWS, GCP, or similar) are
+  only needed for backup/restore tests.
 - **Duration**: minutes to hours — do not run the full suite casually.
 
 ### Testing Expectations
@@ -183,5 +182,5 @@ Before submitting any change:
 4. If Prometheus alert rules were modified, validate with `promtool check rules` and run
    `promtool test rules` against test files in `tests/alerts/`.
 5. Verify corresponding tests exist for any new or changed behavior.
-6. Confirm global constants are in `constants.py`, domain-specific ones in the relevant module.
+6. Confirm all constants are in `constants.py`.
 7. Confirm leader checks are present for any app-scoped relation data writes.
