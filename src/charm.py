@@ -69,6 +69,7 @@ from single_kernel_postgresql.config.literals import (
     Substrates,
 )
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
+from single_kernel_postgresql.utils import label2name, new_password, render_file
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -140,7 +141,6 @@ from relations.postgresql_provider import PostgreSQLProvider
 from relations.tls import TLS
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
-from utils import label2name, new_password, render_file
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -436,6 +436,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
         self._setup_pgbackrest_exporter()
+        self.watcher_offer.update_unit_address()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
@@ -1996,6 +1997,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 self._patroni.switchover(self._member_name)
                 self.unit_peer_data.update({"timestamp": str(datetime.now())})
+                if self.unit.is_leader():
+                    self.postgresql_client_relation.update_endpoints()
+                    self.async_replication.update_async_replication_data()
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
             except SwitchoverFailedError:
@@ -2286,22 +2290,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         key, ca, cert = self.tls.get_peer_tls_files()
         if key is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
         render_file(
-            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}", self.tls.get_peer_ca_bundle(), 0o600
+            Substrates.VM,
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            self.tls.get_peer_ca_bundle(),
+            0o600,
         )
 
         try:
