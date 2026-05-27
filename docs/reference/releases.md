@@ -16,6 +16,7 @@ For more details about all new PostgreSQL 16 features, see the complete [release
 
 | Charmhub revision</br>(amd, arm) | Snap revision</br>(amd, arm) | PostgreSQL version | Minimum Juju version |
 |:----------------------------:|:------------------------:|:------------------:|:--------------------:|
+|           [1088, 1089]       |         282, 283         |        16.13       |         3.6.21      |
 |           [1047, 1046]       |         244, 242         |        16.11       |         3.6.14      | 
 |           [990, 989]         |         244, 242         |        16.11       |         3.6.1      | 
 |           [952, 951]         |         239, 202         |        16.10       |         3.6.1      | 
@@ -45,3 +46,4 @@ See: [`juju info`](https://juju.is/docs/juju/juju-info).
 [952, 951]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.135.0
 [990, 989]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.165.0
 [1047, 1046]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.206.0
+[1088, 1089]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.242.0

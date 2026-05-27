@@ -21,6 +21,9 @@ from ..high_availability.high_availability_helpers_new import (
 
 DB_APP_1 = "db1"
 DB_APP_2 = "db2"
+WATCHER_APP_NAME = "postgresql-watcher"
+WATCHER_APP_1 = "watcher1"
+WATCHER_APP_2 = "watcher2"
 DB_TEST_APP_NAME = "postgresql-test-app"
 DB_TEST_APP_1 = "test-app1"
 DB_TEST_APP_2 = "test-app2"
@@ -90,7 +93,8 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     """Simple test to ensure that the database application charms get deployed."""
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture, "spaces": "client,peers"}
-    bind = {"database-peers": "peers", "database": "client"}
+    bind = {"database-peers": "peers", "database": "client", "watcher-offer": "peers"}
+    bind_watcher = {"database-peers": "peers", "watcher": "peers"}
 
     logging.info("Deploying postgresql clusters")
     model_1 = Juju(model=first_model)
@@ -101,7 +105,16 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
         config=configuration,
         constraints=constraints,
         bind=bind,
-        num_units=3,
+        num_units=2,
+    )
+    model_1.deploy(
+        charm=WATCHER_APP_NAME,
+        app=WATCHER_APP_1,
+        base="ubuntu@24.04",
+        config=configuration,
+        constraints=constraints,
+        bind=bind_watcher,
+        channel="16/edge",
     )
 
     model_2 = Juju(model=second_model)
@@ -112,7 +125,16 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
         config=configuration,
         constraints=constraints,
         bind=bind,
-        num_units=3,
+        num_units=2,
+    )
+    model_2.deploy(
+        charm=WATCHER_APP_NAME,
+        app=WATCHER_APP_2,
+        base="ubuntu@24.04",
+        config=configuration,
+        constraints=constraints,
+        bind=bind_watcher,
+        channel="16/edge",
     )
 
     logging.info("Deploying tls operators")
@@ -127,8 +149,10 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
     model_1.offer(f"{first_model}.self-signed-certificates", endpoint="certificates")
     model_2.consume(f"{first_model}.self-signed-certificates", "certificates-offer")
 
+    model_1.integrate(DB_APP_1, WATCHER_APP_1)
     model_1.integrate(f"{DB_APP_1}:client-certificates", "self-signed-certificates")
     model_1.integrate(f"{DB_APP_1}:peer-certificates", "self-signed-certificates")
+    model_2.integrate(DB_APP_2, WATCHER_APP_2)
     model_2.integrate(f"{DB_APP_2}:client-certificates", "certificates-offer")
     model_2.integrate(f"{DB_APP_2}:peer-certificates", "certificates-offer")
 
@@ -160,11 +184,11 @@ def test_deploy(first_model: str, second_model: str, lxd_spaces, charm) -> None:
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1, DB_TEST_APP_1),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1, DB_TEST_APP_1, WATCHER_APP_1),
         timeout=20 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2, DB_TEST_APP_2),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2, DB_TEST_APP_2, WATCHER_APP_2),
         timeout=20 * MINUTE_SECS,
     )
 
@@ -219,7 +243,7 @@ def test_data_replication(
     logging.info("Testing data replication")
     results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
 
-    assert len(results) == 6
+    assert len(results) == 4
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 

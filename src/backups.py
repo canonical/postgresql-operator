@@ -27,6 +27,8 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
+from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
@@ -61,6 +63,18 @@ S3_BLOCK_MESSAGES = [
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
 ]
+STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE = (
+    "Backups are not supported on a standby cluster. "
+    "Run create-backup on the primary cluster instead."
+)
+STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE = (
+    "Backups are not supported on a standby cluster. "
+    "Run list-backups on the primary cluster instead."
+)
+STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE = (
+    "Restoring backups is not supported on a standby cluster. "
+    "Run restore on the primary cluster instead."
+)
 
 
 class ListBackupsError(Exception):
@@ -147,6 +161,9 @@ class PostgreSQLBackups(Object):
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
+        if self._is_standby_cluster():
+            return False, STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE
+
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
 
@@ -168,6 +185,16 @@ class PostgreSQLBackups(Object):
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
+
+    def _is_standby_cluster(self) -> bool:
+        """Return whether this unit belongs to a standby cluster."""
+        if (
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
+            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
+        ):
+            return False
+
+        return not self.charm.async_replication.is_primary_cluster()
 
     def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
@@ -1066,6 +1093,11 @@ Stderr:
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
+        if self._is_standby_cluster():
+            logger.warning(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
+            event.fail(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
+            return
+
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.warning(validation_message)
@@ -1247,6 +1279,11 @@ Stderr:
         Returns:
             a boolean indicating whether restore should be run.
         """
+        if self._is_standby_cluster():
+            logger.error(f"Restore failed: {STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE}")
+            event.fail(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
+            return False
+
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.error(f"Restore failed: {validation_message}")
@@ -1332,8 +1369,11 @@ Stderr:
             return False
 
         if self._tls_ca_chain_filename != "":
-            self.charm._patroni.render_file(
-                self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
+            render_file(
+                Substrates.VM,
+                self._tls_ca_chain_filename,
+                "\n".join(s3_parameters["tls-ca-chain"]),
+                0o644,
             )
 
         with open("templates/pgbackrest.conf.j2") as file:
@@ -1359,14 +1399,14 @@ Stderr:
             process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
-        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
+        render_file(Substrates.VM, f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
-            self.charm._patroni.render_file(
-                PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
-            )
+        render_file(
+            Substrates.VM, PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
+        )
 
         return True
 

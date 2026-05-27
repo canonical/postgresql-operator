@@ -5,31 +5,29 @@
 import logging
 
 import pytest
-from pytest_operator.plugin import OpsTest
 
-from .helpers import CHARM_BASE, DATABASE_APP_NAME
+from .adapters import JujuFixture
+from .jubilant_helpers import DATABASE_APP_NAME
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
-async def test_storage(ops_test: OpsTest, charm):
+def test_storage(juju: JujuFixture, charm):
     """Build and deploy the charm and check its storage list."""
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
+    with juju.ext.fast_forward():
+        juju.ext.model.deploy(
             charm,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
         logger.info("Checking charm storages")
         expected_storages = ["archive", "data", "logs", "temp"]
-        storages = await ops_test.model.list_storage()
+        storages = juju.ext.model.list_storage()
         assert len(storages) == 4, f"Expected 4 storages, got: {len(storages)}"
         for index, storage in enumerate(storages):
-            assert (
-                storage["attachments"]["unit-postgresql-0"].__dict__["storage_tag"]
-                == f"storage-{expected_storages[index]}-{index}"
-            ), f"Storage {expected_storages[index]} not found"
+            assert storage["key"] == f"{expected_storages[index]}/{index}", (
+                f"Storage {expected_storages[index]} not found"
+            )

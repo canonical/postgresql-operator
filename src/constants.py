@@ -12,7 +12,6 @@ PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE]
 REPLICATION_CONSUMER_RELATION = "replication"
 REPLICATION_OFFER_RELATION = "replication-offer"
-API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
 TLS_KEY_FILE = "key.pem"
@@ -81,6 +80,18 @@ UNIT_SCOPE = "unit"
 SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 
 TRACING_PROTOCOL = "otlp_http"
+
+# Watcher constants
+WATCHER_OFFER_RELATION = "watcher-offer"
+WATCHER_RELATION = "watcher"
+WATCHER_USER = "watcher"
+
+# Labels are not confidential
+WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105
+WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
+
+RAFT_PORT = 2222
+RAFT_PARTNER_PREFIX = "partner_node_status_server_"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}

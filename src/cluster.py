@@ -9,31 +9,35 @@ import json
 import logging
 import os
 import pathlib
-import pwd
 import re
 import shutil
 import subprocess
-from asyncio import as_completed, create_task, run, wait
-from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
-from ssl import CERT_NONE, create_default_context
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import psutil
 import requests
 import tomli
 from charmlibs import snap
-from httpx import AsyncClient, BasicAuth, HTTPError
+from httpx import BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.literals import (
+    API_REQUEST_TIMEOUT,
     PEER,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
+    Substrates,
+)
+from single_kernel_postgresql.utils import (
+    _change_owner,
+    label2name,
+    parallel_patroni_get_request,
+    render_file,
 )
 from tenacity import (
     Future,
@@ -48,7 +52,6 @@ from tenacity import (
 )
 
 from constants import (
-    API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -57,9 +60,10 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    RAFT_PARTNER_PREFIX,
+    RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import label2name
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +234,7 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(POSTGRESQL_DATA_PATH)
+        _change_owner(Substrates.VM, POSTGRESQL_DATA_PATH)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
@@ -239,35 +243,11 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
-    def _change_owner(self, path: str) -> None:
-        """Change the ownership of a file or a directory to the postgres user.
-
-        Args:
-            path: path to a file or directory.
-        """
-        # Get the uid/gid for the _daemon_ user.
-        user_database = pwd.getpwnam("_daemon_")
-        # Set the correct ownership for the file or directory.
-        os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
-
     @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
         return {member["name"] for member in self.cached_cluster_status}
-
-    def _create_directory(self, path: str, mode: int) -> None:
-        """Creates a directory.
-
-        Args:
-            path: the path of the directory that should be created.
-            mode: access permission mask applied to the
-              directory using chmod (e.g. 0o640).
-        """
-        os.makedirs(path, mode=mode, exist_ok=True)
-        # Ensure correct permissions are set on the directory.
-        os.chmod(path, mode)
-        self._change_owner(path)
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -281,9 +261,28 @@ class Patroni:
 
     def cluster_status(self, alternative_endpoints: list | None = None) -> list[ClusterMember]:
         """Query the cluster status."""
+        if not self._patroni_async_auth:
+            raise RetryError(
+                last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
+            )
+
+        # TODO we don't know the other cluster's ca
+        verify = not bool(alternative_endpoints)
+        if alternative_endpoints:
+            endpoints = alternative_endpoints
+        else:
+            endpoints = []
+            if self.unit_ip:
+                endpoints.append(self.unit_ip)
+                for peer_ip in self.peers_ips:
+                    endpoints.append(peer_ip)
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(
-            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
+        if response := parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+            endpoints,
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            self._patroni_async_auth,
+            verify,
         ):
             logger.debug("API cluster_status: %s", response["members"])
             return response["members"]
@@ -326,57 +325,6 @@ class Patroni:
                 if member["name"] == member_name:
                     return member["state"]
         return ""
-
-    async def _httpx_get_request(self, url: str, verify: bool = True) -> dict[str, Any] | None:
-        if not self._patroni_async_auth:
-            return None
-        ssl_ctx = create_default_context()
-        if verify:
-            with suppress(FileNotFoundError):
-                ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-        else:
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = CERT_NONE
-        async with AsyncClient(
-            auth=self._patroni_async_auth,
-            timeout=API_REQUEST_TIMEOUT,
-            verify=ssl_ctx,
-            trust_env=False,
-        ) as client:
-            try:
-                return (await client.get(url)).raise_for_status().json()
-            except (HTTPError, ValueError):
-                return None
-
-    async def _async_get_request(
-        self, uri: str, endpoints: list[str], verify: bool = True
-    ) -> dict[str, Any] | None:
-        tasks = [
-            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}", verify))
-            for ip in endpoints
-        ]
-        for task in as_completed(tasks):
-            if result := await task:
-                for task in tasks:
-                    task.cancel()
-                await wait(tasks)
-                return result
-
-    def parallel_patroni_get_request(
-        self, uri: str, endpoints: list[str] | None = None
-    ) -> dict[str, Any] | None:
-        """Call all possible patroni endpoints in parallel."""
-        if not endpoints:
-            endpoints = []
-            if self.unit_ip:
-                endpoints.append(self.unit_ip)
-            for peer_ip in self.peers_ips:
-                endpoints.append(peer_ip)
-            verify = True
-        else:
-            # TODO we don't know the other cluster's ca
-            verify = False
-        return run(self._async_get_request(uri, endpoints, verify))
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
@@ -596,6 +544,28 @@ class Patroni:
 
         return len(r.json()["members"]) == 0
 
+    def is_member_registered_in_cluster(self) -> bool:
+        """Check if this member is registered in the Raft DCS cluster.
+
+        In Raft mode, a new member may be running and replicating but not yet
+        registered in the DCS if it hasn't been added to the Raft cluster.
+
+        Returns:
+            True if this member appears in the /cluster endpoint, False otherwise.
+        """
+        try:
+            cluster_status = self.cluster_status()
+        except RetryError:
+            logger.debug("Could not get cluster status to check member registration")
+            return False
+
+        if not cluster_status:
+            return False
+
+        # Check if this member's name appears in the cluster members list
+        member_name = self.member_name
+        return any(member.get("name") == member_name for member in cluster_status)
+
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
         try:
@@ -645,26 +615,15 @@ class Patroni:
                 if self.get_primary() is None:
                     raise ClusterNotPromotedError("cluster not promoted")
 
-    def render_file(self, path: str, content: str, mode: int, change_owner: bool = True) -> None:
-        """Write a content rendered from a template to a file.
-
-        Args:
-            path: the path to the file.
-            content: the data to be written to the file.
-            mode: access permission mask applied to the
-              file using chmod (e.g. 0o640).
-            change_owner: whether to change the file owner
-              to the _daemon_ user.
-        """
-        # TODO: keep this method to use it also for generating replication configuration files and
-        # move it to an utils / helpers file.
-        # Write the content to the file.
-        with open(path, "w+") as file:
-            file.write(content)
-        # Ensure correct permissions are set on the file.
-        os.chmod(path, mode)
-        if change_owner:
-            self._change_owner(path)
+    def set_max_timelines_history(self) -> None:
+        """Patch the DCS with max_timelines_history limit."""
+        self._session.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"max_timelines_history": 50},
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
     def render_patroni_yml_file(
         self,
@@ -759,8 +718,11 @@ class Patroni:
             user_databases_map=user_databases_map,
             slots=slots,
             instance_password_encryption=self.charm.config.instance_password_encryption,
+            watcher=self.charm.watcher_offer.watcher_raft_address
+            if self.charm.watcher_offer.is_active
+            else None,
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -958,7 +920,51 @@ class Patroni:
         except Exception:
             return []
 
-    def remove_raft_member(self, member_ip: str) -> None:
+    def cleanup_raft_cluster(self) -> bool:
+        """Cleanup RAFT members not belonging to the current cluster or not a related watcher."""
+        # Get Raft cluster status to find all members
+        try:
+            if not self.charm._is_workload_running:
+                logger.warning("Raft cleanup: Patroni service not running.")
+                return True
+            syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+            if raft_status := syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"]):
+                # Find all partner nodes in the Raft cluster
+                # Keys look like: partner_node_status_server_10.131.50.142:2222
+                for key in raft_status:
+                    if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+                        member_addr = key.replace(RAFT_PARTNER_PREFIX, "")
+                        member_ip = member_addr.split(":")[0]
+
+                        # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
+                        if (
+                            member_ip not in self.charm._units_ips
+                            and member_addr != self.charm.watcher_offer.watcher_raft_address
+                        ):
+                            logger.info(f"Removing stale Raft member: {member_addr}")
+                            self.remove_raft_member(member_addr)
+                            self.charm._remove_from_members_ips(member_ip)
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Error during Raft cleanup: {e}")
+            return False
+
+    def _set_stuck_raft_flag(self) -> None:
+        self.charm.set_unit_status(BlockedStatus("Raft majority loss, run: promote-to-primary"))
+        logger.warning("Remove raft member: Stuck raft cluster detected")
+        data_flags = {"raft_stuck": "True"}
+        self.charm.unit_peer_data.update(data_flags)
+
+        # Leader doesn't always trigger when changing it's own peer data.
+        if self.charm.unit.is_leader():
+            self.charm.on[PEER].relation_changed.emit(
+                unit=self.charm.unit,
+                app=self.charm.app,
+                relation=self.charm.model.get_relation(PEER),
+            )
+
+    def remove_raft_member(self, member_address: str | None) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -969,6 +975,10 @@ class Patroni:
             RaftMemberNotFoundError: if the member to be removed
                 is not part of the raft cluster.
         """
+        if not member_address:
+            logger.debug("Remove raft member: No address provided")
+            return
+
         if self.charm.has_raft_keys():
             logger.debug("Remove raft member: Raft already in recovery")
             return
@@ -979,48 +989,37 @@ class Patroni:
         raft_host = "127.0.0.1:2222"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-        except UtilityException:
+        except UtilityException as e:
             logger.warning("Remove raft member: Cannot connect to raft cluster")
-            raise RemoveRaftMemberFailedError() from None
+            raise RemoveRaftMemberFailedError() from e
         if not raft_status:
             logger.warning("Remove raft member: No raft status")
             raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
-        if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
+        if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
+        if raft_status["has_quorum"] and not raft_status["leader"]:
+            logger.warning("Remove raft member: No raft leader")
+            raise RemoveRaftMemberFailedError() from None
         if not raft_status["has_quorum"] and (
-            not raft_status["leader"] or raft_status["leader"].host == member_ip
+            not raft_status["leader"] or raft_status["leader"].address == member_address
         ):
-            self.charm.set_unit_status(
-                BlockedStatus("Raft majority loss, run: promote-to-primary")
-            )
-            logger.warning("Remove raft member: Stuck raft cluster detected")
-            data_flags = {"raft_stuck": "True"}
-            self.charm.unit_peer_data.update(data_flags)
-
-            # Leader doesn't always trigger when changing it's own peer data.
-            if self.charm.unit.is_leader():
-                self.charm.on[PEER].relation_changed.emit(
-                    unit=self.charm.unit,
-                    app=self.charm.app,
-                    relation=self.charm.model.get_relation(PEER),
-                )
+            self._set_stuck_raft_flag()
             return
 
-        # Suppressing since the call will be removed soon
         # Remove the member from the raft cluster.
         try:
-            result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
-        except UtilityException:
+            result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
+        except UtilityException as e:
             logger.debug("Remove raft member: Remove call failed")
-            raise RemoveRaftMemberFailedError() from None
+            raise RemoveRaftMemberFailedError() from e
 
         if not result or not result.startswith("SUCCESS"):
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
-            raise RemoveRaftMemberFailedError()
+            raise RemoveRaftMemberFailedError() from None
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
