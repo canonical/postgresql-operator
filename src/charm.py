@@ -1398,6 +1398,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if val:
                 updates[key] = val
         self.unit_peer_data.update(updates)
+        self.watcher_offer.update_endpoints()
 
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""

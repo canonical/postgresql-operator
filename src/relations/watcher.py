@@ -462,8 +462,10 @@ class PostgreSQLWatcherRelation(Object):
         Called when cluster membership changes (peer joins/departs).
         Also dynamically adds new PostgreSQL peers to the running Raft cluster.
         """
-        if self.charm.unit.is_leader() and (relation := self._relation):
-            self._update_relation_data(relation)
+        if relation := self._relation:
+            if self.charm.unit.is_leader():
+                self._update_relation_data(relation)
+            self.update_unit_address(relation)
 
     def _get_standby_clusters(self) -> list[str]:
         """Return the names of related standby clusters."""
