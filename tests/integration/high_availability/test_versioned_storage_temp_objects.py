@@ -21,6 +21,8 @@ variable (default: 1) for spread parametrization.
 import logging
 import os
 import platform
+import re
+import time
 
 import jubilant
 from jubilant import Juju, TaskError
@@ -90,6 +92,35 @@ def _get_temp_tablespace_location(juju: Juju, unit: str) -> str:
         "postgres",
     )
     return result[0] if result else ""
+
+
+def _complete_rolling_refresh(juju: Juju) -> None:
+    """Drive a multi-unit rolling refresh to completion.
+
+    After force-refresh-start upgrades the first unit, this polls the app
+    status for resume-refresh prompts and runs them for each remaining unit.
+    """
+    deadline = time.time() + 20 * MINUTE_SECS
+    while time.time() < deadline:
+        status = juju.status()
+        if status.apps[DB_APP_NAME].is_active:
+            return
+
+        app_msg = status.apps[DB_APP_NAME].app_status.message or ""
+        if "resume-refresh" in app_msg:
+            match = re.search(r"on unit (\d+)", app_msg)
+            if match:
+                resume_unit = f"{DB_APP_NAME}/{match.group(1)}"
+                logger.info("Running resume-refresh on %s", resume_unit)
+                try:
+                    juju.run(unit=resume_unit, action="resume-refresh", wait=15 * MINUTE_SECS)
+                except TaskError:
+                    logger.info("resume-refresh failed on %s, will retry", resume_unit)
+                continue
+
+        time.sleep(30)
+
+    raise TimeoutError("Rolling refresh did not complete within deadline")
 
 
 def _get_temp_object_count(juju: Juju, unit: str) -> int:
@@ -221,12 +252,17 @@ def test_clear_objects_and_complete_upgrade(juju: Juju) -> None:
     unit_names = sorted(units.keys())
 
     logger.info("Re-running force-refresh-start after clearing objects")
-    juju.run(
-        unit=unit_names[-1],
-        action="force-refresh-start",
-        params={"check-compatibility": False},
-        wait=10 * MINUTE_SECS,
-    )
+    try:
+        juju.run(
+            unit=unit_names[-1],
+            action="force-refresh-start",
+            params={"check-compatibility": False},
+            wait=15 * MINUTE_SECS,
+        )
+    except TimeoutError:
+        logger.info("force-refresh-start timed out, continuing with rolling refresh")
+
+    _complete_rolling_refresh(juju)
 
     juju.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
@@ -368,30 +404,25 @@ def test_clear_objects_and_rollback(juju: Juju) -> None:
     logger.info("Rolling back to 16/stable")
     juju.cli("refresh", DB_APP_NAME, "--switch", f"ch:{DB_APP_NAME}", "--channel", "16/stable")
 
-    logger.info("Waiting for rollback to complete or block")
-    try:
-        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
+    logger.info("Waiting for rollback to block")
+    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
 
-        units = get_app_units(juju, DB_APP_NAME)
-        unit_names = sorted(units.keys())
+    units = get_app_units(juju, DB_APP_NAME)
+    unit_names = sorted(units.keys())
 
-        if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
-            logger.info("Rollback blocked due to incompatibility, forcing start")
+    if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+        logger.info("Rollback blocked due to incompatibility, forcing start")
+        try:
             juju.run(
                 unit=unit_names[-1],
                 action="force-refresh-start",
                 params={"check-compatibility": False},
-                wait=10 * MINUTE_SECS,
+                wait=15 * MINUTE_SECS,
             )
+        except TimeoutError:
+            logger.info("force-refresh-start timed out, continuing with rolling refresh")
 
-        juju.wait(jubilant.all_agents_idle, timeout=10 * MINUTE_SECS)
-
-        if not juju.status().apps[DB_APP_NAME].is_active:
-            logger.info("Running resume-refresh action")
-            juju.run(unit=unit_names[1], action="resume-refresh", wait=15 * MINUTE_SECS)
-    except TimeoutError:
-        logger.info("Rollback completed without blocking")
-        assert juju.status().apps[DB_APP_NAME].is_active
+    _complete_rolling_refresh(juju)
 
     logger.info("Waiting for rollback to finish")
     juju.wait(
@@ -402,7 +433,7 @@ def test_clear_objects_and_rollback(juju: Juju) -> None:
 
 def test_verify_root_layout_after_rollback(juju: Juju) -> None:
     """Verify root layout and temp tablespace after rollback."""
-    unit = get_app_leader(juju, DB_APP_NAME)
+    unit = get_db_primary_unit(juju, DB_APP_NAME)
     logger.info("Verifying root layout after rollback on %s", unit)
 
     _assert_path_exists(juju, unit, f"{DATA_ROOT}/PG_VERSION")

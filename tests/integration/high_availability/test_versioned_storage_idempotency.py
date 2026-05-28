@@ -74,6 +74,23 @@ def _get_operator_password(juju: Juju) -> str:
     return password
 
 
+STABLE_DATA_FILES = ["PG_VERSION", "base", "global", "pg_xact", "pg_multixact"]
+
+
+def _get_key_inodes(juju: Juju, unit: str, path: str) -> dict[str, str]:
+    """Return inode numbers for key PostgreSQL data files/dirs.
+
+    Only checks files that migrate-data.sh would move — ignores
+    volatile runtime files that PostgreSQL creates/removes during
+    normal operation.
+    """
+    result = {}
+    for name in STABLE_DATA_FILES:
+        output = juju.ssh(unit, f"sudo stat -c '%i' {path}/{name} 2>/dev/null || echo missing")
+        result[name] = output.strip()
+    return result
+
+
 def _get_temp_tablespace_location(juju: Juju, unit: str) -> str:
     password = _get_operator_password(juju)
     ip = get_unit_ip(juju, DB_APP_NAME, unit)
@@ -228,7 +245,7 @@ def test_initial_upgrade(juju: Juju, charm: str) -> None:
 
 def test_re_upgrade_is_noop(juju: Juju, charm: str) -> None:
     """Upgrade again when already on versioned layout — should be a no-op."""
-    unit = get_app_leader(juju, DB_APP_NAME)
+    unit = get_db_primary_unit(juju, DB_APP_NAME)
     password = _get_operator_password(juju)
     ip = get_unit_ip(juju, DB_APP_NAME, unit)
 
@@ -244,12 +261,23 @@ def test_re_upgrade_is_noop(juju: Juju, charm: str) -> None:
         "postgres",
     )
 
+    units = get_app_units(juju, DB_APP_NAME)
+    inodes_before = {u: _get_key_inodes(juju, u, DATA_VERSIONED) for u in sorted(units)}
+    logger.info("Captured inode listings before re-upgrade")
+
     logger.info("Re-upgrading (already on versioned layout)")
     _do_upgrade(juju, charm)
 
-    unit = get_app_leader(juju, DB_APP_NAME)
-    _verify_versioned_layout(juju, unit)
+    units = get_app_units(juju, DB_APP_NAME)
+    for u in sorted(units):
+        _verify_versioned_layout(juju, u)
+        inodes_after = _get_key_inodes(juju, u, DATA_VERSIONED)
+        assert inodes_before[u] == inodes_after, (
+            f"Inodes changed on {u} during re-upgrade — migrate-data.sh did not exit early"
+        )
+    logger.info("Inode listings unchanged — migrate-data.sh exited early")
 
+    unit = get_db_primary_unit(juju, DB_APP_NAME)
     ip = get_unit_ip(juju, DB_APP_NAME, unit)
     result = execute_queries_on_unit(
         ip,
@@ -267,7 +295,7 @@ def test_re_upgrade_is_noop(juju: Juju, charm: str) -> None:
         ["DROP TABLE idempotency_marker;", "SELECT 1;"],
         "postgres",
     )
-    logger.info("Re-upgrade verified as no-op — layout and data intact")
+    logger.info("Re-upgrade verified as no-op — layout, inodes, and data intact")
 
 
 # ---- Phase 3: Rollback to root ----
@@ -304,12 +332,23 @@ def test_re_rollback_is_noop(juju: Juju) -> None:
         "postgres",
     )
 
+    units = get_app_units(juju, DB_APP_NAME)
+    inodes_before = {u: _get_key_inodes(juju, u, DATA_ROOT) for u in sorted(units)}
+    logger.info("Captured inode listings before re-rollback")
+
     logger.info("Re-rolling back (already on root layout)")
     _do_rollback(juju)
 
-    unit = get_app_leader(juju, DB_APP_NAME)
-    _verify_root_layout(juju, unit)
+    units = get_app_units(juju, DB_APP_NAME)
+    for u in sorted(units):
+        _verify_root_layout(juju, u)
+        inodes_after = _get_key_inodes(juju, u, DATA_ROOT)
+        assert inodes_before[u] == inodes_after, (
+            f"Inodes changed on {u} during re-rollback — migrate-data.sh did not exit early"
+        )
+    logger.info("Inode listings unchanged — migrate-data.sh exited early")
 
+    unit = get_db_primary_unit(juju, DB_APP_NAME)
     ip = get_unit_ip(juju, DB_APP_NAME, unit)
     result = execute_queries_on_unit(
         ip,
@@ -327,4 +366,4 @@ def test_re_rollback_is_noop(juju: Juju) -> None:
         ["DROP TABLE rollback_marker;", "SELECT 1;"],
         "postgres",
     )
-    logger.info("Re-rollback verified as no-op — layout and data intact")
+    logger.info("Re-rollback verified as no-op — layout, inodes, and data intact")
