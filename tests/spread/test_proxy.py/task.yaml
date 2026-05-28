@@ -1,7 +1,17 @@
 summary: test_proxy.py
 environment:
   TEST_MODULE: test_proxy.py
+prepare: |
+  apt-get update -qq
+  apt-get install -y -qq squid
+  BRIDGE_IP=$(ip -4 -o addr show lxdbr0 | awk '{print $4}' | cut -d/ -f1)
+  printf 'http_port %s:3128\nacl localnet src 10.0.0.0/8\nhttp_access allow localnet\nhttp_access allow localhost\nhttp_access deny all\n' "$BRIDGE_IP" > /etc/squid/squid.conf
+  systemctl restart squid
+  systemctl is-active --quiet squid
 execute: |
   tox run -e integration -- "tests/integration/$TEST_MODULE" --alluredir="$SPREAD_TASK/allure-results"
+restore: |
+  systemctl stop squid
+  apt-get remove -y -qq squid
 artifacts:
   - allure-results

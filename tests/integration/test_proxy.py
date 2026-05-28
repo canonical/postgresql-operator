@@ -27,7 +27,6 @@ from .jubilant_helpers import (
     DATABASE_APP_NAME,
     get_primary,
     get_unit_address,
-    run_command_on_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,7 +93,7 @@ def test_deploy_with_proxy(juju: JujuFixture, charm: str):
 def test_proxy_env_vars_present_on_units(juju: JujuFixture):
     """Verify the proxy env vars are set in /etc/environment (test precondition)."""
     unit_name = next(iter(juju.status().get_units(DATABASE_APP_NAME)))
-    env_output = run_command_on_unit(juju, unit_name, "cat /etc/environment")
+    env_output = juju.ssh(unit_name, "cat /etc/environment")
     assert "HTTPS_PROXY" in env_output, (
         "Proxy env vars not found in /etc/environment — cloudinit-userdata not applied"
     )
