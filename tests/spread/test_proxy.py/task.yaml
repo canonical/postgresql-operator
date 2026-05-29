@@ -9,7 +9,7 @@ prepare: |
   systemctl restart squid
   systemctl is-active --quiet squid
 execute: |
-  tox run -e integration -- "tests/integration/$TEST_MODULE" --alluredir="$SPREAD_TASK/allure-results"
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
 restore: |
   systemctl stop squid
   apt-get remove -y -qq squid

@@ -22,7 +22,7 @@ import textwrap
 import pytest
 import requests
 
-from .adapters import JujuFixture, temp_model_fixture
+from .adapters import JujuFixture
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
     get_primary,
@@ -61,25 +61,20 @@ CLOUDINIT_USERDATA = textwrap.dedent("""\
         NO_PROXY=localhost,127.0.0.1,10.0.0.0/8
 """).format(proxy=PROXY_URL)
 
-
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
-    keep_models = bool(request.config.getoption("--keep-models"))
-    with temp_model_fixture(
-        keep=keep_models,
-        config={
-            "http-proxy": PROXY_URL,
-            "https-proxy": PROXY_URL,
-            "no-proxy": "127.0.0.1,localhost,::1",
-            "cloudinit-userdata": CLOUDINIT_USERDATA,
-        },
-    ) as juju:
-        yield juju
+PROXY_CONFIG = {
+    "http-proxy": PROXY_URL,
+    "https-proxy": PROXY_URL,
+    "no-proxy": "127.0.0.1,localhost,::1",
+    "cloudinit-userdata": CLOUDINIT_USERDATA,
+}
 
 
 @pytest.mark.abort_on_fail
 def test_deploy_with_proxy(juju: JujuFixture, charm: str):
     """Deploy PostgreSQL in a model with HTTP proxy configured."""
+    # Apply the proxy config before deploying so the units' machines are provisioned
+    # with it (cloudinit-userdata only affects machines created after it is set).
+    juju.ext.model.set_config(PROXY_CONFIG)
     juju.ext.model.deploy(
         charm,
         application_name=DATABASE_APP_NAME,
