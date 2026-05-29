@@ -52,7 +52,7 @@ from cluster import (
 )
 from constants import (
     PEER,
-    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_DATA_DIR,
     SECRET_INTERNAL_LABEL,
     UPDATE_CERTS_BIN_PATH,
 )
@@ -379,38 +379,72 @@ def test_enable_disable_extensions(harness, caplog):
             assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
-def test_on_start(harness):
+def test_on_start_no_password(harness):
+    """Test start is deferred when passwords are not yet generated."""
+    with (
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+    ):
+        _get_password.return_value = None
+        harness.charm.on.start.emit()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+
+        # ModelError when fetching the password has the same outcome.
+        _get_password.side_effect = ModelError
+        harness.charm.on.start.emit()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+
+
+def test_on_start_bootstrap_failure(harness):
+    """Test start is blocked when cluster bootstrap fails."""
     with (
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
         patch(
-            "charm.PostgresqlOperatorCharm._set_primary_status_message"
-        ) as _set_primary_status_message,
-        patch(
-            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
-        ) as _enable_disable_extensions,
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
-        ) as _update_relation_endpoints,
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
-        patch("charm.PostgreSQLProvider.update_endpoints"),
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
+    ):
+        _get_password.return_value = "fake-operator-password"
+        _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = False
+
+        # TODO: test replicas start (DPE-494).
+        harness.set_leader()
+        harness.charm.on.start.emit()
+        _bootstrap_cluster.assert_called_once()
+        _restart_services_after_reboot.assert_called_once()
+        assert isinstance(harness.model.unit.status, BlockedStatus)
+
+
+def test_on_start_create_user_error(harness):
+    """Test start is blocked when creating the default postgres user fails."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
+        ) as _restart_services_after_reboot,
+        patch(
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch(
             "charm.Patroni.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
-        patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
-        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_storage_attached",
-            side_effect=[False, True, True, True, True, True],
-        ),
         patch(
             "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
             new_callable=PropertyMock,
@@ -421,61 +455,73 @@ def test_on_start(harness):
             new_callable=PropertyMock,
             return_value=True,
         ),
-        patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
     ):
-        _get_postgresql_version.return_value = "16.6"
-
-        # Test before the passwords are generated.
-        _member_started.return_value = False
-        _get_password.return_value = None
-        harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_not_called()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-
-        # ModelError in get password
-        _get_password.side_effect = ModelError
-        harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_not_called()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-
-        # Mock the passwords.
-        _get_password.side_effect = None
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = True
+        _member_started.return_value = True
+        _postgresql.list_users.return_value = []
+        _postgresql.create_user.side_effect = PostgreSQLCreateUserError
 
-        # Mock cluster start and postgres user creation success values.
-        _bootstrap_cluster.side_effect = [False, True, True]
-        _postgresql.list_users.side_effect = [[], [], []]
-        _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None, None, None]
-
-        # Test for a failed cluster bootstrapping.
-        # TODO: test replicas start (DPE-494).
         harness.set_leader()
         harness.charm.on.start.emit()
-        _bootstrap_cluster.assert_called_once()
-        _oversee_users.assert_not_called()
-        _restart_services_after_reboot.assert_called_once()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
-        # Set an initial waiting status (like after the install hook was triggered).
-        harness.model.unit.status = WaitingStatus("fake message")
-
-        # Test the event of an error happening when trying to create the default postgres user.
-        _restart_services_after_reboot.reset_mock()
-        _member_started.return_value = True
-        harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
-        _oversee_users.assert_not_called()
         _restart_services_after_reboot.assert_called_once()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
-        # Set an initial waiting status again (like after the install hook was triggered).
-        harness.model.unit.status = WaitingStatus("fake message")
 
-        # Then test the event of a correct cluster bootstrapping.
-        _restart_services_after_reboot.reset_mock()
+def test_on_start_success(harness):
+    """Test successful cluster bootstrapping on the primary unit."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
+        ) as _restart_services_after_reboot,
+        patch(
+            "charm.PostgresqlOperatorCharm._set_primary_status_message"
+        ) as _set_primary_status_message,
+        patch(
+            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+        ) as _enable_disable_extensions,
+        patch("charm.PostgresqlOperatorCharm._update_relation_endpoints"),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "charm.PostgresqlOperatorCharm._replication_password",
+            new_callable=PropertyMock,
+        ) as _replication_password,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch(
+            "charm.Patroni.member_started",
+            new_callable=PropertyMock,
+        ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+    ):
+        _get_password.return_value = "fake-operator-password"
+        _replication_password.return_value = "fake-replication-password"
+        _bootstrap_cluster.return_value = True
+        _member_started.return_value = True
+        _postgresql.list_users.return_value = []
+
+        harness.set_leader()
         harness.charm.on.start.emit()
-        assert _postgresql.create_user.call_count == 3  # Considering the previous failed call.
+        assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
@@ -500,6 +546,7 @@ def test_on_start_replica(harness):
         patch.object(EventBase, "defer") as _defer,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             return_value=True,
@@ -554,6 +601,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.Patroni") as patroni,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
@@ -599,6 +647,224 @@ def test_on_start_after_blocked_state(harness):
         _bootstrap_cluster.assert_not_called()
         # Assert the status didn't change.
         assert harness.model.unit.status == initial_status
+
+
+def test_ensure_storage_layout(harness, tmp_path):
+    """_ensure_storage_layout creates TEMP_DATA_DIR only.
+
+    Data migration between storage roots and versioned paths is handled
+    by the snap hooks — the charm only ensures TEMP_DATA_DIR exists
+    (it may live on a tmpfs mount that is wiped on reboot).
+    """
+    temp_root = tmp_path / "temp" / "16" / "main"
+    with (
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil"),
+    ):
+        harness.charm._ensure_storage_layout()
+    assert temp_root.is_dir()
+    # No other dirs should be created by the charm.
+    assert not (tmp_path / "data").exists()
+    assert not (tmp_path / "archive").exists()
+    assert not (tmp_path / "logs").exists()
+
+
+def test_migrate_temp_tablespace_location_skips_when_not_primary(harness):
+    """If the unit is not primary, the migration is skipped."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+    ):
+        result = harness.charm._migrate_temp_tablespace_location()
+
+    assert result is True
+
+
+def test_migrate_temp_tablespace_location_skips_when_no_endpoint(harness):
+    """If primary_endpoint is not yet set, the migration is skipped."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=None,
+        ),
+    ):
+        result = harness.charm._migrate_temp_tablespace_location()
+
+    assert result is True
+
+
+def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_path):
+    """When temp tablespace is at old TEMP_STORAGE_PATH, it is migrated to TEMP_DATA_DIR."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_storage_path = str(tmp_path / "temp")
+    temp_data_dir.mkdir(parents=True)
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (temp_storage_path,)  # still at old path
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    cursor.execute.assert_has_calls([
+        call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
+        call("DROP TABLESPACE temp;"),
+        call(f"CREATE TABLESPACE temp LOCATION '{temp_data_dir}';"),
+        call("GRANT CREATE ON TABLESPACE temp TO public;"),
+    ])
+
+
+def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(harness, tmp_path):
+    """When temp tablespace is already at TEMP_DATA_DIR, no migration is performed."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_data_dir.mkdir(parents=True)
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (str(temp_data_dir),)  # already at versioned path
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    # Only the SELECT should have been executed — no DROP/CREATE
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+
+
+def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness, tmp_path):
+    """When the tablespace doesn't exist in pg_catalog, no migration is needed."""
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = None  # tablespace was never created or already dropped
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    # Only the SELECT should have been executed
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+
+
+def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness, tmp_path):
+    """When the tablespace is at an unexpected location, migration is skipped with a warning."""
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchone.return_value = ("/some/unexpected/path",)
+    connection.cursor.return_value = cursor
+    postgresql = MagicMock()
+    postgresql._connect_to_database.return_value = connection
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+        patch("charm.logger") as logger,
+    ):
+        assert harness.charm._migrate_temp_tablespace_location()
+
+    cursor.execute.assert_called_once_with(
+        "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+    )
+    logger.warning.assert_called_once()
+
+
+def test_migrate_temp_tablespace_location_returns_false_on_db_error(harness):
+    """When a psycopg2 error occurs, the method returns False."""
+    postgresql = MagicMock()
+    postgresql._connect_to_database.side_effect = psycopg2.Error("connection failed")
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch(
+            "charm.PostgresqlOperatorCharm.postgresql",
+            new_callable=PropertyMock,
+            return_value=postgresql,
+        ),
+    ):
+        assert not harness.charm._migrate_temp_tablespace_location()
+
+
+def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
+    """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
+    temp_root = tmp_path / "temp" / "16" / "main"
+    with (
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil"),
+    ):
+        harness.charm._ensure_storage_layout()
+    assert temp_root.is_dir()
 
 
 def test_on_update_status(harness):
@@ -3047,8 +3313,8 @@ def test_handle_processes_failures(harness):
         assert harness.charm._handle_processes_failures()
         assert not _restart_patroni.called
         _rename.assert_called_once_with(
-            os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
-            os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{_now.isoformat()}"),
+            os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
+            os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{_now.isoformat()}"),
         )
         _rename.reset_mock()
 

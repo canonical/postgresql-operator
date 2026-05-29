@@ -10,6 +10,7 @@ from typing import get_args
 import psycopg2
 import pytest
 import requests
+from constants import POSTGRESQL_DATA_DIR
 from locales import SNAP_LOCALES
 from psycopg2 import sql
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
@@ -17,7 +18,6 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 from .adapters import JujuFixture
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
-    STORAGE_PATH,
     check_cluster_members,
     convert_records_to_dict,
     db_connect,
@@ -131,7 +131,7 @@ def test_settings_are_correct(juju: JujuFixture, unit_id: int):
     assert settings["archive_mode"] == "on"
     assert settings["autovacuum"] == "on"
     assert settings["cluster_name"] == DATABASE_APP_NAME
-    assert settings["data_directory"] == STORAGE_PATH
+    assert settings["data_directory"] == POSTGRESQL_DATA_DIR
     assert settings["data_checksums"] == "on"
     assert settings["fsync"] == "on"
     assert settings["full_page_writes"] == "on"
