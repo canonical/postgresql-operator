@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 from jinja2 import Template
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import Substrates
 from tenacity import RetryError, wait_fixed
 
 from backups import (
@@ -1885,11 +1886,13 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         # Ensure the correct rendered template is sent to _render_file method.
         calls = [
             call(
+                Substrates.VM,
                 "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
                 expected_content,
                 0o640,
             ),
             call(
+                Substrates.VM,
                 "/etc/logrotate.d/pgbackrest.logrotate",
                 log_rotation_expected_content,
                 0o644,
@@ -1897,7 +1900,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             ),
         ]
         if tls_ca_chain_filename != "":
-            calls.insert(0, call(tls_ca_chain_filename, "fake-tls-ca-chain", 0o644))
+            calls.insert(0, call(Substrates.VM, tls_ca_chain_filename, "fake-tls-ca-chain", 0o644))
         _render_file.assert_has_calls(calls)
 
 

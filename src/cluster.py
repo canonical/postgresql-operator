@@ -26,10 +26,18 @@ from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.literals import (
+    API_REQUEST_TIMEOUT,
     PEER,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
+    Substrates,
+)
+from single_kernel_postgresql.utils import (
+    _change_owner,
+    label2name,
+    parallel_patroni_get_request,
+    render_file,
 )
 from tenacity import (
     Future,
@@ -44,7 +52,6 @@ from tenacity import (
 )
 
 from constants import (
-    API_REQUEST_TIMEOUT,
     LOGS_DATA_DIR,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
@@ -58,7 +65,6 @@ from constants import (
     RAFT_PORT,
     TLS_CA_BUNDLE_FILE,
 )
-from utils import _change_owner, label2name, parallel_patroni_get_request, render_file
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +229,7 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         os.makedirs(POSTGRESQL_DATA_DIR, exist_ok=True)
-        _change_owner(POSTGRESQL_DATA_DIR)
+        _change_owner(Substrates.VM, POSTGRESQL_DATA_DIR)
 
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
@@ -712,7 +718,7 @@ class Patroni:
             if self.charm.watcher_offer.is_active
             else None,
         )
-        render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
