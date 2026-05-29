@@ -92,46 +92,49 @@ async def verify_raft_cluster_health(
     assert return_code == 0, f"Failed to get watcher address from {watcher_unit.name}"
     watcher_ip = watcher_ip.strip()
 
-    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            for unit in ops_test.model.applications[db_app_name].units:
-                # Get the Raft password from Patroni config using juju exec directly
-                # We need to avoid shell interpretation issues with run_command_on_unit
-                complete_command = [
-                    "exec",
-                    "--unit",
-                    unit.name,
-                    "--",
-                    "cat",
-                    "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
-                ]
-                return_code, stdout, _ = await ops_test.juju(*complete_command)
-                assert return_code == 0, f"Failed to read patroni.yaml on {unit.name}"
+    async with ops_test.fast_forward():
+        for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True):
+            with attempt:
+                for unit in ops_test.model.applications[db_app_name].units:
+                    # Get the Raft password from Patroni config using juju exec directly
+                    # We need to avoid shell interpretation issues with run_command_on_unit
+                    complete_command = [
+                        "exec",
+                        "--unit",
+                        unit.name,
+                        "--",
+                        "cat",
+                        "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
+                    ]
+                    return_code, stdout, _ = await ops_test.juju(*complete_command)
+                    assert return_code == 0, f"Failed to read patroni.yaml on {unit.name}"
 
-                conf = safe_load(stdout)
-                password = conf.get("raft", {}).get("password")
-                self_addr = conf.get("raft", {}).get("self_addr")
-                assert password, f"Could not find Raft password in patroni.yaml on {unit.name}"
+                    conf = safe_load(stdout)
+                    password = conf.get("raft", {}).get("password")
+                    self_addr = conf.get("raft", {}).get("self_addr")
+                    assert password, f"Could not find Raft password in patroni.yaml on {unit.name}"
 
-                # Check Raft status using the password
-                syncobj_util = TcpUtility(password=password, timeout=3)
-                status = syncobj_util.executeCommand(self_addr, ["status"])
-                logger.info(f"Raft status on {unit.name}: {status}...")
+                    # Check Raft status using the password
+                    syncobj_util = TcpUtility(password=password, timeout=3)
+                    status = syncobj_util.executeCommand(self_addr, ["status"])
+                    logger.info(f"Raft status on {unit.name}: {status}")
 
-                # Verify quorum
-                assert status["has_quorum"] is True, f"Unit {unit.name} does not have Raft quorum"
+                    # Verify quorum
+                    assert status["has_quorum"] is True, (
+                        f"Unit {unit.name} does not have Raft quorum"
+                    )
 
-                assert status["partner_nodes_count"] + 1 == expected_members
+                    assert status["partner_nodes_count"] + 1 == expected_members
 
-                # Verify watcher is in the cluster (if requested)
-                # After network isolation tests, the watcher may have been redeployed
-                # with a new IP that isn't yet updated in the Raft configuration
-                if check_watcher_ip:
-                    assert watcher_ip in [
-                        key.split(":")[0].split(RAFT_PARTNER_PREFIX)[-1]
-                        for key in status
-                        if key.startswith(RAFT_PARTNER_PREFIX)
-                    ], f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}"
+                    # Verify watcher is in the cluster (if requested)
+                    # After network isolation tests, the watcher may have been redeployed
+                    # with a new IP that isn't yet updated in the Raft configuration
+                    if check_watcher_ip:
+                        assert watcher_ip in [
+                            key.split(":")[0].split(RAFT_PARTNER_PREFIX)[-1]
+                            for key in status
+                            if key.startswith(RAFT_PARTNER_PREFIX)
+                        ], f"Watcher {watcher_ip} not found in Raft cluster on {unit.name}"
 
     logger.info("Raft cluster health verified successfully")
 
