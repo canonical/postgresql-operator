@@ -817,28 +817,36 @@ class PostgreSQLBackups(Object):
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Call the stanza initialization when the credentials or the connection info change."""
         if not self.charm.is_cluster_initialised:
-            logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
+            logger.debug(
+                "Deferring S3 credential change handling: PostgreSQL cluster is not initialised yet."
+            )
             event.defer()
             return
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
-            logger.info("Cannot change S3 configuration in bad PITR restore status")
+            logger.info(
+                "Deferring S3 credential change handling: unit is in bad PITR restore status."
+            )
             event.defer()
             return
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
         if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
-            logger.info("Cannot change S3 configuration during restore")
+            logger.info(
+                "Deferring S3 credential change handling: cluster is restoring backup or PITR."
+            )
             event.defer()
             return
 
         if not self._render_pgbackrest_conf_file():
-            logger.debug("Cannot set pgBackRest configurations, missing configurations.")
+            logger.debug(
+                "Skipping S3 credential change handling: missing S3 settings to render pgBackRest config."
+            )
             return
 
         if not self._can_initialise_stanza:
-            logger.debug("Cannot initialise stanza yet.")
+            logger.debug("Deferring S3 credential change handling: cannot initialise stanza yet.")
             event.defer()
             return
 
@@ -884,12 +892,25 @@ class PostgreSQLBackups(Object):
         if not self.check_stanza():
             return False
 
-        s3_parameters, _ = self._retrieve_s3_parameters()
-        self._upload_content_to_s3(
+        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
+        if missing_parameters:
+            logger.error(
+                "Cannot upload model-uuid.txt to S3: missing required S3 parameters %s.",
+                missing_parameters,
+            )
+            self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+            return False
+
+        if not self._upload_content_to_s3(
             self.model.uuid,
             "model-uuid.txt",
             s3_parameters,
-        )
+        ):
+            logger.error("Failed to upload model-uuid.txt to S3 during S3 initialization.")
+            self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+            return False
+
+        logger.info("Successfully uploaded model-uuid.txt to S3 during S3 initialization.")
 
         return True
 
