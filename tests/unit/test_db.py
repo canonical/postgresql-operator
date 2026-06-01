@@ -175,12 +175,12 @@ def test_get_extensions(harness):
         default: false
         type: boolean"""
     harness = Harness(PostgresqlOperatorCharm, config=config)
-    harness.cleanup()
     harness.begin()
     assert harness.charm.legacy_db_relation._get_extensions(relation) == (
         [extensions[1], extensions[2]],
         {extensions[2]},
     )
+    harness.cleanup()
 
 
 def test_set_up_relation(harness):
