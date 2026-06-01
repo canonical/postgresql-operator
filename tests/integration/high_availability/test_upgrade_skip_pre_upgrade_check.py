@@ -39,6 +39,7 @@ def test_deploy_stable(juju: Juju) -> None:
         app=DB_TEST_APP_NAME,
         base="ubuntu@24.04",
         channel="latest/edge",
+        config={"sleep_interval": 2000},
         constraints={"arch": "arm64"} if platform.machine() == "aarch64" else None,
         num_units=1,
     )
@@ -129,7 +130,7 @@ async def test_rollback_without_pre_refresh_check(
         juju.wait(jubilant.all_agents_idle, timeout=10 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
-        juju.run(unit=unit_names[1], action="resume-refresh", wait=40 * MINUTE_SECS)
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=10 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert juju.status().apps[DB_APP_NAME].is_active
