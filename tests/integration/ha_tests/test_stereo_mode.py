@@ -18,13 +18,14 @@ import asyncio
 import logging
 
 import pytest
-from constants import RAFT_PARTNER_PREFIX
 from pysyncobj.utility import TcpUtility
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 from yaml import safe_load
 
-from ..helpers import APPLICATION_NAME, DATABASE_APP_NAME
+from constants import RAFT_PARTNER_PREFIX
+
+from ..helpers import APPLICATION_NAME, DATABASE_APP_NAME, get_machine_from_unit, stop_machine
 from .helpers import APPLICATION_NAME as TEST_APP_NAME
 from .helpers import (
     are_writes_increasing,
@@ -38,6 +39,7 @@ from .helpers import (
 )
 
 WATCHER_APP_NAME = "postgresql-watcher"
+SECOND_PG_APP_NAME = "postgresql-b"
 
 
 async def start_writes(ops_test: OpsTest) -> None:
@@ -116,7 +118,7 @@ async def verify_raft_cluster_health(
                 # Check Raft status using the password
                 syncobj_util = TcpUtility(password=password, timeout=3)
                 status = syncobj_util.executeCommand(self_addr, ["status"])
-                logger.info(f"Raft status on {unit.name}: {status}...")
+                logger.info(f"Raft status on {unit.name}: {status}")
 
                 # Verify quorum
                 assert status["has_quorum"] is True, f"Unit {unit.name} does not have Raft quorum"
@@ -190,11 +192,13 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
             channel="edge",
         )
 
-        # Wait for initial deployment
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
-            timeout=1200,
-            raise_on_error=False,  # Watcher may be waiting for relation
+        logger.info("Deploying second PostgreSQL cluster for multi-cluster watcher test")
+        await ops_test.model.deploy(
+            charm,
+            application_name=SECOND_PG_APP_NAME,
+            num_units=2,
+            series="noble",
+            config={"profile": "testing", "synchronous-mode-strict": False},
         )
 
         # Relate PostgreSQL (watcher-offer) to watcher (watcher)
@@ -209,13 +213,6 @@ async def test_build_and_deploy_stereo_mode(ops_test: OpsTest, charm) -> None:
                 logger.info(f"Watcher relation already exists: {e}")
             else:
                 raise
-
-        # Wait for watcher to join Raft cluster
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, WATCHER_APP_NAME],
-            status="active",
-            timeout=600,
-        )
 
         # Relate PostgreSQL to test app
         try:
@@ -260,6 +257,7 @@ async def test_replica_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     logger.info(f"Shutting down replica: {replica}")
 
     # Shutdown the replica
+    await stop_machine(ops_test, await get_machine_from_unit(ops_test, replica))
     await ops_test.model.destroy_unit(replica, force=True, destroy_storage=False, max_wait=1500)
 
     # Wait for the cluster to stabilize after unit removal
@@ -339,6 +337,7 @@ async def test_primary_shutdown_with_watcher(ops_test: OpsTest, continuous_write
     logger.info(f"Shutting down primary: {original_primary}")
 
     # Shutdown the primary
+    await stop_machine(ops_test, await get_machine_from_unit(ops_test, original_primary))
     await ops_test.model.destroy_unit(
         original_primary, force=True, destroy_storage=False, max_wait=1500
     )
@@ -433,6 +432,7 @@ async def test_watcher_shutdown_no_outage(ops_test: OpsTest, continuous_writes) 
 
     # Remove the watcher
     watcher_unit = ops_test.model.applications[WATCHER_APP_NAME].units[0]
+    await stop_machine(ops_test, await get_machine_from_unit(ops_test, watcher_unit.name))
     await ops_test.model.destroy_unit(watcher_unit.name, force=True, max_wait=300)
 
     # Verify writes continue without interruption
@@ -519,12 +519,13 @@ async def test_primary_network_isolation_with_watcher(
     # Wait for cluster to stabilize with restored network
     # The old primary may take time to rejoin after getting a new IP address,
     # so we use raise_on_error=False and wait longer
-    await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME],
-        timeout=900,
-        idle_period=30,
-        raise_on_error=False,  # Old primary may be in error while rejoining
-    )
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME],
+            timeout=900,
+            idle_period=30,
+            raise_on_error=False,  # Old primary may be in error while rejoining
+        )
 
     # Wait for the old primary to rejoin as replica
     # This can take a while as it needs to recover with a new IP
@@ -674,28 +675,14 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
     to multiple PostgreSQL clusters simultaneously. Each relation gets its own
     Raft instance with a dedicated port and data directory.
     """
-    second_pg_app = "postgresql-b"
-
     try:
         # Deploy a second PostgreSQL cluster
-        logger.info("Deploying second PostgreSQL cluster for multi-cluster watcher test")
-        await ops_test.model.deploy(
-            charm,
-            application_name=second_pg_app,
-            num_units=2,
-            series="noble",
-            config={"profile": "testing", "synchronous-mode-strict": False},
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[second_pg_app],
-            status="active",
-            timeout=1200,
-        )
+        await ops_test.model.wait_for_idle(apps=[SECOND_PG_APP_NAME], status="active", timeout=330)
 
         # Relate the watcher to the second cluster
         logger.info("Relating watcher to second PostgreSQL cluster")
         await ops_test.model.integrate(
-            f"{second_pg_app}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
+            f"{SECOND_PG_APP_NAME}:watcher-offer", f"{WATCHER_APP_NAME}:watcher"
         )
 
         # Use fast_forward to trigger update_status quickly, which runs
@@ -703,7 +690,7 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
         async with ops_test.fast_forward():
             # Wait for the watcher to connect to both clusters
             await ops_test.model.wait_for_idle(
-                apps=[DATABASE_APP_NAME, second_pg_app, WATCHER_APP_NAME],
+                apps=[DATABASE_APP_NAME, SECOND_PG_APP_NAME, WATCHER_APP_NAME],
                 status="active",
                 timeout=600,
             )
@@ -715,14 +702,14 @@ async def test_multi_cluster_watcher(ops_test: OpsTest, charm) -> None:
             )
             # Check second cluster
             await verify_raft_cluster_health(
-                ops_test, second_pg_app, WATCHER_APP_NAME, expected_members=3
+                ops_test, SECOND_PG_APP_NAME, WATCHER_APP_NAME, expected_members=3
             )
 
     finally:
         # Clean up the second cluster relation and app
-        if second_pg_app in ops_test.model.applications:
+        if SECOND_PG_APP_NAME in ops_test.model.applications:
             await ops_test.model.remove_application(
-                second_pg_app, block_until_done=True, force=True
+                SECOND_PG_APP_NAME, block_until_done=True, force=True
             )
 
     # Verify original watcher is still healthy after removing the second cluster
