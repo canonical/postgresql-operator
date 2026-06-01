@@ -108,12 +108,6 @@ def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
         timeout=20 * MINUTE_SECS,
     )
 
-    logging.info("Wait for upgrade to complete")
-    juju.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
-        timeout=20 * MINUTE_SECS,
-    )
-
     logging.info("Ensure continuous writes are incrementing")
     check_db_units_writes_increment(juju, DB_APP_NAME)
 

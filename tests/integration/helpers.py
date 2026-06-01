@@ -17,7 +17,6 @@ import psycopg2
 import pytest
 import requests
 import yaml
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
@@ -31,6 +30,8 @@ from tenacity import (
     wait_exponential,
     wait_fixed,
 )
+
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
