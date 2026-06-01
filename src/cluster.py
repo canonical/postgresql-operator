@@ -208,6 +208,13 @@ class Patroni:
         """Patroni REST API URL."""
         return f"https://{self.unit_ip}:8008"
 
+    @cached_property
+    def _session(self) -> requests.Session:
+        # Patroni API calls are always intra-cluster and must not go through HTTP proxies.
+        s = requests.Session()
+        s.trust_env = False
+        return s
+
     @staticmethod
     def _dict_to_hba_string(_dict: dict[str, Any]) -> str:
         """Transform a dictionary into a Host Based Authentication valid string."""
@@ -411,7 +418,7 @@ class Patroni:
         """Gets, retires and parses the Patroni health endpoint."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
-                r = requests.get(
+                r = self._session.get(
                     f"{self._patroni_url}/health",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
@@ -454,7 +461,7 @@ class Patroni:
                     for members_ip in members_ips:
                         endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
-                        r = requests.get(
+                        r = self._session.get(
                             f"{url}/{endpoint}",
                             verify=self.verify,
                             auth=self._patroni_auth,
@@ -520,7 +527,7 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(
+                    r = self._session.get(
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
@@ -582,7 +589,7 @@ class Patroni:
 
     def promote_standby_cluster(self) -> None:
         """Promote a standby cluster to be a regular cluster."""
-        config_response = requests.get(
+        config_response = self._session.get(
             f"{self._patroni_url}/config",
             verify=self.verify,
             auth=self._patroni_auth,
@@ -595,7 +602,7 @@ class Patroni:
         )
         if "standby_cluster" not in config_response.json():
             raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
-        r = requests.patch(
+        r = self._session.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"standby_cluster": None},
@@ -610,7 +617,7 @@ class Patroni:
 
     def set_max_timelines_history(self) -> None:
         """Patch the DCS with max_timelines_history limit."""
-        requests.patch(
+        self._session.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"max_timelines_history": 50},
@@ -806,7 +813,7 @@ class Patroni:
                 body = {"leader": current_primary}
                 if candidate:
                     body["candidate"] = candidate
-                r = requests.post(
+                r = self._session.post(
                     f"{self._patroni_url}/switchover",
                     json=body,
                     verify=self.verify,
@@ -1018,7 +1025,7 @@ class Patroni:
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         logger.debug("Reloading Patroni configuration...")
-        r = requests.post(
+        r = self._session.post(
             f"{self._patroni_url}/reload",
             verify=self.verify,
             auth=self._patroni_auth,
@@ -1057,7 +1064,7 @@ class Patroni:
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
         logger.debug("Restarting PostgreSQL...")
-        r = requests.post(
+        r = self._session.post(
             f"{self._patroni_url}/restart",
             verify=self.verify,
             auth=self._patroni_auth,
@@ -1069,7 +1076,7 @@ class Patroni:
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         logger.debug("Reinitializing PostgreSQL...")
-        r = requests.post(
+        r = self._session.post(
             f"{self._patroni_url}/reinitialize",
             verify=self.verify,
             auth=self._patroni_auth,
@@ -1087,7 +1094,7 @@ class Patroni:
         """
         if not base_parameters:
             base_parameters = {}
-        r = requests.patch(
+        r = self._session.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={
@@ -1116,7 +1123,7 @@ class Patroni:
         """
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
-                current_config = requests.get(
+                current_config = self._session.get(
                     f"{self._patroni_url}/config",
                     verify=self.verify,
                     timeout=PATRONI_TIMEOUT,
@@ -1140,7 +1147,7 @@ class Patroni:
                 "plugin": "pgoutput",
                 "type": "logical",
             }
-        r = requests.patch(
+        r = self._session.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"slots": slots_patch},
@@ -1183,7 +1190,7 @@ class Patroni:
         """Update synchronous_node_count to the minority of the planned cluster."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                r = requests.patch(
+                r = self._session.patch(
                     f"{self._patroni_url}/config",
                     json=self.synchronous_configuration,
                     verify=self.verify,
