@@ -11,6 +11,7 @@ import os
 import pathlib
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -114,7 +115,7 @@ from constants import (
     PGBACKREST_METRICS_PORT,
     PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
-    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_DATA_DIR,
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
@@ -124,7 +125,10 @@ from constants import (
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
+    SNAP_DAEMON_USER,
     SPI_MODULE,
+    TEMP_DATA_DIR,
+    TEMP_STORAGE_PATH,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -169,9 +173,30 @@ class StorageUnavailableError(Exception):
 class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     _charm: "PostgresqlOperatorCharm"
 
-    @staticmethod
-    def run_pre_refresh_checks_after_1_unit_refreshed() -> None:
-        pass
+    def _check_temp_tablespace_objects(self) -> None:
+        try:
+            connection = self._charm.postgresql._connect_to_database()
+            connection.autocommit = True
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT count(*) FROM pg_class WHERE reltablespace = "
+                "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp');"
+            )
+            count = cursor.fetchone()[0]
+            cursor.close()
+            connection.close()
+            if count > 0:
+                raise charm_refresh.PrecheckFailed(
+                    f"Temp tablespace has {count} active object(s). "
+                    "Please ensure no sessions are using temp tables before refreshing."
+                )
+        except charm_refresh.PrecheckFailed:
+            raise
+        except Exception:
+            logger.debug("Unable to check temp tablespace objects", exc_info=True)
+
+    def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
+        self._check_temp_tablespace_objects()
 
     def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
         for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
@@ -180,6 +205,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                     raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
+        self._check_temp_tablespace_objects()
 
         # Switch primary to last unit to refresh
 
@@ -389,6 +415,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.refresh.in_progress:
                 self._post_snap_refresh(self.refresh)
             else:
+                self._migrate_temp_tablespace_location()
                 self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
@@ -411,11 +438,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         charm_tracing_config(self._grafana_agent)
 
-    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
-        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
-
-        Called after snap refresh
-        """
+    def _check_and_update_internal_cert(self) -> None:
+        """Check if the internal cert CN matches the unit IP and regenerate if needed."""
         try:
             if (
                 (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
@@ -429,6 +453,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
+    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
+        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
+
+        Called after snap refresh
+        """
+        self._check_and_update_internal_cert()
+
         if not self._patroni.start_patroni():
             self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
@@ -441,7 +472,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
         try:
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+            for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(10)):
                 with attempt:
                     # Check if the member hasn't started or hasn't joined the cluster yet.
                     if (
@@ -463,7 +494,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.set_max_timelines_history()
             except Exception:
                 logger.warning("Unable to patch in max_timelines_history")
+            peer_relation = self.model.get_relation("database-peers")
+            all_units = sorted(
+                [self.unit, *(peer_relation.units if peer_relation else [])],
+                key=lambda u: int(u.name.split("/")[1]),
+            )
+            if self.unit == all_units[0]:
+                for attempt in Retrying(
+                    stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True
+                ):
+                    with attempt:
+                        if not self._migrate_temp_tablespace_location(required=True):
+                            raise Exception("Temp tablespace migration not yet complete")
             refresh.next_unit_allowed_to_refresh = True
+            self.set_unit_status(ActiveStatus(), refresh=refresh)
 
     def set_unit_status(
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
@@ -652,6 +696,162 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def is_unit_stopped(self) -> bool:
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
+
+    def _ensure_storage_layout(self) -> None:
+        """Ensure the temp tablespace directory exists.
+
+        Data migration between storage roots and versioned 16/main
+        subdirectories is handled by the snap hooks (pre-refresh for
+        reverse, post-refresh for forward).  TEMP_DATA_DIR may live on
+        a tmpfs mount that is wiped on reboot, so we recreate it
+        unconditionally.  CREATE TABLESPACE requires the directory to
+        be writable by the PostgreSQL _daemon_ user, so we chown it.
+
+        The 16/ parent dir must also be _daemon_-owned: the snap daemon
+        runs as _daemon_ and needs write permission to clean up the
+        versioned subdirectory and run DROP/CREATE TABLESPACE during
+        rollback (handled by the snap's pre-refresh hook).
+        """
+        temp_dir = Path(TEMP_DATA_DIR)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+        if temp_dir.parent.exists():
+            shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+
+    def _resolve_primary_host(self) -> str | None:
+        """Wait for Patroni to settle and return the primary host.
+
+        After a snap refresh, Patroni may briefly report this unit as the
+        primary before discovering the real cluster topology.  Query the
+        Patroni API directly (bypassing primary_endpoint, which can return
+        stale data from the peer databag) and retry until the primary
+        points to a different host or this unit truly is the primary.
+        """
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    primary = self._patroni.get_primary()
+                    if not primary:
+                        raise Exception("No primary found yet")
+                    target_host = self._patroni.get_member_ip(primary)
+                    if not target_host:
+                        raise Exception("Primary IP not available yet")
+                    if target_host != self._unit_ip or self.is_primary:
+                        return target_host
+                    raise Exception("Patroni not settled yet")
+        except RetryError:
+            logger.warning("Patroni did not settle within 60s")
+            return None
+        return None
+
+    def _migrate_temp_tablespace_location(self, *, required: bool = False) -> bool:
+        """One-shot migration of the temp tablespace to the versioned directory.
+
+        During a snap upgrade, the post-refresh hook migrates temp data from the
+        old non-versioned storage root (TEMP_STORAGE_PATH) to the versioned
+        subdirectory (TEMP_DATA_DIR).  This method updates the PostgreSQL catalog
+        entry to match.
+
+        During a snap downgrade (rollback), the pre-refresh hook handles both
+        file migration and catalog migration (DROP/CREATE TABLESPACE) back to
+        the non-versioned root.  This method only handles the forward case.
+
+        DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction
+        block, so this method avoids using the connection as a context manager
+        (which would create one in psycopg2).  Instead it uses plain assignments
+        and explicit close(), mirroring the pattern in the single_kernel_postgresql
+        set_up_database helper.
+
+        Args:
+            required: If True (used during upgrade), return False when the
+                primary is unavailable so the caller can retry.  If False
+                (default, used during install), return True to skip gracefully
+                when no cluster exists yet.
+        """
+        if not self.primary_endpoint:
+            return not required
+
+        if self.async_replication._relation is not None:
+            return True
+
+        target_host = self._resolve_primary_host()
+        if target_host is None:
+            return False
+
+        return self._execute_temp_tablespace_migration(target_host)
+
+    def _execute_temp_tablespace_migration(self, target_host: str) -> bool:
+        """Execute the temp tablespace DDL migration on the given host."""
+        connection = None
+        cursor = None
+        try:
+            connection = self.postgresql._connect_to_database(database_host=target_host)
+            connection.autocommit = True
+            cursor = connection.cursor()
+
+            cursor.execute(
+                "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return True
+
+            current_location = row[0]
+            if current_location == TEMP_DATA_DIR:
+                return True
+
+            if current_location != TEMP_STORAGE_PATH:
+                logger.warning(
+                    "Skipping temp tablespace migration: unexpected location %s "
+                    "(expected %s or %s)",
+                    current_location,
+                    TEMP_STORAGE_PATH,
+                    TEMP_DATA_DIR,
+                )
+                return True
+
+            logger.info(
+                "Migrating temp tablespace location from %s to %s",
+                TEMP_STORAGE_PATH,
+                TEMP_DATA_DIR,
+            )
+            cursor.execute("DROP TABLESPACE temp;")
+            cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
+            cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+            # Flush WAL past the CREATE TABLESPACE record so replicas won't
+            # need to replay it during a future rollback (the versioned
+            # directory may not exist after the snap's pre-refresh hook).
+            cursor.execute("CHECKPOINT;")
+        except psycopg2.Error:
+            logger.exception("Failed to migrate temp tablespace location")
+            try:
+                check_conn = self.postgresql._connect_to_database(database_host=target_host)
+                check_conn.autocommit = True
+                check_cur = check_conn.cursor()
+                check_cur.execute(
+                    "SELECT count(*) FROM pg_class WHERE reltablespace = "
+                    "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp')"
+                )
+                obj_count = check_cur.fetchone()[0]
+                check_cur.close()
+                check_conn.close()
+                if obj_count > 0:
+                    logger.error(
+                        "Temp tablespace has %d object(s). "
+                        "Please move or drop all objects from the temp tablespace, "
+                        "then run 'juju resolved postgresql/<unit-number>' to retry.",
+                        obj_count,
+                    )
+            except Exception:
+                logger.debug("Could not query temp tablespace for blocking objects")
+            return False
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+        return True
 
     @cached_property
     def postgresql(self) -> PostgreSQL:
@@ -1672,6 +1872,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.tls.generate_internal_peer_cert()
 
         self.unit_peer_data.update({"ip": self._unit_ip})
+        self._ensure_storage_layout()
 
         # Open port
         try:
@@ -1815,9 +2016,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
+        self.postgresql.set_up_database(temp_location=TEMP_DATA_DIR)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
@@ -2148,11 +2347,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
-            data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
+            data_directory_contents = os.listdir(POSTGRESQL_DATA_DIR)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
                 os.rename(
-                    os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
-                    os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{datetime.now(UTC).isoformat()}"),
+                    os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
+                    os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{datetime.now(UTC).isoformat()}"),
                 )
                 logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True

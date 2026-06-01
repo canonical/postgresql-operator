@@ -105,7 +105,7 @@ def test_tls_enabled(juju: JujuFixture) -> None:
                 run_command_on_unit(
                     juju,
                     replica,
-                    "sudo charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/var/lib/postgresql/ promote",
+                    "sudo charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/var/lib/postgresql/16/main promote",
                 )
 
                 # Check that the replica was promoted.
