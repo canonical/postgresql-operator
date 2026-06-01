@@ -1109,6 +1109,20 @@ def test_on_s3_credential_changed(harness):
         _defer.assert_called_once()
         _start_stop_pgbackrest_service.assert_not_called()
 
+        # Test when pgBackRest service cannot be started/stopped yet.
+        _defer.reset_mock()
+        _can_initialise_stanza.return_value = True
+        _start_stop_pgbackrest_service.return_value = False
+        harness.charm.backup.s3_client.on.credentials_changed.emit(
+            relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
+        )
+        _defer.assert_called_once()
+        _start_stop_pgbackrest_service.assert_called_once()
+        _on_s3_credential_changed_primary.assert_not_called()
+
+        _start_stop_pgbackrest_service.reset_mock()
+        _start_stop_pgbackrest_service.return_value = True
+
         # Test when unit is not a leader and can't do any peer data changes
         _is_primary.return_value = False
         _can_initialise_stanza.return_value = True
@@ -1165,7 +1179,7 @@ def test_on_s3_credential_changed_primary(harness):
         patch(
             "charm.PostgreSQLBackups._retrieve_s3_parameters",
             return_value=({"path": "example"}, None),
-        ),
+        ) as _retrieve_s3_parameters,
         patch("charm.PostgreSQLBackups._upload_content_to_s3") as _upload_content_to_s3,
     ):
         mock_event = MagicMock()
@@ -1201,9 +1215,30 @@ def test_on_s3_credential_changed_primary(harness):
         _check_stanza.assert_called_once()
         _upload_content_to_s3.assert_not_called()
 
+        _retrieve_s3_parameters.return_value = ({}, ["bucket"])
         _check_stanza.return_value = True
+        assert not harness.charm.backup._on_s3_credential_changed_primary(mock_event)
+        _s3_initialization_set_failure.assert_called_with(
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+        )
+        _upload_content_to_s3.assert_not_called()
+
+        _retrieve_s3_parameters.return_value = ({"path": "example"}, None)
+        _upload_content_to_s3.return_value = False
+        _s3_initialization_set_failure.reset_mock()
+        assert not harness.charm.backup._on_s3_credential_changed_primary(mock_event)
+        _s3_initialization_set_failure.assert_called_once_with(
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+        )
+
+        _check_stanza.return_value = True
+        _upload_content_to_s3.return_value = True
         assert harness.charm.backup._on_s3_credential_changed_primary(mock_event)
-        _upload_content_to_s3.assert_called_once()
+        _upload_content_to_s3.assert_called_with(
+            harness.charm.model.uuid,
+            "model-uuid.txt",
+            {"path": "example"},
+        )
 
 
 def test_on_s3_credential_gone(harness):
