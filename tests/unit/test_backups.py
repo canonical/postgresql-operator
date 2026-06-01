@@ -1217,7 +1217,6 @@ def test_on_s3_credential_changed_primary(harness):
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
         )
 
-        _check_stanza.return_value = True
         _upload_content_to_s3.return_value = True
         assert harness.charm.backup._on_s3_credential_changed_primary(mock_event)
         _upload_content_to_s3.assert_called_with(
