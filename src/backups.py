@@ -814,13 +814,14 @@ class PostgreSQLBackups(Object):
             )
         return return_code == 0
 
-    def _credential_changed_checks(self, event: CredentialsChangedEvent) -> bool:
+    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
+        """Call the stanza initialization when the credentials or the connection info change."""
         if not self.charm.is_cluster_initialised:
             logger.debug(
                 "Deferring S3 credential change handling: PostgreSQL cluster is not initialised yet."
             )
             event.defer()
-            return False
+            return
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
@@ -828,7 +829,7 @@ class PostgreSQLBackups(Object):
                 "Deferring S3 credential change handling: unit is in bad PITR restore status."
             )
             event.defer()
-            return False
+            return
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
         if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
@@ -836,33 +837,21 @@ class PostgreSQLBackups(Object):
                 "Deferring S3 credential change handling: cluster is restoring backup or PITR."
             )
             event.defer()
-            return False
+            return
 
         if not self._render_pgbackrest_conf_file():
             logger.debug(
                 "Skipping S3 credential change handling: missing S3 settings to render pgBackRest config."
             )
-            return False
+            return
 
         if not self._can_initialise_stanza:
             logger.debug("Deferring S3 credential change handling: cannot initialise stanza yet.")
             event.defer()
-            return False
-
-        return True
-
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
-        """Call the stanza initialization when the credentials or the connection info change."""
-        if not self._credential_changed_checks(event):
             return
 
         # Start the pgBackRest service for the check_stanza to be successful. It's required to run on all the units if the tls is enabled.
-        if not self.start_stop_pgbackrest_service():
-            logger.debug(
-                "Deferring S3 credential change handling: failed to start/stop pgBackRest service."
-            )
-            event.defer()
-            return
+        self.start_stop_pgbackrest_service()
 
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
@@ -876,14 +865,6 @@ class PostgreSQLBackups(Object):
 
         if self.charm.is_primary and "s3-initialization-done" not in self.charm.unit_peer_data:
             self._on_s3_credential_changed_primary(event)
-        elif not self.charm.is_primary:
-            logger.debug(
-                "Skipping S3 primary initialization in credential change handler: unit is not primary."
-            )
-        else:
-            logger.debug(
-                "Skipping S3 primary initialization in credential change handler: already initialized on this unit."
-            )
 
         if self.charm.is_standby_leader:
             logger.info(

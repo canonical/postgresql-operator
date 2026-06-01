@@ -1109,20 +1109,6 @@ def test_on_s3_credential_changed(harness):
         _defer.assert_called_once()
         _start_stop_pgbackrest_service.assert_not_called()
 
-        # Test when pgBackRest service cannot be started/stopped yet.
-        _defer.reset_mock()
-        _can_initialise_stanza.return_value = True
-        _start_stop_pgbackrest_service.return_value = False
-        harness.charm.backup.s3_client.on.credentials_changed.emit(
-            relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
-        )
-        _defer.assert_called_once()
-        _start_stop_pgbackrest_service.assert_called_once()
-        _on_s3_credential_changed_primary.assert_not_called()
-
-        _start_stop_pgbackrest_service.reset_mock()
-        _start_stop_pgbackrest_service.return_value = True
-
         # Test when unit is not a leader and can't do any peer data changes
         _is_primary.return_value = False
         _can_initialise_stanza.return_value = True
