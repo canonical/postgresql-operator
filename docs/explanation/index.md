@@ -11,6 +11,7 @@ Core concepts about the history and high-level design of Charmed PostgreSQL:
 :titlesonly:
 
 Architecture <architecture>
+Stereo mode <stereo-mode>
 Interfaces and endpoints <interfaces-and-endpoints>
 Charm versions <charm-versions/index>
 ```
