@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import platform
 
 import jubilant
 from jubilant import Juju
@@ -30,6 +31,7 @@ def test_deploy_stable(juju: Juju) -> None:
         base="ubuntu@24.04",
         channel="16/stable",
         config={"profile": "testing"},
+        constraints={"arch": "arm64"} if platform.machine() == "aarch64" else None,
         num_units=3,
     )
     juju.deploy(
@@ -37,6 +39,7 @@ def test_deploy_stable(juju: Juju) -> None:
         app=DB_TEST_APP_NAME,
         base="ubuntu@24.04",
         channel="latest/edge",
+        constraints={"arch": "arm64"} if platform.machine() == "aarch64" else None,
         num_units=1,
     )
 

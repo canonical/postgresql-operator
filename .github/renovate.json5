@@ -8,7 +8,7 @@
   ],
   baseBranchPatterns: [
     'main',
-    '/^*\\/edge$/',
+    '/^[0-9][0-9]\\/edge$/',
   ],
   packageRules: [
     {
@@ -17,6 +17,12 @@
       ],
       "matchBaseBranches": ["main"],
       allowedVersions: '<2.0.0',
+    },
+    {
+      matchPackageNames: ['postgresql-charms-single-kernel'],
+      schedule: ['* * * * *'],
+      minimumReleaseAge: '0',
+      groupName: "Single kernel"
     },
   ],
   customManagers: [],
