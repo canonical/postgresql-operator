@@ -20,7 +20,6 @@ import psycopg2
 import pytest
 import requests
 import yaml
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 from tenacity import (
     RetryError,
     Retrying,
@@ -31,6 +30,8 @@ from tenacity import (
     wait_exponential,
     wait_fixed,
 )
+
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
 from .ha_tests.helpers import ProcessError
@@ -440,7 +441,7 @@ def check_for_fix_log_message(juju: jubilant.Juju, unit_name: str) -> bool:
     )
 
     expected_message = (
-        "Fixed permissions on temp tablespace directory at /var/snap/charmed-postgresql/common/data/temp "
+        "Fixed permissions on temp tablespace directory at /var/snap/charmed-postgresql/common/data/temp/16/main "
         "(persistent storage), existing tablespace remains valid"
     )
 
