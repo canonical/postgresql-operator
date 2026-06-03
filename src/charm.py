@@ -3025,7 +3025,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 REWIND_USER: "all",
             })
             return user_database_map
-        hosts = [True, False] if self.is_connectivity_enabled else [False]
+        hosts = (
+            [True, False]
+            if self.is_connectivity_enabled and self.primary_endpoint
+            else [self.is_connectivity_enabled]
+        )
         for current_host in hosts:
             try:
                 for user in self.postgresql.list_users(current_host=current_host):
@@ -3066,7 +3070,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except PostgreSQLListUsersError:
                 continue
         logger.debug("relations_user_databases_map: Unable to get users")
-        return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+        user_database_map.update({
+            USER: "all",
+            REPLICATION_USER: "all",
+            REWIND_USER: "all",
+        })
+        return user_database_map
 
     def _collect_user_relations(self) -> dict[str, str]:
         user_db_pairs = {}
