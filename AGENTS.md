@@ -101,6 +101,20 @@ all substrates (VM and K8s). It provides:
 14. **Vendored libraries** — the `lib/` directory contains charm libraries managed by
     `charmcraft fetch-lib`. Never modify these files — submit fixes upstream instead.
 
+15. **Backward compatibility** — A new charm revision must keep working with data written by
+    older revisions, and during a refresh new- and old-code units run at the same time. Don't
+    drop or rename a config option, peer-data key, or stored secret field without preserving
+    the old form — keep reading it, alias it, or migrate it. Put upgrade logic in the
+    `charm_refresh` framework rather than ad-hoc upgrade hooks, and don't perform an operation
+    a still-old peer can't handle while a refresh is in progress.
+
+16. **Idempotency** — Handlers re-run constantly (update-status fires every few minutes;
+    deferred events replay), so every handler must be safe to run repeatedly and converge to
+    the same result. Write handlers as reconcilers: compute desired state, compare to actual,
+    act only on the difference. Avoid unconditional side effects — generate credentials only
+    if absent, guard one-time setup behind peer-data flags, use "create if not exists"
+    semantics, and prefer set-based writes over blind appends.
+
 ## Code Quality Rules
 
 ### Copyright Header
