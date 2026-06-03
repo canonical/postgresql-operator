@@ -59,6 +59,7 @@ from ops import (
     main,
 )
 from ops_tracing import Tracing, set_destination
+from single_kernel_postgresql.compat.postgresql import PostgreSQLBaseError
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
@@ -3067,7 +3068,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         REWIND_USER: "all",
                     })
                 return user_database_map
-            except PostgreSQLListUsersError:
+            except PostgreSQLBaseError as e:
+                logger.debug(f"Failing to get users with {e}")
                 continue
         logger.debug("relations_user_databases_map: Unable to get users")
         user_database_map.update({
