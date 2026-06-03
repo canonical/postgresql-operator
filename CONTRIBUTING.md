@@ -37,6 +37,25 @@ charmcraft test lxd-vm:  # integration tests
 tox                      # runs 'lint' and 'unit' environments
 ```
 
+Run a single unit test with `tox run -e unit -- tests/unit/test_charm.py::test_function_name`.
+`--exitfirst` is the default, so a run stops at the first failure.
+
+Unit tests use pytest + pytest-asyncio (auto mode) and instantiate the charm via
+`ops.testing.Harness`. Branch coverage is enabled and `logger.debug` lines are excluded.
+`conftest.py` already auto-mocks `charm_refresh.Machines` and `ops.JujuVersion.has_secrets`
+(both `True`) — do not mock these again. Most tests are flat functions; some files (e.g.
+`test_watcher_relation.py`) use test classes, so both `::test_function` and
+`::TestClass::test_method` selectors work.
+
+Integration tests live in `tests/integration/` and use jubilant (preferred for new tests) or
+pytest-operator (legacy). They need a running Juju controller; cloud credentials (AWS, GCP, or
+similar) are only required for backup/restore tests. The full suite takes minutes to hours —
+don't run it casually.
+
+When changing `src/X.py`, run `tests/unit/test_X.py`; new public methods need corresponding
+unit tests. If you modify Prometheus alert rules, validate them with `promtool check rules` and
+run `promtool test rules` against the test files in `tests/alerts/`.
+
 ## Build charm
 
 The build environment assumes that there are preinstalled on the system:

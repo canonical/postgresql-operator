@@ -10,7 +10,7 @@ PostgreSQL 16 on virtual machines via Patroni for high availability.
 - **`charm.py`** — Main operator class. Event handler registration, orchestration, and business
   logic. Delegates domain-specific work to specialized modules.
 - **`cluster.py`** — Patroni lifecycle management: start/stop, switchover, health checks, Raft
-  consensus, Patroni configuration rendering (`render_patroni_yml_file`).
+  consensus, and Patroni configuration rendering.
 - **`backups.py`** — pgBackRest integration: backup, restore, PITR, S3 credential management,
   pgBackRest configuration rendering.
 - **`config.py`** — Pydantic configuration model (`CharmConfig`) only. Pure schema definition
@@ -60,11 +60,11 @@ all substrates (VM and K8s). It provides:
    events in `charm.py`, except for the peer relation (`database-peers`) whose
    `relation_changed` and `relation_departed` events are observed directly in `charm.py`.
 
-3. **Leader-only writes** — app-scoped relation data writes require a
-   `self.unit.is_leader()` guard. Unit-scoped data can be written by any unit.
+3. **Leader-only writes** — app-scoped relation data writes require a leader guard
+   (`self.unit.is_leader()`). Unit-scoped data can be written by any unit.
 
-4. **Peer data access** — use `self.charm.app_peer_data` and `self.charm.unit_peer_data` dict
-   properties for reading/writing peer relation data.
+4. **Peer data access** — use the charm's peer-data properties for reading/writing peer
+   relation data, rather than reaching into the relation object directly.
 
 5. **Configuration flow** — `CharmConfig` (Pydantic model in `config.py`) validates charm
    config. Config file rendering happens in `cluster.py` (Patroni YAML) and `backups.py`
@@ -78,13 +78,13 @@ all substrates (VM and K8s). It provides:
 8. **Snap-based workload** — PostgreSQL runs as a snap (`charmed-postgresql`). All paths are
    under `/var/snap/charmed-postgresql/`. Service management uses the `charmlibs.snap` library.
 
-9. **Event deferral** — check preconditions before proceeding in event handlers: peer relation
-   exists (`self._peers is not None`), cluster initialized (`"cluster_initialised" in
-   self.app_peer_data`), Patroni started (`self._patroni.member_started`), can connect to
-   PostgreSQL. Defer the event if preconditions are not met.
+9. **Event deferral** — check preconditions before proceeding in event handlers: the peer
+   relation exists, the cluster is initialised, Patroni has started, and PostgreSQL is
+   reachable. Defer the event if any precondition is not met.
 
-10. **Status setting** — use `self.set_unit_status()` instead of `self.unit.status =` directly.
-    This method respects the refresh lifecycle and will not override refresh status.
+10. **Status setting** — set unit status through the charm's status helper rather than
+    assigning `self.unit.status` directly. The helper respects the refresh lifecycle and will
+    not override refresh status.
 
 11. **Rolling restarts** — use `RollingOpsManager` (bound to the `restart` peer relation) for
     coordinated PostgreSQL restarts. Never restart Patroni/PostgreSQL directly without going
@@ -95,8 +95,8 @@ all substrates (VM and K8s). It provides:
     appropriate stop/wait strategies. Catch `RetryError` when all retries are exhausted.
 
 13. **Juju secrets** — sensitive data (passwords, TLS keys) must be stored using Juju secrets
-    via `self.set_secret` / `self.get_secret`. Never store passwords or credentials in plain
-    relation data.
+    via the charm's secret helpers. Never store passwords or credentials in plain relation
+    data.
 
 14. **Vendored libraries** — the `lib/` directory contains charm libraries managed by
     `charmcraft fetch-lib`. Never modify these files — submit fixes upstream instead.
@@ -115,86 +115,18 @@ all substrates (VM and K8s). It provides:
     if absent, guard one-time setup behind peer-data flags, use "create if not exists"
     semantics, and prefer set-based writes over blind appends.
 
-## Code Quality Rules
+## Tooling
 
-### Copyright Header
+Formatting, imports, naming, complexity, copyright headers, security lints, docstrings, and
+type checks (`ty`, with type hints on all `src/` and `scripts/` signatures) are enforced by
+`tox run -e format` and `tox run -e lint`. Run those rather than hand-applying style rules.
+Before submitting, run `tox run -e format`, `tox run -e lint`, and `tox run -e unit`.
 
-Every file must start with:
+When writing unit tests, note that `conftest.py` already auto-mocks `charm_refresh.Machines`
+and `ops.JujuVersion.has_secrets` (both `True`) — don't re-mock these.
 
-```python
-# Copyright YYYY Canonical Ltd.
-# See LICENSE file for licensing details.
-```
+## Further reading
 
-### Style
-
-- **Line length**: 99 characters
-- **Python target**: 3.12
-- **Imports**: sorted via ruff I001 — stdlib, then third-party, then local. Absolute imports
-  preferred.
-- **Docstrings**: Google style, required for public functions and classes.
-- **Naming**: `snake_case` for functions/variables, `PascalCase` for classes, `UPPER_CASE`
-  for constants.
-- **McCabe complexity**: max 10.
-- **Security rules** (ruff S-series): enabled for `src/`, disabled for `tests/`.
-- **Password-like string labels**: annotate with `# noqa: S105` when the string is a label or
-  key name, not an actual secret.
-
-### Type Checking
-
-- `ty` type checker via `ty check`.
-- Type hints required for all function signatures in `src/`.
-- Use `TYPE_CHECKING` guard for type-only imports (avoids circular imports at runtime).
-
-## Testing Rules
-
-### Unit Tests
-
-- **Framework**: pytest + pytest-asyncio (auto mode).
-- **Location**: `tests/unit/`.
-- **Run all**: `tox run -e unit`
-- **Run single test**: `tox run -e unit -- tests/unit/test_charm.py::test_function_name`
-- **Coverage**: branch coverage enabled, excludes `logger.debug` lines.
-- **Auto-mocked in `conftest.py`**: `charm_refresh.Machines` and `ops.JujuVersion.has_secrets`
-  (set to `True`). Do not mock these again.
-- **Charm instantiation**: uses `ops.testing.Harness`.
-- **Test structure**: primarily flat functions. Some files (e.g., `test_watcher_relation.py`)
-  use test classes — both `::test_function` and `::TestClass::test_method` work with pytest.
-- **Exit behavior**: `--exitfirst` is the default (stops on first failure).
-
-### Integration Tests
-
-- **Framework**: jubilant (preferred for new tests) and pytest-operator (legacy).
-- **Location**: `tests/integration/`.
-- **Run**: `tox run -e integration -- tests/integration/test_file.py`
-- **Requirements**: running Juju controller. Cloud credentials (AWS, GCP, or similar) are
-  only needed for backup/restore tests.
-- **Duration**: minutes to hours — do not run the full suite casually.
-
-### Testing Expectations
-
-- Changing `src/X.py` means running `tests/unit/test_X.py`.
-- New public methods need corresponding unit tests.
-- Do not re-mock what `conftest.py` already handles.
-
-## Build
-
-- **Build charm**: `charmcraftcache pack`
-- **Format code**: `tox run -e format`
-- **Lint**: `tox run -e lint`
-- **Unit tests**: `tox run -e unit`
-- **Single unit test**: `tox run -e unit -- tests/unit/test_charm.py::test_function_name`
-- **Integration tests**: `tox run -e integration -- tests/integration/test_file.py`
-
-## Workflow Checklist
-
-Before submitting any change:
-
-1. Run `tox run -e format` — auto-fix formatting issues.
-2. Run `tox run -e lint` — fix all errors (codespell, ruff, shellcheck, ty).
-3. Run `tox run -e unit` — ensure all unit tests pass.
-4. If Prometheus alert rules were modified, validate with `promtool check rules` and run
-   `promtool test rules` against test files in `tests/alerts/`.
-5. Verify corresponding tests exist for any new or changed behavior.
-6. Confirm all constants are in `constants.py`.
-7. Confirm leader checks are present for any app-scoped relation data writes.
+Before build or test work, see `CONTRIBUTING.md` — dev environment, build, lint, and test
+commands, plus testing specifics (`conftest` auto-mocks, running a single test, frameworks,
+alert-rule validation) under `#testing` and `#build-charm`.
