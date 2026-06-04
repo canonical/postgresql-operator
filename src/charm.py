@@ -698,7 +698,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return "stopped" in self.unit_peer_data
 
     def _ensure_storage_layout(self) -> None:
-        """Ensure the temp tablespace directory exists.
+        """Ensure the temp tablespace dir exists and versioned parents are _daemon_-owned.
 
         Data migration between storage roots and versioned 16/main
         subdirectories is handled by the snap hooks (pre-refresh for
@@ -707,16 +707,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         unconditionally.  CREATE TABLESPACE requires the directory to
         be writable by the PostgreSQL _daemon_ user, so we chown it.
 
-        The 16/ parent dir must also be _daemon_-owned: the snap daemon
-        runs as _daemon_ and needs write permission to clean up the
-        versioned subdirectory and run DROP/CREATE TABLESPACE during
-        rollback (handled by the snap's pre-refresh hook).
+        The 16/ parent dirs must also be _daemon_-owned: the snap daemon
+        runs as _daemon_ and needs write permission on the parent to
+        remove/rename the versioned subdirectory.  Without this, the temp
+        parent breaks DROP/CREATE TABLESPACE during rollback, and the data
+        parent breaks ``patronictl reinit`` (Patroni can only empty 16/main,
+        not remove it, logging permission errors).  The snap's
+        migrate-data.sh creates these parents as root, so we fix them here.
         """
         temp_dir = Path(TEMP_DATA_DIR)
         temp_dir.mkdir(parents=True, exist_ok=True)
         shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
         if temp_dir.parent.exists():
             shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+
+        data_parent = Path(POSTGRESQL_DATA_DIR).parent
+        if data_parent.exists():
+            shutil.chown(data_parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
     def _resolve_primary_host(self) -> str | None:
         """Wait for Patroni to settle and return the primary host.

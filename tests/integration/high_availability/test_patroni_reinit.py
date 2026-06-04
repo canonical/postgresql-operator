@@ -3,14 +3,13 @@
 """Integration test: replica reinit after pg_control corruption via patronictl reinit."""
 
 import logging
-import time
 
 import jubilant
 import requests
 from jubilant import Juju
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from constants import PATRONI_CONF_PATH, POSTGRESQL_DATA_DIR
+from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 
 from .high_availability_helpers_new import (
     MINUTE_SECS,
@@ -68,12 +67,14 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
 
     Steps:
     1. Confirm the cluster is healthy and continuous writes are flowing.
-    2. Stop Patroni on a replica, delete pg_control, then restart Patroni so that
-       PostgreSQL fails to start due to the missing control file.
-    3. Verify Patroni logs record a pg_control startup failure.
+    2. Stop Patroni on a replica (waiting until it is fully stopped), delete pg_control,
+       then restart Patroni so that PostgreSQL fails to start due to the missing control file.
+    3. Verify Patroni logs record a pg_control startup failure and that the replica is no
+       longer streaming, so the test cannot falsely pass on a still-healthy replica.
     4. Run ``patronictl reinit`` to restore the replica from the primary.
-    5. Confirm the replica recovers, that pg_control is present in the data directory,
-       and that data integrity is maintained across all units.
+    5. Confirm the replica returns to the streaming state, that reinit did not log
+       data-directory permission errors, that pg_control is present, and that data
+       integrity is maintained across all units.
     """
     logger.info("Identifying primary and replica units")
     primary_unit = get_db_primary_unit(juju, DB_APP_NAME)
@@ -87,6 +88,12 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
 
     replica_member_name = replica_unit.replace("/", "-")
     cluster_name = DB_APP_NAME
+
+    def get_member_state() -> str | None:
+        """Return the replica's reported state from the primary's /cluster endpoint."""
+        cluster_resp = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
+        members = cluster_resp.json()["members"]
+        return next((m["state"] for m in members if m["name"] == replica_member_name), None)
 
     logger.info("Verifying initial health of replica %s", replica_unit)
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True):
@@ -102,31 +109,36 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     logger.info("Stopping Patroni on %s", replica_unit)
     juju.ssh(replica_unit, "sudo systemctl stop snap.charmed-postgresql.patroni")
 
+    logger.info("Waiting for Patroni to stop on %s before deleting pg_control", replica_unit)
+    for attempt in Retrying(stop=stop_after_delay(MINUTE_SECS), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            active_state = juju.ssh(
+                replica_unit,
+                "systemctl is-active snap.charmed-postgresql.patroni || true",
+            ).strip()
+            assert active_state != "active", (
+                f"Patroni still active on {replica_unit} ({active_state!r}); refusing to delete "
+                "pg_control while PostgreSQL may still be running"
+            )
+
     logger.info("Deleting pg_control at %s on %s", PG_CONTROL_PATH, replica_unit)
     juju.ssh(replica_unit, f"sudo rm {PG_CONTROL_PATH}")
 
     logger.info("Starting Patroni on %s (pg_control is now missing)", replica_unit)
     juju.ssh(replica_unit, "sudo systemctl start snap.charmed-postgresql.patroni")
 
-    time.sleep(10)
-
-    logger.info("Verifying Patroni logs show a pg_control startup failure on %s", replica_unit)
+    logger.info("Confirming pg_control deletion broke replica %s (not streaming)", replica_unit)
+    broken_state: str | None = None
     for attempt in Retrying(
         stop=stop_after_delay(2 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
     ):
         with attempt:
-            logs = juju.ssh(
-                replica_unit,
-                "sudo journalctl -u snap.charmed-postgresql.patroni --no-pager -n 200 2>&1",
+            broken_state = get_member_state()
+            assert broken_state not in ("running", "streaming"), (
+                f"Replica {replica_unit} unexpectedly healthy ({broken_state!r}) before reinit; "
+                "pg_control deletion did not break it, so the test would falsely pass"
             )
-            assert "pg_control" in logs.lower(), (
-                f"Expected Patroni logs on {replica_unit} to contain a pg_control error; "
-                f"last 1000 chars of logs: {logs[-1000:]!r}"
-            )
-
-    logger.info(
-        "Confirmed pg_control startup failure recorded in Patroni logs on %s", replica_unit
-    )
+    logger.info("Replica %s broken (state=%r) before reinit", replica_unit, broken_state)
 
     logger.info("Running patronictl reinit on %s", replica_unit)
     patronictl_cmd = (
@@ -135,28 +147,30 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     )
     juju.ssh(replica_unit, patronictl_cmd)
 
-    logger.info("Waiting for %s to recover after patronictl reinit", replica_unit)
+    logger.info("Waiting for %s to reach the streaming state after reinit", replica_unit)
     for attempt in Retrying(
         stop=stop_after_delay(5 * MINUTE_SECS), wait=wait_fixed(10), reraise=True
     ):
         with attempt:
-            resp = requests.get(f"https://{replica_ip}:8008/health", verify=False)
-            assert resp.status_code == 200, (
-                f"Replica {replica_unit} still unhealthy after reinit: HTTP {resp.status_code}"
-            )
-
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            cluster_resp = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
-            members = cluster_resp.json()["members"]
-            replica_state = next(
-                (m["state"] for m in members if m["name"] == replica_member_name), None
-            )
-            assert replica_state in ("running", "streaming"), (
+            replica_state = get_member_state()
+            assert replica_state == "streaming", (
                 f"Replica {replica_unit} not streaming after reinit: {replica_state!r}"
             )
+    logger.info("Replica %s is streaming after reinit", replica_unit)
 
-    logger.info("Replica %s is healthy and streaming after reinit", replica_unit)
+    logger.info("Checking reinit logged no data-directory permission errors on %s", replica_unit)
+    permission_error_grep = (
+        "sudo grep -iEh "
+        "'could not remove data directory|could not rename data directory|permissionerror' "
+        f"{PATRONI_LOGS_PATH}/patroni.log* 2>/dev/null || true"
+    )
+    permission_errors = juju.ssh(replica_unit, permission_error_grep).strip()
+    assert not permission_errors, (
+        f"patronictl reinit on {replica_unit} logged data-directory permission failures; the "
+        "versioned-storage parent directory is not writable by the PostgreSQL user. "
+        f"Matching Patroni log lines:\n{permission_errors}"
+    )
+    logger.info("No data-directory permission errors logged during reinit on %s", replica_unit)
 
     logger.info("Verifying pg_control exists in data directory of %s after reinit", replica_unit)
     result = juju.ssh(
