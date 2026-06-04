@@ -3047,7 +3047,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     if databases := ",".join(
                         sorted(
                             self.postgresql.list_accessible_databases_for_user(
-                                user, current_host=self.is_connectivity_enabled
+                                user, current_host=current_host
                             )
                         )
                     ):
@@ -3059,9 +3059,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         True for relation in self.client_relations if relation.name == "db-admin"
                     ):
                         user_database_map["landscape"] = "all"
-                if self.postgresql.list_access_groups(
-                    current_host=self.is_connectivity_enabled
-                ) != set(ACCESS_GROUPS):
+                if self.postgresql.list_access_groups(current_host=current_host) != set(
+                    ACCESS_GROUPS
+                ):
                     user_database_map.update({
                         USER: "all",
                         REPLICATION_USER: "all",
