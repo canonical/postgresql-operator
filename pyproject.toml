@@ -47,6 +47,7 @@ optional = true
 
 [tool.poetry.group.lint.dependencies]
 codespell = "^2.4.2"
+ty = "^0.0.42"
 
 [tool.poetry.group.unit]
 optional = true
@@ -138,3 +139,11 @@ max-complexity = 10
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ty.environment]
+python = ".tox/lint/"
+extra-paths = ["./lib"]
+
+[tool.ty.src]
+include = ["src", "scripts"]
+exclude = ["tests"]
