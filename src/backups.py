@@ -567,7 +567,7 @@ class PostgreSQLBackups(Object):
             "--output=json",
         ])
         if return_code != 0:
-            extracted_error = self._extract_error_message(stderr)
+            extracted_error = self._extract_error_message(output, stderr)
             raise ListBackupsError(f"Failed to list repository with error: {extracted_error}")
 
         repository = json.loads(output).items()
