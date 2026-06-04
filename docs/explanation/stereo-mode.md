@@ -37,15 +37,15 @@ Once integrated, the watcher:
 The watcher participates in **leader election only**. It stores no table data and never becomes a PostgreSQL primary or replica.
 ```
 
-## When the watcher votes
+## When the watcher votes (and when it doesn't)
 
-The watcher adjusts its vote to the number of `postgresql` units, withholding it only when the cluster already forms a safe odd majority on its own:
+The watcher runs and votes only when the `postgresql` units would otherwise form an even voter count. When they already make a safe odd count on their own, the watcher stops its Raft service and leaves the quorum:
 
-* **An even number of units (2, 4, 6, …):** the watcher votes, making the total odd — three voters for two units, five for four — so a single failure still leaves a clear majority.
-* **An odd number of units, three or more (3, 5, 7, …):** the watcher abstains, because the `postgresql` units already form an odd voter count.
-* **A single unit:** the watcher still votes, but a one-unit cluster has no high availability either way — there is no second copy to fail over to.
+* **An even number of units (2, 4, 6, …):** the watcher runs and votes, making the total odd — three voters for two units, five for four — so a single failure still leaves a clear majority.
+* **An odd number of units, three or more (3, 5, 7, …):** the watcher stops itself and leaves the quorum, because the `postgresql` units already form an odd voter count — keeping it would make the count even again and degrade partition tolerance.
+* **A single unit:** the watcher still runs and votes, but a one-unit cluster has no high availability either way — there is no second copy to fail over to.
 
-This means you can keep the watcher integrated as you scale `postgresql` up and down: it withholds its vote only when the cluster is already an odd size of three or more, and contributes it otherwise.
+This means you can keep the watcher integrated as you scale `postgresql` up and down: it stops itself only when the cluster is already an odd size of three or more, and runs otherwise.
 
 ## Availability-zone placement
 

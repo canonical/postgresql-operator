@@ -6,10 +6,8 @@ This guide shows how to deploy Charmed PostgreSQL in **stereo mode**: two `postg
 For background on why the third vote is needed, see {ref}`stereo-mode`.
 
 ```{note}
-Stereo mode is currently available in the `16/edge` channel only — it is not yet part of `16/stable`. The commands below use `16/edge` accordingly.
+Stereo mode requires `postgresql` revision 1149 or higher. The deploy commands below use the `16/edge` channel, which provides it.
 ```
-
-<!-- TODO: Stereo mode is currently available in the `16/edge` channel only. When the `watcher-offer` feature is released to `16/stable`, update the `--channel 16/edge` flags in the deploy commands below, the Channel column in the `juju status` sample, and the channel note above to `16/stable`. -->
 
 ## Prerequisites
 
@@ -54,7 +52,7 @@ mymodel  gce         google/us-east1  3.6.23   unsupported  09:42:31+02:00
 
 App         Version  Status  Scale  Charm               Channel   Rev  Exposed  Message
 pg-watcher  16.14    active      1  postgresql-watcher  16/edge    25  no
-postgresql  16.14    active      2  postgresql          16/edge  1148  no
+postgresql  16.14    active      2  postgresql          16/edge  1150  no
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 pg-watcher/0*  active    idle   2        34.138.167.85             Raft connected, monitoring 2 PostgreSQL endpoints
