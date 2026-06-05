@@ -1020,15 +1020,14 @@ class Patroni:
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
             raise RemoveRaftMemberFailedError() from None
 
-    def _get_partner_addrs(self) -> list[str]:
-        partner_addrs = list(self.charm._units_ips - {self.charm._unit_ip})
-        if watcher_addr := self.charm.watcher_offer.watcher_raft_address:
-            partner_addrs.append(watcher_addr)
-        return partner_addrs
-
     def check_raft_connection(self) -> None:
         """Verify that the watcher has joined the Raft cluster."""
-        if not (partner_addrs := self._get_partner_addrs()):
+        partner_addrs = (
+            [watcher_addr, *self.charm._peer_members_ips]
+            if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
+            else list(self.charm._peer_members_ips)
+        )
+        if not partner_addrs:
             logger.debug("Check connection early exit: No partners provided")
             return
 
