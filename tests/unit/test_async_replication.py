@@ -753,7 +753,7 @@ def test_handle_replication_change():
     assert result is False
     relation.get_system_identifier.assert_not_called()
     mock_event.fail.assert_called_once_with(
-        "All units from the other cluster must publish their pod addresses in the relation data."
+        "All units from the other cluster must publish their unit addresses in the relation data."
     )
 
     # 3.

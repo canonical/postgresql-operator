@@ -442,17 +442,17 @@ class PostgreSQLAsyncReplication(Object):
         remote_units = [unit for unit in relation.units if unit.app == relation.app]
         if len(remote_units) == 0:
             event.fail(
-                "All units from the other cluster must publish their pod addresses in the relation data."
+                "All units from the other cluster must publish their unit addresses in the relation data."
             )
             return False
 
         # Check if all units from the other cluster published their IPs in the relation data.
-        # If not, fail the action telling that all units must publish their pod addresses in the
+        # If not, fail the action telling that all units must publish their unit addresses in the
         # relation data.
         for unit in remote_units:
             if "unit-address" not in relation.data[unit]:
                 event.fail(
-                    "All units from the other cluster must publish their pod addresses in the relation data."
+                    "All units from the other cluster must publish their unit addresses in the relation data."
                 )
                 return False
 

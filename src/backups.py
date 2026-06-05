@@ -45,6 +45,7 @@ from constants import (
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
 )
+from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
 
 logger = logging.getLogger(__name__)
 
@@ -201,8 +202,8 @@ class PostgreSQLBackups(Object):
     def _is_standby_cluster(self) -> bool:
         """Return whether this unit belongs to a standby cluster."""
         if (
-            self.model.get_relation("replication") is None
-            and self.model.get_relation("replication-offer") is None
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
+            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
         ):
             return False
 
