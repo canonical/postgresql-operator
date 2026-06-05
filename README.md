@@ -1,8 +1,8 @@
 # Charmed PostgreSQL VM Operator
 
-[![CharmHub Badge](https://charmhub.io/postgresql/badge.svg)](https://charmhub.io/postgresql)
-[![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml)
-[![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3Amain)
+[![CharmHub Badge](https://charmhub.io/postgresql/badge.svg?channel=16%2Fstable)](https://charmhub.io/postgresql?channel=16%2Fstable)
+[![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg?branch=16%2Fedge)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml?query=branch%3A16%2Fedge)
+[![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=16%2Fedge)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3A16%2Fedge)
 
 
 This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines via the [Juju orchestration engine](https://juju.is/).
