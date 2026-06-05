@@ -1,3 +1,5 @@
+
+
 (how-to)=
 # How-to guides
 
@@ -5,128 +7,87 @@ The following guides cover key processes and common tasks for managing and using
 
 ## Deployment and setup
 
-Installation of different cloud services with Juju:
-* [Sunbeam]
-* [MAAS]
-* [AWS EC2]
-* [GCE]
-* [Azure]
-* [Multi-availability zones (AZ)][Multi-AZ]
-
-Other deployment scenarios and configurations:
-* [Terraform]
-* [TLS VIP access]
-* [Air-gapped]
-* [Juju storage]
-
-## Usage and maintenance
-
-* [Integrate with another application]
-* [External access]
-* [Scale replicas]
-* [Enable TLS]
-* [Enable plugins/extensions]
-* [Switchover/failover]
-
-## Backup and restore
-* [Configure S3 AWS]
-* [Configure S3 RadosGW]
-* [Create a backup]
-* [Restore a backup]
-* [Manage backup retention]
-* [Migrate a cluster]
-
-## Monitoring (COS)
-
-* [Enable monitoring] with Grafana
-* [Enable alert rules] with Prometheus
-* [Enable tracing] with Tempo
-* [Enable profiling] with Parca
-
-## Minor upgrades
-* [Perform a minor upgrade]
-* [Perform a minor rollback]
-
-## Cross-regional (cluster-cluster) async replication
-
-* [Cross-regional async replication]
-    * [Set up clusters]
-    * [Integrate with a client app]
-    * [Remove or recover a cluster]
-    * [Enable plugins/extensions]
-
-## Development
-
-This section is for charm developers looking to support PostgreSQL integrations with their charm.
-
-* [Integrate with your charm]
-* [Migrate data via pg_dump]
-* [Migrate data via backup/restore]
-
-<!--Links-->
-
-[Sunbeam]: /how-to/deploy/sunbeam
-[MAAS]: /how-to/deploy/maas
-[AWS EC2]: /how-to/deploy/aws-ec2
-[GCE]: /how-to/deploy/gce
-[Azure]: /how-to/deploy/azure
-[Multi-AZ]: /how-to/deploy/multi-az
-[TLS VIP access]: /how-to/deploy/tls-vip-access
-[Juju spaces]: /how-to/deploy/juju-spaces
-[Terraform]: /how-to/deploy/terraform
-[Air-gapped]: /how-to/deploy/air-gapped
-[Juju storage]: /how-to/deploy/juju-storage
-
-[Integrate with another application]: /how-to/integrate-with-another-application
-[External access]: /how-to/external-network-access
-[Scale replicas]: /how-to/scale-replicas
-[Enable TLS]: /how-to/enable-tls
-[Switchover/failover]: /how-to/switchover-failover
-
-[Configure S3 AWS]: /how-to/back-up-and-restore/configure-s3-aws
-[Configure S3 RadosGW]: /how-to/back-up-and-restore/configure-s3-radosgw
-[Create a backup]: /how-to/back-up-and-restore/create-a-backup
-[Restore a backup]: /how-to/back-up-and-restore/restore-a-backup
-[Manage backup retention]: /how-to/back-up-and-restore/manage-backup-retention
-[Migrate a cluster]: /how-to/back-up-and-restore/migrate-a-cluster
-
-[Enable monitoring]: /how-to/monitoring-cos/enable-monitoring
-[Enable alert rules]: /how-to/monitoring-cos/enable-alert-rules
-[Enable tracing]: /how-to/monitoring-cos/enable-tracing
-[Enable profiling]: /how-to/monitoring-cos/enable-profiling
-
-[Perform a minor upgrade]: /how-to/upgrade/perform-a-minor-upgrade
-[Perform a minor rollback]: /how-to/upgrade/perform-a-minor-rollback
-
-[Cross-regional async replication]: /how-to/cross-regional-async-replication/index
-[Set up clusters]: /how-to/cross-regional-async-replication/set-up-clusters
-[Integrate with a client app]: /how-to/cross-regional-async-replication/integrate-with-a-client-app
-[Remove or recover a cluster]: /how-to/cross-regional-async-replication/remove-or-recover-a-cluster
-[Enable plugins/extensions]: /how-to/enable-plugins-extensions/index
-
-[Integrate with your charm]: /how-to/development/integrate-with-your-charm
-[Migrate data via pg_dump]: /how-to/development/migrate-data-via-pg-dump
-[Migrate data via backup/restore]: /how-to/development/migrate-data-via-backup-restore
-
+Available deployment methods, clouds, and specialised setups:
 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
-:hidden:
 
 Deploy <deploy/index>
+```
+
+## Operations and maintenance
+
+Essential operations to configure and manage a PostgreSQL cluster:
+
+```{toctree}
+:titlesonly:
+
+Scale <scale-replicas>
 Integrate <integrate-with-another-application>
 Manage passwords <manage-passwords>
-External network access <external-network-access>
-Scale <scale-replicas>
-Switchover/failover <switchover-failover>
 Enable TLS <enable-tls>
-Enable LDAP <enable-ldap>
 Enable plugins/extensions <enable-plugins-extensions/index>
+```
+
+Advanced networking, credential management, and disaster recovery:
+
+```{toctree}
+:titlesonly:
+
+External network access <external-network-access>
+Enable LDAP <enable-ldap>
+Switchover/failover <switchover-failover>
+```
+
+### Backups and data migration
+
+Configuration of storage providers and backup management:
+
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+
 Back up and restore <back-up-and-restore/index>
+```
+
+### Monitoring (COS)
+
+Set up observability services like Grafana, Prometheus, Loki, and Tempo through the Canonical Observability Stack (COS):
+
+```{toctree}
+:maxdepth: 2
+
 Monitoring (COS) <monitoring-cos/index>
-Upgrade <upgrade/index>
+```
+
+### Refresh (upgrade)
+
+Instructions for performing an in-place application refresh:
+
+```{toctree}
+:titlesonly:
+
+Refresh (upgrade) <upgrade/index>
+```
+
+### Cross-regional (cluster-cluster) async replication
+
+Walkthrough of a cluster-cluster deployment and its essential operations:
+
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+
 Cross-regional async replication <cross-regional-async-replication/index>
+```
+
+## Charm development
+
+For charm developers looking to support PostgreSQL integrations with their charm
+
+```{toctree}
+:titlesonly:
+
 Development <development/index>
 ```

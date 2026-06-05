@@ -20,7 +20,7 @@ This page contains a markdown version of the alert rules described in the `postg
 | PostgresqlTooManyConnections | ![warning] | PostgresSQL instance is using > 80% of the maximum connections.<br>Consider checking how many connections the client application is opening, or using PgBouncer in front of the database. |
 | PostgresqlNotEnoughConnections | ![info] | PostgresSQL instance does not have enough connections.<br>PostgreSQL instance should have more connections (> 5).<br>Consider double-checking how many connections the client application is opening and/or using PgBouncer in front of the database. |
 | PostgresqlDeadLocks | ![warning] | PostgresSQL instance has dead locks.<br>See more details with the pg_locks view. |
-| PostgresqlHighRollbackRate | ![warning] | PostgresSQL instance has a high rollback rate instance.<br>The ratio of transactions being aborted compared to committed is > 2 %.<br>This is probably happening due to unoptimised configurations related to commit delay, connections, memory, and WAL files. |
+| PostgresqlHighRollbackRate | ![warning] | PostgresSQL instance has a high rollback rate instance.<br>The ratio of transactions being aborted compared to committed is > 2 %.<br>This is probably happening due to non-optimal configurations related to commit delay, connections, memory, and WAL files. |
 | PostgresqlCommitRateLow | ![info] | PostgresSQL instance has a low commit rate.<br>PostgresSQL seems to be processing very few transactions.<br>Check for long-running queries and configuration issues, like insufficient cache size. |
 | PostgresqlLowXidConsumption | ![info] | PostgresSQL instance shows low XID consumption.<br>PostgresSQL seems to be consuming transaction IDs very slowly.<br>Run ANALYZE to update the optimizer statistics, ensure that query plans are correct, and double-check your VACUUM settings. |
 | PostgresqlHighRateStatementTimeout | ![critical] | PostgresSQL instance shows a high rate of statement timeout.<br>Either tune `statement_timeout` when sending queries or use EXPLAIN ANALYZE to understand how the queries can be improved. |
@@ -58,8 +58,8 @@ This page contains a markdown version of the alert rules described in the `postg
 | `PgBackRestBackupError` | ![critical] | Backup failed for a stanza.<br>The last pgBackRest backup ended with error status > 0.<br>Check the pgBackRest logs for the stanza. |
 | `PgBackRestBackupTooOld` | ![warning] | No recent backup available.<br>The last pgBackRest backup is older than 7 days.<br>Consider checking your backup schedule, capacity, and logs. |
 | `PgBackRestStanzaError` | ![warning] | A stanza has reported errors.<br>Status > 0 indicates problems such as missing stanza path or no valid backups.<br>Check pgBackRest logs for details. |
-| `PgBackRestRepoError` | ![warning] | A repository has reported errors.<br>Status > 0 indicates the repo may be inaccessible, out of space, or otherwise unhealthy.<br>Check pgBackRest logs and storage system. |
-| `PgBackRestExporterError` | ![critical] | The pgBackRest exporter failed to fetch data.<br>Metric `pgbackrest_exporter_status == 0` indicates exporter-side issues.<br>This may be a misconfiguration or runtime error; check exporter logs. |
+| `PgBackRestRepoError` | ![warning] | A repository has reported errors.<br>Status > 0 indicates the repository may be inaccessible, out of space, or otherwise unhealthy.<br>Check pgBackRest logs and storage system. |
+| `PgBackRestExporterError` | ![critical] | The pgBackRest exporter failed to fetch data.<br>Metric `pgbackrest_exporter_status == 0` indicates exporter-side issues.<br>This may be an incorrect configuration or a runtime error. Check exporter logs. |
 
 <!-- Badges -->
 [info]: https://img.shields.io/badge/info-blue

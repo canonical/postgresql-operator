@@ -262,7 +262,7 @@ class PostgreSQLAsyncReplication(Object):
             }.items():
                 databag = relation_data[app]
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
-                if relation_promoted_cluster_counter > promoted_cluster_counter:
+                if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
         return primary_cluster
@@ -576,6 +576,13 @@ class PostgreSQLAsyncReplication(Object):
         """Set up asynchronous replication between two clusters."""
         if self._get_primary_cluster() is not None:
             event.fail("There is already a replication set up.")
+            return
+
+        if self._relation is None:
+            event.fail(
+                "No async-replication relation has been established."
+                " Create the offer and relate the two clusters before running this action."
+            )
             return
 
         if self._relation.name == REPLICATION_CONSUMER_RELATION:

@@ -594,6 +594,16 @@ class Patroni:
                 if self.get_primary() is None:
                     raise ClusterNotPromotedError("cluster not promoted")
 
+    def set_max_timelines_history(self) -> None:
+        """Patch the DCS with max_timelines_history limit."""
+        requests.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"max_timelines_history": 50},
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
+
     def render_file(self, path: str, content: str, mode: int, change_owner: bool = True) -> None:
         """Write a content rendered from a template to a file.
 

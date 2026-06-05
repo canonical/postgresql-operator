@@ -199,6 +199,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                     self.charm.update_config()
 
                     self._set_up_new_access_roles_for_legacy()
+                    self._patch_max_timelines_history()
 
                     self.set_unit_completed()
 
@@ -275,6 +276,12 @@ class PostgreSQLUpgrade(DataUpgrade):
         self.charm.postgresql.grant_internal_access_group_memberships()
         self.charm.postgresql.grant_relation_access_group_memberships()
         logger.debug("Access roles created")
+
+    def _patch_max_timelines_history(self):
+        try:
+            self.charm._patroni.set_max_timelines_history()
+        except Exception:
+            logger.warning("Unable to patch in max_timelines_history")
 
     @property
     def unit_upgrade_data(self) -> RelationDataContent:
