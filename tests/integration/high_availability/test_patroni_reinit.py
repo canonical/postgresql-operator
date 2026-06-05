@@ -7,7 +7,7 @@ import logging
 import jubilant
 import requests
 from jubilant import Juju
-from tenacity import Retrying, stop_after_delay, wait_fixed
+from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 
 from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 
@@ -27,6 +27,16 @@ DB_APP_NAME = "postgresql"
 DB_TEST_APP_NAME = "postgresql-test-app"
 
 PG_CONTROL_PATH = f"{POSTGRESQL_DATA_DIR}/global/pg_control"
+
+
+def _reinit_transiently_failed(exc: BaseException) -> bool:
+    """Return True for transient reinit failures that clear once Patroni settles."""
+    text = f"{exc} {getattr(exc, 'stderr', '') or ''} {getattr(exc, 'stdout', '') or ''}"
+    # Member not yet re-registered in the cluster after the restart.
+    if "No replica among provided members" in text:
+        return True
+    # The target's REST API was briefly not listening right after the restart.
+    return "Connection refused" in text and "/reinitialize" in text
 
 
 def test_deploy(juju: Juju, charm: str) -> None:
@@ -130,22 +140,45 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     logger.info("Confirming pg_control deletion broke replica %s (not streaming)", replica_unit)
     broken_state: str | None = None
     for attempt in Retrying(
-        stop=stop_after_delay(2 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
+        stop=stop_after_delay(3 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
     ):
         with attempt:
             broken_state = get_member_state()
-            assert broken_state not in ("running", "streaming"), (
-                f"Replica {replica_unit} unexpectedly healthy ({broken_state!r}) before reinit; "
-                "pg_control deletion did not break it, so the test would falsely pass"
+            # Reject None: right after restart the member is briefly absent from the cluster
+            # (its DCS key TTL-expires while PostgreSQL fails to start), and reinit cannot
+            # target an absent member ("No replica among provided members").
+            assert broken_state is not None and broken_state not in ("running", "streaming"), (
+                f"Replica {replica_unit} not yet present-and-broken ({broken_state!r}); expected it "
+                "registered but not running/streaming before reinit"
             )
     logger.info("Replica %s broken (state=%r) before reinit", replica_unit, broken_state)
+
+    logger.info(
+        "Waiting for %s Patroni REST API to accept connections before reinit", replica_unit
+    )
+    for attempt in Retrying(
+        stop=stop_after_delay(2 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
+    ):
+        with attempt:
+            # Any HTTP response means the API is listening; we only need it reachable so
+            # patronictl's POST /reinitialize is not connection-refused.
+            requests.get(f"https://{replica_ip}:8008/patroni", verify=False)
 
     logger.info("Running patronictl reinit on %s", replica_unit)
     patronictl_cmd = (
         f"sudo charmed-postgresql.patronictl -c {PATRONI_CONF_PATH}/patroni.yaml "
         f"reinit {cluster_name} {replica_member_name} --force"
     )
-    juju.ssh(replica_unit, patronictl_cmd)
+    # Retry transient reinit failures (member not yet re-registered, or its REST API not yet
+    # listening after the restart) until Patroni accepts the request.
+    for attempt in Retrying(
+        stop=stop_after_delay(3 * MINUTE_SECS),
+        wait=wait_fixed(10),
+        retry=retry_if_exception(_reinit_transiently_failed),
+        reraise=True,
+    ):
+        with attempt:
+            juju.ssh(replica_unit, patronictl_cmd)
 
     logger.info("Waiting for %s to reach the streaming state after reinit", replica_unit)
     for attempt in Retrying(
