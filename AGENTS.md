@@ -5,50 +5,6 @@ PostgreSQL 16 on virtual machines via Patroni for high availability.
 
 ## Architectural Rules
 
-### Module Responsibilities
-
-- **`charm.py`** — Main operator class. Event handler registration, orchestration, and business
-  logic. Delegates domain-specific work to specialized modules.
-- **`cluster.py`** — Patroni lifecycle management: start/stop, switchover, health checks, Raft
-  consensus, and Patroni configuration rendering.
-- **`backups.py`** — pgBackRest integration: backup, restore, PITR, S3 credential management,
-  pgBackRest configuration rendering.
-- **`config.py`** — Pydantic configuration model (`CharmConfig`) only. Pure schema definition
-  with validated fields. Does not render config files.
-- **`relations/`** — One handler class per relation interface (5 files):
-  `postgresql_provider.py`, `async_replication.py`, `logical_replication.py`, `tls.py`,
-  `watcher.py`.
-- **`cluster_topology_observer.py`** — Watches for cluster topology changes via a spawned
-  background process and emits custom charm events.
-- **`ldap.py`** — LDAP integration via the `LdapRequirer` interface.
-- **`locales.py`** — Literal type definition of all locales available in the snap.
-- **`rotate_logs.py`** — Background process management for log rotation (pgBackRest logs).
-- **`constants.py`** — All shared constants (paths, ports, password keys, error messages,
-  local state values).
-- **`grafana_dashboards/`** — Grafana dashboard JSON definitions for COS integration.
-- **`prometheus_alert_rules/`** — Prometheus alerting rule definitions (YAML).
-- **`loki_alert_rules/`** — Loki alerting rule definitions.
-- **`lib/`** — Vendored charm libraries managed by `charmcraft fetch-lib`. Never modify
-  these files directly — changes will be overwritten on the next fetch.
-
-The following directories are at the **repository root** (not under `src/`):
-
-- **`templates/`** — Jinja2 templates: `patroni.yml.j2`, `pgbackrest.conf.j2`,
-  `pgbackrest.logrotate.j2`.
-
-### External Package: `single_kernel_postgresql`
-
-The `single_kernel_postgresql` package is the shared library used across PostgreSQL charms on
-all substrates (VM and K8s). It provides:
-
-- **`PostgreSQL` class** — SQL-level operations (user/role management, database creation,
-  extension management, parameter building). Never manages PostgreSQL lifecycle.
-- **Config literals** — `SYSTEM_USERS`, `REPLICATION_USER`, `REWIND_USER`, `MONITORING_USER`,
-  `USER`, `BACKUP_USER`, `PEER`, `Substrates`, `POSTGRESQL_STORAGE_PERMISSIONS`.
-- **Exception classes** — `PostgreSQLCreateUserError`, `PostgreSQLBaseError`, etc.
-- **`TLSTransfer`** — TLS certificate transfer event handling.
-- **Utility functions** — File rendering, password generation, HTTP helpers.
-
 ### Key Rules
 
 1. **Never manage PostgreSQL directly** — all lifecycle operations (start, stop, restart,
@@ -114,6 +70,50 @@ all substrates (VM and K8s). It provides:
     act only on the difference. Avoid unconditional side effects — generate credentials only
     if absent, guard one-time setup behind peer-data flags, use "create if not exists"
     semantics, and prefer set-based writes over blind appends.
+
+### Module Responsibilities
+
+- **`charm.py`** — Main operator class. Event handler registration, orchestration, and business
+  logic. Delegates domain-specific work to specialized modules.
+- **`cluster.py`** — Patroni lifecycle management: start/stop, switchover, health checks, Raft
+  consensus, and Patroni configuration rendering.
+- **`backups.py`** — pgBackRest integration: backup, restore, PITR, S3 credential management,
+  pgBackRest configuration rendering.
+- **`config.py`** — Pydantic configuration model (`CharmConfig`) only. Pure schema definition
+  with validated fields. Does not render config files.
+- **`relations/`** — One handler class per relation interface (5 files):
+  `postgresql_provider.py`, `async_replication.py`, `logical_replication.py`, `tls.py`,
+  `watcher.py`.
+- **`cluster_topology_observer.py`** — Watches for cluster topology changes via a spawned
+  background process and emits custom charm events.
+- **`ldap.py`** — LDAP integration via the `LdapRequirer` interface.
+- **`locales.py`** — Literal type definition of all locales available in the snap.
+- **`rotate_logs.py`** — Background process management for log rotation (pgBackRest logs).
+- **`constants.py`** — All shared constants (paths, ports, password keys, error messages,
+  local state values).
+- **`grafana_dashboards/`** — Grafana dashboard JSON definitions for COS integration.
+- **`prometheus_alert_rules/`** — Prometheus alerting rule definitions (YAML).
+- **`loki_alert_rules/`** — Loki alerting rule definitions.
+- **`lib/`** — Vendored charm libraries managed by `charmcraft fetch-lib`. Never modify
+  these files directly — changes will be overwritten on the next fetch.
+
+The following directories are at the **repository root** (not under `src/`):
+
+- **`templates/`** — Jinja2 templates: `patroni.yml.j2`, `pgbackrest.conf.j2`,
+  `pgbackrest.logrotate.j2`.
+
+### External Package: `single_kernel_postgresql`
+
+The `single_kernel_postgresql` package is the shared library used across PostgreSQL charms on
+all substrates (VM and K8s). It provides:
+
+- **`PostgreSQL` class** — SQL-level operations (user/role management, database creation,
+  extension management, parameter building). Never manages PostgreSQL lifecycle.
+- **Config literals** — `SYSTEM_USERS`, `REPLICATION_USER`, `REWIND_USER`, `MONITORING_USER`,
+  `USER`, `BACKUP_USER`, `PEER`, `Substrates`, `POSTGRESQL_STORAGE_PERMISSIONS`.
+- **Exception classes** — `PostgreSQLCreateUserError`, `PostgreSQLBaseError`, etc.
+- **`TLSTransfer`** — TLS certificate transfer event handling.
+- **Utility functions** — File rendering, password generation, HTTP helpers.
 
 ## Tooling
 
