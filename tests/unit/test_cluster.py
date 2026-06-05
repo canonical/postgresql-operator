@@ -333,7 +333,10 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
 
 def test_start_patroni(peers_ips, patroni):
-    with patch("charm.snap.SnapCache") as _snap_cache:
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.Patroni.check_raft_connection") as _check_raft_connection,
+    ):
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
@@ -342,6 +345,7 @@ def test_start_patroni(peers_ips, patroni):
         assert patroni.start_patroni()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
+        _check_raft_connection.assert_called_once_with()
 
         # Test a fail scenario.
         assert not patroni.start_patroni()

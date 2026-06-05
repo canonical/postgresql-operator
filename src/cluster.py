@@ -731,7 +731,10 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
-            return selected_snap.services["patroni"]["active"]
+            if selected_snap.services["patroni"]["active"]:
+                self.check_raft_connection()
+                return True
+            return False
         except snap.SnapError as e:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -982,7 +985,7 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_host = "127.0.0.1:2222"
+        raft_host = f"127.0.0.1:{RAFT_PORT}"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
         except UtilityException as e:
@@ -1050,7 +1053,10 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.restart(services=["patroni"])
-            return selected_snap.services["patroni"]["active"]
+            if selected_snap.services["patroni"]["active"]:
+                self.check_raft_connection()
+                return True
+            return False
         except snap.SnapError as e:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -1231,3 +1237,48 @@ class Patroni:
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)
         subprocess.run(["/bin/systemctl", "daemon-reload"])
+
+    def check_raft_connection(self) -> None:
+        """Verify that the watcher has joined the Raft cluster."""
+        partner_addrs = list(self.charm._units_ips)
+        if watcher_addr := self.charm.watcher_offer.watcher_raft_address:
+            partner_addrs.append(watcher_addr)
+
+        # if not partner_addrs:
+        #     logger.debug("Check connection early exit: No partners provided")
+        #     return
+
+        member_address = f"127.0.0.1:{RAFT_PORT}"
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=self.patroni_password, timeout=3)
+
+        enabled = False
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(2)):
+                with attempt:
+                    if not (
+                        raft_status := syncobj_util.executeCommand(member_address, ["status"])
+                    ):
+                        raise Exception("Raft watcher no status")
+                    logger.debug(f"Observer raft: {raft_status}")
+                    for key in raft_status:
+                        if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] == 2:
+                            enabled = True
+                            break
+                    if not enabled:
+                        # Ping the other members as a sanity check
+                        for addr in partner_addrs:
+                            try:
+                                logger.debug(
+                                    f"{addr} Raft: {syncobj_util.executeCommand(f'{addr}:{RAFT_PORT}', ['status'])}"
+                                )
+                            except Exception:
+                                logger.debug(f"Unable to connect to {addr}")
+                                continue
+                            logger.warning("Unable to connect to peers")
+                            self.restart_patroni()
+                            raise Exception("Patroni Raft not connected")
+                        logger.warning("No Raft members reachable")
+                        raise Exception("No Raft members reachable")
+        except RetryError:
+            logger.warning("Unable to reconnect watcher")
