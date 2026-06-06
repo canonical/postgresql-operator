@@ -1608,6 +1608,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._update_relation_endpoints()
             self._set_primary_status_message()
             self.async_replication.update_async_replication_data()
+        self._patroni.check_raft_connection()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
