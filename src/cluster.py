@@ -1022,13 +1022,14 @@ class Patroni:
 
     def check_raft_connection(self) -> None:
         """Verify that the watcher has joined the Raft cluster."""
-        partner_addrs = (
-            [watcher_addr, *self.charm._peer_members_ips]
-            if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
-            else list(self.charm._peer_members_ips)
-        )
-        if not partner_addrs:
-            logger.debug("Check connection early exit: No partners provided")
+        if self.unit_ip not in self.charm.members_ips or not (
+            partner_addrs := (
+                [watcher_addr, *self.peers_ips]
+                if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
+                else list(self.peers_ips)
+            )
+        ):
+            logger.debug("Check connection early exit: No connectivity expected")
             return
 
         member_address = f"127.0.0.1:{RAFT_PORT}"

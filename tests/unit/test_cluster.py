@@ -927,10 +927,10 @@ def test_check_raft_connection(patroni):
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("cluster.stop_after_attempt", return_value=stop_after_delay(0)),
         patch(
-            "charm.PostgresqlOperatorCharm._peer_members_ips",
+            "charm.PostgresqlOperatorCharm.members_ips",
             new_callable=PropertyMock,
             return_value=set(),
-        ) as _peer_members_ips,
+        ) as _members_ips,
         patch(
             "charm.PostgresqlOperatorCharm._unit_ip",
             new_callable=PropertyMock,
@@ -943,7 +943,7 @@ def test_check_raft_connection(patroni):
         assert not _tcputility.called
 
         # Can't get watcher status
-        _peer_members_ips.return_value = {"2.2.2.2", "3.3.3.3"}
+        _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
         _tcputility.return_value.executeCommand.side_effect = [{}]
 
         patroni.check_raft_connection()

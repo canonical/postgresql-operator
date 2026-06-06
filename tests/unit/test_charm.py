@@ -1372,6 +1372,7 @@ def test_on_cluster_topology_change(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
+        patch("charm.Patroni.check_raft_connection") as _check_raft_connection,
     ):
         # Mock the property value.
         _primary_endpoint.side_effect = [None, "1.1.1.1"]
