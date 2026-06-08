@@ -5,7 +5,6 @@
 import logging
 
 import jubilant
-import requests
 from jubilant import Juju
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 
@@ -16,7 +15,6 @@ from .high_availability_helpers_new import (
     get_app_units,
     get_db_primary_unit,
     get_member_state,
-    get_unit_ip,
     wait_for_apps_status,
 )
 
@@ -95,10 +93,7 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
 
     logger.info("Primary: %s | Replica under test: %s", primary_unit, replica_unit)
 
-    replica_ip = get_unit_ip(juju, DB_APP_NAME, replica_unit)
-
     replica_member_name = replica_unit.replace("/", "-")
-    cluster_name = DB_APP_NAME
 
     logger.info("Verifying continuous writes are flowing")
     check_db_units_writes_increment(juju, DB_APP_NAME)
@@ -125,6 +120,10 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     juju.ssh(replica_unit, "sudo systemctl start snap.charmed-postgresql.patroni")
 
     logger.info("Confirming pg_control deletion broke replica %s (not streaming)", replica_unit)
+    pg_control_failure_grep = (
+        "sudo grep -iEh 'error when calling pg_controldata|system ID is invalid' "
+        f"{PATRONI_LOGS_PATH}/patroni.log* 2>/dev/null || true"
+    )
     broken_state: str | None = None
     for attempt in Retrying(
         stop=stop_after_delay(3 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
@@ -138,23 +137,16 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
                 f"Replica {replica_unit} not yet present-and-broken ({broken_state!r}); expected it "
                 "registered but not running/streaming before reinit"
             )
+            assert juju.ssh(replica_unit, pg_control_failure_grep).strip(), (
+                f"Patroni on {replica_unit} has not logged a pg_control startup failure; the "
+                "pg_control deletion may not have broken PostgreSQL startup"
+            )
     logger.info("Replica %s broken (state=%r) before reinit", replica_unit, broken_state)
-
-    logger.info(
-        "Waiting for %s Patroni REST API to accept connections before reinit", replica_unit
-    )
-    for attempt in Retrying(
-        stop=stop_after_delay(2 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
-    ):
-        with attempt:
-            # Any HTTP response means the API is listening; we only need it reachable so
-            # patronictl's POST /reinitialize is not connection-refused.
-            requests.get(f"https://{replica_ip}:8008/patroni", verify=False)
 
     logger.info("Running patronictl reinit on %s", replica_unit)
     patronictl_cmd = (
         f"sudo charmed-postgresql.patronictl -c {PATRONI_CONF_PATH}/patroni.yaml "
-        f"reinit {cluster_name} {replica_member_name} --force"
+        f"reinit {DB_APP_NAME} {replica_member_name} --force"
     )
     # Retry transient reinit failures (member not yet re-registered, or its REST API not yet
     # listening after the restart) until Patroni accepts the request.
