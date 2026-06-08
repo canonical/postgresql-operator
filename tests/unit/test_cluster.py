@@ -922,7 +922,6 @@ def test_are_replicas_up(patroni):
 
 def test_check_raft_connection(patroni):
     with (
-        patch("cluster.Patroni.restart_patroni") as _restart_patroni,
         patch("cluster.TcpUtility") as _tcputility,
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("cluster.stop_after_attempt", return_value=stop_after_delay(0)),
@@ -937,75 +936,68 @@ def test_check_raft_connection(patroni):
             return_value="1.1.1.1",
         ),
     ):
-        pass
         # No partners
-        # patroni.check_raft_connection()
+        patroni.check_raft_connection()
 
-        # assert not _tcputility.called
+        assert not _tcputility.called
 
-        # # Can't get watcher status
-        # _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
-        # _tcputility.return_value.executeCommand.side_effect = [{}]
+        # Can't get watcher status
+        _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
+        _tcputility.return_value.executeCommand.side_effect = [{}]
 
-        # patroni.check_raft_connection()
+        patroni.check_raft_connection()
 
-        # _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        # _tcputility.return_value.executeCommand.assert_called_once_with(
-        #     "127.0.0.1:2222", ["status"]
-        # )
-        # assert not _restart_patroni.called
-        # _tcputility.reset_mock()
-        # _tcputility.return_value.executeCommand.reset_mock()
+        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
+        _tcputility.return_value.executeCommand.assert_called_once_with("1.1.1.1:2222", ["status"])
+        _tcputility.reset_mock()
+        _tcputility.return_value.executeCommand.reset_mock()
 
-        # # One partner is online
-        # raft_status = {
-        #     f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 0,
-        #     f"{RAFT_PARTNER_PREFIX}3.3.3.3:2222": 2,
-        # }
-        # _tcputility.return_value.executeCommand.side_effect = [raft_status]
+        # One partner is online, the other is offline
+        raft_status = {
+            f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 2,
+            f"{RAFT_PARTNER_PREFIX}3.3.3.3:2222": 0,
+        }
+        _tcputility.return_value.executeCommand.side_effect = [raft_status, Exception]
 
-        # patroni.check_raft_connection()
+        patroni.check_raft_connection()
 
-        # _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        # _tcputility.return_value.executeCommand.assert_called_once_with(
-        #     "127.0.0.1:2222", ["status"]
-        # )
-        # assert not _restart_patroni.called
-        # _tcputility.reset_mock()
-        # _tcputility.return_value.executeCommand.reset_mock()
+        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
+        assert _tcputility.return_value.executeCommand.call_count == 2
+        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
+        _tcputility.reset_mock()
+        _tcputility.return_value.executeCommand.reset_mock()
 
-        # # Partners not connectable
-        # raft_status = {
-        #     f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 0,
-        #     f"{RAFT_PARTNER_PREFIX}3.3.3.3:2222": 0,
-        # }
-        # _tcputility.return_value.executeCommand.side_effect = [raft_status, Exception, Exception]
+        # Unable to re-add
+        _tcputility.return_value.executeCommand.side_effect = [raft_status, raft_status, Exception]
 
-        # patroni.check_raft_connection()
+        patroni.check_raft_connection()
 
-        # _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        # assert _tcputility.return_value.executeCommand.call_count == 3
-        # _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
-        # _tcputility.return_value.executeCommand.assert_any_call("2.2.2.2:2222", ["status"])
-        # _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
-        # assert not _restart_patroni.called
-        # _tcputility.reset_mock()
-        # _tcputility.return_value.executeCommand.reset_mock()
+        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
+        assert _tcputility.return_value.executeCommand.call_count == 3
+        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call(
+            "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
+        )
+        _tcputility.reset_mock()
+        _tcputility.return_value.executeCommand.reset_mock()
 
-        # # Stuck raft
-        # raft_status = {
-        #     f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 0,
-        #     f"{RAFT_PARTNER_PREFIX}3.3.3.3:2222": 0,
-        # }
-        # _tcputility.return_value.executeCommand.side_effect = [raft_status, Exception, {1: 2}]
+        # Unit re-added
+        _tcputility.return_value.executeCommand.side_effect = None
+        _tcputility.return_value.executeCommand.return_value = raft_status
 
-        # patroni.check_raft_connection()
+        patroni.check_raft_connection()
 
-        # _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        # assert _tcputility.return_value.executeCommand.call_count == 3
-        # _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
-        # _tcputility.return_value.executeCommand.assert_any_call("2.2.2.2:2222", ["status"])
-        # _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
-        # _restart_patroni.assert_called_once_with()
-        # _tcputility.reset_mock()
-        # _tcputility.return_value.executeCommand.reset_mock()
+        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
+        assert _tcputility.return_value.executeCommand.call_count == 4
+        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call(
+            "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
+        )
+        _tcputility.return_value.executeCommand.assert_any_call(
+            "3.3.3.3:2222", ["add", "1.1.1.1:2222"]
+        )
+        _tcputility.reset_mock()
+        _tcputility.return_value.executeCommand.reset_mock()

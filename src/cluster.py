@@ -1030,7 +1030,7 @@ class Patroni:
             logger.debug("Check connection early exit: No connectivity expected")
             return
 
-        member_address = f"127.0.0.1:{RAFT_PORT}"
+        member_address = f"{self.unit_ip}:{RAFT_PORT}"
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.patroni_password, timeout=3)
 
