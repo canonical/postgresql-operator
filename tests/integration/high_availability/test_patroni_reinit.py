@@ -12,10 +12,10 @@ from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 
 from .high_availability_helpers_new import (
-    MINUTE_SECS,
     check_db_units_writes_increment,
     get_app_units,
     get_db_primary_unit,
+    get_member_state,
     get_unit_ip,
     wait_for_apps_status,
 )
@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 DB_APP_NAME = "postgresql"
 DB_TEST_APP_NAME = "postgresql-test-app"
+
+MINUTE_SECS = 60
 
 PG_CONTROL_PATH = f"{POSTGRESQL_DATA_DIR}/global/pg_control"
 
@@ -93,25 +95,10 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
 
     logger.info("Primary: %s | Replica under test: %s", primary_unit, replica_unit)
 
-    primary_ip = get_unit_ip(juju, DB_APP_NAME, primary_unit)
     replica_ip = get_unit_ip(juju, DB_APP_NAME, replica_unit)
 
     replica_member_name = replica_unit.replace("/", "-")
     cluster_name = DB_APP_NAME
-
-    def get_member_state() -> str | None:
-        """Return the replica's reported state from the primary's /cluster endpoint."""
-        cluster_resp = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
-        members = cluster_resp.json()["members"]
-        return next((m["state"] for m in members if m["name"] == replica_member_name), None)
-
-    logger.info("Verifying initial health of replica %s", replica_unit)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            resp = requests.get(f"https://{replica_ip}:8008/health", verify=False)
-            assert resp.status_code == 200, (
-                f"Replica {replica_unit} unhealthy before test: HTTP {resp.status_code}"
-            )
 
     logger.info("Verifying continuous writes are flowing")
     check_db_units_writes_increment(juju, DB_APP_NAME)
@@ -143,7 +130,7 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
         stop=stop_after_delay(3 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
     ):
         with attempt:
-            broken_state = get_member_state()
+            broken_state = get_member_state(juju, DB_APP_NAME, replica_member_name)
             # Reject None: right after restart the member is briefly absent from the cluster
             # (its DCS key TTL-expires while PostgreSQL fails to start), and reinit cannot
             # target an absent member ("No replica among provided members").
@@ -185,7 +172,7 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
         stop=stop_after_delay(5 * MINUTE_SECS), wait=wait_fixed(10), reraise=True
     ):
         with attempt:
-            replica_state = get_member_state()
+            replica_state = get_member_state(juju, DB_APP_NAME, replica_member_name)
             assert replica_state == "streaming", (
                 f"Replica {replica_unit} not streaming after reinit: {replica_state!r}"
             )

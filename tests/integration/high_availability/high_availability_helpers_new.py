@@ -188,6 +188,13 @@ def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
     raise Exception("No standby primary node found")
 
 
+def get_member_state(juju: Juju, app_name: str, member_name: str) -> str | None:
+    """Return a cluster member's reported state from the leader's /cluster endpoint."""
+    unit_address = get_unit_ip(juju, app_name, get_app_leader(juju, app_name))
+    members = requests.get(f"https://{unit_address}:8008/cluster", verify=False).json()["members"]
+    return next((member["state"] for member in members if member["name"] == member_name), None)
+
+
 def get_db_max_written_value(
     juju: Juju, app_name: str, unit_name: str, db_name: str = "postgresql_test_app_database"
 ) -> int:
