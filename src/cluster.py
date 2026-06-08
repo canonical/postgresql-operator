@@ -1056,8 +1056,8 @@ class Patroni:
                             syncobj_util.executeCommand(addr, ["remove", member_address])
                             syncobj_util.executeCommand(addr, ["add", member_address])
                             raise Exception("Patroni Raft reconnected")
-        except RetryError:
-            logger.warning("Unable to reconnect member")
+        except RetryError as e:
+            logger.warning(f"Unable to reconnect member {e}")
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
