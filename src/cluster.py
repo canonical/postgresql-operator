@@ -1035,7 +1035,7 @@ class Patroni:
         syncobj_util = TcpUtility(password=self.patroni_password, timeout=3)
 
         try:
-            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(2)):
+            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1)):
                 with attempt:
                     if not (
                         raft_status := syncobj_util.executeCommand(member_address, ["status"])
@@ -1053,11 +1053,16 @@ class Patroni:
                                 logger.debug(f"Unable to connect to {addr}")
                                 continue
                             logger.debug(f"Potentially stuck connection with {addr}")
-                            syncobj_util.executeCommand(addr, ["remove", member_address])
-                            syncobj_util.executeCommand(addr, ["add", member_address])
+                            try:
+                                syncobj_util.executeCommand(addr, ["remove", member_address])
+                                syncobj_util.executeCommand(addr, ["add", member_address])
+                            except Exception as e:
+                                logger.warning(f"Failed to reconnect to {addr}: {e}")
+                                raise e
+                            logger.info("Reconnecting Raft to {addr}")
                             raise Exception("Patroni Raft reconnected")
-        except RetryError as e:
-            logger.warning(f"Unable to reconnect member {e}")
+        except RetryError:
+            logger.warning("Unable to reconnect member")
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
