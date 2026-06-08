@@ -3,6 +3,7 @@
 """Integration test: replica reinit after pg_control corruption via patronictl reinit."""
 
 import logging
+import subprocess
 
 import jubilant
 from jubilant import Juju
@@ -37,6 +38,17 @@ def _reinit_transiently_failed(exc: BaseException) -> bool:
         return True
     # The target's REST API was briefly not listening right after the restart.
     return "Connection refused" in text and "/reinitialize" in text
+
+
+def _grep_patroni_logs(juju: Juju, unit: str, pattern: str) -> str:
+    """Return matching Patroni log lines on the unit, or "" when grep finds none (exit 1)."""
+    command = f"sudo grep -iEh '{pattern}' {PATRONI_LOGS_PATH}/patroni.log*"
+    try:
+        return juju.ssh(unit, command).strip()
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode == 1:  # grep exit 1 means no lines matched
+            return ""
+        raise
 
 
 def test_deploy(juju: Juju, charm: str) -> None:
@@ -104,11 +116,15 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     logger.info("Waiting for Patroni to stop on %s before deleting pg_control", replica_unit)
     for attempt in Retrying(stop=stop_after_delay(MINUTE_SECS), wait=wait_fixed(3), reraise=True):
         with attempt:
-            active_state = juju.ssh(
-                replica_unit,
-                "systemctl is-active snap.charmed-postgresql.patroni || true",
-            ).strip()
-            assert active_state != "active", (
+            # `systemctl is-active` prints the state on stdout and exits non-zero once the
+            # service is no longer active; read that state whatever the exit code.
+            try:
+                active_state = juju.ssh(
+                    replica_unit, "systemctl is-active snap.charmed-postgresql.patroni"
+                ).strip()
+            except subprocess.CalledProcessError as exc:
+                active_state = (exc.stdout or "").strip()
+            assert active_state and active_state != "active", (
                 f"Patroni still active on {replica_unit} ({active_state!r}); refusing to delete "
                 "pg_control while PostgreSQL may still be running"
             )
@@ -120,10 +136,6 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     juju.ssh(replica_unit, "sudo systemctl start snap.charmed-postgresql.patroni")
 
     logger.info("Confirming pg_control deletion broke replica %s (not streaming)", replica_unit)
-    pg_control_failure_grep = (
-        "sudo grep -iEh 'error when calling pg_controldata|system ID is invalid' "
-        f"{PATRONI_LOGS_PATH}/patroni.log* 2>/dev/null || true"
-    )
     broken_state: str | None = None
     for attempt in Retrying(
         stop=stop_after_delay(3 * MINUTE_SECS), wait=wait_fixed(5), reraise=True
@@ -137,7 +149,9 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
                 f"Replica {replica_unit} not yet present-and-broken ({broken_state!r}); expected it "
                 "registered but not running/streaming before reinit"
             )
-            assert juju.ssh(replica_unit, pg_control_failure_grep).strip(), (
+            assert _grep_patroni_logs(
+                juju, replica_unit, "error when calling pg_controldata|system ID is invalid"
+            ), (
                 f"Patroni on {replica_unit} has not logged a pg_control startup failure; the "
                 "pg_control deletion may not have broken PostgreSQL startup"
             )
@@ -171,12 +185,11 @@ def test_patroni_reinit_after_pg_control_deletion(juju: Juju, continuous_writes)
     logger.info("Replica %s is streaming after reinit", replica_unit)
 
     logger.info("Checking reinit logged no data-directory permission errors on %s", replica_unit)
-    permission_error_grep = (
-        "sudo grep -iEh "
-        "'could not remove data directory|could not rename data directory|permissionerror' "
-        f"{PATRONI_LOGS_PATH}/patroni.log* 2>/dev/null || true"
+    permission_errors = _grep_patroni_logs(
+        juju,
+        replica_unit,
+        "could not remove data directory|could not rename data directory|permissionerror",
     )
-    permission_errors = juju.ssh(replica_unit, permission_error_grep).strip()
     assert not permission_errors, (
         f"patronictl reinit on {replica_unit} logged data-directory permission failures; the "
         "versioned-storage parent directory is not writable by the PostgreSQL user. "
