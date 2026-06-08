@@ -15,7 +15,6 @@ from .. import architecture
 from ..conftest import ConnectionInformation
 from .high_availability_helpers_new import (
     get_app_leader,
-    get_app_units,
     get_db_primary_unit,
     wait_for_apps_status,
 )
@@ -52,8 +51,8 @@ def second_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
     model_name = f"{juju.model}-other"
 
     logger.info("Creating model: %s", model_name)
-    juju.add_model(model_name)
-    model_2 = Juju(model=model_name)
+    model_2 = Juju()
+    model_2.add_model(model_name)
     model_2.cli("set-model-constraints", f"arch={architecture.architecture}")
 
     yield model_name
@@ -61,7 +60,7 @@ def second_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
         return
 
     logger.info("Destroying model: %s", model_name)
-    juju.destroy_model(model_name, destroy_storage=True, force=True)
+    model_2.destroy_model(model_name, destroy_storage=True, force=True)
 
 
 def _configure_s3_integrator(
@@ -72,7 +71,19 @@ def _configure_s3_integrator(
 ) -> None:
     """Deploy and configure one s3-integrator app against microceph RGW."""
     if app_name not in model.status().apps:
-        model.deploy("s3-integrator", app=app_name, channel="1/stable")
+        model.deploy(
+            "s3-integrator",
+            app=app_name,
+            channel="1/stable",
+            config={
+                "endpoint": f"https://{microceph.host}",
+                "bucket": f"{app_name}-bucket",
+                "path": "/pg",
+                "region": "",
+                "s3-uri-style": "path",
+                "tls-ca-chain": microceph.cert,
+            },
+        )
 
     # Wait until Juju has finished unit setup and registered charm actions.
     model.wait(
@@ -80,28 +91,9 @@ def _configure_s3_integrator(
             app_name in status.apps
             and bool(status.apps[app_name].units)
             and jubilant.all_agents_idle(status, app_name)
+            and jubilant.all_blocked(status, app_name)
         ),
-        timeout=5 * MINUTE_SECS,
-    )
-
-    model.config(
-        app_name,
-        {
-            "endpoint": f"https://{microceph.host}",
-            "bucket": f"{app_name}-bucket",
-            "path": "/pg",
-            "region": "",
-            "s3-uri-style": "path",
-            "tls-ca-chain": microceph.cert,
-        },
-    )
-    model.wait(
-        ready=lambda status: (
-            app_name in status.apps
-            and bool(status.apps[app_name].units)
-            and jubilant.all_agents_idle(status, app_name)
-        ),
-        timeout=5 * MINUTE_SECS,
+        timeout=10 * MINUTE_SECS,
     )
 
     model.run(
@@ -202,8 +194,7 @@ def test_standby_backup_rejected_with_clear_message(
 
     logger.info("Creating backup on primary cluster")
     primary_unit = get_db_primary_unit(model_1, DB_APP_1)
-    replica_unit = next(unit for unit in get_app_units(model_1, DB_APP_1) if unit != primary_unit)
-    model_1.run(unit=replica_unit, action="create-backup", wait=5 * MINUTE_SECS).raise_on_failure()
+    model_1.run(unit=primary_unit, action="create-backup", wait=5 * MINUTE_SECS).raise_on_failure()
 
     logger.info("Ensuring backup is rejected on standby cluster")
     with pytest.raises(TaskError) as exc_info:
