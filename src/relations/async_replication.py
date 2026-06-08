@@ -178,11 +178,11 @@ class PostgreSQLAsyncReplication(Object):
             if not all(
                 event.relation.data[unit].get("stopped") == counter
                 for unit in event.relation.units
-                if unit.app != event.relation.app
+                if unit.app == event.relation.app
             ):
                 logger.info("Other cluster not yet down.")
                 event.defer()
-                return False
+                return True
             self.charm.update_config()
             if self.is_primary_cluster() and self.charm.unit.is_leader():
                 self._update_primary_cluster_data()
