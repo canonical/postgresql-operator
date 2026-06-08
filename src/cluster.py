@@ -1023,11 +1023,9 @@ class Patroni:
     def check_raft_connection(self) -> None:
         """Verify that the watcher has joined the Raft cluster."""
         if self.unit_ip not in self.charm.members_ips or not (
-            partner_addrs := (
-                [watcher_addr, *self.peers_ips]
-                if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
-                else list(self.peers_ips)
-            )
+            [watcher_addr, *self.peers_ips]
+            if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
+            else list(self.peers_ips)
         ):
             logger.debug("Check connection early exit: No connectivity expected")
             return
@@ -1036,7 +1034,6 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.patroni_password, timeout=3)
 
-        enabled = False
         try:
             for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(2)):
                 with attempt:
@@ -1046,26 +1043,21 @@ class Patroni:
                         raise Exception("Raft watcher no status")
                     logger.debug(f"Observer raft: {raft_status}")
                     for key in raft_status:
-                        if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] == 2:
-                            enabled = True
-                            break
-                    if not enabled:
-                        # Ping the other members as a sanity check
-                        for addr in partner_addrs:
+                        if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+                            addr = key.split(RAFT_PARTNER_PREFIX)[-1]
                             try:
                                 logger.debug(
-                                    f"{addr} Raft: {syncobj_util.executeCommand(f'{addr}:{RAFT_PORT}', ['status'])}"
+                                    f"{addr} Raft: {syncobj_util.executeCommand(addr, ['status'])}"
                                 )
                             except Exception:
                                 logger.debug(f"Unable to connect to {addr}")
                                 continue
-                            logger.warning("Unable to connect to peers")
-                            self.restart_patroni()
-                            raise Exception("Patroni Raft not connected")
-                        logger.warning("No Raft members reachable")
-                        raise Exception("No Raft members reachable")
+                            logger.debug(f"Potentially stuck connection with {addr}")
+                            syncobj_util.executeCommand(addr, ["remove", member_address])
+                            syncobj_util.executeCommand(addr, ["add", member_address])
+                            raise Exception("Patroni Raft reconnected")
         except RetryError:
-            logger.warning("Unable to reconnect watcher")
+            logger.warning("Unable to reconnect member")
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
