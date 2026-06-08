@@ -31,7 +31,7 @@ PG_CONTROL_PATH = f"{POSTGRESQL_DATA_DIR}/global/pg_control"
 
 def _reinit_transiently_failed(exc: BaseException) -> bool:
     """Return True for transient reinit failures that clear once Patroni settles."""
-    text = f"{exc} {getattr(exc, 'stderr', '') or ''} {getattr(exc, 'stdout', '') or ''}"
+    text = str(exc)  # jubilant's CLIError.__str__ already includes stdout and stderr
     # Member not yet re-registered in the cluster after the restart.
     if "No replica among provided members" in text:
         return True
