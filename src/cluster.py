@@ -1024,10 +1024,14 @@ class Patroni:
 
     def check_raft_connection(self) -> None:
         """Verify that the watcher has joined the Raft cluster."""
-        if self.unit_ip not in self.charm.members_ips or not (
-            [watcher_addr, *self.peers_ips]
-            if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
-            else list(self.peers_ips)
+        if (
+            not self.unit_ip
+            or self.unit_ip not in self.charm.members_ips
+            or not (
+                [watcher_addr, *self.peers_ips]
+                if (watcher_addr := self.charm.watcher_offer.watcher_raft_address)
+                else list(self.peers_ips)
+            )
         ):
             logger.debug("Check connection early exit: No connectivity expected")
             return
@@ -1042,8 +1046,8 @@ class Patroni:
                     if not (
                         raft_status := syncobj_util.executeCommand(member_address, ["status"])
                     ):
-                        raise Exception("Raft watcher no status")
-                    logger.debug(f"Observer raft: {raft_status}")
+                        raise Exception("Raft no status")
+                    logger.debug(f"Local raft: {raft_status}")
                     for key in raft_status:
                         if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
                             addr = key.split(RAFT_PARTNER_PREFIX)[-1]
