@@ -1038,7 +1038,9 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1)):
                 with attempt:
                     if not (
-                        raft_status := syncobj_util.executeCommand(member_address, ["status"])
+                        raft_status := syncobj_util.executeCommand(
+                            f"127.0.0.1:{RAFT_PORT}", ["status"]
+                        )
                     ):
                         raise Exception("Raft no status")
                     logger.debug(f"Local raft: {raft_status}")

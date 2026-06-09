@@ -956,7 +956,9 @@ def test_check_raft_connection(patroni):
         patroni.check_raft_connection()
 
         _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        _tcputility.return_value.executeCommand.assert_called_once_with("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
         _tcputility.reset_mock()
         _tcputility.return_value.executeCommand.reset_mock()
 
@@ -971,7 +973,7 @@ def test_check_raft_connection(patroni):
 
         _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
         assert _tcputility.return_value.executeCommand.call_count == 2
-        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
         _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
         _tcputility.reset_mock()
         _tcputility.return_value.executeCommand.reset_mock()
@@ -983,7 +985,7 @@ def test_check_raft_connection(patroni):
 
         _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
         assert _tcputility.return_value.executeCommand.call_count == 3
-        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
         _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
         _tcputility.return_value.executeCommand.assert_any_call(
             "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
@@ -999,7 +1001,7 @@ def test_check_raft_connection(patroni):
 
         _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
         assert _tcputility.return_value.executeCommand.call_count == 4
-        _tcputility.return_value.executeCommand.assert_any_call("1.1.1.1:2222", ["status"])
+        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
         _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
         _tcputility.return_value.executeCommand.assert_any_call(
             "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
