@@ -174,6 +174,15 @@ class PostgreSQLAsyncReplication(Object):
     ) -> bool:
         """Configure the primary cluster."""
         if self.charm.app == primary_cluster:
+            counter = self._get_highest_promoted_cluster_counter_value()
+            if not all(
+                event.relation.data[unit].get("stopped") == counter
+                for unit in event.relation.units
+                if unit.app == event.relation.app
+            ):
+                logger.info("Other cluster not yet down.")
+                event.defer()
+                return True
             self.charm.update_config()
             if self.is_primary_cluster() and self.charm.unit.is_leader():
                 self._update_primary_cluster_data()
@@ -505,11 +514,6 @@ class PostgreSQLAsyncReplication(Object):
 
         self._update_primary_cluster_data(promoted_cluster_counter, system_identifier)
 
-        # Emit an async replication changed event for this unit (to promote this cluster before demoting the
-        # other if this one is a standby cluster, which is needed to correctly set up the async replication
-        # when performing a switchover).
-        self._re_emit_async_relation_changed_event()
-
         return True
 
     def _is_following_promoted_cluster(self) -> bool:
@@ -572,6 +576,9 @@ class PostgreSQLAsyncReplication(Object):
 
         if not self._stop_database(event):
             return
+        event.relation.data[self.charm.unit]["stopped"] = (
+            self._get_highest_promoted_cluster_counter_value()
+        )
 
         if not (self.charm.is_unit_stopped or self._is_following_promoted_cluster()) or not all(
             "stopped" in self.charm.all_peer_data[unit]
