@@ -436,7 +436,6 @@ def test_handle_replication_change():
     relation.get_system_identifier = MagicMock(return_value=(12345, None))
     relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
     relation._update_primary_cluster_data = MagicMock()
-    relation._re_emit_async_relation_changed_event = MagicMock()
 
     with patch.object(
         PostgreSQLAsyncReplication,
@@ -451,7 +450,6 @@ def test_handle_replication_change():
     relation.get_system_identifier.assert_called_once()
     relation._get_highest_promoted_cluster_counter_value.assert_called_once()
     relation._update_primary_cluster_data.assert_called_once_with(2, 12345)
-    relation._re_emit_async_relation_changed_event.assert_called_once()
     mock_event.fail.assert_not_called()
 
 

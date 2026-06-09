@@ -650,21 +650,33 @@ def test_on_start_after_blocked_state(harness):
 
 
 def test_ensure_storage_layout(harness, tmp_path):
-    """_ensure_storage_layout creates TEMP_DATA_DIR only.
+    """_ensure_storage_layout creates TEMP_DATA_DIR and chowns the versioned parents.
 
     Data migration between storage roots and versioned paths is handled
-    by the snap hooks — the charm only ensures TEMP_DATA_DIR exists
-    (it may live on a tmpfs mount that is wiped on reboot).
+    by the snap hooks.  The charm ensures TEMP_DATA_DIR exists (it may live
+    on a tmpfs mount that is wiped on reboot) and makes the 16/ parent of
+    both the temp and the data dirs _daemon_-owned, so Patroni can remove
+    the versioned subdirectory (e.g. during patronictl reinit).
     """
     temp_root = tmp_path / "temp" / "16" / "main"
+    data_root = tmp_path / "data" / "16" / "main"
+    # The snap's migrate-data.sh creates the data parent (as root); the
+    # charm only fixes its ownership, it does not create the data dir.
+    data_root.parent.mkdir(parents=True)
     with (
         patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.shutil"),
+        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
+        patch("charm.shutil") as mock_shutil,
     ):
         harness.charm._ensure_storage_layout()
     assert temp_root.is_dir()
-    # No other dirs should be created by the charm.
-    assert not (tmp_path / "data").exists()
+    # The charm does not create the data dir leaf — only the snap does.
+    assert not data_root.exists()
+    # Both versioned 16/ parents (and the temp leaf) are chowned to _daemon_.
+    chowned = {call.args[0] for call in mock_shutil.chown.call_args_list}
+    assert temp_root in chowned
+    assert temp_root.parent in chowned
+    assert data_root.parent in chowned
     assert not (tmp_path / "archive").exists()
     assert not (tmp_path / "logs").exists()
 
