@@ -229,6 +229,8 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         os.makedirs(POSTGRESQL_DATA_DIR, exist_ok=True)
+        # Parent must be _daemon_-owned so Patroni can rename/remove the data dir on reinit.
+        _change_owner(Substrates.VM, os.path.dirname(POSTGRESQL_DATA_DIR))
         _change_owner(Substrates.VM, POSTGRESQL_DATA_DIR)
 
         # Create empty base config

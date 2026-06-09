@@ -1,8 +1,9 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import os
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
+from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import pytest
 import requests
@@ -478,14 +479,21 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 
         patroni.configure_patroni_on_unit()
 
-        _getpwnam.assert_called_once_with("_daemon_")
+        assert _getpwnam.call_args_list == [call("_daemon_"), call("_daemon_")]
         _makedirs.assert_called_once_with(POSTGRESQL_DATA_DIR, exist_ok=True)
 
+        # Parent and data dir are both chowned (parent enables Patroni reinit rename/remove).
+        _chown.assert_any_call(
+            os.path.dirname(POSTGRESQL_DATA_DIR),
+            uid=sentinel.uid,
+            gid=sentinel.gid,
+        )
         _chown.assert_any_call(
             POSTGRESQL_DATA_DIR,
             uid=sentinel.uid,
             gid=sentinel.gid,
         )
+        assert _chown.call_count == 2
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
         _chmod.assert_called_once_with(POSTGRESQL_DATA_DIR, 448)
