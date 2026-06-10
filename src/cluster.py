@@ -456,7 +456,7 @@ class Patroni:
                     members_ips = {self.unit_ip}
                     members_ips.update(self.peers_ips)
                     for members_ip in members_ips:
-                        endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
+                        endpoint = "leader" if members_ip == primary_ip else "replica?lag=100MB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
                         r = requests.get(
                             f"{url}/{endpoint}",
