@@ -1037,12 +1037,13 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1)):
                 with attempt:
-                    if not (
-                        raft_status := syncobj_util.executeCommand(
+                    try:
+                        raft_status = syncobj_util.executeCommand(
                             f"127.0.0.1:{RAFT_PORT}", ["status"]
                         )
-                    ):
-                        raise Exception("Raft no status")
+                    except Exception:
+                        logger.debug("Check connection early exit: Cannot connect to local Raft")
+                        return
                     logger.debug(f"Local raft: {raft_status}")
                     for key in raft_status:
                         if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
