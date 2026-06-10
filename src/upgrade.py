@@ -152,6 +152,10 @@ class PostgreSQLUpgrade(DataUpgrade):
         if len(self.peer_relation.units) == 0:
             return False
 
+        if self.charm.async_replication.get_primary_cluster_endpoint():
+            logger.info("Standby cluster is read-only; skipping pre-upgrade switchover")
+            return False
+
         if snap_refreshed(snap.SnapCache()[POSTGRESQL_SNAP_NAME].revision):
             logger.info("Snap is already at the target revision, skipping pre-upgrade switchover")
             return False
