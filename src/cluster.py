@@ -962,7 +962,7 @@ class Patroni:
                 relation=self.charm.model.get_relation(PEER),
             )
 
-    def remove_raft_member(self, member_address: str | None, remote: bool = False) -> None:
+    def remove_raft_member(self, member_address: str, remote: bool = False) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -973,10 +973,6 @@ class Patroni:
             RaftMemberNotFoundError: if the member to be removed
                 is not part of the raft cluster.
         """
-        if not member_address:
-            logger.debug("Remove raft member: No address provided")
-            return
-
         if self.charm.has_raft_keys():
             logger.debug("Remove raft member: Raft already in recovery")
             return
@@ -991,9 +987,13 @@ class Patroni:
             except UtilityException:
                 logger.warning("Remove raft member: Cannot connect to raft cluster")
                 continue
+            if not raft_status:
+                logger.warning("Remove raft member: No raft status")
+                continue
 
             # Check whether the member is still part of the raft cluster.
             if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
+                logger.debug("Remove raft member: Address already removed")
                 return
 
             # If there's no quorum and the leader left raft cluster is stuck
@@ -1019,12 +1019,8 @@ class Patroni:
             return
         raise RemoveRaftMemberFailedError("No host reachable")
 
-    def add_raft_member(self, member_address: str | None, remote: bool = False) -> None:
+    def add_raft_member(self, member_address: str, remote: bool = False) -> None:
         """Add a member to the raft cluster."""
-        if not member_address:
-            logger.debug("Add raft member: No address provided")
-            return
-
         if self.charm.has_raft_keys():
             logger.debug("Add raft member: Raft already in recovery")
             return
@@ -1040,8 +1036,13 @@ class Patroni:
                 logger.warning("Add raft member: Cannot connect to raft cluster")
                 raise RemoveRaftMemberFailedError() from e
 
+            if not raft_status:
+                logger.warning("Add raft member: No raft status")
+                continue
+
             # Check whether the member is still part of the raft cluster.
             if f"{RAFT_PARTNER_PREFIX}{member_address}" in raft_status:
+                logger.debug("Add raft member: Address already added")
                 return
 
             # If there's no quorum and the leader left raft cluster is stuck

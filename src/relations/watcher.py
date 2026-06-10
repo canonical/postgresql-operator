@@ -110,7 +110,8 @@ class PostgreSQLWatcherRelation(Object):
 
         self._relation.data[self.charm.app].update({"disable-watcher": "True"})
         try:
-            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
+            if self.watcher_raft_address:
+                self.charm._patroni.remove_raft_member(self.watcher_raft_address)
         except Exception as e:
             logger.warning(f"Error remove Raft watcher: {e}")
 
