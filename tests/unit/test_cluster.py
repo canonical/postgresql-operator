@@ -334,10 +334,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
 
 def test_start_patroni(peers_ips, patroni):
-    with (
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni.check_raft_connection") as _check_raft_connection,
-    ):
+    with patch("charm.snap.SnapCache") as _snap_cache:
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
@@ -346,7 +343,6 @@ def test_start_patroni(peers_ips, patroni):
         assert patroni.start_patroni()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
-        _check_raft_connection.assert_called_once_with()
 
         # Test a fail scenario.
         assert not patroni.start_patroni()
@@ -673,14 +669,14 @@ def test_get_patroni_restart_condition(patroni):
 def test_update_patroni_restart_condition(patroni, new_restart_condition):
     with (
         patch("builtins.open", mock_open(read_data="Restart=always")) as _open,
-        patch("subprocess.run") as _run,
+        patch("cluster.daemon_reload") as _daemon_reload,
     ):
         _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
         patroni.update_patroni_restart_condition(new_restart_condition)
         _open.return_value.__enter__.return_value.write.assert_called_once_with(
             f"Restart={new_restart_condition}"
         )
-        _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
+        _daemon_reload.assert_called_once_with()
 
 
 def test_cleanup_raft_cluster(patroni):
@@ -926,88 +922,3 @@ def test_are_replicas_up(patroni):
         # Return None on error
         _cluster_status.side_effect = Exception
         assert patroni.are_replicas_up() is None
-
-
-def test_check_raft_connection(patroni):
-    with (
-        patch("cluster.TcpUtility") as _tcputility,
-        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
-        patch("cluster.stop_after_attempt", return_value=stop_after_delay(0)),
-        patch(
-            "charm.PostgresqlOperatorCharm.members_ips",
-            new_callable=PropertyMock,
-            return_value=set(),
-        ) as _members_ips,
-        patch(
-            "charm.PostgresqlOperatorCharm._unit_ip",
-            new_callable=PropertyMock,
-            return_value="1.1.1.1",
-        ),
-    ):
-        # No partners
-        patroni.check_raft_connection()
-
-        assert not _tcputility.called
-
-        # Can't get watcher status
-        _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
-        _tcputility.return_value.executeCommand.side_effect = [{}]
-
-        patroni.check_raft_connection()
-
-        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        _tcputility.return_value.executeCommand.assert_called_once_with(
-            "127.0.0.1:2222", ["status"]
-        )
-        _tcputility.reset_mock()
-        _tcputility.return_value.executeCommand.reset_mock()
-
-        # One partner is online, the other is offline
-        raft_status = {
-            f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 2,
-            f"{RAFT_PARTNER_PREFIX}3.3.3.3:2222": 0,
-        }
-        _tcputility.return_value.executeCommand.side_effect = [raft_status, Exception]
-
-        patroni.check_raft_connection()
-
-        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        assert _tcputility.return_value.executeCommand.call_count == 2
-        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
-        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
-        _tcputility.reset_mock()
-        _tcputility.return_value.executeCommand.reset_mock()
-
-        # Unable to re-add
-        _tcputility.return_value.executeCommand.side_effect = [raft_status, raft_status, Exception]
-
-        patroni.check_raft_connection()
-
-        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        assert _tcputility.return_value.executeCommand.call_count == 3
-        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
-        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
-        _tcputility.return_value.executeCommand.assert_any_call(
-            "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
-        )
-        _tcputility.reset_mock()
-        _tcputility.return_value.executeCommand.reset_mock()
-
-        # Unit re-added
-        _tcputility.return_value.executeCommand.side_effect = None
-        _tcputility.return_value.executeCommand.return_value = raft_status
-
-        patroni.check_raft_connection()
-
-        _tcputility.assert_called_once_with(password="fake-patroni-password", timeout=3)
-        assert _tcputility.return_value.executeCommand.call_count == 4
-        _tcputility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
-        _tcputility.return_value.executeCommand.assert_any_call("3.3.3.3:2222", ["status"])
-        _tcputility.return_value.executeCommand.assert_any_call(
-            "3.3.3.3:2222", ["remove", "1.1.1.1:2222"]
-        )
-        _tcputility.return_value.executeCommand.assert_any_call(
-            "3.3.3.3:2222", ["add", "1.1.1.1:2222"]
-        )
-        _tcputility.reset_mock()
-        _tcputility.return_value.executeCommand.reset_mock()

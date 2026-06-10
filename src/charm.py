@@ -101,6 +101,7 @@ from cluster import (
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
+    start_raft_observer,
 )
 from config import CharmConfig
 from constants import (
@@ -356,6 +357,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -1615,7 +1617,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._update_relation_endpoints()
             self._set_primary_status_message()
             self.async_replication.update_async_replication_data()
-        self._patroni.check_raft_connection()
+
+    def _on_raft_reconnect(self, event) -> None:
+        logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
+        addr = f"{self._unit_ip}:{RAFT_PORT}"
+        try:
+            self._patroni.remove_raft_member(addr, remote=True)
+        except Exception:
+            logger.exception("Unable to remove Raft member")
+            event.defer()
+        try:
+            self._patroni.add_raft_member(addr, remote=True)
+        except Exception:
+            logger.exception("Unable to add Raft member")
+            event.defer()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -1889,6 +1904,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             logger.exception("failed to open port")
 
+        start_raft_observer()
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():

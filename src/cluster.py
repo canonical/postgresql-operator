@@ -11,7 +11,6 @@ import os
 import pathlib
 import re
 import shutil
-import subprocess
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
@@ -20,6 +19,7 @@ import psutil
 import requests
 import tomli
 from charmlibs import snap
+from charmlibs.systemd import daemon_reload
 from httpx import BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
@@ -733,10 +733,7 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
-            if selected_snap.services["patroni"]["active"]:
-                self.check_raft_connection()
-                return True
-            return False
+            return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -965,7 +962,7 @@ class Patroni:
                 relation=self.charm.model.get_relation(PEER),
             )
 
-    def remove_raft_member(self, member_address: str | None) -> None:
+    def remove_raft_member(self, member_address: str | None, remote: bool = False) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -987,85 +984,86 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_host = f"127.0.0.1:{RAFT_PORT}"
-        try:
-            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-        except UtilityException as e:
-            logger.warning("Remove raft member: Cannot connect to raft cluster")
-            raise RemoveRaftMemberFailedError() from e
-        if not raft_status:
-            logger.warning("Remove raft member: No raft status")
-            raise RemoveRaftMemberFailedError() from None
+        raft_hosts = [f"127.0.0.1:{RAFT_PORT}"] if not remote else list(self.charm.members_ips)
+        for raft_host in raft_hosts:
+            try:
+                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            except UtilityException:
+                logger.warning("Remove raft member: Cannot connect to raft cluster")
+                continue
 
-        # Check whether the member is still part of the raft cluster.
-        if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
+            # Check whether the member is still part of the raft cluster.
+            if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
+                return
+
+            # If there's no quorum and the leader left raft cluster is stuck
+            if raft_status["has_quorum"] and not raft_status["leader"]:
+                logger.warning("Remove raft member: No raft leader")
+                raise RemoveRaftMemberFailedError() from None
+            if not raft_status["has_quorum"] and (
+                not raft_status["leader"] or raft_status["leader"].address == member_address
+            ):
+                self._set_stuck_raft_flag()
+                return
+
+            # Remove the member from the raft cluster.
+            try:
+                result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
+            except UtilityException as e:
+                logger.debug("Remove raft member: Remove call failed")
+                raise RemoveRaftMemberFailedError() from e
+
+            if not result or not result.startswith("SUCCESS"):
+                logger.debug(f"Remove raft member: Remove call not successful with {result}")
+                raise RemoveRaftMemberFailedError() from None
+            return
+        raise RemoveRaftMemberFailedError("No host reachable")
+
+    def add_raft_member(self, member_address: str | None, remote: bool = False) -> None:
+        """Add a member to the raft cluster."""
+        if not member_address:
+            logger.debug("Add raft member: No address provided")
             return
 
-        # If there's no quorum and the leader left raft cluster is stuck
-        if raft_status["has_quorum"] and not raft_status["leader"]:
-            logger.warning("Remove raft member: No raft leader")
-            raise RemoveRaftMemberFailedError() from None
-        if not raft_status["has_quorum"] and (
-            not raft_status["leader"] or raft_status["leader"].address == member_address
-        ):
-            self._set_stuck_raft_flag()
+        if self.charm.has_raft_keys():
+            logger.debug("Add raft member: Raft already in recovery")
             return
 
-        # Remove the member from the raft cluster.
-        try:
-            result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
-        except UtilityException as e:
-            logger.debug("Remove raft member: Remove call failed")
-            raise RemoveRaftMemberFailedError() from e
-
-        if not result or not result.startswith("SUCCESS"):
-            logger.debug(f"Remove raft member: Remove call not successful with {result}")
-            raise RemoveRaftMemberFailedError() from None
-
-    def check_raft_connection(self) -> None:
-        """Verify that the watcher has joined the Raft cluster."""
-        if self.unit_ip not in self.charm.members_ips or (
-            not self.charm.watcher_offer.watcher_raft_address and not self.peers_ips
-        ):
-            logger.debug("Check connection early exit: No connectivity expected")
-            return
-
-        member_address = f"{self.unit_ip}:{RAFT_PORT}"
         # Get the status of the raft cluster.
-        syncobj_util = TcpUtility(password=self.patroni_password, timeout=3)
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1)):
-                with attempt:
-                    try:
-                        raft_status = syncobj_util.executeCommand(
-                            f"127.0.0.1:{RAFT_PORT}", ["status"]
-                        )
-                    except Exception:
-                        logger.debug("Check connection early exit: Cannot connect to local Raft")
-                        return
-                    logger.debug(f"Local raft: {raft_status}")
-                    for key in raft_status:
-                        if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
-                            addr = key.split(RAFT_PARTNER_PREFIX)[-1]
-                            try:
-                                logger.debug(
-                                    f"{addr} Raft: {syncobj_util.executeCommand(addr, ['status'])}"
-                                )
-                            except Exception:
-                                logger.debug(f"Unable to connect to {addr}")
-                                continue
-                            logger.debug(f"Potentially stuck connection with {addr}")
-                            try:
-                                syncobj_util.executeCommand(addr, ["remove", member_address])
-                                syncobj_util.executeCommand(addr, ["add", member_address])
-                            except Exception as e:
-                                logger.warning(f"Failed to reconnect to {addr}: {e}")
-                                raise e
-                            logger.info("Reconnecting Raft to {addr}")
-                            raise Exception("Patroni Raft reconnected")
-        except RetryError as e:
-            logger.warning(f"Unable to reconnect member: {e.last_attempt.exception()}")
+        raft_hosts = [f"127.0.0.1:{RAFT_PORT}"] if not remote else list(self.charm.members_ips)
+        for raft_host in raft_hosts:
+            try:
+                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            except UtilityException as e:
+                logger.warning("Add raft member: Cannot connect to raft cluster")
+                raise RemoveRaftMemberFailedError() from e
+
+            # Check whether the member is still part of the raft cluster.
+            if f"{RAFT_PARTNER_PREFIX}{member_address}" in raft_status:
+                return
+
+            # If there's no quorum and the leader left raft cluster is stuck
+            if raft_status["has_quorum"] and not raft_status["leader"]:
+                logger.warning("Add raft member: No raft leader")
+                raise RemoveRaftMemberFailedError() from None
+            if not raft_status["has_quorum"] and (
+                not raft_status["leader"] or raft_status["leader"].address == member_address
+            ):
+                self._set_stuck_raft_flag()
+                return
+
+            # Remove the member from the raft cluster.
+            try:
+                result = syncobj_util.executeCommand(raft_host, ["add", member_address])
+            except UtilityException as e:
+                logger.debug("Add raft member: Remove call failed")
+                raise RemoveRaftMemberFailedError() from e
+
+            if not result or not result.startswith("SUCCESS"):
+                logger.debug(f"Remove raft member: Remove call not successful with {result}")
+                raise RemoveRaftMemberFailedError() from None
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
@@ -1100,10 +1098,7 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.restart(services=["patroni"])
-            if selected_snap.services["patroni"]["active"]:
-                self.check_raft_connection()
-                return True
-            return False
+            return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -1283,4 +1278,4 @@ class Patroni:
         logger.debug(f"new patroni service file: {new_patroni_service}")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)
-        subprocess.run(["/bin/systemctl", "daemon-reload"])
+        daemon_reload()
