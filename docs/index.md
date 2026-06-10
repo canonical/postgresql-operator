@@ -28,7 +28,7 @@ Learn about what's in the charm, how to set up your environment, and perform the
 
 Advanced deployments and operations focused on production scenarios and high availability.
 
-* **Advanced deployment scenarios**: {ref}`Terraform <terraform>` • {ref}`Air-gapped deployments <air-gapped>` • {ref}`Multiple availability zones <multi-az>` • {ref}`Cluster-cluster replication <cross-regional-async-replication>` • {ref}`Logical replication <logical-replication>`
+* **Advanced deployment scenarios**: {ref}`Terraform <terraform>` • {ref}`Air-gapped deployments <air-gapped>` • {ref}`Multiple availability zones <multi-az>` • {ref}`Stereo mode (two-node HA) <deploy-stereo-mode>` • {ref}`Cluster-cluster replication <cross-regional-async-replication>` • {ref}`Logical replication <logical-replication>`
 * **Networking**: {ref}`Juju spaces <juju-spaces>` • {ref}`Enable TLS encryption <enable-tls>` • {ref}`External network access <external-network-access>`
 * **Upgrades and data migration**: {ref}`In-place refresh (upgrade) <refresh>` • {ref}`Cluster and data migration <data-migration>`
 * **Troubleshooting**: {ref}`Overview and tools <troubleshooting>` • {ref}`Manual switchover/failover <switchover-failover>` • {ref}`Logs<logs>` • {ref}`sos-report`
