@@ -11,10 +11,10 @@ import psycopg2
 import pytest
 import requests
 from psycopg2 import sql
+from single_kernel_postgresql.config.locales import LOCALES as SNAP_LOCALES
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from constants import POSTGRESQL_DATA_DIR
-from locales import SNAP_LOCALES
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (

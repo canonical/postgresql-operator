@@ -1,0 +1,130 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+[project]
+name = "postgresql-charms-single-kernel"
+description = "Shared and reusable code for PostgreSQL-related charms"
+version = "16.2.3"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Canonical Data Platform", email = "data-platform@lists.launchpad.net"}
+]
+classifiers = [
+ "Development Status :: 3 - Alpha",
+ "Intended Audience :: Developers",
+ "Operating System :: POSIX :: Linux",
+]
+requires-python = ">=3.8,<4.0"
+dependencies = [
+    "ops>=2.0.0",
+    "psycopg2>=2.9.10",
+    "tenacity>=9.0.0",
+]
+
+[project.optional-dependencies]
+postgresql = [
+    "httpx; python_version >= '3.12'",
+    "data-platform-helpers>=0.1.7; python_version >= '3.12'",
+    "charmlibs-pathops>=1.0.1; python_version >= '3.12'",
+    "charmlibs-snap>=1.0.1; python_version >= '3.12'",
+    "charmlibs-interfaces-tls-certificates>=1.8.3; python_version >= '3.12'",
+    "charm-refresh; python_version >= '3.12'",
+    "requests; python_version >= '3.12'",
+    "tomli; python_version >= '3.12'",
+    "pydantic>=2.0; python_version >= '3.12'",
+ ]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "single_kernel_postgresql"
+module-root = ""
+
+[dependency-groups]
+format = [
+    "ruff==0.15.16"
+]
+lint = [
+    "codespell==2.4.2",
+    "ty==0.0.46"
+]
+unit = [
+    "coverage[toml]==7.14.1",
+    "pytest==9.0.3"
+]
+
+
+[tool.uv.dependency-groups]
+unit = {requires-python = ">=3.12"}
+lint = {requires-python = ">=3.12"}
+format = {requires-python = ">=3.12"}
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+
+# Linting tools configuration
+[tool.ruff]
+# preview and explicit preview are enabled for CPY001
+preview = true
+target-version = "py312"
+src = ["src", "."]
+line-length = 99
+
+[tool.ruff.lint]
+explicit-preview-rules = true
+select = ["A", "E", "W", "F", "C", "N", "D", "I001", "B", "CPY001", "RUF", "S", "SIM", "UP", "TCH"]
+extend-ignore = [
+    "D203",
+    "D204",
+    "D213",
+    "D215",
+    "D400",
+    "D404",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D413",
+]
+# Ignore E501 because using black creates errors with this
+# Ignore D107 Missing docstring in __init__
+ignore = ["E501", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "D100", "D101", "D102", "D103", "D104",
+    # Asserts
+    "B011",
+    # Disable security checks for tests
+    "S",
+]
+
+[tool.ruff.lint.flake8-copyright]
+# Check for properly formatted copyright header in each file
+author = "Canonical Ltd."
+notice-rgx = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+"
+min-file-size = 1
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ty.environment]
+python = ".tox/lint/"
+python-version = "3.12"
+
+[tool.ty.src]
+exclude = ["tests", "single_kernel_postgresql/lib"]

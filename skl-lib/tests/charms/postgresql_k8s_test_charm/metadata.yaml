@@ -1,0 +1,136 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: postgresql-k8s
+display-name: Charmed PostgreSQL K8s
+summary: Charmed PostgreSQL 16 for Kubernetes
+description: |
+   PostgreSQL is an open-source relational database management system
+   built to handle a wide range of workloads. This charmed operator deploys 
+   and operates PostgreSQL on Kubernetes.
+
+   For deployment on virtual machines, see [Charmed PostgreSQL VM](https://charmhub.io/postgresql).
+
+   To learn more about how to deploy and manage this charm, see the 
+   [official documentation](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/16/).
+docs: https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/16/
+source: https://github.com/canonical/postgresql-k8s-operator
+issues: https://github.com/canonical/postgresql-k8s-operator/issues
+website:
+  - https://ubuntu.com/data/postgresql
+  - https://charmhub.io/postgresql-k8s
+  - https://github.com/canonical/postgresql-k8s-operator
+  - https://chat.charmhub.io/charmhub/channels/data-platform
+maintainers:
+  - Canonical Data Platform <data-platform@lists.launchpad.net>
+
+containers:
+  postgresql:
+    resource: postgresql-image
+    mounts:
+      - storage: archive
+        location: /var/lib/pg/archive
+      - storage: data
+        location: /var/lib/pg/data
+      - storage: logs
+        location: /var/lib/pg/logs
+      - storage: temp
+        location: /var/lib/pg/temp
+
+resources:
+  postgresql-image:
+    type: oci-image
+    description: OCI image for PostgreSQL
+    upstream-source: ghcr.io/canonical/charmed-postgresql@sha256:1da72aefe66fed3b739a0c78778ccb8f71ef343a375f2632146240550580aef1  # renovate: oci-image tag: 16.14-24.04_edge
+
+peers:
+  database-peers:
+    interface: postgresql_peers
+  refresh-v-three:
+    interface: refresh
+  restart:
+    interface: rolling_op
+  status-peers:
+    interface: status-peers
+
+provides:
+  replication-offer:
+    interface: postgresql_async
+    limit: 1
+    optional: true
+#   logical-replication-offer:
+#     interface: postgresql_logical_replication
+#     optional: true
+  database:
+    interface: postgresql_client
+  metrics-endpoint:
+    interface: prometheus_scrape
+    optional: true
+  grafana-dashboard:
+    interface: grafana_dashboard
+    optional: true
+
+requires:
+  replication:
+    interface: postgresql_async
+    limit: 1
+    optional: true
+#   logical-replication:
+#     interface: postgresql_logical_replication
+#     limit: 1
+#     optional: true
+  peer-certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+  client-certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+  receive-ca-cert:
+    interface: certificate_transfer
+    optional: true
+  s3-parameters:
+    interface: s3
+    limit: 1
+    optional: true
+  ldap:
+    interface: ldap
+    limit: 1
+    optional: true
+  logging:
+    interface: loki_push_api
+    limit: 1
+    optional: true
+  tracing:
+    interface: tracing
+    limit: 1
+    optional: true
+
+storage:
+  archive:
+    type: filesystem
+    description: Storage mount used for holding local backups (before typically sending them to remote object storage) when relevant/needed.
+    location: /var/lib/pg/archive
+  data:
+    type: filesystem
+    description: Storage mount used for storing all tables, indexes, and so on (except those from temporary tablespaces).
+    location: /var/lib/pg/data
+  logs:
+    type: filesystem
+    description: Storage mount used for storing all the logs that are part of the transactional commit path (WAL files).
+    location: /var/lib/pg/logs
+  temp:
+    type: filesystem
+    description: Storage mount used for storing temporary tablespaces (where typically sort operations happen).
+    location: /var/lib/pg/temp
+
+assumes:
+  - k8s-api
+  - any-of:
+      - all-of:
+          - juju >= 3.4.3
+          - juju < 3.5
+      - all-of:
+          - juju >= 3.5.1
+          - juju < 4

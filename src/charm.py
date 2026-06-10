@@ -25,8 +25,25 @@ from urllib.parse import urlparse
 
 import charm_refresh
 import ops.log
-import psycopg2
-import psycopg2.errors
+
+# First platform-specific import, will fail on wrong architecture
+try:
+    import psycopg2
+    import psycopg2.errors
+except ModuleNotFoundError:
+    from ops.main import main
+    from single_kernel_postgresql.utils.arch import (
+        WrongArchitectureWarningCharm,
+        is_wrong_architecture,
+    )
+
+    # If the charm was deployed inside a host with different architecture
+    # (possibly due to user specifying an incompatible revision)
+    # then deploy an empty blocked charm with a warning.
+    if is_wrong_architecture() and __name__ == "__main__":
+        main(WrongArchitectureWarningCharm)
+    raise
+
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -60,16 +77,19 @@ from ops import (
 )
 from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.compat.postgresql import PostgreSQLBaseError
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
-    PEER,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
     USER,
-    Substrates,
 )
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION as PEER,
+)
+from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils import label2name, new_password, render_file
 from single_kernel_postgresql.utils.postgresql import (
@@ -102,7 +122,6 @@ from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
 )
-from config import CharmConfig
 from constants import (
     APP_SCOPE,
     DATABASE,
@@ -424,8 +443,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
-                {"path": "/metrics", "port": METRICS_PORT},
-                {"path": "/metrics", "port": PGBACKREST_METRICS_PORT},
+                {"path": "/metrics", "port": int(METRICS_PORT)},
+                {"path": "/metrics", "port": int(PGBACKREST_METRICS_PORT)},
             ],
             scrape_configs=self.patroni_scrape_config,
             refresh_events=[

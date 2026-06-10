@@ -3,20 +3,32 @@
 
 """File containing constants to be used in the charm."""
 
+from single_kernel_postgresql.config.literals import (  # noqa: F401
+    BACKUP_TYPE_OVERRIDES,
+    DATABASE,
+    DATABASE_DEFAULT_NAME,
+    DATABASE_MAPPING_LABEL,
+    DATABASE_PORT,
+    METRICS_PORT,
+    PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PGBACKREST_LOGROTATE_FILE,
+    PGBACKREST_METRICS_PORT,
+    PLUGIN_OVERRIDES,
+    SPI_MODULE,
+    TLS_CA_FILE,
+    TLS_CERT_FILE,
+    TLS_KEY_FILE,
+    TRACING_RELATION_NAME,
+    USERNAME_MAPPING_LABEL,
+)
+
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
-DATABASE = "database"
-DATABASE_DEFAULT_NAME = "postgres"
-DATABASE_PORT = "5432"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE]
 REPLICATION_CONSUMER_RELATION = "replication"
 REPLICATION_OFFER_RELATION = "replication-offer"
-PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
-TLS_KEY_FILE = "key.pem"
-TLS_CA_FILE = "ca.pem"
-TLS_CERT_FILE = "cert.pem"
 TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
@@ -66,9 +78,6 @@ UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
-METRICS_PORT = 9187
-PGBACKREST_METRICS_PORT = 9854
-
 # Labels are not confidential
 REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
 REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
@@ -79,9 +88,6 @@ PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
 SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
 SECRET_DELETED_LABEL = "None"  # noqa: S105
 SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
-
-USERNAME_MAPPING_LABEL = "custom-usernames"
-DATABASE_MAPPING_LABEL = "prefix-databases"
 
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
@@ -101,12 +107,3 @@ WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
 
 RAFT_PORT = 2222
 RAFT_PARTNER_PREFIX = "partner_node_status_server_"
-
-BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
-PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
-
-SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
-
-TRACING_RELATION_NAME = "tracing"
-
-PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"

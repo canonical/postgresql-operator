@@ -1,12 +1,14 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""List of locales available in the snap."""
+"""List of locales available across supported substrates (snap and rock)."""
 
 from typing import Literal
 
-SNAP_LOCALES = Literal[
+LOCALES = Literal[
     "C",
+    "C.utf8",
+    "POSIX",
     "aa_DJ",
     "aa_DJ.utf8",
     "aa_ER",

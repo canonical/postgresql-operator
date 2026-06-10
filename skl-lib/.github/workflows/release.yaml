@@ -1,0 +1,94 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Publish
+
+on:
+  push:
+    branches:
+      - 16/edge
+
+concurrency:
+  # Prevent race conditions (if multiple commits have been pushed since the last release)
+  group: dpw-release-python-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-tests:
+    name: Tests
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+
+  build:
+    name: "Build package"
+    needs:
+      - ci-tests
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.export.outputs.VERSION }}
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: "Install uv"
+        run: sudo snap install astral-uv --classic
+      - name: "Export package information"
+        id: export
+        run: |
+          VERSION=$(uv version --short)
+          if [ "$(git tag -l "${VERSION}")" ]; then
+            echo "Tag ${VERSION} already exists. Please bump the project to a greater version."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: "Build package"
+        run: uv build
+      - name: "Store the distribution packages"
+        uses: actions/upload-artifact@v7
+        with:
+          name: distfiles
+          path: dist/
+    permissions: {}
+
+  upload-github:
+    name: "Publish to GitHub"
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+      - name: "Download all the dists"
+        uses: actions/download-artifact@v8
+        with:
+          name: distfiles
+          path: dist/
+      - name: "Create GitHub release"
+        run: |
+          git tag "${VAR_VERSION}"
+          git push origin "${VAR_VERSION}"
+          gh release create "${VAR_VERSION}" --generate-notes --title "${VAR_VERSION}"
+          gh release upload "${VAR_VERSION}" dist/*.{tar.gz,whl}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VAR_VERSION: ${{ needs.build.outputs.VERSION }}
+    permissions:
+      contents: write  # Needed to create GitHub release
+
+  upload-pypi:
+    name: "Publish to PyPI"
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download all the dists"
+        uses: actions/download-artifact@v8
+        with:
+          name: distfiles
+          path: dist/
+      - name: "Publish to PyPI"
+        uses: pypa/gh-action-pypi-publish@release/v1
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
