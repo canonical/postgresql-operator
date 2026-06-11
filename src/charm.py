@@ -1637,7 +1637,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else f"{next(member for member in self.members_ips)}:{RAFT_PORT}"
         )
         try:
-            self._patroni.remove_raft_member(local_addr, remote_address=remote_addr)
+            self._patroni.remove_raft_member(
+                local_addr, remote_address=remote_addr, set_raft_flags=False
+            )
         except Exception:
             logger.exception("Unable to remove Raft member")
             return
