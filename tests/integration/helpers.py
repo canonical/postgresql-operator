@@ -20,6 +20,7 @@ import yaml
 from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import (
     RetryError,
     Retrying,
@@ -31,7 +32,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
+from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -646,7 +647,7 @@ async def get_password(
     Returns:
         the user password.
     """
-    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{database_app_name}.app")
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{database_app_name}.app")
     password = secret.get(f"{username}-password")
 
     return password
