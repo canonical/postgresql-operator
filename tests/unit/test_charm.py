@@ -528,6 +528,73 @@ def test_on_start_success(harness):
         _restart_services_after_reboot.assert_called_once()
 
 
+def test_setup_users_skips_writes_on_standby_cluster(harness):
+    """A standby cluster is read-only, so _setup_users must not issue write DDL (DPE-10284)."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+    ):
+        # Even though this would raise on a read-only standby, the guard must
+        # short-circuit before create_predefined_instance_roles is ever called.
+        _postgresql.create_predefined_instance_roles.side_effect = (
+            psycopg2.errors.ReadOnlySqlTransaction
+        )
+
+        harness.charm._setup_users()
+
+        _postgresql.create_predefined_instance_roles.assert_not_called()
+        _postgresql.create_user.assert_not_called()
+        _postgresql.set_up_database.assert_not_called()
+        _oversee_users.assert_not_called()
+
+
+def test_setup_users_runs_on_primary_cluster(harness):
+    """On a primary cluster _setup_users provisions the predefined roles and users."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+    ):
+        _postgresql.list_users.return_value = []
+        _postgresql.list_access_groups.return_value = set()
+
+        harness.charm._setup_users()
+
+        _postgresql.create_predefined_instance_roles.assert_called_once()
+        assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
+        _oversee_users.assert_called_once()
+
+
+def test_is_standby_cluster(harness):
+    """is_standby_cluster is relation-based and independent of the Patroni API."""
+    with (
+        patch("charm.PostgreSQLAsyncReplication.is_primary_cluster") as _is_primary_cluster,
+        patch.object(harness.charm.model, "get_relation") as _get_relation,
+    ):
+        # No replication relation at all -> not a standby cluster.
+        _get_relation.return_value = None
+        assert harness.charm.is_standby_cluster is False
+
+        # Replication relation present, and this app is the primary cluster.
+        _get_relation.return_value = Mock()
+        _is_primary_cluster.return_value = True
+        assert harness.charm.is_standby_cluster is False
+
+        # Replication relation present, and this app is NOT the primary cluster -> standby.
+        _is_primary_cluster.return_value = False
+        assert harness.charm.is_standby_cluster is True
+
+
 def test_on_start_replica(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
