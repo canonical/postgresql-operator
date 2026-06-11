@@ -962,7 +962,7 @@ class Patroni:
                 relation=self.charm.model.get_relation(PEER),
             )
 
-    def remove_raft_member(self, member_address: str, remote: bool = False) -> None:
+    def remove_raft_member(self, member_address: str) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -980,46 +980,43 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_hosts = [f"127.0.0.1:{RAFT_PORT}"] if not remote else list(self.charm.members_ips)
-        for raft_host in raft_hosts:
-            try:
-                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-            except UtilityException:
-                logger.warning("Remove raft member: Cannot connect to raft cluster")
-                continue
-            if not raft_status:
-                logger.warning("Remove raft member: No raft status")
-                continue
+        raft_host = f"127.0.0.1:{RAFT_PORT}"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException as e:
+            logger.warning("Remove raft member: Cannot connect to raft cluster")
+            raise RemoveRaftMemberFailedError() from e
+        if not raft_status:
+            logger.warning("Remove raft member: No raft status")
+            raise RemoveRaftMemberFailedError() from None
 
-            # Check whether the member is still part of the raft cluster.
-            if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
-                logger.debug("Remove raft member: Address already removed")
-                return
-
-            # If there's no quorum and the leader left raft cluster is stuck
-            if raft_status["has_quorum"] and not raft_status["leader"]:
-                logger.warning("Remove raft member: No raft leader")
-                raise RemoveRaftMemberFailedError() from None
-            if not raft_status["has_quorum"] and (
-                not raft_status["leader"] or raft_status["leader"].address == member_address
-            ):
-                self._set_stuck_raft_flag()
-                return
-
-            # Remove the member from the raft cluster.
-            try:
-                result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
-            except UtilityException as e:
-                logger.debug("Remove raft member: Remove call failed")
-                raise RemoveRaftMemberFailedError() from e
-
-            if not result or not result.startswith("SUCCESS"):
-                logger.debug(f"Remove raft member: Remove call not successful with {result}")
-                raise RemoveRaftMemberFailedError() from None
+        # Check whether the member is still part of the raft cluster.
+        if f"{RAFT_PARTNER_PREFIX}{member_address}" not in raft_status:
+            logger.debug("Remove raft member: Address already removed")
             return
-        raise RemoveRaftMemberFailedError("No host reachable")
 
-    def add_raft_member(self, member_address: str, remote: bool = False) -> None:
+        # If there's no quorum and the leader left raft cluster is stuck
+        if raft_status["has_quorum"] and not raft_status["leader"]:
+            logger.warning("Remove raft member: No raft leader")
+            raise RemoveRaftMemberFailedError() from None
+        if not raft_status["has_quorum"] and (
+            not raft_status["leader"] or raft_status["leader"].address == member_address
+        ):
+            self._set_stuck_raft_flag()
+            return
+
+        # Remove the member from the raft cluster.
+        try:
+            result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
+        except UtilityException as e:
+            logger.debug("Remove raft member: Remove call failed")
+            raise RemoveRaftMemberFailedError() from e
+
+        if not result or not result.startswith("SUCCESS"):
+            logger.debug(f"Remove raft member: Remove call not successful with {result}")
+            raise RemoveRaftMemberFailedError() from None
+
+    def add_raft_member(self, member_address: str) -> None:
         """Add a member to the raft cluster."""
         if self.charm.has_raft_keys():
             logger.debug("Add raft member: Raft already in recovery")
@@ -1028,43 +1025,42 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_hosts = [f"127.0.0.1:{RAFT_PORT}"] if not remote else list(self.charm.members_ips)
-        for raft_host in raft_hosts:
-            try:
-                raft_status = syncobj_util.executeCommand(raft_host, ["status"])
-            except UtilityException as e:
-                logger.warning("Add raft member: Cannot connect to raft cluster")
-                raise RemoveRaftMemberFailedError() from e
+        raft_host = f"127.0.0.1:{RAFT_PORT}"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException as e:
+            logger.warning("Add raft member: Cannot connect to raft cluster")
+            raise RemoveRaftMemberFailedError() from e
 
-            if not raft_status:
-                logger.warning("Add raft member: No raft status")
-                continue
+        if not raft_status:
+            logger.warning("Add raft member: No raft status")
+            raise RemoveRaftMemberFailedError() from None
 
-            # Check whether the member is still part of the raft cluster.
-            if f"{RAFT_PARTNER_PREFIX}{member_address}" in raft_status:
-                logger.debug("Add raft member: Address already added")
-                return
+        # Check whether the member is still part of the raft cluster.
+        if f"{RAFT_PARTNER_PREFIX}{member_address}" in raft_status:
+            logger.debug("Add raft member: Address already added")
+            return
 
-            # If there's no quorum and the leader left raft cluster is stuck
-            if raft_status["has_quorum"] and not raft_status["leader"]:
-                logger.warning("Add raft member: No raft leader")
-                raise RemoveRaftMemberFailedError() from None
-            if not raft_status["has_quorum"] and (
-                not raft_status["leader"] or raft_status["leader"].address == member_address
-            ):
-                self._set_stuck_raft_flag()
-                return
+        # If there's no quorum and the leader left raft cluster is stuck
+        if raft_status["has_quorum"] and not raft_status["leader"]:
+            logger.warning("Add raft member: No raft leader")
+            raise RemoveRaftMemberFailedError() from None
+        if not raft_status["has_quorum"] and (
+            not raft_status["leader"] or raft_status["leader"].address == member_address
+        ):
+            self._set_stuck_raft_flag()
+            return
 
-            # Remove the member from the raft cluster.
-            try:
-                result = syncobj_util.executeCommand(raft_host, ["add", member_address])
-            except UtilityException as e:
-                logger.debug("Add raft member: Remove call failed")
-                raise RemoveRaftMemberFailedError() from e
+        # Remove the member from the raft cluster.
+        try:
+            result = syncobj_util.executeCommand(raft_host, ["add", member_address])
+        except UtilityException as e:
+            logger.debug("Add raft member: Remove call failed")
+            raise RemoveRaftMemberFailedError() from e
 
-            if not result or not result.startswith("SUCCESS"):
-                logger.debug(f"Remove raft member: Remove call not successful with {result}")
-                raise RemoveRaftMemberFailedError() from None
+        if not result or not result.startswith("SUCCESS"):
+            logger.debug(f"Add raft member: Remove call not successful with {result}")
+            raise RemoveRaftMemberFailedError() from None
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):

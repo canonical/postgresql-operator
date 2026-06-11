@@ -7,7 +7,8 @@ from os import environ
 from subprocess import run
 
 from pysyncobj.utility import TcpUtility
-from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
+
+# from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from yaml import safe_load
 
 from constants import PATRONI_CONF_PATH, RAFT_PARTNER_PREFIX, RAFT_PORT
@@ -43,26 +44,21 @@ def check_raft_connection(password: str) -> None:
     syncobj_util = TcpUtility(password=password, timeout=3)
 
     try:
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1)):
-            with attempt:
-                try:
-                    raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
-                except Exception:
-                    print("Cannot connect to local Raft")
-                    return
-                print(f"Local raft: {raft_status}")
-                for key in raft_status:
-                    if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
-                        addr = key.split(RAFT_PARTNER_PREFIX)[-1]
-                        try:
-                            print(f"{addr} Raft: {syncobj_util.executeCommand(addr, ['status'])}")
-                        except Exception:
-                            print(f"Unable to connect to {addr}")
-                            continue
-                        print(f"Potentially stuck connection with {addr}")
-                        dispatch("raft_reconnect")
-    except RetryError as e:
-        print(f"Unable to reconnect member: {e.last_attempt.exception()}")
+        raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
+    except Exception:
+        print("Cannot connect to local Raft")
+        return
+    print(f"Local raft: {raft_status}")
+    for key in raft_status:
+        if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
+            addr = key.split(RAFT_PARTNER_PREFIX)[-1]
+            try:
+                print(f"{addr} Raft: {syncobj_util.executeCommand(addr, ['status'])}")
+            except Exception:
+                print(f"Unable to connect to {addr}")
+                continue
+            print(f"Potentially stuck connection with {addr}")
+            dispatch("raft_reconnect")
 
 
 def main() -> None:

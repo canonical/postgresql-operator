@@ -1625,12 +1625,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.remove_raft_member(addr)
         except Exception:
             logger.exception("Unable to remove Raft member")
-            event.defer()
+            return
         try:
             self._patroni.add_raft_member(addr)
         except Exception:
             logger.exception("Unable to add Raft member")
-            event.defer()
+            return
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
