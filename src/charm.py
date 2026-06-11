@@ -1622,12 +1622,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
         addr = f"{self._unit_ip}:{RAFT_PORT}"
         try:
-            self._patroni.remove_raft_member(addr, remote=True)
+            self._patroni.remove_raft_member(addr)
         except Exception:
             logger.exception("Unable to remove Raft member")
             event.defer()
         try:
-            self._patroni.add_raft_member(addr, remote=True)
+            self._patroni.add_raft_member(addr)
         except Exception:
             logger.exception("Unable to add Raft member")
             event.defer()
