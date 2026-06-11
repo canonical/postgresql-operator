@@ -20,7 +20,6 @@ import yaml
 from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
-from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import (
     RetryError,
     Retrying,
@@ -40,6 +39,7 @@ DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
+PEER_RELATION = "database-peers"
 
 
 class SecretNotFoundError(Exception):

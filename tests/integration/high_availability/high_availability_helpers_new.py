@@ -12,8 +12,6 @@ from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from constants import PEER
-
 from ..helpers import execute_queries_on_unit
 
 MINUTE_SECS = 60
@@ -21,6 +19,8 @@ SERVER_CONFIG_USERNAME = "operator"
 
 JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
+
+PEER = "database-peers"
 
 
 def check_db_units_writes_increment(
