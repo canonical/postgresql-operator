@@ -962,7 +962,7 @@ class Patroni:
                 relation=self.charm.model.get_relation(PEER),
             )
 
-    def remove_raft_member(self, member_address: str) -> None:
+    def remove_raft_member(self, member_address: str, remote_address: str | None = None) -> None:
         """Remove a member from the raft cluster.
 
         The raft cluster is a different cluster from the Patroni cluster.
@@ -980,7 +980,7 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_host = f"127.0.0.1:{RAFT_PORT}"
+        raft_host = remote_address if remote_address else f"127.0.0.1:{RAFT_PORT}"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
         except UtilityException as e:
@@ -1016,7 +1016,7 @@ class Patroni:
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
             raise RemoveRaftMemberFailedError() from None
 
-    def add_raft_member(self, member_address: str) -> None:
+    def add_raft_member(self, member_address: str, remote_address: str | None = None) -> None:
         """Add a member to the raft cluster."""
         if self.charm.has_raft_keys():
             logger.debug("Add raft member: Raft already in recovery")
@@ -1025,7 +1025,7 @@ class Patroni:
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
-        raft_host = f"127.0.0.1:{RAFT_PORT}"
+        raft_host = remote_address if remote_address else f"127.0.0.1:{RAFT_PORT}"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
         except UtilityException as e:

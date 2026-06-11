@@ -1618,16 +1618,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._set_primary_status_message()
             self.async_replication.update_async_replication_data()
 
-    def _on_raft_reconnect(self, event) -> None:
+    def _on_raft_reconnect(self, _) -> None:
+        if (
+            not self._unit_ip
+            or not self.is_cluster_initialised
+            or self._unit_ip not in self.members_ips
+            or self.has_raft_keys()
+            or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
+        ):
+            return
+
         logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
-        addr = f"{self._unit_ip}:{RAFT_PORT}"
+        local_addr = f"{self._unit_ip}:{RAFT_PORT}"
+        remote_addr = (
+            watcher_addr
+            if (watcher_addr := self.watcher_offer.watcher_raft_address)
+            and self.watcher_offer.is_active
+            else f"{next(member for member in self.members_ips)}:{RAFT_PORT}"
+        )
         try:
-            self._patroni.remove_raft_member(addr)
+            self._patroni.remove_raft_member(local_addr, remote_address=remote_addr)
         except Exception:
             logger.exception("Unable to remove Raft member")
             return
         try:
-            self._patroni.add_raft_member(addr)
+            self._patroni.add_raft_member(local_addr, remote_address=remote_addr)
         except Exception:
             logger.exception("Unable to add Raft member")
             return
