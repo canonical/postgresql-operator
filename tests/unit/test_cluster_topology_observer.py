@@ -8,8 +8,8 @@ import pytest
 from ops.charm import CharmBase
 from ops.model import ActiveStatus, Relation, WaitingStatus
 from ops.testing import Harness
+from single_kernel_postgresql.managers.patroni import Patroni
 
-from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
