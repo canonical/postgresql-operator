@@ -48,6 +48,16 @@ Deploy a cluster on a cloud using different availability zones:
 Multi-AZ <multi-az>
 ```
 
+## High availability
+
+Deploy a two-node cluster with a lightweight watcher that supplies a third Raft vote:
+
+```{toctree}
+:titlesonly:
+
+Stereo mode <stereo-mode>
+```
+
 ## Terraform
 
 Deploy PostgreSQL and automate your infrastructure with the Juju Terraform Provider:
