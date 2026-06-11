@@ -796,6 +796,21 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
+    def stop_all_services(self) -> None:
+        """Stop every charmed-postgresql snap service.
+
+        Used on unit teardown so the snap releases the storage mounts (PostgreSQL,
+        pgBackRest, the exporters) before Juju unmounts them.
+        """
+        try:
+            logger.debug("Stopping all charmed-postgresql services...")
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.stop()
+        except snap.SnapError as e:
+            error_message = "Failed to stop charmed-postgresql snap services"
+            logger.exception(error_message, exc_info=e)
+
     def switchover(self, candidate: str | None = None, async_cluster: bool = False) -> None:
         """Trigger a switchover."""
         # Try to trigger the switchover.

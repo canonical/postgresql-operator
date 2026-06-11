@@ -5,6 +5,7 @@
 
 import logging
 import os
+import signal
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -57,3 +58,14 @@ class RotateLogs(Object):
 
         self._charm.unit_peer_data.update({"rotate-logs-pid": f"{pid}"})
         logging.info(f"Started rotate logs process with PID {pid}")
+
+    def stop_log_rotation(self) -> None:
+        """Stop the running rotate logs process if we have previously started it."""
+        if stored_pid := self._charm.unit_peer_data.get("rotate-logs-pid"):
+            pid = int(stored_pid)
+            try:
+                os.kill(pid, signal.SIGINT)
+                logging.info(f"Stopped rotate logs process with PID {pid}")
+                self._charm.unit_peer_data.update({"rotate-logs-pid": ""})
+            except OSError:
+                pass

@@ -124,6 +124,27 @@ def test_on_install(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
+def test_on_storage_detaching(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
+        patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+    ):
+        # Every storage's detaching event releases the storage by stopping the
+        # background processes and all the snap services.
+        for storage_name in ("archive", "data", "logs", "temp"):
+            _stop_observer.reset_mock()
+            _stop_log_rotation.reset_mock()
+            _patroni.reset_mock()
+
+            storage_id = harness.add_storage(storage_name, attach=True)[0]
+            harness.detach_storage(storage_id)
+
+            _stop_observer.assert_called_once_with()
+            _stop_log_rotation.assert_called_once_with()
+            _patroni.return_value.stop_all_services.assert_called_once_with()
+
+
 def test_patroni_scrape_config(harness):
     result = harness.charm.patroni_scrape_config()
 

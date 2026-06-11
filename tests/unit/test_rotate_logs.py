@@ -1,5 +1,6 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
+import signal
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
@@ -96,3 +97,33 @@ def test_start_log_rotation_already_running(harness):
         harness.charm.rotate_logs.start_log_rotation()
         _kill.assert_called_once_with(1234, 0)
         _popen.assert_called_once()
+
+
+def test_stop_log_rotation(harness):
+    with (
+        patch("os.kill") as _kill,
+        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+    ):
+        # Nothing is done when the peer relation (and so the stored PID) is gone.
+        _peers.return_value = None
+        harness.charm.rotate_logs.stop_log_rotation()
+        _kill.assert_not_called()
+
+        # Nothing is done when there is no process running.
+        _peers.return_value = Mock(data={harness.charm.unit: {}})
+        harness.charm.rotate_logs.stop_log_rotation()
+        _kill.assert_not_called()
+
+        # The process is killed and the stored PID is cleared.
+        peer_data = {"rotate-logs-pid": "1"}
+        _peers.return_value = Mock(data={harness.charm.unit: peer_data})
+        harness.charm.rotate_logs.stop_log_rotation()
+        _kill.assert_called_once_with(1, signal.SIGINT)
+        assert peer_data["rotate-logs-pid"] == ""
+        _kill.reset_mock()
+
+        # A dead process doesn't break the script.
+        _peers.return_value = Mock(data={harness.charm.unit: {"rotate-logs-pid": "1"}})
+        _kill.side_effect = OSError
+        harness.charm.rotate_logs.stop_log_rotation()
+        _kill.assert_called_once_with(1, signal.SIGINT)

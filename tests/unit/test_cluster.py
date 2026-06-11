@@ -367,6 +367,21 @@ def test_stop_patroni(peers_ips, patroni):
         assert not patroni.stop_patroni()
 
 
+def test_stop_all_services(peers_ips, patroni):
+    with patch("charm.snap.SnapCache") as _snap_cache:
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+
+        # All snap services are stopped (no services= argument means the whole snap).
+        patroni.stop_all_services()
+        _cache.__getitem__.assert_called_once_with("charmed-postgresql")
+        _selected_snap.stop.assert_called_once_with()
+
+        # A snap error does not propagate out of the teardown helper.
+        _selected_snap.stop.side_effect = snap.SnapError
+        patroni.stop_all_services()
+
+
 def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
