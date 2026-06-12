@@ -49,6 +49,9 @@ def check_raft_connection(password: str) -> None:
         print("Cannot connect to local Raft")
         return
     print(f"Local raft: {raft_status}")
+    if not raft_status["leader"] or not raft_status["has_quorum"]:
+        print("No leader or quorum")
+        return
     for key in raft_status:
         if key.startswith(RAFT_PARTNER_PREFIX) and raft_status[key] != 2:
             addr = key.split(RAFT_PARTNER_PREFIX)[-1]
