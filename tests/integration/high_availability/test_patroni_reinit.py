@@ -9,8 +9,7 @@ import jubilant
 from jubilant import Juju
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 
-from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
-
+from ..helpers import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
     get_app_units,

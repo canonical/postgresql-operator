@@ -43,6 +43,12 @@ RELATION_ENDPOINT = "postgresql"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
 PEER = "database-peers"
 
+SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
+DATA_DIR_SUBFOLDER = "16/main"
+SNAP_DATA_PATH = f"{SNAP_COMMON_PATH}/var/lib"
+POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
+POSTGRESQL_DATA_DIR = f"{POSTGRESQL_DATA_PATH}/{DATA_DIR_SUBFOLDER}"
+
 
 class RoleAttributeValue(Enum):
     NO = 0
