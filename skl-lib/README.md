@@ -1,1 +1,0 @@
-# postgresql-single-kernel-library

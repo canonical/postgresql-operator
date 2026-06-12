@@ -51,7 +51,7 @@ parts:
     source: .
     after:
       - poetry-deps
-    poetry-export-extra-args: ['--only', 'main,charm-libs', '--without-hashes']
+    poetry-export-extra-args: ['--only', 'main,charm-libs']
     build-packages:
       - libffi-dev  # Needed to build Python dependencies with Rust from source
       - libssl-dev  # Needed to build Python dependencies with Rust from source
@@ -78,8 +78,6 @@ parts:
       rustup default 1.96.0  # renovate: charmcraft-rust-latest
 
       craftctl default
-      SKP_SITE=$(find "$CRAFT_PART_INSTALL" -type d -path "*site-packages/single_kernel_postgresql" | head -1)
-      cp -rf "$CRAFT_PART_BUILD/skl-lib/single_kernel_postgresql/." "$SKP_SITE/"
       # Include requirements.txt in *.charm artifact for easier debugging
       cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
   # "files" part name is arbitrary; use for consistency
