@@ -35,12 +35,20 @@ class MockCharm(CharmBase):
         self.unit.status = ActiveStatus("cluster topology changed")
 
     @property
-    def _patroni(self) -> Patroni:
-        return Mock(_patroni_url="http://1.1.1.1:8008/", peers_ips={}, verify=True)
+    def patroni(self) -> Patroni:
+        return Mock(_patroni_url="http://1.1.1.1:8008/", verify=True)
 
     @property
     def _peers(self) -> Relation | None:
         return None
+
+    @property
+    def _unit_ip(self) -> str | None:
+        return "1.1.1.1"
+
+    @property
+    def _units_ips(self) -> set[str]:
+        return {}
 
 
 @pytest.fixture(autouse=True)

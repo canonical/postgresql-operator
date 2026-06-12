@@ -143,7 +143,7 @@ def test_primary_endpoint(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PostgresqlOperatorCharm.patroni", new_callable=PropertyMock) as _patroni,
     ):
         _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
         _patroni.return_value.get_primary.return_value = sentinel.primary
@@ -163,7 +163,7 @@ def test_primary_endpoint_no_peers(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PostgresqlOperatorCharm.patroni", new_callable=PropertyMock) as _patroni,
     ):
         assert harness.charm.primary_endpoint is None
 
@@ -337,7 +337,7 @@ def test_enable_disable_extensions(harness, caplog):
     with (
         patch("charm.Patroni.get_primary") as _get_primary,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("charm.PostgresqlOperatorCharm.patroni"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
@@ -3672,7 +3672,7 @@ def test_api_update_config_with_worker_processes(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3711,7 +3711,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3736,7 +3736,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
 def test_api_update_config_with_async_replication_primary(harness):
     """Test _api_update_config when primary endpoint is available."""
     with (
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,

@@ -14,9 +14,9 @@ def create_mock_charm():
     mock_charm.unit.is_leader.return_value = True
     mock_charm.cluster_name = "postgresql"
     mock_charm._unit_ip = "10.0.0.1"
-    mock_charm._patroni.unit_ip = "10.0.0.1"
-    mock_charm._patroni.peers_ips = {"10.0.0.2"}
-    mock_charm._patroni.raft_password = "test-raft-password"
+    mock_charm.patroni.unit_ip = "10.0.0.1"
+    mock_charm.patroni.peers_ips = {"10.0.0.2"}
+    mock_charm.patroni.raft_password = "test-raft-password"
     mock_charm.is_cluster_initialised = True
     mock_charm.update_config = MagicMock()
     return mock_charm
@@ -273,7 +273,7 @@ class TestWatcherRelationSecrets:
     def test_get_or_create_watcher_secret_no_raft_password(self):
         """Test _get_or_create_watcher_secret returns None without password."""
         mock_charm = create_mock_charm()
-        mock_charm._patroni.raft_password = None
+        mock_charm.patroni.raft_password = None
 
         from ops import SecretNotFoundError
 

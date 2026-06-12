@@ -15,6 +15,7 @@ from functools import cached_property
 from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
+from typing import TYPE_CHECKING
 
 from boto3.session import Session
 from botocore.client import Config
@@ -54,6 +55,9 @@ from constants import (
 )
 from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
 
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
+
 logger = logging.getLogger(__name__)
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
@@ -89,7 +93,7 @@ class ListBackupsError(Exception):
 class PostgreSQLBackups(Object):
     """In this class, we manage PostgreSQL backups."""
 
-    def __init__(self, charm, relation_name: str):
+    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str):
         """Manager of PostgreSQL backups."""
         super().__init__(charm, "backup")
         self.charm = charm
@@ -161,7 +165,9 @@ class PostgreSQLBackups(Object):
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
         return not (
-            not self.charm._patroni.member_started and (len(self.charm._peers.data.keys()) == 2)
+            not self.charm.patroni.member_started
+            and self.charm._peers
+            and (len(self.charm._peers.data.keys()) == 2)
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
@@ -183,7 +189,7 @@ class PostgreSQLBackups(Object):
         if is_primary and self.charm.app.planned_units() > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
 
-        if not self.charm._patroni.member_started:
+        if not self.charm.patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
 
         if "stanza" not in self.charm.app_peer_data:
@@ -250,7 +256,7 @@ class PostgreSQLBackups(Object):
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
             return_code, system_identifier_from_instance, error = self._execute_command([
-                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_DIR,
             ])
             if return_code != 0:
@@ -805,7 +811,7 @@ class PostgreSQLBackups(Object):
         ):
             return
 
-        for _unit, unit_data in self.charm._peers.data.items():
+        for _unit, unit_data in self.charm.all_peer_data.items():
             if "s3-initialization-done" not in unit_data:
                 continue
 
@@ -1181,7 +1187,7 @@ Stderr:
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")
-        if not self.charm._patroni.stop_patroni():
+        if not self.charm.patroni.stop_patroni():
             error_message = "Failed to stop database service"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
@@ -1219,7 +1225,7 @@ Stderr:
 
         # Start the database to start the restore process.
         logger.info("Configuring Patroni to restore the backup")
-        self.charm._patroni.start_patroni()
+        self.charm.patroni.start_patroni()
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
@@ -1419,7 +1425,7 @@ Stderr:
         """Removes the restoring backup flag and restart the database."""
         self.charm.app_peer_data.update({"restoring-backup": "", "restore-to-time": ""})
         self.charm.update_config()
-        self.charm._patroni.start_patroni()
+        self.charm.patroni.start_patroni()
 
     def _retrieve_s3_parameters(self) -> tuple[dict, list[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
@@ -1481,7 +1487,7 @@ Stderr:
             return False
 
         # Stop the service if TLS is not enabled or there are no replicas.
-        if len(self.charm._peer_members_ips) == 0 or self.charm._patroni.get_standby_leader():
+        if len(self.charm._peer_members_ips) == 0 or self.charm.patroni.get_standby_leader():
             charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 
