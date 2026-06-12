@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import shutil
+from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
@@ -965,6 +966,15 @@ class Patroni:
                 app=self.charm.app,
                 relation=self.charm.model.get_relation(PEER),
             )
+
+    def get_raft_status(self) -> dict | None:
+        """Get local raft status."""
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+
+        raft_host = f"127.0.0.1:{RAFT_PORT}"
+        with suppress(UtilityException):
+            return syncobj_util.executeCommand(raft_host, ["status"])
 
     def remove_raft_member(
         self, member_address: str, remote_address: str | None = None, set_raft_flags: bool = True

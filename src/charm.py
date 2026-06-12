@@ -1619,6 +1619,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.async_replication.update_async_replication_data()
 
     def _on_raft_reconnect(self, _) -> None:
+        logger.debug(f"Local raft status: {self._patroni.get_raft_status()}")
         if (
             not self._unit_ip
             or not self.is_cluster_initialised
