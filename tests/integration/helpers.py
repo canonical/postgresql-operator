@@ -20,7 +20,6 @@ import yaml
 from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
-from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import (
     RetryError,
     Retrying,
@@ -32,7 +31,10 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
+# Constants formerly imported from constants.py or single_kernel_postgresql
+DATABASE_DEFAULT_NAME = "postgres"
+PEER_RELATION = "database-peers"
+SYSTEM_USERS_PASSWORD_CONFIG = "system-users"
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())

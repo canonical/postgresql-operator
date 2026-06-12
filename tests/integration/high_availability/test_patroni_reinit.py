@@ -9,8 +9,6 @@ import jubilant
 from jubilant import Juju
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
 
-from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
-
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
     get_app_units,
@@ -18,6 +16,11 @@ from .high_availability_helpers_new import (
     get_member_state,
     wait_for_apps_status,
 )
+
+# Constants formerly imported from constants.py
+PATRONI_CONF_PATH = "/var/snap/charmed-postgresql/current/etc/patroni"
+PATRONI_LOGS_PATH = "/var/snap/charmed-postgresql/common/var/log/patroni"
+POSTGRESQL_DATA_DIR = "/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main"
 
 logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)

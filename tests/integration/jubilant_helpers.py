@@ -20,7 +20,6 @@ import psycopg2
 import pytest
 import requests
 import yaml
-from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import (
     RetryError,
     Retrying,
@@ -32,11 +31,14 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
-
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
 from .ha_tests.helpers import ProcessError
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError
+
+# Constants formerly imported from constants.py or single_kernel_postgresql
+DATABASE_DEFAULT_NAME = "postgres"
+PEER_RELATION = "database-peers"
+SYSTEM_USERS_PASSWORD_CONFIG = "system-users"
 
 logger = logging.getLogger(__name__)
 

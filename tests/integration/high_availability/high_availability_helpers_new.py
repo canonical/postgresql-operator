@@ -10,10 +10,12 @@ import jubilant
 import requests
 from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
-from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import execute_queries_on_unit
+
+# Constant formerly imported from single_kernel_postgresql
+PEER_RELATION = "database-peers"
 
 MINUTE_SECS = 60
 SERVER_CONFIG_USERNAME = "operator"

@@ -10,13 +10,14 @@ import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from constants import DATABASE_DEFAULT_NAME
-
 from ..helpers import CHARM_BASE, DATABASE_APP_NAME
 from .helpers import build_connection_string
 from .test_new_relations_1 import DATA_INTEGRATOR_APP_NAME
 
 logger = logging.getLogger(__name__)
+
+# Constant formerly imported from constants.py
+DATABASE_DEFAULT_NAME = "postgres"
 
 APPLICATION_APP_NAME = "postgresql-test-app"
 APP_NAMES = [DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME]
