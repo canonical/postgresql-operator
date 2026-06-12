@@ -32,3 +32,17 @@ def test_metrics_ports_are_str():
     assert literals.PGBACKREST_METRICS_PORT == "9854"
     assert isinstance(literals.METRICS_PORT, str)
     assert isinstance(literals.PGBACKREST_METRICS_PORT, str)
+
+
+def test_scope_and_secret_constants():
+    assert literals.APP_SCOPE == "app"
+    assert literals.UNIT_SCOPE == "unit"
+    assert literals.USER_PASSWORD_KEY == "operator-password"
+    assert literals.MONITORING_PASSWORD_KEY == "monitoring-password"
+    assert literals.REPLICATION_PASSWORD_KEY == "replication-password"
+    assert literals.REWIND_PASSWORD_KEY == "rewind-password"
+    assert literals.PATRONI_PASSWORD_KEY == "patroni-password"
+    assert literals.SECRET_INTERNAL_LABEL == "internal-secret"
+    assert literals.SECRET_DELETED_LABEL == "None"
+    assert literals.SECRET_KEY_OVERRIDES == {"ca": "cauth"}
+    assert literals.SYSTEM_USERS_PASSWORD_CONFIG == "system-users"

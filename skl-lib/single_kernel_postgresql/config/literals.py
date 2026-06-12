@@ -67,3 +67,21 @@ PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 
 # pgBackRest
 PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"
+
+
+# Scopes
+APP_SCOPE = "app"
+UNIT_SCOPE = "unit"
+
+# Password keys
+USER_PASSWORD_KEY = "operator-password"  # noqa: S105
+MONITORING_PASSWORD_KEY = "monitoring-password"  # noqa: S105
+REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
+REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
+PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
+
+# Secret labels
+SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
+SECRET_DELETED_LABEL = "None"  # noqa: S105
+SECRET_KEY_OVERRIDES = {"ca": "cauth"}
+SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105

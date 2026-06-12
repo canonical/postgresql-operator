@@ -28,12 +28,10 @@ from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     API_REQUEST_TIMEOUT,
+    PEER_RELATION,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
-)
-from single_kernel_postgresql.config.literals import (
-    PEER_RELATION as PEER,
 )
 from single_kernel_postgresql.utils import (
     _change_owner,
@@ -958,10 +956,10 @@ class Patroni:
 
         # Leader doesn't always trigger when changing it's own peer data.
         if self.charm.unit.is_leader():
-            self.charm.on[PEER].relation_changed.emit(
+            self.charm.on[PEER_RELATION].relation_changed.emit(
                 unit=self.charm.unit,
                 app=self.charm.app,
-                relation=self.charm.model.get_relation(PEER),
+                relation=self.charm.model.get_relation(PEER_RELATION),
             )
 
     def remove_raft_member(self, member_address: str | None) -> None:

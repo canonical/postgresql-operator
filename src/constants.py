@@ -4,31 +4,43 @@
 """File containing constants to be used in the charm."""
 
 from single_kernel_postgresql.config.literals import (  # noqa: F401
+    APP_SCOPE,
     BACKUP_TYPE_OVERRIDES,
+    BACKUP_USER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_MAPPING_LABEL,
     DATABASE_PORT,
     METRICS_PORT,
+    MONITORING_PASSWORD_KEY,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PATRONI_PASSWORD_KEY,
+    PEER_RELATION,
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_METRICS_PORT,
     PLUGIN_OVERRIDES,
+    REPLICATION_PASSWORD_KEY,
+    REWIND_PASSWORD_KEY,
+    SECRET_DELETED_LABEL,
+    SECRET_INTERNAL_LABEL,
+    SECRET_KEY_OVERRIDES,
+    SNAP_USER,
     SPI_MODULE,
+    SYSTEM_USERS_PASSWORD_CONFIG,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_RELATION_NAME,
+    UNIT_SCOPE,
+    USER_PASSWORD_KEY,
     USERNAME_MAPPING_LABEL,
 )
 
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
-PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE]
 REPLICATION_CONSUMER_RELATION = "replication"
 REPLICATION_OFFER_RELATION = "replication-offer"
-BACKUP_USER = "backup"
 TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
@@ -36,7 +48,6 @@ PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
-SNAP_DAEMON_USER = "_daemon_"
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 # pgBackRest logging configuration
 # We use stderr for all error/warning output to have a consistent, predictable error extraction
@@ -78,21 +89,8 @@ UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
-# Labels are not confidential
-REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
-REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
-USER_PASSWORD_KEY = "operator-password"  # noqa: S105
-MONITORING_PASSWORD_KEY = "monitoring-password"  # noqa: S105
+# VM-only password key (not in the shared lib)
 RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
-PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
-SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
-SECRET_DELETED_LABEL = "None"  # noqa: S105
-SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
-
-APP_SCOPE = "app"
-UNIT_SCOPE = "unit"
-
-SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 
 TRACING_PROTOCOL = "otlp_http"
 

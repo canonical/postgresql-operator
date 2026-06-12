@@ -20,6 +20,7 @@ import psycopg2
 import pytest
 import requests
 import yaml
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import (
     RetryError,
     Retrying,
@@ -31,7 +32,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
+from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
 
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
 from .ha_tests.helpers import ProcessError
@@ -80,7 +81,7 @@ def get_password(
     Returns:
         the user password.
     """
-    secret = get_secret_by_label(label=f"{PEER}.{database_app_name}.app")
+    secret = get_secret_by_label(label=f"{PEER_RELATION}.{database_app_name}.app")
     password = secret.get(f"{username}-password")
     print(f"Retrieved password for {username}: {password}")
 
