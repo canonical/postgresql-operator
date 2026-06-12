@@ -13,13 +13,9 @@ from types import SimpleNamespace
 from charmlibs import pathops
 from charmlibs.pathops import PathProtocol
 from ops import Container
-from ops.pebble import Plan
 
 from single_kernel_postgresql.config.exceptions import PostgreSQLFileOperationError
-from single_kernel_postgresql.config.literals import (
-    DIR_PERMISSIONS_READONLY,
-    K8S_POSTGRESQL_SERVICE_NAME,
-)
+from single_kernel_postgresql.config.literals import DIR_PERMISSIONS_READONLY
 from single_kernel_postgresql.workload.base import BaseWorkload
 from single_kernel_postgresql.workload.paths.base import Paths as BasePaths
 from single_kernel_postgresql.workload.paths.k8s import K8sPaths
@@ -46,26 +42,6 @@ class K8sWorkload(BaseWorkload):
     def install(self) -> None:
         """Install the workload."""
         pass
-
-    def get_current_layer(self) -> Plan:
-        """Get the current Pebble layer."""
-        return self.container.get_plan()
-
-    def reconcile_pebble_layer(self, new_layer, replan: bool = False) -> None:
-        """Reconcile the Pebble layer."""
-        current_layer = self.get_current_layer()
-        # Check if there are any changes to layer services.
-        if current_layer.services != new_layer.services:
-            # Changes were made, add the new layer.
-            self.container.add_layer(K8S_POSTGRESQL_SERVICE_NAME, new_layer, combine=True)
-            logging.info("Added updated layer 'postgresql' to Pebble plan")
-            if replan:
-                self.container.replan()
-                logging.info("Restarted postgresql service")
-        if current_layer.checks != new_layer.checks:
-            # Changes were made, add the new layer.
-            self.container.add_layer(K8S_POSTGRESQL_SERVICE_NAME, new_layer, combine=True)
-            logging.info("Updated health checks")
 
     def is_service_started(self, paused: bool | None = False) -> bool:
         """Check if the snap service is running.

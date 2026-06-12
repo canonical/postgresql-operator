@@ -9,7 +9,6 @@ import logging
 from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm, PostgreSQL
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import CONTAINER_NAME, SYSTEM_USERS, USER
-from single_kernel_postgresql.managers.k8s import K8sManager
 from single_kernel_postgresql.workload.base import BaseWorkload
 from single_kernel_postgresql.workload.k8s import K8sWorkload
 
@@ -22,10 +21,6 @@ class PostgreSQLK8sCharm(AbstractPostgreSQLCharm):
     def __init__(self, *args):
         """Initialize the PostgreSQL Kubernetes Charm."""
         super().__init__(*args)
-        assert isinstance(self.workload, K8sWorkload), (  # noqa: S101
-            "Workload must be an instance of K8sWorkload"
-        )
-        self.k8s_manager = K8sManager(self.state, self.workload, self.postgresql)
 
     @property
     def postgresql(self) -> PostgreSQL:

@@ -19,18 +19,6 @@ from ..config.enums import Substrates
 from ..config.literals import API_REQUEST_TIMEOUT
 
 
-def unit_name_to_pod_name(unit_name: str) -> str:
-    """Converts unit name to pod name.
-
-    Args:
-        unit_name: name in "postgresql-k8s/0" format.
-
-    Returns:
-        pod name in "postgresql-k8s-0" format.
-    """
-    return unit_name.replace("/", "-")
-
-
 def new_password() -> str:
     """Generate a random password string.
 

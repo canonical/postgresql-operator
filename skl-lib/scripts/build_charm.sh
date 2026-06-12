@@ -13,9 +13,6 @@ LIB_PATH="./${LIB}"
 CHARMS_PATH="./tests/charms"
 # This is for charms that don't need the library to be copied and can be packed directly.
 THIRD_PARTY_CHARMS=("")
-# We compute a version based on the tag of the pip package version.
-# This is just for the test charms
-VERSION_TAG="test/0.0.0+dirty"
 
 # --- Argument Parsing ---
 while [[ "$#" -gt 0 ]]; do
@@ -64,7 +61,6 @@ pack_charm() {
     fi
 }
 
-
 # --- Main Logic ---
 git_hash=$(git describe --always --dirty)
 
@@ -94,11 +90,8 @@ for directory in "${TEST_CHARMS[@]}"; do
         pushd "$directory"
 
         # Backup files
-        cp refresh_versions.toml refresh_versions.toml.backup
         cp pyproject.toml pyproject.toml.backup
         cp poetry.lock poetry.lock.backup
-
-        sed -i "2s@^@charm = \"${VERSION_TAG}\"\n@" refresh_versions.toml
 
         # Disable strict mode for build test lib.
         pushd "${LIB_PATH}"
@@ -118,7 +111,6 @@ for directory in "${TEST_CHARMS[@]}"; do
         rm -rf "${LIB_PATH}"
         mv pyproject.toml.backup pyproject.toml
         mv poetry.lock.backup poetry.lock
-        mv refresh_versions.toml.backup refresh_versions.toml
 
         # Go back to root directory
         popd

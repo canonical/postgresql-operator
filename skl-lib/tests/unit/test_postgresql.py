@@ -37,12 +37,10 @@ from single_kernel_postgresql.config.enums import Substrates
 def harness(substrate, test_charm_path):
     with open(test_charm_path + "/metadata.yaml") as meta_file:
         meta = meta_file.read()
-    with open(test_charm_path + "/actions.yaml") as actions_file:
-        actions = actions_file.read()
     if substrate == "vm":
-        harness = Harness(vm_charm.PostgreSQLVMCharm, meta=meta, actions=actions)
+        harness = Harness(vm_charm.PostgreSQLVMCharm, meta=meta)
     else:
-        harness = Harness(k8s_charm.PostgreSQLK8sCharm, meta=meta, actions=actions)
+        harness = Harness(k8s_charm.PostgreSQLK8sCharm, meta=meta)
 
     # Set up the initial relation and hooks.
     peer_rel_id = harness.add_relation(PEER_RELATION, "postgresql-single-kernel")

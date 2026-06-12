@@ -4,26 +4,17 @@
 from typing import Literal
 
 import pytest
-from _pytest.config.argparsing import Parser
 
 # To separate vm and k8s tests
 type Substrate = Literal["vm", "k8s"]
 
 
-def pytest_addoption(parser: Parser):
-    parser.addoption(
-        "--substrate",
-        action="store",
-        help="Substrate to test, either vm or k8s",
-        choices=("vm", "k8s"),
-        default="vm",
-    )
-
-
-@pytest.fixture(scope="session")
+# This causes every test that uses the `substrate` fixture to run twice,
+# once with substrate="vm" and once with substrate="k8s".
+@pytest.fixture(params=["vm", "k8s"], autouse=True, scope="session")
 def substrate(request) -> Substrate:
     """The substrate that we are testing."""
-    return request.config.option.substrate
+    return request.param
 
 
 @pytest.fixture(scope="session")
