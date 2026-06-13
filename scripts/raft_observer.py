@@ -48,6 +48,9 @@ def check_raft_connection(password: str) -> None:
     except Exception:
         print("Cannot connect to local Raft")
         return
+    if not raft_status:
+        print("No Raft status")
+        return
     print(f"Local raft: {raft_status}")
     if not raft_status["leader"] or not raft_status["has_quorum"]:
         print("No leader or quorum")
@@ -62,6 +65,7 @@ def check_raft_connection(password: str) -> None:
                 continue
             print(f"Potentially stuck connection with {addr}")
             dispatch("raft_reconnect")
+            return
 
 
 def main() -> None:
