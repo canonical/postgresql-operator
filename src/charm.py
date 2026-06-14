@@ -64,14 +64,14 @@ from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
-    PATRONI_CONF_PATH,
+    PATRONI_CONF_VM_PATH,
     PEER_RELATION,
-    POSTGRESQL_DATA_DIR,
+    POSTGRESQL_DATA_VM_DIR,
     RAFT_PORT,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
-    TEMP_DATA_DIR,
+    TEMP_DATA_VM_DIR,
     TEMP_STORAGE_VM_PATH,
     TLS_CA_BUNDLE_FILE,
     USER,
@@ -720,13 +720,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         not remove it, logging permission errors).  The snap's
         migrate-data.sh creates these parents as root, so we fix them here.
         """
-        temp_dir = Path(TEMP_DATA_DIR)
+        temp_dir = Path(TEMP_DATA_VM_DIR)
         temp_dir.mkdir(parents=True, exist_ok=True)
         shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
         if temp_dir.parent.exists():
             shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
-        data_parent = Path(POSTGRESQL_DATA_DIR).parent
+        data_parent = Path(POSTGRESQL_DATA_VM_DIR).parent
         if data_parent.exists():
             shutil.chown(data_parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
 
@@ -809,7 +809,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return True
 
             current_location = row[0]
-            if current_location == TEMP_DATA_DIR:
+            if current_location == TEMP_DATA_VM_DIR:
                 return True
 
             if current_location != TEMP_STORAGE_VM_PATH:
@@ -818,17 +818,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "(expected %s or %s)",
                     current_location,
                     TEMP_STORAGE_VM_PATH,
-                    TEMP_DATA_DIR,
+                    TEMP_DATA_VM_DIR,
                 )
                 return True
 
             logger.info(
                 "Migrating temp tablespace location from %s to %s",
                 TEMP_STORAGE_VM_PATH,
-                TEMP_DATA_DIR,
+                TEMP_DATA_VM_DIR,
             )
             cursor.execute("DROP TABLESPACE temp;")
-            cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
+            cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_VM_DIR}';")
             cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
             # Flush WAL past the CREATE TABLESPACE record so replicas won't
             # need to replay it during a future rollback (the versioned
@@ -2032,7 +2032,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 extra_user_roles=[ROLE_STATS],
             )
 
-        self.postgresql.set_up_database(temp_location=TEMP_DATA_DIR)
+        self.postgresql.set_up_database(temp_location=TEMP_DATA_VM_DIR)
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
@@ -2363,11 +2363,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self.patroni.member_inactive:
-            data_directory_contents = os.listdir(POSTGRESQL_DATA_DIR)
+            data_directory_contents = os.listdir(POSTGRESQL_DATA_VM_DIR)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
                 os.rename(
-                    os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
-                    os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{datetime.now(UTC).isoformat()}"),
+                    os.path.join(POSTGRESQL_DATA_VM_DIR, "pg_wal"),
+                    os.path.join(
+                        POSTGRESQL_DATA_VM_DIR, f"pg_wal-{datetime.now(UTC).isoformat()}"
+                    ),
                 )
                 logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True
@@ -2506,23 +2508,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         key, ca, cert = self.tls.get_peer_tls_files()
         if key is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+            render_file(Substrates.VM, f"{PATRONI_CONF_VM_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
         render_file(
             Substrates.VM,
-            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
+            f"{PATRONI_CONF_VM_PATH}/{TLS_CA_BUNDLE_FILE}",
             self.tls.get_peer_ca_bundle(),
             0o600,
         )

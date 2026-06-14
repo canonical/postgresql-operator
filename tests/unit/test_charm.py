@@ -33,7 +33,7 @@ from ops.testing import Harness
 from psycopg2 import OperationalError
 from single_kernel_postgresql.config.literals import (
     PEER_RELATION,
-    POSTGRESQL_DATA_DIR,
+    POSTGRESQL_DATA_VM_DIR,
 )
 from single_kernel_postgresql.managers.patroni import (
     NotReadyError,
@@ -417,7 +417,8 @@ def test_on_start_bootstrap_failure(harness):
         _bootstrap_cluster.return_value = False
 
         # TODO: test replicas start (DPE-494).
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -464,7 +465,8 @@ def test_on_start_create_user_error(harness):
         _postgresql.list_users.return_value = []
         _postgresql.create_user.side_effect = PostgreSQLCreateUserError
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -518,7 +520,8 @@ def test_on_start_success(harness):
         _member_started.return_value = True
         _postgresql.list_users.return_value = []
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
         _oversee_users.assert_called_once()
@@ -663,8 +666,8 @@ def test_ensure_storage_layout(harness, tmp_path):
     # charm only fixes its ownership, it does not create the data dir.
     data_root.parent.mkdir(parents=True)
     with (
-        patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_root)),
+        patch("charm.POSTGRESQL_DATA_VM_DIR", str(data_root)),
         patch("charm.shutil") as mock_shutil,
     ):
         harness.charm._ensure_storage_layout()
@@ -738,8 +741,8 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
-        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_STORAGE_VM_PATH", temp_storage_path),
     ):
         assert harness.charm._migrate_temp_tablespace_location()
 
@@ -775,7 +778,7 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_data_dir)),
     ):
         assert harness.charm._migrate_temp_tablespace_location()
 
@@ -871,7 +874,7 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
     """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
     temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_root)),
         patch("charm.shutil"),
     ):
         harness.charm._ensure_storage_layout()
@@ -3324,8 +3327,8 @@ def test_handle_processes_failures(harness):
         assert harness.charm._handle_processes_failures()
         assert not _restart_patroni.called
         _rename.assert_called_once_with(
-            os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
-            os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{_now.isoformat()}"),
+            os.path.join(POSTGRESQL_DATA_VM_DIR, "pg_wal"),
+            os.path.join(POSTGRESQL_DATA_VM_DIR, f"pg_wal-{_now.isoformat()}"),
         )
         _rename.reset_mock()
 

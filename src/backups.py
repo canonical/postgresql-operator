@@ -30,15 +30,15 @@ from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
-    ARCHIVE_DATA_DIR,
+    ARCHIVE_DATA_VM_DIR,
     BACKUP_USER,
-    LOGS_DATA_DIR,
-    PATRONI_CONF_PATH,
-    PGBACKREST_CONF_PATH,
-    PGBACKREST_CONFIGURATION_FILE,
-    PGBACKREST_LOGS_PATH,
-    POSTGRESQL_DATA_DIR,
-    TEMP_DATA_DIR,
+    LOGS_DATA_VM_DIR,
+    PATRONI_CONF_VM_PATH,
+    PGBACKREST_CONF_VM_PATH,
+    PGBACKREST_CONFIGURATION_VM_FILE,
+    PGBACKREST_LOGS_VM_PATH,
+    POSTGRESQL_DATA_VM_DIR,
+    TEMP_DATA_VM_DIR,
 )
 from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -122,7 +122,7 @@ class PostgreSQLBackups(Object):
         """Returns the path to the TLS CA chain file."""
         s3_parameters, _ = self._retrieve_s3_parameters()
         if s3_parameters.get("tls-ca-chain") is not None:
-            return f"{PGBACKREST_CONF_PATH}/pgbackrest-tls-ca-chain.crt"
+            return f"{PGBACKREST_CONF_VM_PATH}/pgbackrest-tls-ca-chain.crt"
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
@@ -225,7 +225,7 @@ class PostgreSQLBackups(Object):
             return_code, stdout, stderr = self._execute_command(
                 [
                     PGBACKREST_EXECUTABLE,
-                    PGBACKREST_CONFIGURATION_FILE,
+                    PGBACKREST_CONFIGURATION_VM_FILE,
                     PGBACKREST_LOG_LEVEL_STDERR,
                     "info",
                     "--output=json",
@@ -257,7 +257,7 @@ class PostgreSQLBackups(Object):
 
             return_code, system_identifier_from_instance, error = self._execute_command([
                 f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
-                POSTGRESQL_DATA_DIR,
+                POSTGRESQL_DATA_VM_DIR,
             ])
             if return_code != 0:
                 raise Exception(error)
@@ -365,10 +365,10 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         paths = [
-            ARCHIVE_DATA_DIR,
-            POSTGRESQL_DATA_DIR,
-            LOGS_DATA_DIR,
-            TEMP_DATA_DIR,
+            ARCHIVE_DATA_VM_DIR,
+            POSTGRESQL_DATA_VM_DIR,
+            LOGS_DATA_VM_DIR,
+            TEMP_DATA_VM_DIR,
         ]
         path = None
         try:
@@ -418,7 +418,7 @@ class PostgreSQLBackups(Object):
             Extracted error message from stderr, prioritizing ERROR/WARN lines.
         """
         if not stderr.strip():
-            return f"Unknown error occurred. Please check the logs at {PGBACKREST_LOGS_PATH}"
+            return f"Unknown error occurred. Please check the logs at {PGBACKREST_LOGS_VM_PATH}"
 
         # Extract lines with ERROR or WARN markers from pgBackRest stderr output
         error_lines = []
@@ -478,7 +478,7 @@ class PostgreSQLBackups(Object):
         backup_list = []
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
-            PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_CONFIGURATION_VM_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
@@ -551,7 +551,7 @@ class PostgreSQLBackups(Object):
         """
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
-            PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_CONFIGURATION_VM_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
@@ -587,7 +587,7 @@ class PostgreSQLBackups(Object):
         """
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
-            PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_CONFIGURATION_VM_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
             "archive",
@@ -707,7 +707,7 @@ class PostgreSQLBackups(Object):
                 with attempt:
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
-                        PGBACKREST_CONFIGURATION_FILE,
+                        PGBACKREST_CONFIGURATION_VM_FILE,
                         PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "stanza-create",
@@ -766,7 +766,7 @@ class PostgreSQLBackups(Object):
                 with attempt:
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
-                        PGBACKREST_CONFIGURATION_FILE,
+                        PGBACKREST_CONFIGURATION_VM_FILE,
                         PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "check",
@@ -1031,7 +1031,7 @@ Juju Version: {self.charm.model.juju_version!s}
     ) -> None:
         command = [
             PGBACKREST_EXECUTABLE,
-            PGBACKREST_CONFIGURATION_FILE,
+            PGBACKREST_CONFIGURATION_VM_FILE,
             PGBACKREST_LOG_LEVEL_STDERR,
             f"--stanza={self.stanza_name}",
             "--log-level-console=debug",
@@ -1233,7 +1233,7 @@ Stderr:
             [
                 "charmed-postgresql.patronictl",
                 "-c",
-                f"{PATRONI_CONF_PATH}/patroni.yaml",
+                f"{PATRONI_CONF_VM_PATH}/patroni.yaml",
                 "remove",
                 self.charm.cluster_name,
             ],
@@ -1394,8 +1394,8 @@ Stderr:
             enable_tls=len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
-            data_path=POSTGRESQL_DATA_DIR,
-            log_path=f"{PGBACKREST_LOGS_PATH}",
+            data_path=POSTGRESQL_DATA_VM_DIR,
+            log_path=f"{PGBACKREST_LOGS_VM_PATH}",
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
             bucket=s3_parameters["bucket"],
@@ -1410,7 +1410,7 @@ Stderr:
             process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
-        render_file(Substrates.VM, f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
+        render_file(Substrates.VM, f"{PGBACKREST_CONF_VM_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:

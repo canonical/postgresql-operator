@@ -13,11 +13,11 @@ from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
-    ARCHIVE_DATA_DIR,
-    LOGS_DATA_DIR,
+    ARCHIVE_DATA_VM_DIR,
+    LOGS_DATA_VM_DIR,
     PEER_RELATION,
-    POSTGRESQL_DATA_DIR,
-    TEMP_DATA_DIR,
+    POSTGRESQL_DATA_VM_DIR,
+    TEMP_DATA_VM_DIR,
 )
 from tenacity import RetryError, wait_fixed
 
@@ -562,17 +562,17 @@ def test_empty_data_files(harness):
         _is_dir.return_value = True
         _rmtree.side_effect = OSError
         assert not harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(f"{ARCHIVE_DATA_DIR}/test_file.txt")
+        _rmtree.assert_called_once_with(f"{ARCHIVE_DATA_VM_DIR}/test_file.txt")
 
         # Test when data files are successfully removed.
         _rmtree.reset_mock()
         _rmtree.side_effect = None
         assert harness.charm.backup._empty_data_files()
         _rmtree.assert_has_calls([
-            call(f"{ARCHIVE_DATA_DIR}/test_file.txt"),
-            call(f"{POSTGRESQL_DATA_DIR}/test_file.txt"),
-            call(f"{LOGS_DATA_DIR}/test_file.txt"),
-            call(f"{TEMP_DATA_DIR}/test_file.txt"),
+            call(f"{ARCHIVE_DATA_VM_DIR}/test_file.txt"),
+            call(f"{POSTGRESQL_DATA_VM_DIR}/test_file.txt"),
+            call(f"{LOGS_DATA_VM_DIR}/test_file.txt"),
+            call(f"{TEMP_DATA_VM_DIR}/test_file.txt"),
         ])
 
 
@@ -1860,7 +1860,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
-            data_path=POSTGRESQL_DATA_DIR,
+            data_path=POSTGRESQL_DATA_VM_DIR,
             log_path="/var/snap/charmed-postgresql/common/var/log/pgbackrest",
             region="us-east-1",
             endpoint="https://storage.googleapis.com",
