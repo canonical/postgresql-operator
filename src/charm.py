@@ -72,7 +72,7 @@ from single_kernel_postgresql.config.literals import (
     REWIND_USER,
     SYSTEM_USERS,
     TEMP_DATA_DIR,
-    TEMP_STORAGE_PATH,
+    TEMP_STORAGE_VM_PATH,
     TLS_CA_BUNDLE_FILE,
     USER,
 )
@@ -812,19 +812,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if current_location == TEMP_DATA_DIR:
                 return True
 
-            if current_location != TEMP_STORAGE_PATH:
+            if current_location != TEMP_STORAGE_VM_PATH:
                 logger.warning(
                     "Skipping temp tablespace migration: unexpected location %s "
                     "(expected %s or %s)",
                     current_location,
-                    TEMP_STORAGE_PATH,
+                    TEMP_STORAGE_VM_PATH,
                     TEMP_DATA_DIR,
                 )
                 return True
 
             logger.info(
                 "Migrating temp tablespace location from %s to %s",
-                TEMP_STORAGE_PATH,
+                TEMP_STORAGE_VM_PATH,
                 TEMP_DATA_DIR,
             )
             cursor.execute("DROP TABLESPACE temp;")
@@ -1443,6 +1443,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self,
             substrate=Substrates.VM,
             endpoint=self._unit_ip,
+            primary_endpoint=None,
             endpoints=list(self._peer_members_ips),
             cluster_name=self.cluster_name,
             member_name=self._member_name,
