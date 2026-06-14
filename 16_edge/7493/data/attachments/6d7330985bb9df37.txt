@@ -1,0 +1,78 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-0': 101, 'testing.postgresql-1': 101, 'testing.postgresql-2': 101}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-0': 102, 'testing.postgresql-1': 102, 'testing.postgresql-2': 102}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-0, count: 107, max_number_written: 107, total_expected_writes: 107
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-1, count: 107, max_number_written: 107, total_expected_writes: 107
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 107, max_number_written: 107, total_expected_writes: 107
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.23   unsupported  02:14:11Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.14    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  536  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.75.105.51              received database credentials of the first database
+postgresql/0*           active    idle   0        10.75.105.216   5432/tcp  
+postgresql/1            active    idle   1        10.75.105.77    5432/tcp  Primary
+postgresql/2            active    idle   2        10.75.105.18    5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.75.105.216  juju-4c55b4-0  ubuntu@24.04  runnervm1li68  Running
+1        started  10.75.105.77   juju-4c55b4-1  ubuntu@24.04  runnervm1li68  Running
+2        started  10.75.105.18   juju-4c55b4-2  ubuntu@24.04  runnervm1li68  Running
+3        started  10.75.105.51   juju-4c55b4-3  ubuntu@24.04  runnervm1li68  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:50:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:50:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:50:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:50:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:51:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:51:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:51:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:51:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:51:36 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 286, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0112023680 state=finished raised Exception>]
+unit-postgresql-0: 01:51:39 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 286, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f16db023470 state=finished raised Exception>]
+unit-postgresql-0: 01:51:42 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 286, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2b02e2f5f0 state=finished raised Exception>]
+unit-postgresql-0: 01:51:42 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 569, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 286, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2b02e4b4d0 state=finished raised Exception>]
+unit-postgresql-2: 01:56:42 ERROR unit.postgresql/2.juju-log database-peers:2: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
