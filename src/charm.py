@@ -118,6 +118,7 @@ from constants import (
     PGBACKREST_MONITORING_SNAP_SERVICE,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_DIR,
+    RAFT_PARTNER_PREFIX,
     RAFT_PASSWORD_KEY,
     RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
@@ -1619,14 +1620,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.async_replication.update_async_replication_data()
 
     def _on_raft_reconnect(self, _) -> None:
-        logger.debug(f"Local raft status: {self._patroni.get_raft_status()}")
+        raft_status = self._patroni.get_raft_status()
+        logger.debug(f"Local raft status: {raft_status}")
         if (
-            not self._unit_ip
+            not raft_status
+            or not self._unit_ip
             or not self.is_cluster_initialised
             or self._unit_ip not in self.members_ips
             or self.has_raft_keys()
             or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
         ):
+            return
+
+        if all(
+            raft_status[partner] == 2
+            for partner in raft_status
+            if partner.startswith(RAFT_PARTNER_PREFIX)
+        ):
+            logger.debug("All raft members are active.")
             return
 
         logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
