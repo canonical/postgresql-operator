@@ -1,0 +1,109 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.23   unsupported  00:41:38Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+another-database     14.23    active      2  postgresql                          1  no       
+database                      active    1/2  postgresql                          0  no       
+postgresql-test-app           active      2  postgresql-test-app  latest/edge  535  no       received database credentials of the first database
+
+Unit                    Workload  Agent       Machine  Public address  Ports     Message
+another-database/0      active    idle        3        10.199.39.230   5432/tcp  
+another-database/1*     active    idle        4        10.199.39.223   5432/tcp  Primary (read-only)
+database/0*             active    idle        2        10.199.39.97    5432/tcp  Primary (degraded)
+database/1              waiting   allocating  5                                  waiting for machine
+postgresql-test-app/0*  active    idle        0        10.199.39.154             received database credentials of the first database
+postgresql-test-app/1   active    idle        1        10.199.39.76              received database credentials of the first database
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.199.39.154  juju-a7ddc7-0  ubuntu@22.04  runnervmqtt2i  Running
+1        started  10.199.39.76   juju-a7ddc7-1  ubuntu@22.04  runnervmqtt2i  Running
+2        started  10.199.39.97   juju-a7ddc7-2  ubuntu@22.04  runnervmqtt2i  Running
+3        started  10.199.39.230  juju-a7ddc7-3  ubuntu@22.04  runnervmqtt2i  Running
+4        started  10.199.39.223  juju-a7ddc7-4  ubuntu@22.04  runnervmqtt2i  Running
+5        down                    pending        ubuntu@22.04                 Failed creating instance from image: Unpack failed: Failed to run: unsquashfs -f -d /var/snap/lxd/common/lxd/storage-...
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:29:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:29:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:31:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:31:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:31:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:31:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:31:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:31:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:31:24 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:31:24 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-1: 00:32:09 ERROR unit.another-database/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3aab94f1c0 state=finished raised Exception>]
+unit-database-0: 00:32:10 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 569, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 369, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8a6030d420 state=finished raised Exception>]
+unit-another-database-1: 00:32:17 ERROR unit.another-database/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-database-0: 00:36:35 ERROR unit.database/0.juju-log Exporting trace data
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 157, in tx
+    yield conn
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 247, in pushpop
+    cursor = conn.execute(
+sqlite3.OperationalError: database or disk is full
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_export.py", line 83, in export
+    rv = self.buffer.pushpop((otlp_json.encode_spans(spans), otlp_json.CONTENT_TYPE))
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 83, in wrapper
+    raise exc
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 78, in wrapper
+    return f(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 210, in pushpop
+    with self.tx(readonly=not data) as conn:
+  File "/usr/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 159, in tx
+    conn.execute('ROLLBACK')
+sqlite3.OperationalError: cannot rollback - no transaction is active
+unit-database-0: 00:36:35 ERROR unit.database/0.juju-log Exception while exporting Span.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 157, in tx
+    yield conn
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 247, in pushpop
+    cursor = conn.execute(
+sqlite3.OperationalError: database or disk is full
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/opentelemetry/sdk/_shared_internal/__init__.py", line 182, in _export
+    self._exporter.export(
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_export.py", line 83, in export
+    rv = self.buffer.pushpop((otlp_json.encode_spans(spans), otlp_json.CONTENT_TYPE))
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 83, in wrapper
+    raise exc
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 78, in wrapper
+    return f(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 210, in pushpop
+    with self.tx(readonly=not data) as conn:
+  File "/usr/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.10/site-packages/ops_tracing/_buffer.py", line 159, in tx
+    conn.execute('ROLLBACK')
+sqlite3.OperationalError: cannot rollback - no transaction is active
+unit-database-0: 00:36:35 ERROR juju.worker.uniter.operation hook "update-status" (via hook dispatching script: dispatch) failed: exit status 1
+controller-0: 00:37:09 ERROR juju.worker.provisioner cannot start instance for machine "5": Failed creating instance from image: Unpack failed: Failed to run: unsquashfs -f -d /var/snap/lxd/common/lxd/storage-pools/default/containers/juju-a7ddc7-5/rootfs -n /var/snap/lxd/common/lxd/images/83a189d3b7e517656df113a6086189a1b28489a760e8f6b881c382d6a6e10ffe.rootfs: exit status 1 (Write on output file failed because No space left on device
+FATAL ERROR: writer: failed to write file /var/snap/lxd/common/lxd/storage-pools/default/containers/juju-a7ddc7-5/rootfs/usr/share/vim/vim82/doc/spell.txt)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
