@@ -31,7 +31,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
+from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
 
 from .adapters import JujuFixture, ModelAdapter, UnitAdapter
 from .ha_tests.helpers import ProcessError
@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 
 RELATION_ENDPOINT = "postgresql"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
+PEER = "database-peers"
+
+SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
+DATA_DIR_SUBFOLDER = "16/main"
+SNAP_DATA_PATH = f"{SNAP_COMMON_PATH}/var/lib"
+POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
+POSTGRESQL_DATA_DIR = f"{POSTGRESQL_DATA_PATH}/{DATA_DIR_SUBFOLDER}"
 
 
 class RoleAttributeValue(Enum):

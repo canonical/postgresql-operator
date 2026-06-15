@@ -23,11 +23,10 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 from yaml import safe_load
 
-from constants import RAFT_PARTNER_PREFIX
-
 from ..helpers import APPLICATION_NAME, DATABASE_APP_NAME, get_machine_from_unit, stop_machine
 from .helpers import APPLICATION_NAME as TEST_APP_NAME
 from .helpers import (
+    RAFT_PARTNER_PREFIX,
     are_writes_increasing,
     check_writes,
     cut_network_from_unit,

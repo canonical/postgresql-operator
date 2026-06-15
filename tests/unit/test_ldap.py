@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 from charms.glauth_k8s.v0.ldap import LdapProviderData
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import PEER_RELATION
 
 from charm import PostgresqlOperatorCharm
-from constants import PEER
 
 
 @pytest.fixture(autouse=True)
@@ -16,7 +16,7 @@ def harness():
     harness = Harness(PostgresqlOperatorCharm)
 
     # Set up the initial relation and hooks.
-    peer_relation_id = harness.add_relation(PEER, "postgresql")
+    peer_relation_id = harness.add_relation(PEER_RELATION, "postgresql")
     harness.add_relation_unit(peer_relation_id, "postgresql/0")
     harness.set_leader(True)
 
@@ -32,7 +32,7 @@ def test_on_ldap_ready(harness):
         harness.charm.ldap._on_ldap_ready(mock_event)
         _update_config.assert_called_once()
 
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         app_databag = harness.get_relation_data(peer_rel_id, harness.charm.app)
         assert "ldap_enabled" in app_databag
 
@@ -44,7 +44,7 @@ def test_on_ldap_unavailable(harness):
         harness.charm.ldap._on_ldap_unavailable(mock_event)
         _update_config.assert_called_once()
 
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         app_databag = harness.get_relation_data(peer_rel_id, harness.charm.app)
         assert app_databag["ldap_enabled"] == "False"
 

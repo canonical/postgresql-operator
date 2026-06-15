@@ -13,10 +13,10 @@ import requests
 from psycopg2 import sql
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
-from constants import POSTGRESQL_DATA_DIR
 from locales import SNAP_LOCALES
 
 from .adapters import JujuFixture
+from .helpers import POSTGRESQL_DATA_DIR
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
     check_cluster_members,

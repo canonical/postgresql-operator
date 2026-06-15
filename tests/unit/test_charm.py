@@ -31,6 +31,16 @@ from ops import (
 from ops.framework import EventBase
 from ops.testing import Harness
 from psycopg2 import OperationalError
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION,
+    POSTGRESQL_DATA_VM_DIR,
+)
+from single_kernel_postgresql.managers.patroni import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -44,18 +54,7 @@ from charm import (
     PostgresqlOperatorCharm,
     StorageUnavailableError,
 )
-from cluster import (
-    NotReadyError,
-    RemoveRaftMemberFailedError,
-    SwitchoverFailedError,
-    SwitchoverNotSyncError,
-)
-from constants import (
-    PEER,
-    POSTGRESQL_DATA_DIR,
-    SECRET_INTERNAL_LABEL,
-    UPDATE_CERTS_BIN_PATH,
-)
+from constants import SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -66,7 +65,7 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 def harness():
     harness = Harness(PostgresqlOperatorCharm)
     harness.begin()
-    harness.add_relation(PEER, harness.charm.app.name)
+    harness.add_relation(PEER_RELATION, harness.charm.app.name)
     harness.add_relation("restart", harness.charm.app.name)
     yield harness
     harness.cleanup()
@@ -144,7 +143,7 @@ def test_primary_endpoint(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PostgresqlOperatorCharm.patroni", new_callable=PropertyMock) as _patroni,
     ):
         _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
         _patroni.return_value.get_primary.return_value = sentinel.primary
@@ -164,7 +163,7 @@ def test_primary_endpoint_no_peers(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PostgresqlOperatorCharm.patroni", new_callable=PropertyMock) as _patroni,
     ):
         assert harness.charm.primary_endpoint is None
 
@@ -216,7 +215,7 @@ def test_on_leader_elected(harness):
 
 
 def test_is_cluster_initialised(harness):
-    rel_id = harness.model.get_relation(PEER).id
+    rel_id = harness.model.get_relation(PEER_RELATION).id
     # Test when the cluster was not initialised yet.
     assert not (harness.charm.is_cluster_initialised)
 
@@ -338,7 +337,7 @@ def test_enable_disable_extensions(harness, caplog):
     with (
         patch("charm.Patroni.get_primary") as _get_primary,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("charm.PostgresqlOperatorCharm.patroni"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
@@ -418,7 +417,8 @@ def test_on_start_bootstrap_failure(harness):
         _bootstrap_cluster.return_value = False
 
         # TODO: test replicas start (DPE-494).
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -465,7 +465,8 @@ def test_on_start_create_user_error(harness):
         _postgresql.list_users.return_value = []
         _postgresql.create_user.side_effect = PostgreSQLCreateUserError
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -519,7 +520,8 @@ def test_on_start_success(harness):
         _member_started.return_value = True
         _postgresql.list_users.return_value = []
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
         _oversee_users.assert_called_once()
@@ -664,8 +666,8 @@ def test_ensure_storage_layout(harness, tmp_path):
     # charm only fixes its ownership, it does not create the data dir.
     data_root.parent.mkdir(parents=True)
     with (
-        patch("charm.TEMP_DATA_DIR", str(temp_root)),
-        patch("charm.POSTGRESQL_DATA_DIR", str(data_root)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_root)),
+        patch("charm.POSTGRESQL_DATA_VM_DIR", str(data_root)),
         patch("charm.shutil") as mock_shutil,
     ):
         harness.charm._ensure_storage_layout()
@@ -739,8 +741,8 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
-        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_STORAGE_VM_PATH", temp_storage_path),
     ):
         assert harness.charm._migrate_temp_tablespace_location()
 
@@ -776,7 +778,7 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_data_dir)),
     ):
         assert harness.charm._migrate_temp_tablespace_location()
 
@@ -872,7 +874,7 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
     """TEMP_DATA_DIR is recreated after a tmpfs wipe on reboot."""
     temp_root = tmp_path / "temp" / "16" / "main"
     with (
-        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.TEMP_DATA_VM_DIR", str(temp_root)),
         patch("charm.shutil"),
     ):
         harness.charm._ensure_storage_layout()
@@ -912,7 +914,7 @@ def test_on_update_status(harness):
         patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
         patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test before the cluster is initialised.
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
@@ -1001,7 +1003,7 @@ def test_on_update_status_after_restore_operation(harness):
         patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
     ):
         _get_current_timeline.return_value = "2"
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when the restore operation fails.
         with harness.hooks_disabled():
             harness.set_leader()
@@ -1269,7 +1271,7 @@ def test_update_config(harness):
             },
         ),
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
         _is_workload_running.side_effect = [True, True, False, True]
@@ -2070,7 +2072,7 @@ def test_on_peer_relation_changed(harness):
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster") as _reconfigure_cluster,
         patch("ops.framework.EventBase.defer") as _defer,
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test an uninitialized cluster.
         mock_event = Mock()
         mock_event.unit = None
@@ -2139,7 +2141,7 @@ def test_on_peer_relation_changed(harness):
 
         # Test when Patroni has already started but this is a replica with a
         # huge or unknown lag.
-        relation = harness.model.get_relation(PEER, rel_id)
+        relation = harness.model.get_relation(PEER_RELATION, rel_id)
         _member_started.return_value = True
         for values in [True, False]:
             _defer.reset_mock()
@@ -2158,7 +2160,7 @@ def test_on_peer_relation_changed(harness):
                 assert isinstance(harness.charm.unit.status, MaintenanceStatus)
 
         # Test when it was not possible to start the pgBackRest service yet.
-        relation = harness.model.get_relation(PEER, rel_id)
+        relation = harness.model.get_relation(PEER_RELATION, rel_id)
         _member_started.return_value = True
         _defer.reset_mock()
         _coordinate_stanza_fields.reset_mock()
@@ -2243,7 +2245,7 @@ def test_update_member_ip(harness):
         patch.object(harness.charm.watcher_offer, "update_unit_address"),
         patch.object(harness.charm.watcher_offer, "update_endpoints"),
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when the IP address of the unit hasn't changed.
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -2428,7 +2430,7 @@ def test_stuck_raft_cluster_check(harness):
     assert not harness.charm._stuck_raft_cluster_check()
 
     # Raft is stuck
-    rel_id = harness.model.get_relation(PEER).id
+    rel_id = harness.model.get_relation(PEER_RELATION).id
     with harness.hooks_disabled():
         harness.set_leader()
         harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
@@ -2452,7 +2454,7 @@ def test_stuck_raft_cluster_check(harness):
 
 
 def test_stuck_raft_cluster_cleanup(harness):
-    rel_id = harness.model.get_relation(PEER).id
+    rel_id = harness.model.get_relation(PEER_RELATION).id
 
     # Cleans up app data
     with harness.hooks_disabled():
@@ -2491,7 +2493,7 @@ def test_stuck_raft_cluster_cleanup(harness):
 
 
 def test_stuck_raft_cluster_rejoin(harness):
-    rel_id = harness.model.get_relation(PEER).id
+    rel_id = harness.model.get_relation(PEER_RELATION).id
 
     with (
         patch(
@@ -2512,7 +2514,7 @@ def test_stuck_raft_cluster_rejoin(harness):
                 harness.charm.unit.name,
                 {
                     "raft_primary": "test_primary",
-                    f"{PEER}-address": "192.0.2.0",
+                    f"{PEER_RELATION}-address": "192.0.2.0",
                 },
             )
             harness.update_relation_data(
@@ -2531,7 +2533,7 @@ def test_stuck_raft_cluster_rejoin(harness):
 
 
 def test_raft_reinitialisation(harness):
-    rel_id = harness.model.get_relation(PEER).id
+    rel_id = harness.model.get_relation(PEER_RELATION).id
 
     with (
         patch(
@@ -2702,7 +2704,7 @@ def test_migration_from_single_secret(harness, scope, is_leader):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
 
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
@@ -2721,7 +2723,7 @@ def test_migration_from_single_secret(harness, scope, is_leader):
         harness.charm.set_secret(scope, "operator-password", "blablabla")
         with harness.hooks_disabled():
             harness.set_leader(is_leader)
-        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
+        assert harness.charm.model.get_secret(label=f"{PEER_RELATION}.postgresql.{scope}")
         assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
         assert SECRET_INTERNAL_LABEL not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
@@ -2740,7 +2742,7 @@ def test_handle_postgresql_restart_need(harness):
         ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         for values in itertools.product(
             [True, False], [True, False], [True, False], [True, False]
         ):
@@ -2803,7 +2805,7 @@ def test_on_peer_relation_departed(harness):
         patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
         patch("charm.Patroni.get_member_ip") as _get_member_ip,
     ):
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when the current unit is the departing unit.
         harness.charm.unit.status = ActiveStatus()
         event = Mock()
@@ -3142,7 +3144,7 @@ def test_restart_services_after_reboot(harness):
     ):
         with harness.hooks_disabled():
             harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
+                harness.model.get_relation(PEER_RELATION).id,
                 harness.charm.app.name,
                 {"members_ips": json.dumps([])},
             )
@@ -3152,7 +3154,7 @@ def test_restart_services_after_reboot(harness):
 
         with harness.hooks_disabled():
             harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
+                harness.model.get_relation(PEER_RELATION).id,
                 harness.charm.app.name,
                 {"members_ips": json.dumps([_unit_ip])},
             )
@@ -3236,7 +3238,7 @@ def test_on_promote_to_primary(harness):
 
         # Unit, no force, raft stuck
         event.params = {"scope": "unit"}
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
 
@@ -3265,7 +3267,7 @@ def test_get_ldap_parameters(harness):
     ):
         with harness.hooks_disabled():
             harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
+                harness.model.get_relation(PEER_RELATION).id,
                 harness.charm.app.name,
                 {"ldap_enabled": "False"},
             )
@@ -3276,7 +3278,7 @@ def test_get_ldap_parameters(harness):
 
         with harness.hooks_disabled():
             harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
+                harness.model.get_relation(PEER_RELATION).id,
                 harness.charm.app.name,
                 {"ldap_enabled": "True"},
             )
@@ -3302,7 +3304,7 @@ def test_handle_processes_failures(harness):
         patch("charm.datetime") as _datetime,
     ):
         _datetime.now.return_value = _now
-        rel_id = harness.model.get_relation(PEER).id
+        rel_id = harness.model.get_relation(PEER_RELATION).id
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id,
@@ -3325,8 +3327,8 @@ def test_handle_processes_failures(harness):
         assert harness.charm._handle_processes_failures()
         assert not _restart_patroni.called
         _rename.assert_called_once_with(
-            os.path.join(POSTGRESQL_DATA_DIR, "pg_wal"),
-            os.path.join(POSTGRESQL_DATA_DIR, f"pg_wal-{_now.isoformat()}"),
+            os.path.join(POSTGRESQL_DATA_VM_DIR, "pg_wal"),
+            os.path.join(POSTGRESQL_DATA_VM_DIR, f"pg_wal-{_now.isoformat()}"),
         )
         _rename.reset_mock()
 
@@ -3673,7 +3675,7 @@ def test_api_update_config_with_worker_processes(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3712,7 +3714,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3737,7 +3739,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
 def test_api_update_config_with_async_replication_primary(harness):
     """Test _api_update_config when primary endpoint is available."""
     with (
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni") as mock_patroni,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,

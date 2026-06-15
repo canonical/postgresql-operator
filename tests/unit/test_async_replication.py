@@ -69,8 +69,8 @@ def test__configure_primary_cluster():
     mock_charm.app = MagicMock()
     mock_charm.unit.is_leader.return_value = True
     mock_charm.update_config = MagicMock()
-    mock_charm._patroni.get_standby_leader.return_value = True
-    mock_charm._patroni.promote_standby_cluster = MagicMock()
+    mock_charm.patroni.get_standby_leader.return_value = True
+    mock_charm.patroni.promote_standby_cluster = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation.is_primary_cluster = MagicMock(return_value=True)
@@ -81,7 +81,7 @@ def test__configure_primary_cluster():
 
     mock_charm.update_config.assert_called_once()
     relation._update_primary_cluster_data.assert_called_once()
-    mock_charm._patroni.promote_standby_cluster()
+    mock_charm.patroni.promote_standby_cluster()
     assert result is True
 
     # 4.
@@ -90,7 +90,7 @@ def test__configure_primary_cluster():
     mock_charm.app = MagicMock()
     mock_charm.unit.is_leader.return_value = True
     mock_charm.update_config = MagicMock()
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni.get_standby_leader.return_value = None
 
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation.is_primary_cluster = MagicMock(return_value=True)
@@ -306,14 +306,14 @@ def test_wait_for_standby_leader():
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
-    mock_charm._patroni.is_member_isolated = True
-    mock_charm._patroni.restart_patroni = MagicMock()
+    mock_charm.patroni.is_member_isolated = True
+    mock_charm.patroni.restart_patroni = MagicMock()
 
     result = relation._wait_for_standby_leader(mock_event)
     assert result is True
-    mock_charm._patroni.restart_patroni.assert_called_once()
+    mock_charm.patroni.restart_patroni.assert_called_once()
     mock_event.defer.assert_called_once()
 
     # 2.
@@ -322,9 +322,9 @@ def test_wait_for_standby_leader():
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
-    mock_charm._patroni.is_member_isolated = False
+    mock_charm.patroni.is_member_isolated = False
 
     result = relation._wait_for_standby_leader(mock_event)
     assert result is True
@@ -335,7 +335,7 @@ def test_wait_for_standby_leader():
     mock_event = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = True
 
     result = relation._wait_for_standby_leader(mock_event)
@@ -513,7 +513,7 @@ def test_handle_forceful_promotion():
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
-    mock_charm._patroni.get_primary.side_effect = RetryError("timeout")
+    mock_charm.patroni.get_primary.side_effect = RetryError("timeout")
 
     result = relation._handle_forceful_promotion(mock_event)
 
@@ -535,7 +535,7 @@ def test_handle_forceful_promotion():
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
-    mock_charm._patroni.get_primary.side_effect = None
+    mock_charm.patroni.get_primary.side_effect = None
 
     result = relation._handle_forceful_promotion(mock_event)
 
@@ -554,7 +554,7 @@ def test_handle_forceful_promotion():
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[])
 
-    mock_charm._patroni.get_primary.side_effect = None
+    mock_charm.patroni.get_primary.side_effect = None
 
     result = relation._handle_forceful_promotion(mock_event)
 
@@ -576,7 +576,7 @@ def test_on_async_relation_broken():
     mock_charm = MagicMock()
     mock_charm._peers = MagicMock()
     mock_charm.is_unit_departing = False
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = True
     mock_event = MagicMock()
 

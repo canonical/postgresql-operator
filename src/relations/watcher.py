@@ -27,12 +27,11 @@ from ops import (
     SecretNotFoundError,
 )
 from pysyncobj.utility import TcpUtility
+from single_kernel_postgresql.config.literals import RAFT_PARTNER_PREFIX, RAFT_PORT
 from single_kernel_postgresql.utils import new_password
 
 from constants import (
-    RAFT_PARTNER_PREFIX,
     RAFT_PASSWORD_KEY,
-    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     WATCHER_OFFER_RELATION,
@@ -85,7 +84,7 @@ class PostgreSQLWatcherRelation(Object):
             True if a watcher is connected, False otherwise.
         """
         try:
-            syncobj_util = TcpUtility(password=self.charm._patroni.raft_password, timeout=3)
+            syncobj_util = TcpUtility(password=self.charm.patroni.raft_password, timeout=3)
             raft_status = syncobj_util.executeCommand(f"127.0.0.1:{RAFT_PORT}", ["status"])
             if raft_status:
                 # Check if watcher is in the partner_node_status entries
@@ -110,7 +109,7 @@ class PostgreSQLWatcherRelation(Object):
 
         self._relation.data[self.charm.app].update({"disable-watcher": "True"})
         try:
-            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
+            self.charm.patroni.remove_raft_member(self.watcher_raft_address)
         except Exception as e:
             logger.warning(f"Error remove Raft watcher: {e}")
 
@@ -213,7 +212,7 @@ class PostgreSQLWatcherRelation(Object):
             # Only the leader handles Raft membership changes and user management
             # to avoid race conditions between multiple PostgreSQL units
             if self.charm.unit.is_leader():
-                self.charm._patroni.cleanup_raft_cluster()
+                self.charm.patroni.cleanup_raft_cluster()
                 self._ensure_watcher_user()
             # Update Patroni configuration to include watcher in Raft
             self.charm.update_config()
@@ -236,7 +235,7 @@ class PostgreSQLWatcherRelation(Object):
         logger.info("Watcher relation broken, updating Patroni configuration")
         self.watcher_raft_address = None
         if self.charm.unit.is_leader():
-            self.charm._patroni.cleanup_raft_cluster()
+            self.charm.patroni.cleanup_raft_cluster()
         # Update Patroni configuration without the watcher
         self.charm.update_config()
 
@@ -345,7 +344,7 @@ class PostgreSQLWatcherRelation(Object):
 
         # Get the Raft password from the internal secret
         try:
-            raft_password = self.charm._patroni.raft_password
+            raft_password = self.charm.patroni.raft_password
         except Exception as e:
             logger.warning(f"Error getting raft_password: {e}")
             raft_password = None
@@ -441,7 +440,7 @@ class PostgreSQLWatcherRelation(Object):
         if not (unit_ip := self.charm._unit_ip):
             return
 
-        relation.data[self.charm.unit]["version"] = self.charm._patroni.get_postgresql_version()
+        relation.data[self.charm.unit]["version"] = self.charm.patroni.get_postgresql_version()
         if self.charm.refresh:
             relation.data[self.charm.unit]["snap"] = self.charm.refresh.pinned_snap_revision
         current_address = relation.data[self.charm.unit].get("unit-address")
@@ -491,7 +490,7 @@ class PostgreSQLWatcherRelation(Object):
             return
 
         try:
-            if raft_password := self.charm._patroni.raft_password:
+            if raft_password := self.charm.patroni.raft_password:
                 secret = self.charm.model.get_secret(label=WATCHER_SECRET_LABEL)
                 content = secret.get_content(refresh=True)
                 if content.get(RAFT_PASSWORD_KEY) != raft_password:

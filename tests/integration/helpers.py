@@ -31,7 +31,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
+from constants import DATABASE_DEFAULT_NAME, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -39,6 +39,33 @@ DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
+
+# TODO Use single kernel
+PEER_RELATION = "database-peers"
+SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
+SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
+DATA_DIR_SUBFOLDER = "16/main"
+
+SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc"
+SNAP_DATA_PATH = f"{SNAP_COMMON_PATH}/var/lib"
+SNAP_LOGS_PATH = f"{SNAP_COMMON_PATH}/var/log"
+ARCHIVE_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/archive"
+LOGS_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/logs"
+TEMP_STORAGE_PATH = f"{SNAP_COMMON_PATH}/data/temp"
+
+PATRONI_CONF_PATH = f"{SNAP_CONF_PATH}/patroni"
+PATRONI_LOGS_PATH = f"{SNAP_LOGS_PATH}/patroni"
+
+PGBACKREST_CONF_PATH = f"{SNAP_CONF_PATH}/pgbackrest"
+PGBACKREST_LOGS_PATH = f"{SNAP_LOGS_PATH}/pgbackrest"
+
+POSTGRESQL_CONF_PATH = f"{SNAP_CONF_PATH}/postgresql"
+POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
+POSTGRESQL_DATA_DIR = f"{POSTGRESQL_DATA_PATH}/{DATA_DIR_SUBFOLDER}"
+ARCHIVE_DATA_DIR = f"{ARCHIVE_STORAGE_PATH}/{DATA_DIR_SUBFOLDER}"
+LOGS_DATA_DIR = f"{LOGS_STORAGE_PATH}/{DATA_DIR_SUBFOLDER}"
+TEMP_DATA_DIR = f"{TEMP_STORAGE_PATH}/{DATA_DIR_SUBFOLDER}"
+POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
 
 
 class SecretNotFoundError(Exception):
@@ -646,7 +673,7 @@ async def get_password(
     Returns:
         the user password.
     """
-    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{database_app_name}.app")
+    secret = await get_secret_by_label(ops_test, label=f"{PEER_RELATION}.{database_app_name}.app")
     password = secret.get(f"{username}-password")
 
     return password
