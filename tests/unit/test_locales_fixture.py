@@ -15,7 +15,7 @@ def test_locales_fixture_matches_library() -> None:
     from the repo root after a library locale change:
         python -c "from typing import get_args; \
 from single_kernel_postgresql.config.locales import LOCALES; \
-print(chr(10).join(get_args(LOCALES)))" > tests/integration/locales.txt
+print(chr(10).join(sorted(get_args(LOCALES))))" > tests/integration/locales.txt
     """
     fixture = (Path(__file__).parents[1] / "integration" / "locales.txt").read_text().splitlines()
-    assert fixture == list(get_args(LOCALES))
+    assert fixture == sorted(get_args(LOCALES))
