@@ -1646,7 +1646,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             watcher_addr
             if (watcher_addr := self.watcher_offer.watcher_raft_address)
             and self.watcher_offer.is_active
-            else f"{next(member for member in self.members_ips)}:{RAFT_PORT}"
+            else f"{next(member for member in self.members_ips if member != self._unit_ip)}:{RAFT_PORT}"
         )
         try:
             self._patroni.remove_raft_member(
