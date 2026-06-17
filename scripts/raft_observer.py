@@ -6,9 +6,8 @@
 from os import environ
 from subprocess import run
 
+from charmlibs.snap import SnapCache
 from pysyncobj.utility import TcpUtility
-
-# from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from yaml import safe_load
 
 from constants import PATRONI_CONF_PATH, RAFT_PARTNER_PREFIX, RAFT_PORT
@@ -70,6 +69,9 @@ def check_raft_connection(password: str) -> None:
 
 def main() -> None:
     """Main watch and dispatch."""
+    if not SnapCache()["charmed-postgresql"].services["patroni"]["active"]:
+        print("Patroni is not running")
+        return
     if not (password := get_raft_password()):
         return
     check_raft_connection(password)
