@@ -17,6 +17,12 @@ def fetch_charm(charm_path: str | os.PathLike, architecture: str) -> pathlib.Pat
     return packed_charms[0].resolve(strict=True)
 
 
+def _unit_is_blocked(juju: JujuFixture) -> bool:
+    """Return True once the deployed unit reports a blocked workload status."""
+    units = juju.ext.model.applications[DATABASE_APP_NAME].units
+    return bool(units) and units[0].workload_status == "blocked"
+
+
 @markers.amd64_only
 def test_arm_charm_on_amd_host(juju: JujuFixture) -> None:
     """Try deploying an arm64 charm on an amd64 host."""
@@ -27,7 +33,10 @@ def test_arm_charm_on_amd_host(juju: JujuFixture) -> None:
         num_units=1,
         config={"profile": "testing"},
     )
-    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], raise_on_error=False, status="blocked")
+    # The wrong-architecture charm sets BlockedStatus and exits on every hook, so
+    # it never converges to a fully idle state (less so under slow CI machine
+    # provisioning). Wait for the blocked status directly rather than for idle.
+    juju.ext.model.block_until(lambda: _unit_is_blocked(juju), timeout=20 * 60)
 
 
 @markers.arm64_only
@@ -40,4 +49,7 @@ def test_amd_charm_on_arm_host(juju: JujuFixture) -> None:
         num_units=1,
         config={"profile": "testing"},
     )
-    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], raise_on_error=False, status="blocked")
+    # The wrong-architecture charm sets BlockedStatus and exits on every hook, so
+    # it never converges to a fully idle state (less so under slow CI machine
+    # provisioning). Wait for the blocked status directly rather than for idle.
+    juju.ext.model.block_until(lambda: _unit_is_blocked(juju), timeout=20 * 60)
