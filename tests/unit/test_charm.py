@@ -31,7 +31,7 @@ from ops import (
 from ops.framework import EventBase
 from ops.testing import Harness
 from psycopg2 import OperationalError
-from single_kernel_postgresql.config.literals import PEER_RELATION
+from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -53,7 +53,6 @@ from cluster import (
 )
 from constants import (
     POSTGRESQL_DATA_DIR,
-    SECRET_INTERNAL_LABEL,
     UPDATE_CERTS_BIN_PATH,
 )
 

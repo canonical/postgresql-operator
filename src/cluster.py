@@ -28,6 +28,7 @@ from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     API_REQUEST_TIMEOUT,
+    PATRONI_CLUSTER_STATUS_ENDPOINT,
     PEER_RELATION,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
@@ -53,7 +54,6 @@ from tenacity import (
 
 from constants import (
     LOGS_DATA_DIR,
-    PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,

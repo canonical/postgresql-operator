@@ -41,12 +41,11 @@ from ops import (
     SecretNotFoundError,
     WaitingStatus,
 )
-from single_kernel_postgresql.config.literals import PEER_RELATION
+from single_kernel_postgresql.config.literals import APP_SCOPE, PEER_RELATION
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 from cluster import ClusterNotPromotedError, NotReadyError, StandbyClusterAlreadyPromotedError
 from constants import (
-    APP_SCOPE,
     ARCHIVE_DATA_DIR,
     LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
