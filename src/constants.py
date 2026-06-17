@@ -3,10 +3,6 @@
 
 """File containing constants to be used in the charm."""
 
-BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
-REPLICATION_CONSUMER_RELATION = "replication"
-REPLICATION_OFFER_RELATION = "replication-offer"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
@@ -14,16 +10,6 @@ PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
-# pgBackRest logging configuration
-# We use stderr for all error/warning output to have a consistent, predictable error extraction
-# mechanism. By default, pgBackRest uses stdout (console) for warnings, but we standardize on
-# stderr to avoid potential log duplication and to make error handling more reliable.
-# Reference: https://pgbackrest.org/configuration.html#section-log
-PGBACKREST_LOG_LEVEL_STDERR = "--log-level-stderr=warn"
-# pgBackRest error codes
-PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE = (
-    82  # Archive timeout - unable to archive WAL files within configured timeout period
-)
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
@@ -53,17 +39,6 @@ POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
 UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
-
-TRACING_PROTOCOL = "otlp_http"
-
-# Watcher constants
-WATCHER_OFFER_RELATION = "watcher-offer"
-WATCHER_RELATION = "watcher"
-WATCHER_USER = "watcher"
-
-# Labels are not confidential
-WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105
-WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
 
 RAFT_PORT = 2222
 RAFT_PARTNER_PREFIX = "partner_node_status_server_"

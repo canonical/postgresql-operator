@@ -29,9 +29,15 @@ from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
+    BACKUP_ID_FORMAT,
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
+    PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_LOG_LEVEL_STDERR,
     PGBACKREST_LOGROTATE_FILE,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
     UNIT_SCOPE,
 )
 from single_kernel_postgresql.utils import render_file
@@ -39,20 +45,15 @@ from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ARCHIVE_DATA_DIR,
-    BACKUP_ID_FORMAT,
     LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
-    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
-    PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
-    PGBACKREST_LOG_LEVEL_STDERR,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_DIR,
     TEMP_DATA_DIR,
 )
-from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
 
 logger = logging.getLogger(__name__)
 
