@@ -14,6 +14,8 @@ from psycopg2 import sql
 from single_kernel_postgresql.config.locales import SNAP_LOCALES
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
+from constants import POSTGRESQL_DATA_DIR
+
 from .adapters import JujuFixture
 from .jubilant_helpers import (
     DATABASE_APP_NAME,
@@ -31,9 +33,6 @@ from .jubilant_helpers import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Constant formerly imported from constants.py
-POSTGRESQL_DATA_DIR = "/var/snap/charmed-postgresql/common/var/lib/postgresql/16/main"
 
 UNIT_IDS = [0, 1, 2]
 
