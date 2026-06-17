@@ -3,14 +3,10 @@
 
 """File containing constants to be used in the charm."""
 
-from single_kernel_postgresql.config.literals import DATABASE
-
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
-ALL_CLIENT_RELATIONS = [DATABASE]
 REPLICATION_CONSUMER_RELATION = "replication"
 REPLICATION_OFFER_RELATION = "replication-offer"
-TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
@@ -57,9 +53,6 @@ POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
 UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
-
-# VM-only password key (not in the shared lib)
-RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
 
 TRACING_PROTOCOL = "otlp_http"
 

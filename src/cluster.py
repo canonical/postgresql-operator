@@ -32,6 +32,7 @@ from single_kernel_postgresql.config.literals import (
     PEER_RELATION,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
+    TLS_CA_BUNDLE_FILE,
     USER,
 )
 from single_kernel_postgresql.utils import (
@@ -63,7 +64,6 @@ from constants import (
     POSTGRESQL_LOGS_PATH,
     RAFT_PARTNER_PREFIX,
     RAFT_PORT,
-    TLS_CA_BUNDLE_FILE,
 )
 
 logger = logging.getLogger(__name__)

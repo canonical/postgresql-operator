@@ -91,6 +91,7 @@ from single_kernel_postgresql.config.literals import (
     PEER_RELATION,
     PGBACKREST_METRICS_PORT,
     PLUGIN_OVERRIDES,
+    RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
     REPLICATION_USER,
     REWIND_PASSWORD_KEY,
@@ -101,6 +102,7 @@ from single_kernel_postgresql.config.literals import (
     SNAP_USER,
     SPI_MODULE,
     SYSTEM_USERS,
+    TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
@@ -147,13 +149,11 @@ from constants import (
     PATRONI_CONF_PATH,
     PGBACKREST_MONITORING_SNAP_SERVICE,
     POSTGRESQL_DATA_DIR,
-    RAFT_PASSWORD_KEY,
     RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
-    TLS_CA_BUNDLE_FILE,
     TRACING_PROTOCOL,
     UPDATE_CERTS_BIN_PATH,
 )
@@ -2166,7 +2166,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            updateable_users = [*SYSTEM_USERS, BACKUP_USER]
+            updateable_users = list(SYSTEM_USERS)
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
