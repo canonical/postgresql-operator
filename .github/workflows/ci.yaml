@@ -105,6 +105,20 @@ jobs:
       actions: read  # Needed for GitHub API call to get workflow version
       contents: read
 
+  release:
+    name: Release charm to Charmhub branch
+    needs:
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@tcpdump-release-charm
+    with:
+      track: '16'
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+    secrets:
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version
+      contents: read
+
   integration-test:
     name: Integration test charm
     needs:
