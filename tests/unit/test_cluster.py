@@ -21,6 +21,7 @@ from tenacity import (
 from charm import PostgresqlOperatorCharm
 from cluster import (
     PATRONI_TIMEOUT,
+    AddRaftMemberFailedError,
     Patroni,
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
@@ -669,14 +670,14 @@ def test_get_patroni_restart_condition(patroni):
 def test_update_patroni_restart_condition(patroni, new_restart_condition):
     with (
         patch("builtins.open", mock_open(read_data="Restart=always")) as _open,
-        patch("subprocess.run") as _run,
+        patch("cluster.daemon_reload") as _daemon_reload,
     ):
         _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
         patroni.update_patroni_restart_condition(new_restart_condition)
         _open.return_value.__enter__.return_value.write.assert_called_once_with(
             f"Restart={new_restart_condition}"
         )
-        _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
+        _daemon_reload.assert_called_once_with()
 
 
 def test_cleanup_raft_cluster(patroni):
@@ -734,6 +735,76 @@ def test_cleanup_raft_cluster(patroni):
 
         _remove_raft_member.assert_called_once_with("2.2.2.2:2222")
         _remove_from_members_ips.assert_called_once_with("2.2.2.2")
+
+
+def test_add_raft_member(patroni):
+    with patch("cluster.TcpUtility") as _tcp_utility:
+        # Member already removed
+        _tcp_utility.return_value.executeCommand.return_value = {
+            "partner_node_status_server_1.2.3.4:2222": 0,
+            "has_quorum": True,
+            "leader": sentinel.raft_leader,
+        }
+
+        patroni.add_raft_member("1.2.3.4:2222")
+
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+        _tcp_utility.reset_mock()
+
+        # Add member
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            {
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+            "SUCCESS",
+        ]
+
+        patroni.add_raft_member("1.2.3.4:2222")
+
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
+        assert _tcp_utility.return_value.executeCommand.call_count == 2
+        _tcp_utility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
+        _tcp_utility.return_value.executeCommand.assert_any_call(
+            "127.0.0.1:2222", ["add", "1.2.3.4:2222"]
+        )
+        _tcp_utility.reset_mock()
+
+        # Raises on failed status
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            {
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+            "FAIL",
+        ]
+
+        with pytest.raises(AddRaftMemberFailedError):
+            patroni.add_raft_member("1.2.3.4:2222")
+            assert False
+
+        # Raises on add error
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            {
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+            UtilityException,
+        ]
+
+        with pytest.raises(AddRaftMemberFailedError):
+            patroni.add_raft_member("1.2.3.4:2222")
+            assert False
+
+        # Raises on status error
+        _tcp_utility.return_value.executeCommand.side_effect = [UtilityException]
+
+        with pytest.raises(AddRaftMemberFailedError):
+            patroni.add_raft_member("1.2.3.4:2222")
+            assert False
 
 
 def test_remove_raft_member(patroni):
