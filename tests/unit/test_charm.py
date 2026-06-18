@@ -411,6 +411,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.TLS.generate_internal_peer_cert"),
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -456,6 +457,7 @@ def test_on_start_create_user_error(harness):
         ),
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -511,6 +513,7 @@ def test_on_start_success(harness):
         ),
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -552,6 +555,7 @@ def test_on_start_replica(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -609,6 +613,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.TLS.generate_internal_peer_cert"),
         patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
         patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
+        patch("charm.start_raft_observer"),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False

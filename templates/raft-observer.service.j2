@@ -1,0 +1,13 @@
+[Unit]
+Description=Patroni Raft observer service
+After=snap.charmed-postgresql.patroni.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+{% for var, val in envvars.items() -%}
+Environment="{{ var }}={{ val }}"
+{% endfor -%}
+ExecStart=python3 {{ script }}
+StandardOutput=journal
+StandardError=journal

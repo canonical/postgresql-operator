@@ -146,12 +146,14 @@ from cluster import (
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
+    start_raft_observer,
 )
 from constants import (
     MONITORING_SNAP_SERVICE,
     PATRONI_CONF_PATH,
     PGBACKREST_MONITORING_SNAP_SERVICE,
     POSTGRESQL_DATA_DIR,
+    RAFT_PARTNER_PREFIX,
     RAFT_PORT,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
@@ -373,6 +375,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -1639,6 +1642,48 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._set_primary_status_message()
             self.async_replication.update_async_replication_data()
 
+    def _on_raft_reconnect(self, _) -> None:
+        raft_status = self._patroni.get_raft_status()
+        logger.debug(f"Local raft status: {raft_status}")
+        if (
+            not raft_status
+            or not self._unit_ip
+            or not self.is_cluster_initialised
+            or self._unit_ip not in self.members_ips
+            or self.has_raft_keys()
+            or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
+        ):
+            return
+
+        if all(
+            raft_status[partner] == 2
+            for partner in raft_status
+            if partner.startswith(RAFT_PARTNER_PREFIX)
+        ):
+            logger.debug("All raft members are active.")
+            return
+
+        logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
+        local_addr = f"{self._unit_ip}:{RAFT_PORT}"
+        remote_addr = (
+            watcher_addr
+            if (watcher_addr := self.watcher_offer.watcher_raft_address)
+            and self.watcher_offer.is_active
+            else f"{next(member for member in self.members_ips if member != self._unit_ip)}:{RAFT_PORT}"
+        )
+        try:
+            self._patroni.remove_raft_member(
+                local_addr, remote_address=remote_addr, set_raft_flags=False
+            )
+        except Exception:
+            logger.exception("Unable to remove Raft member")
+            return
+        try:
+            self._patroni.add_raft_member(local_addr, remote_address=remote_addr)
+        except Exception:
+            logger.exception("Unable to add Raft member")
+            return
+
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         logger.debug("Install start time: %s", datetime.now())
@@ -1911,6 +1956,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             logger.exception("failed to open port")
 
+        start_raft_observer()
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
