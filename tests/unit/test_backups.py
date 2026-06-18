@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError
 from jinja2 import Template
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
 from tenacity import RetryError, wait_fixed
 
 from backups import (

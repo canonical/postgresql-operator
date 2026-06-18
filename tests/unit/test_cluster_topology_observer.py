@@ -10,7 +10,7 @@ from ops.charm import CharmBase
 from ops.model import ActiveStatus, Relation, WaitingStatus
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
 
 from cluster import Patroni
 from cluster_topology_observer import (

@@ -26,13 +26,15 @@ from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     API_REQUEST_TIMEOUT,
-    PEER,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
-    Substrates,
+)
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION as PEER,
 )
 from single_kernel_postgresql.utils import (
     _change_owner,

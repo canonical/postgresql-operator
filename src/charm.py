@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -60,18 +60,23 @@ from ops import (
 )
 from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.compat.postgresql import PostgreSQLBaseError
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
-    PEER,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
     USER,
-    Substrates,
 )
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION as PEER,
+)
+from single_kernel_postgresql.core.state import CharmState
+from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
-from single_kernel_postgresql.utils import label2name, new_password, render_file
+from single_kernel_postgresql.managers.tls import TLSManager
+from single_kernel_postgresql.utils import label2name, new_password
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -88,6 +93,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
+from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
@@ -112,7 +118,6 @@ from constants import (
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
-    PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
     PGBACKREST_METRICS_PORT,
     PGBACKREST_MONITORING_SNAP_SERVICE,
@@ -132,10 +137,6 @@ from constants import (
     SPI_MODULE,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
-    TLS_CA_BUNDLE_FILE,
-    TLS_CA_FILE,
-    TLS_CERT_FILE,
-    TLS_KEY_FILE,
     TRACING_PROTOCOL,
     TRACING_RELATION_NAME,
     UNIT_SCOPE,
@@ -145,9 +146,11 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
-from relations.tls import TLS
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
+
+if TYPE_CHECKING:
+    from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -170,6 +173,26 @@ class CannotConnectError(Exception):
 
 class StorageUnavailableError(Exception):
     """Cannot find storage mountpoint."""
+
+
+class _LazyPostgreSQLClient:
+    """Defer resolution of the charm's PostgreSQL client to first attribute access.
+
+    Passed to the lib TLSManager (which only stores the client and never uses it on
+    the TLS paths) so that the charm's expensive `postgresql` cached_property is not
+    materialised at charm construction time.
+    """
+
+    # INVARIANT: the lib's TLSManager/TLS must NEVER dereference the PostgreSQL client
+    # (verified: client is used only in managers/config.py and cluster.py).  If that
+    # changes, this proxy will silently trigger a blocking Patroni probe — fail fast
+    # instead.
+
+    def __init__(self, charm: "PostgresqlOperatorCharm") -> None:
+        self._charm = charm
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._charm.postgresql, name)
 
 
 @dataclasses.dataclass(eq=False)
@@ -385,7 +408,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = TLS(self, PEER)
+        # The lib state/managers are typed against AbstractPostgreSQLCharm; this charm
+        # is structurally compatible (provides the attributes they read) but does not
+        # subclass it, so cast for the type checker.
+        self._state = CharmState(cast("AbstractPostgreSQLCharm", self), Substrates.VM)
+        self._workload = VMWorkload(charm_dir=self.charm_dir)
+        # NOTE: pass the PostgreSQL client lazily. The lib TLSManager only stores the
+        # client (its TLS paths never dereference it), while the charm's `postgresql`
+        # is a cached_property that builds a real client (and probes Patroni for the
+        # primary endpoint). Resolving it eagerly here would (a) add a blocking Patroni
+        # call to every hook's __init__ and (b) cache a real client that shadows test
+        # patches of `postgresql`. The lazy proxy defers resolution to first attribute
+        # access, so the client is materialised only if/when actually used.
+        self.tls_manager = TLSManager(
+            self._state, self._workload, cast("PostgreSQL", _LazyPostgreSQLClient(self))
+        )
+        self.tls = TLS(self, self._state, self._workload, self.tls_manager)
+        # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
+        # the handler stores+pushes certs on certificate_available, then we reload so
+        # the new material is picked up. Registered after the handler's own observers
+        # so the push happens before the reload.
+        self.framework.observe(
+            self.tls.client_certificate.on.certificate_available, self._reload_tls_after_push
+        )
+        self.framework.observe(
+            self.tls.peer_certificate.on.certificate_available, self._reload_tls_after_push
+        )
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
@@ -442,6 +490,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         charm_tracing_config(self._grafana_agent)
 
+    def _reload_tls_after_push(self, _event) -> None:
+        """Reload PostgreSQL after the lib TLS handler stores+pushes certs.
+
+        Mirror the handler's readiness guard: when the internal CA is absent the
+        handler defers its push (no files on disk), so skip the reload to avoid
+        rendering ssl:on against missing TLS files on an already-running unit.
+        """
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            return
+        self.update_config()
+
     def _check_and_update_internal_cert(self) -> None:
         """Check if the internal cert CN matches the unit IP and regenerate if needed."""
         try:
@@ -453,7 +512,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     != self._unit_ip
                 )
             ):
-                self.tls.generate_internal_peer_cert()
+                self.tls_manager.generate_internal_peer_cert()
+                self.tls_manager.push_tls_files()
+                self.update_config()
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
@@ -1499,7 +1560,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_client_tls_files())
+        return all(self.tls_manager.get_client_tls_files())
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -1756,7 +1817,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("On leader elected failed to reconfigure cluster.")
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
-            self.tls.generate_internal_peer_ca()
+            self.tls_manager.generate_internal_peer_ca()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1943,7 +2004,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
-            self.tls.generate_internal_peer_cert()
+            self.tls_manager.generate_internal_peer_cert()
+            # No update_config() here: bootstrap re-renders Patroni config and reads
+            # these just-pushed TLS files during cluster bootstrap.
+            self.tls_manager.push_tls_files()
 
         self.unit_peer_data.update({"ip": self._unit_ip})
         self._ensure_storage_layout()
@@ -2483,10 +2547,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Request the certificate only if there is already one. If there isn't,
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
-        if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
+        if all(self.tls_manager.get_client_tls_files()) or all(
+            self.tls_manager.get_peer_tls_files()
+        ):
             self.tls.refresh_tls_certificates_event.emit()
         if self.get_secret(UNIT_SCOPE, "internal-cert"):
-            self.tls.generate_internal_peer_cert()
+            self.tls_manager.generate_internal_peer_cert()
+            self.tls_manager.push_tls_files()
+            self.update_config()
 
     @property
     def is_blocked(self) -> bool:
@@ -2567,37 +2635,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
              the peer relation.
         """
         return self.model.get_relation(PEER)
-
-    def push_tls_files_to_workload(self) -> bool:
-        """Move TLS files to the PostgreSQL storage path and enable TLS."""
-        key, ca, cert = self.tls.get_client_tls_files()
-        if key is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
-        if ca is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
-        if cert is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
-
-        key, ca, cert = self.tls.get_peer_tls_files()
-        if key is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
-        if ca is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
-        if cert is not None:
-            render_file(Substrates.VM, f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
-
-        render_file(
-            Substrates.VM,
-            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}",
-            self.tls.get_peer_ca_bundle(),
-            0o600,
-        )
-
-        try:
-            return self.update_config()
-        except Exception:
-            logger.exception("TLS files failed to push. Error in config update")
-            return False
 
     def push_ca_file_into_workload(self, secret_name: str) -> bool:
         """Move CA certificates file into the PostgreSQL storage path."""
