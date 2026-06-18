@@ -20,6 +20,7 @@ from charmlibs import snap
 from ops import (
     ActiveStatus,
     BlockedStatus,
+    ErrorStatus,
     JujuVersion,
     MaintenanceStatus,
     ModelError,
@@ -1200,6 +1201,17 @@ def test_check_detached_storage(harness):
         with pytest.raises(StorageUnavailableError):
             harness.charm._check_detached_storage()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
+
+
+def test_check_detached_storage_does_not_restore_unsettable_status(harness):
+    # The unit.status getter can return statuses that the juju backend rejects
+    # on set (e.g. "error" or "unknown"). Restoring such a cached status must not
+    # be attempted, otherwise the backend raises InvalidStatusError/ModelError.
+    harness.charm.unit._status = ErrorStatus()
+    with patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True):
+        # Storage is attached, so the cached "error" status would be restored
+        # verbatim; this must not raise.
+        harness.charm._check_detached_storage()
 
 
 def test_restart(harness):
