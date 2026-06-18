@@ -1978,7 +1978,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.error("Data directory not attached.")
                     self.unit.status = WaitingStatus("Data directory not attached")
                     raise StorageUnavailableError()
-        self.unit.status = cached_status
+        # The status getter can return statuses that the setter rejects (e.g. an
+        # "error" status left over from a previously failed hook). Only restore
+        # the cached status if it is one juju allows us to set back.
+        if isinstance(
+            cached_status, ActiveStatus | BlockedStatus | MaintenanceStatus | WaitingStatus
+        ):
+            self.unit.status = cached_status
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
