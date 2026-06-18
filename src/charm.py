@@ -436,6 +436,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
+            self._patroni.log_raft_status()
             primary = self._patroni.get_primary() or self._patroni.get_standby_leader()
             primary_endpoint = self._patroni.get_member_ip(primary) if primary else None
             # Force a retry if there is no primary or the member that was
