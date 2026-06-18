@@ -27,6 +27,7 @@ from ops import (
     RelationDataTypeError,
     RelationEvent,
     Unit,
+    UnknownStatus,
     WaitingStatus,
 )
 from ops.framework import EventBase
@@ -378,6 +379,33 @@ def test_enable_disable_extensions(harness, caplog):
             # Should resolve afterwards
             harness.charm.enable_disable_extensions()
             assert isinstance(harness.charm.unit.status, ActiveStatus)
+
+
+@pytest.mark.parametrize("unsettable_status", [ErrorStatus(), UnknownStatus()])
+def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, unsettable_status):
+    # enable_disable_extensions caches the current unit status and restores it
+    # afterwards. The getter can return statuses the backend rejects on set
+    # (e.g. "error" or "unknown") left over from a previously failed hook;
+    # restoring such a cached status must not be attempted, otherwise the backend
+    # raises InvalidStatusError/ModelError and deadlocks the unit.
+    with (
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("subprocess.check_output", return_value=b"C"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+    ):
+        _get_primary.return_value = harness.charm.unit
+        postgresql_mock.enable_disable_extensions.side_effect = None
+
+        # Cache an unsettable status that would otherwise be restored verbatim.
+        harness.charm.unit._status = unsettable_status
+
+        # Must not raise when the cached status is restored at the end.
+        harness.charm.enable_disable_extensions()
+
+        # The unsettable cached status was skipped, not restored.
+        assert not isinstance(harness.charm.unit.status, ErrorStatus | UnknownStatus)
 
 
 def test_on_start_no_password(harness):
@@ -1203,14 +1231,15 @@ def test_check_detached_storage(harness):
         assert isinstance(harness.charm.unit.status, WaitingStatus)
 
 
-def test_check_detached_storage_does_not_restore_unsettable_status(harness):
+@pytest.mark.parametrize("unsettable_status", [ErrorStatus(), UnknownStatus()])
+def test_check_detached_storage_does_not_restore_unsettable_status(harness, unsettable_status):
     # The unit.status getter can return statuses that the juju backend rejects
     # on set (e.g. "error" or "unknown"). Restoring such a cached status must not
     # be attempted, otherwise the backend raises InvalidStatusError/ModelError.
-    harness.charm.unit._status = ErrorStatus()
+    harness.charm.unit._status = unsettable_status
     with patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True):
-        # Storage is attached, so the cached "error" status would be restored
-        # verbatim; this must not raise.
+        # Storage is attached, so the cached status would be restored verbatim;
+        # this must not raise.
         harness.charm._check_detached_storage()
 
 
