@@ -1,6 +1,7 @@
-variable "juju_model_name" {
-  description = "Juju model name"
+variable "juju_model" {
+  description = "Juju model uuid"
   type        = string
+  default     = null
 }
 
 variable "app_name" {
