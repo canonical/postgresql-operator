@@ -533,6 +533,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
         self.unit.status = status
 
+    def _restore_unit_status(self, status: ops.StatusBase) -> None:
+        """Restore a previously cached unit status.
+
+        The status getter can return statuses that the setter rejects (e.g. an
+        "error" status left over from a previously failed hook). Skip restoring
+        any status juju does not allow us to set, to avoid an InvalidStatusError
+        that would deadlock the unit.
+        """
+        if isinstance(status, ActiveStatus | BlockedStatus | MaintenanceStatus | WaitingStatus):
+            self.set_unit_status(status)
+
     def _reconcile_refresh_status(self, _=None):
         if self.unit.is_leader():
             self.async_replication.set_app_status()
@@ -1867,7 +1878,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if original_status.message == EXTENSION_OBJECT_MESSAGE:
             self.set_unit_status(ActiveStatus())
             return
-        self.set_unit_status(original_status)
+        self._restore_unit_status(original_status)
 
     def _check_extension_dependencies(self, extension: str, enable: bool) -> bool:
         skip = False
@@ -2630,7 +2641,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.error("Data directory not attached.")
                     self.unit.status = WaitingStatus("Data directory not attached")
                     raise StorageUnavailableError()
-        self.unit.status = cached_status
+        self._restore_unit_status(cached_status)
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
