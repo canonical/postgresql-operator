@@ -5,6 +5,7 @@
 
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.upgrade import (
     ClusterNotReadyError,
@@ -27,6 +28,9 @@ from constants import (
     SNAP_PACKAGES,
 )
 from utils import new_password
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +55,7 @@ class PostgreSQLUpgrade(DataUpgrade):
     def __init__(self, charm, model: BaseModel, **kwargs) -> None:
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
-        self.charm = charm
+        self.charm: PostgresqlOperatorCharm = charm
         self._on_upgrade_charm_check_legacy()
 
     @override
@@ -64,9 +68,12 @@ class PostgreSQLUpgrade(DataUpgrade):
             Iterable of integer unit.ids, LIFO ordered in upgrade order
                 i.e `[5, 2, 4, 1, 3]`, unit `3` upgrades first, `5` upgrades last
         """
-        primary_unit_id = int(
-            self.charm._patroni.get_primary(unit_name_pattern=True).split("/")[1]
-        )
+        if self.peer_relation is None:
+            raise ClusterNotReadyError("Pre-upgrade check failed", "peer relation not found")
+        primary = self.charm._patroni.get_primary(unit_name_pattern=True)
+        if primary is None:
+            raise ClusterNotReadyError("Pre-upgrade check failed", "no primary found")
+        primary_unit_id = int(primary.split("/")[1])
         sync_standby_ids = [
             int(unit.split("/")[1]) for unit in self.charm._patroni.get_sync_standby_names()
         ]
@@ -157,6 +164,8 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.set_unit_failed()
             return
 
+        if self.peer_relation is None:
+            return
         raft_encryption = (
             int(
                 json
@@ -249,6 +258,8 @@ class PostgreSQLUpgrade(DataUpgrade):
         logger.debug(f"Upgrade stack: {upgrade_stack}")
         self.upgrade_stack = upgrade_stack
         logger.debug("Persisting dependencies to upgrade relation data...")
+        if self.peer_relation is None:
+            return
         self.peer_relation.data[self.charm.app].update({
             "dependencies": json.dumps(self.dependency_model.dict())
         })
@@ -260,7 +271,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.charm.postgresql.create_user(
                 MONITORING_USER,
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                extra_user_roles="pg_monitor",
+                extra_user_roles=["pg_monitor"],
             )
         self.charm.postgresql.set_up_database()
 
@@ -286,4 +297,6 @@ class PostgreSQLUpgrade(DataUpgrade):
     @property
     def unit_upgrade_data(self) -> RelationDataContent:
         """Return the application upgrade data."""
+        if self.peer_relation is None:
+            raise ClusterNotReadyError("Pre-upgrade check failed", "peer relation not found")
         return self.peer_relation.data[self.charm.unit]

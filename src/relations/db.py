@@ -5,6 +5,7 @@
 
 import logging
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from charms.postgresql_k8s.v0.postgresql import (
     ACCESS_GROUP_RELATION,
@@ -14,7 +15,6 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLListUsersError,
 )
 from ops.charm import (
-    CharmBase,
     RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
@@ -30,6 +30,9 @@ from constants import (
     ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
 from utils import new_password
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +54,7 @@ class DbProvides(Object):
         - relation-broken
     """
 
-    def __init__(self, charm: CharmBase, admin: bool = False):
+    def __init__(self, charm: "PostgresqlOperatorCharm", admin: bool = False):
         """Constructor for DbProvides object.
 
         Args:
@@ -259,7 +262,8 @@ class DbProvides(Object):
         # Neither peer relation data nor stored state are good solutions,
         # just a temporary solution.
         if event.departing_unit == self.charm.unit:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+            if self.charm._peers is not None:
+                self.charm._peers.data[self.charm.unit].update({"departing": "True"})
             # Just run the rest of the logic for departing of remote units.
             logger.debug("Early exit on_relation_departed: Skipping departing unit")
             return
@@ -279,6 +283,8 @@ class DbProvides(Object):
             event.defer()
             return
 
+        if event.departing_unit is None:
+            return
         departing_unit = event.departing_unit.name
         local_unit_data = event.relation.data[self.charm.unit]
         local_app_data = event.relation.data[self.charm.app]
@@ -339,7 +345,7 @@ class DbProvides(Object):
         ):
             self.charm.unit.status = ActiveStatus()
 
-    def update_endpoints(self, relation: Relation = None) -> None:
+    def update_endpoints(self, relation: Relation | None = None) -> None:
         """Set the read/write and read-only endpoints."""
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
@@ -422,7 +428,7 @@ class DbProvides(Object):
                 data["version"] = postgresql_version
 
             # Set the data only in the unit databag.
-            unit_relation_databag.update(data)
+            unit_relation_databag.update({k: v for k, v in data.items() if v is not None})
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""
@@ -457,7 +463,7 @@ class DbProvides(Object):
         Returns:
             The state of this unit. Can be 'standalone', 'master', or 'standby'.
         """
-        if len(self.charm._peers.units) == 0:
+        if self.charm._peers is None or len(self.charm._peers.units) == 0:
             return "standalone"
         if self.charm._patroni.get_primary(unit_name_pattern=True) == self.charm.unit.name:
             return "master"

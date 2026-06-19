@@ -18,10 +18,11 @@ from functools import cached_property
 from pathlib import Path
 from signal import SIGHUP
 from ssl import CERT_NONE, create_default_context
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 import psutil
 import requests
+import requests.auth
 from charmlibs import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
@@ -248,14 +249,14 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def get_postgresql_version(self) -> str:
+    def get_postgresql_version(self) -> str | None:
         """Return the PostgreSQL version from the system."""
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
             if snp["name"] == POSTGRESQL_SNAP_NAME:
                 return snp["version"]
 
-    def get_member_ip(self, member_name: str) -> str:
+    def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
 
         Args:
@@ -444,7 +445,7 @@ class Patroni:
             member["role"] in ["leader", "standby_leader"] for member in members
         )
 
-    def get_patroni_health(self) -> dict[str, str]:
+    def get_patroni_health(self) -> dict[str, str] | None:
         """Gets, retires and parses the Patroni health endpoint."""
         for attempt in Retrying(stop=stop_after_delay(15), wait=wait_fixed(3)):
             with attempt:
@@ -478,6 +479,8 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     primary = self.get_primary()
+                    if primary is None:
+                        continue
                     primary_ip = self.get_member_ip(primary)
                     members_ips = {self.unit_ip}
                     members_ips.update(self.peers_ips)
@@ -523,6 +526,8 @@ class Patroni:
         except RetryError:
             return False
 
+        if response is None:
+            return False
         return response["state"] in RUNNING_STATES
 
     @property
@@ -538,6 +543,8 @@ class Patroni:
         except RetryError:
             return True
 
+        if response is None:
+            return True
         return response["state"] not in [
             *STARTED_STATES,
             "creating replica",
@@ -698,7 +705,7 @@ class Patroni:
             restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
-            version=self.get_postgresql_version().split(".")[0],
+            version=(self.get_postgresql_version() or "").split(".")[0],
             synchronous_node_count=self._synchronous_node_count,
             maximum_lag_on_failover=self.charm.config.durability_maximum_lag_on_failover,
             pg_parameters=parameters,
@@ -739,7 +746,14 @@ class Patroni:
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
-            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
+            effective_num_lines: int | Literal["all"]
+            if isinstance(num_lines, int):
+                effective_num_lines = num_lines
+            elif num_lines == "all":
+                effective_num_lines = "all"
+            else:
+                effective_num_lines = 10
+            return selected_snap.logs(services=["patroni"], num_lines=effective_num_lines)
         except snap.SnapError as e:
             error_message = "Failed to get logs from patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -866,7 +880,7 @@ class Patroni:
         for attempt in Retrying(wait=wait_fixed(5)):
             with attempt:
                 health_status = self.get_patroni_health()
-                if (
+                if health_status is None or (
                     health_status["role"] not in ["leader", "master"]
                     or health_status["state"] != "running"
                 ):

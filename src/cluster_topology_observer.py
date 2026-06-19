@@ -9,10 +9,14 @@ import signal
 import subprocess
 from pathlib import Path
 from sys import version_info
+from typing import TYPE_CHECKING
 
-from ops.charm import CharmBase, CharmEvents
+from ops.charm import CharmEvents
 from ops.framework import EventBase, EventSource, Object
 from ops.model import ActiveStatus
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +48,7 @@ class ClusterTopologyObserver(Object):
     Observed cluster topology changes cause :class"`ClusterTopologyChangeEvent` to be emitted.
     """
 
-    def __init__(self, charm: CharmBase, run_cmd: str):
+    def __init__(self, charm: "PostgresqlOperatorCharm", run_cmd: str):
         """Constructor for ClusterTopologyObserver.
 
         Args:
@@ -123,7 +127,7 @@ class ClusterTopologyObserver(Object):
         ):
             return
 
-        observer_pid = int(self._charm._peers.data[self._charm.unit].get("observer-pid"))
+        observer_pid = int(self._charm._peers.data[self._charm.unit]["observer-pid"])
 
         try:
             os.kill(observer_pid, signal.SIGINT)

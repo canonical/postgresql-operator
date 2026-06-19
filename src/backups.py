@@ -875,7 +875,7 @@ class PostgreSQLBackups(Object):
 
         can_use_s3_repository, validation_message = self.can_use_s3_repository()
         if not can_use_s3_repository:
-            self._s3_initialization_set_failure(validation_message)
+            self._s3_initialization_set_failure(validation_message or "")
             return False
 
         if not self._initialise_stanza(event):
@@ -1033,8 +1033,8 @@ Stderr:
             try:
                 backup_id = list(self._list_backups(show_failed=True).keys())[-1]
             except ListBackupsError:
-                logger.exception(error_message)
                 error_message = "Failed to retrieve backup id"
+                logger.exception(error_message)
                 logger.error(f"Backup failed: {error_message}")
                 event.fail(error_message)
                 return
@@ -1063,7 +1063,7 @@ Stderr:
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.warning(validation_message)
-            event.fail(validation_message)
+            event.fail(validation_message or "")
             return
 
         try:
@@ -1207,7 +1207,7 @@ Stderr:
         if backup_type == "full":
             return datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SF")
         if backup_type == "differential":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             last_full_backup = None
             for label in backups[::-1]:
                 if label.endswith("F"):
@@ -1218,12 +1218,13 @@ Stderr:
                 raise TypeError("Differential backup requested but no previous full backup")
             return f"{last_full_backup}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SD')}"
         if backup_type == "incremental":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             if not backups:
                 raise TypeError("Incremental backup requested but no previous successful backup")
             return f"{backups[-1]}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SI')}"
+        raise TypeError(f"Invalid backup type: {backup_type}")
 
-    def _fetch_backup_from_id(self, backup_id: str) -> str:
+    def _fetch_backup_from_id(self, backup_id: str) -> str | None:
         """Fetches backup's pgbackrest label from backup id."""
         timestamp = f"{datetime.strftime(datetime.strptime(backup_id, '%Y-%m-%dT%H:%M:%SZ'), '%Y%m%d-%H%M%S')}"
         backups = self._list_backups(show_failed=False, parse=False).keys()
@@ -1242,7 +1243,7 @@ Stderr:
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.error(f"Restore failed: {validation_message}")
-            event.fail(validation_message)
+            event.fail(validation_message or "")
             return False
 
         if not event.params.get("backup-id") and event.params.get("restore-to-time") is None:
@@ -1325,7 +1326,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
-            process_max=max(os.cpu_count() - 2, 1),
+            process_max=max((os.cpu_count() or 4) - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
