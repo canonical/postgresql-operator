@@ -55,6 +55,7 @@ from ops.model import (
     ModelError,
     Relation,
     RelationDataContent,
+    StatusBase,
     Unit,
     WaitingStatus,
 )
@@ -1318,7 +1319,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if original_status.message == EXTENSION_OBJECT_MESSAGE:
             self.unit.status = ActiveStatus()
             return
-        self.unit.status = original_status
+        self._restore_unit_status(original_status)
 
     def _check_extension_dependencies(self, extension: str, enable: bool) -> bool:
         skip = False
@@ -1991,6 +1992,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception("CA file failed to clean. Error in config update")
             return False
 
+    def _restore_unit_status(self, status: StatusBase) -> None:
+        """Restore a previously cached unit status.
+
+        The status getter can return statuses that the setter rejects (e.g. an
+        "error" status left over from a previously failed hook). Skip restoring
+        any status juju does not allow us to set, to avoid an InvalidStatusError
+        that would deadlock the unit.
+        """
+        if isinstance(status, ActiveStatus | BlockedStatus | MaintenanceStatus | WaitingStatus):
+            self.unit.status = status
+
     def _check_detached_storage(self) -> None:
         """Wait for storage to become available.
 
@@ -2006,7 +2018,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.error("Data directory not attached.")
                     self.unit.status = WaitingStatus("Data directory not attached")
                     raise StorageUnavailableError()
-        self.unit.status = cached_status
+        self._restore_unit_status(cached_status)
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
