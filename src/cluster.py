@@ -511,6 +511,8 @@ class Patroni:
             True if services is not running, starting or restarting. Retries over a period of 60
             seconds times to allow server time to start up.
         """
+        if not self.is_patroni_running():
+            return True
         try:
             response = self.cached_patroni_health
         except RetryError:
