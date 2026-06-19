@@ -22,12 +22,12 @@ from typing import Any, Literal, TypedDict
 
 import psutil
 import requests
-import requests.auth
 from charmlibs import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
+from requests.auth import HTTPBasicAuth
 from tenacity import (
     Future,
     RetryError,
@@ -136,11 +136,11 @@ class Patroni:
         member_name: str,
         planned_units: int,
         peers_ips: set[str],
-        superuser_password: str,
-        replication_password: str,
-        rewind_password: str,
-        raft_password: str,
-        patroni_password: str,
+        superuser_password: str | None,
+        replication_password: str | None,
+        rewind_password: str | None,
+        raft_password: str | None,
+        patroni_password: str | None,
     ):
         """Initialize the Patroni class.
 
@@ -178,8 +178,9 @@ class Patroni:
         return f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if self.charm.is_peer_data_tls_set else True
 
     @cached_property
-    def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
-        return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
+    def _patroni_auth(self) -> HTTPBasicAuth | None:
+        if self.patroni_password:
+            return HTTPBasicAuth("patroni", self.patroni_password)
 
     @cached_property
     def _patroni_async_auth(self) -> BasicAuth | None:
@@ -249,12 +250,13 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def get_postgresql_version(self) -> str | None:
+    def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
             if snp["name"] == POSTGRESQL_SNAP_NAME:
                 return snp["version"]
+        raise Exception("Cannot get version found.")
 
     def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
@@ -445,9 +447,14 @@ class Patroni:
             member["role"] in ["leader", "standby_leader"] for member in members
         )
 
-    def get_patroni_health(self) -> dict[str, str] | None:
+    @cached_property
+    def cached_patroni_health(self) -> dict[str, str]:
+        """Cached local unit health."""
+        return self.get_patroni_health()
+
+    def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
-        for attempt in Retrying(stop=stop_after_delay(15), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
                 r = requests.get(
                     f"{self._patroni_url}/health",
@@ -455,8 +462,9 @@ class Patroni:
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug("API get_patroni_health: %s (%s)", r, r.elapsed.total_seconds())
 
-                return r.json()
+        return r.json()
 
     @property
     def is_creating_backup(self) -> bool:
@@ -479,13 +487,14 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     primary = self.get_primary()
-                    if primary is None:
-                        continue
+                    if not primary:
+                        logger.debug("Failed replication check no primary reported")
+                        raise Exception
                     primary_ip = self.get_member_ip(primary)
                     members_ips = {self.unit_ip}
                     members_ips.update(self.peers_ips)
                     for members_ip in members_ips:
-                        endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
+                        endpoint = "leader" if members_ip == primary_ip else "replica?lag=100MB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
                         member_status = requests.get(
                             f"{url}/{endpoint}",
@@ -522,12 +531,10 @@ class Patroni:
         if not self.is_patroni_running():
             return False
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return False
 
-        if response is None:
-            return False
         return response["state"] in RUNNING_STATES
 
     @property
@@ -539,14 +546,12 @@ class Patroni:
             seconds times to allow server time to start up.
         """
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return True
 
-        if response is None:
-            return True
         return response["state"] not in [
-            *STARTED_STATES,
+            *RUNNING_STATES,
             "creating replica",
             "starting",
             "restarting",
@@ -705,7 +710,7 @@ class Patroni:
             restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
-            version=(self.get_postgresql_version() or "").split(".")[0],
+            version=self.get_postgresql_version().split(".")[0],
             synchronous_node_count=self._synchronous_node_count,
             maximum_lag_on_failover=self.charm.config.durability_maximum_lag_on_failover,
             pg_parameters=parameters,
@@ -734,7 +739,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def patroni_logs(self, num_lines: int | str | None = 10) -> str:
+    def patroni_logs(self, num_lines: int | Literal["all"] = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
 
         Args:
@@ -744,16 +749,10 @@ class Patroni:
             Multi-line logs string.
         """
         try:
+            logger.debug("Getting Patroni logs...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
-            effective_num_lines: int | Literal["all"]
-            if isinstance(num_lines, int):
-                effective_num_lines = num_lines
-            elif num_lines == "all":
-                effective_num_lines = "all"
-            else:
-                effective_num_lines = 10
-            return selected_snap.logs(services=["patroni"], num_lines=effective_num_lines)
+            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
         except snap.SnapError as e:
             error_message = "Failed to get logs from patroni snap service"
             logger.exception(error_message, exc_info=e)

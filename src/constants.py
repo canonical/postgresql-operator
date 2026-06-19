@@ -40,7 +40,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "333", "x86_64": "334"}},
+        {"revision": {"aarch64": "369", "x86_64": "370"}},
     )
 ]
 
@@ -65,8 +65,8 @@ UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
-METRICS_PORT = "9187"
-PGBACKREST_METRICS_PORT = "9854"
+METRICS_PORT = 9187
+PGBACKREST_METRICS_PORT = 9854
 
 # Labels are not confidential
 REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105

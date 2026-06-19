@@ -24,6 +24,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
+from typing import TYPE_CHECKING
 
 from ops import (
     ActionEvent,
@@ -50,6 +51,9 @@ from constants import (
     POSTGRESQL_DATA_PATH,
 )
 
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,7 +67,7 @@ SECRET_LABEL = "async-replication-secret"  # noqa: S105
 class PostgreSQLAsyncReplication(Object):
     """Defines the async-replication management logic."""
 
-    def __init__(self, charm):
+    def __init__(self, charm: "PostgresqlOperatorCharm"):
         """Constructor."""
         super().__init__(charm, "postgresql")
         self.charm = charm
@@ -124,9 +128,7 @@ class PostgreSQLAsyncReplication(Object):
                 try:
                     self.charm._patroni.promote_standby_cluster()
                     if self.charm.app.status.message == READ_ONLY_MODE_BLOCKING_MESSAGE:
-                        self.charm._peers.data[self.charm.app].update({
-                            "promoted-cluster-counter": ""
-                        })
+                        self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
                         self._set_app_status()
                         self.charm._set_primary_status_message()
                 except (StandbyClusterAlreadyPromotedError, ClusterNotPromotedError) as e:
@@ -167,7 +169,7 @@ class PostgreSQLAsyncReplication(Object):
                         )
                         event.defer()
                         return True
-            self.charm._peers.data[self.charm.unit].update({
+            self.charm.unit_peer_data.update({
                 "unit-promoted-cluster-counter": self._get_highest_promoted_cluster_counter_value()
             })
             self.charm._set_primary_status_message()
@@ -225,7 +227,7 @@ class PostgreSQLAsyncReplication(Object):
                 continue
             for databag in [
                 async_relation.data[async_relation.app],
-                self.charm._peers.data[self.charm.app],
+                self.charm.unit_peer_data,
             ]:
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
@@ -239,11 +241,11 @@ class PostgreSQLAsyncReplication(Object):
             primary_cluster is None
             or self.charm.app == primary_cluster
             or not self.charm.unit.is_leader()
-            or self.charm._peers.data[self.charm.unit].get("unit-promoted-cluster-counter")
+            or self.charm.unit_peer_data.get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
         ):
             logger.debug(f"Partner addresses: {self.charm._peer_members_ips}")
-            return self.charm._peer_members_ips
+            return list(self.charm._peer_members_ips)
 
         logger.debug("Partner addresses: []")
         return []
@@ -260,7 +262,7 @@ class PostgreSQLAsyncReplication(Object):
                 continue
             for app, relation_data in {
                 async_relation.app: async_relation.data,
-                self.charm.app: self.charm._peers.data,
+                self.charm.app: self.charm.all_peer_data,
             }.items():
                 databag = relation_data[app]
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
@@ -361,9 +363,9 @@ class PostgreSQLAsyncReplication(Object):
             if self.charm._patroni.member_started:
                 # If the database is started, update the databag in a way the unit is marked as configured
                 # for async replication.
-                self.charm._peers.data[self.charm.unit].update({"stopped": ""})
-                self.charm._peers.data[self.charm.unit].update({
-                    "unit-promoted-cluster-counter": self._get_highest_promoted_cluster_counter_value()
+                self.charm.unit_peer_data.update({
+                    "stopped": "",
+                    "unit-promoted-cluster-counter": self._get_highest_promoted_cluster_counter_value(),
                 })
 
                 if self.charm.unit.is_leader():
@@ -371,13 +373,11 @@ class PostgreSQLAsyncReplication(Object):
                     # active again (including the health checks from the update status hook).
                     self.charm.update_config()
                     if all(
-                        self.charm._peers.data[unit].get("unit-promoted-cluster-counter")
+                        self.charm.all_peer_data[unit].get("unit-promoted-cluster-counter")
                         == self._get_highest_promoted_cluster_counter_value()
-                        for unit in {*self.charm._peers.units, self.charm.unit}
+                        for unit in {*self.charm._peers.units, self.charm.unit}  # type: ignore
                     ):
-                        self.charm._peers.data[self.charm.app].update({
-                            "cluster_initialised": "True"
-                        })
+                        self.charm.app_peer_data.update({"cluster_initialised": "True"})
                     elif self._is_following_promoted_cluster():
                         self.charm.unit.status = WaitingStatus(
                             "Waiting for the database to be started in all units"
@@ -481,7 +481,7 @@ class PostgreSQLAsyncReplication(Object):
         if self._get_primary_cluster() is None:
             return False
         return (
-            self.charm._peers.data[self.charm.unit].get("unit-promoted-cluster-counter")
+            self.charm.unit_peer_data.get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
         )
 
@@ -533,10 +533,10 @@ class PostgreSQLAsyncReplication(Object):
             return
 
         if not (self.charm.is_unit_stopped or self._is_following_promoted_cluster()) or not all(
-            "stopped" in self.charm._peers.data[unit]
-            or self.charm._peers.data[unit].get("unit-promoted-cluster-counter")
+            "stopped" in self.charm.all_peer_data[unit]
+            or self.charm.all_peer_data[unit].get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
-            for unit in self.charm._peers.units
+            for unit in self.charm._peers.units  # type: ignore
         ):
             self.charm.unit.status = WaitingStatus(
                 "Waiting for the database to be stopped in all units"
@@ -571,7 +571,7 @@ class PostgreSQLAsyncReplication(Object):
         # Set the counter for new units.
         highest_promoted_cluster_counter = self._get_highest_promoted_cluster_counter_value()
         if highest_promoted_cluster_counter != "0":
-            self.charm._peers.data[self.charm.unit].update({
+            self.charm.unit_peer_data.update({
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
 
@@ -581,12 +581,14 @@ class PostgreSQLAsyncReplication(Object):
             event.fail("There is already a replication set up.")
             return
 
-        relation = self._relation
-        if relation is None:
-            event.fail("No relation found.")
+        if self._relation is None:
+            event.fail(
+                "No async-replication relation has been established."
+                " Create the offer and relate the two clusters before running this action."
+            )
             return
 
-        if relation.name == REPLICATION_CONSUMER_RELATION:
+        if self._relation.name == REPLICATION_CONSUMER_RELATION:
             event.fail("This action must be run in the cluster where the offer was created.")
             return
 
@@ -652,14 +654,13 @@ class PostgreSQLAsyncReplication(Object):
                 event.defer()
 
     @property
-    def _primary_cluster_endpoint(self) -> str:
+    def _primary_cluster_endpoint(self) -> str | None:
         """Return the endpoint from one of the sync-standbys, or from the primary if there is no sync-standby."""
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
         if len(sync_standby_names) > 0:
             unit = self.model.get_unit(sync_standby_names[0])
             return self.charm._get_unit_ip(unit)
-        else:
-            return self.charm._get_unit_ip(self.charm.unit)
+        return self.charm._get_unit_ip(self.charm.unit)
 
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
@@ -699,7 +700,7 @@ class PostgreSQLAsyncReplication(Object):
 
     def _set_app_status(self) -> None:
         """Set the app status."""
-        if self.charm._peers.data[self.charm.app].get("promoted-cluster-counter") == "0":
+        if self.charm.app_peer_data.get("promoted-cluster-counter") == "0":
             self.charm.app.status = BlockedStatus(READ_ONLY_MODE_BLOCKING_MESSAGE)
             return
         if self._relation is None:
@@ -732,7 +733,7 @@ class PostgreSQLAsyncReplication(Object):
 
             if self.charm.unit.is_leader():
                 # Remove the "cluster_initialised" flag to avoid self-healing in the update status hook.
-                self.charm._peers.data[self.charm.app].update({"cluster_initialised": ""})
+                self.charm.app_peer_data.update({"cluster_initialised": ""})
                 if not self._configure_standby_cluster(event):
                     return False
 
@@ -752,7 +753,7 @@ class PostgreSQLAsyncReplication(Object):
                     f"Failed to remove previous cluster information with error: {e!s}"
                 ) from e
 
-            self.charm._peers.data[self.charm.unit].update({"stopped": "True"})
+            self.charm.unit_peer_data.update({"stopped": "True"})
 
         return True
 
@@ -802,7 +803,7 @@ class PostgreSQLAsyncReplication(Object):
 
         if promoted_cluster_counter is not None:
             for relation in [async_relation, self.charm._peers]:
-                relation.data[self.charm.app].update({
+                relation.data[self.charm.app].update({  # type: ignore
                     "promoted-cluster-counter": str(promoted_cluster_counter)
                 })
 

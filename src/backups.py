@@ -120,7 +120,7 @@ class PostgreSQLBackups(Object):
             ),
         )
 
-    def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
+    def _are_backup_settings_ok(self) -> tuple[bool, str]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
             return (
@@ -132,7 +132,7 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        return True, None
+        return True, ""
 
     @property
     def _can_initialise_stanza(self) -> bool:
@@ -183,7 +183,7 @@ class PostgreSQLBackups(Object):
 
         return self._are_backup_settings_ok()
 
-    def can_use_s3_repository(self) -> tuple[bool, str | None]:
+    def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
         # Check model uuid
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -246,7 +246,7 @@ class PostgreSQLBackups(Object):
                 )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
-        return True, None
+        return True, ""
 
     def _change_connectivity_to_database(self, connectivity: bool) -> None:
         """Enable or disable the connectivity to the database."""
@@ -875,7 +875,7 @@ class PostgreSQLBackups(Object):
 
         can_use_s3_repository, validation_message = self.can_use_s3_repository()
         if not can_use_s3_repository:
-            self._s3_initialization_set_failure(validation_message or "")
+            self._s3_initialization_set_failure(validation_message)
             return False
 
         if not self._initialise_stanza(event):
@@ -1063,7 +1063,7 @@ Stderr:
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.warning(validation_message)
-            event.fail(validation_message or "")
+            event.fail(validation_message)
             return
 
         try:
@@ -1243,7 +1243,7 @@ Stderr:
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
             logger.error(f"Restore failed: {validation_message}")
-            event.fail(validation_message or "")
+            event.fail(validation_message)
             return False
 
         if not event.params.get("backup-id") and event.params.get("restore-to-time") is None:
@@ -1326,7 +1326,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
-            process_max=max((os.cpu_count() or 4) - 2, 1),
+            process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)

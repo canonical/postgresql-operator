@@ -46,6 +46,8 @@ def mocked_requests_get(*args, **kwargs):
         def json(self):
             return self.json_data
 
+        elapsed = Mock()
+
     data = {
         "http://server1/cluster": {
             "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
@@ -125,8 +127,8 @@ def test_get_patroni_health(peers_ips, patroni):
         health = patroni.get_patroni_health()
 
         # Check needed to ensure a fast charm deployment.
-        _stop_after_delay.assert_called_once_with(15)
-        _wait_fixed.assert_called_once_with(3)
+        _stop_after_delay.assert_called_once_with(60)
+        _wait_fixed.assert_called_once_with(7)
 
         assert health == {"state": "running"}
 

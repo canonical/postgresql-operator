@@ -217,9 +217,9 @@ class CharmConfig(BaseConfigModel):
     response_exit_on_error: bool | None
     response_extra_float_digits: ExtraFloatDigitsInt | None
     response_gin_fuzzy_search_limit: PgIntMax | None
-    response_lc_monetary: Literal[tuple(SNAP_LOCALES)] | None  # ty: ignore[invalid-type-form]
-    response_lc_numeric: Literal[tuple(SNAP_LOCALES)] | None  # ty: ignore[invalid-type-form]
-    response_lc_time: Literal[tuple(SNAP_LOCALES)] | None  # ty: ignore[invalid-type-form]
+    response_lc_monetary: SNAP_LOCALES | None
+    response_lc_numeric: SNAP_LOCALES | None
+    response_lc_time: SNAP_LOCALES | None
     session_idle_in_transaction_session_timeout: PgIntMax | None
     storage_bgwriter_lru_maxpages: BgwriterLruMaxpagesInt | None
     storage_bgwriter_lru_multiplier: BgwriterLruMultiplierFloat | None

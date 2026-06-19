@@ -40,7 +40,6 @@ def test_can_promote_cluster():
     type(mock_charm).is_cluster_initialised = PropertyMock(return_value=True)
 
     mock_peers_data = MagicMock()
-    mock_peers_data.update = MagicMock()
 
     with patch.multiple(
         PostgreSQLAsyncReplication,
@@ -54,7 +53,7 @@ def test_can_promote_cluster():
         mock_charm._patroni.promote_standby_cluster.return_value = None
         mock_charm.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
         mock_charm._peers = MagicMock()
-        mock_charm._peers.data = {mock_charm.app: mock_peers_data}
+        mock_charm.app_peer_data = mock_peers_data
         mock_charm._set_primary_status_message = MagicMock()
 
         relation = PostgreSQLAsyncReplication(mock_charm)
@@ -121,14 +120,14 @@ def test_handle_database_start():
     mock_charm.unit = create_mock_unit()
     mock_charm.app = MagicMock()
 
-    mock_peers_data = {
+    mock_charm.all_peer_data = {
         mock_charm.unit: MagicMock(),
         mock_unit1: MagicMock(),
         mock_unit2: MagicMock(),
         mock_charm.app: MagicMock(),
     }
     mock_charm._peers = MagicMock()
-    mock_charm._peers.data = mock_peers_data
+    # mock_charm._peers.data = mock_peers_data
     mock_charm._peers.units = [mock_unit1, mock_unit2]
 
     with (
@@ -142,19 +141,17 @@ def test_handle_database_start():
         ),
     ):
         for unit in [mock_unit1, mock_unit2, mock_charm.unit]:
-            mock_peers_data[unit].get.return_value = "1"
+            mock_charm.all_peer_data[unit].get.return_value = "1"
 
         relation = PostgreSQLAsyncReplication(mock_charm)
         relation._handle_database_start(mock_event)
 
-        mock_peers_data[mock_charm.unit].update.assert_any_call({"stopped": ""})
-        mock_peers_data[mock_charm.unit].update.assert_any_call({
-            "unit-promoted-cluster-counter": "1"
+        mock_charm.unit_peer_data.update.assert_any_call({
+            "stopped": "",
+            "unit-promoted-cluster-counter": "1",
         })
         mock_charm.update_config.assert_called_once()
-        mock_peers_data[mock_charm.app].update.assert_called_once_with({
-            "cluster_initialised": "True"
-        })
+        mock_charm.app_peer_data.update.assert_called_once_with({"cluster_initialised": "True"})
         mock_charm._set_primary_status_message.assert_called_once()
 
     # 2. Test when not all units are ready (leader case)
@@ -241,7 +238,7 @@ def test_on_async_relation_changed():
     mock_unit1 = create_mock_unit("unit1")
     mock_unit2 = create_mock_unit("unit2")
     mock_charm._peers.units = [mock_unit1, mock_unit2]
-    mock_charm._peers.data = {
+    mock_charm.all_peer_data = {
         mock_charm.unit: {"stopped": "1"},
         mock_unit1: {"unit-promoted-cluster-counter": "5"},
         mock_unit2: {"unit-promoted-cluster-counter": "5"},
@@ -346,7 +343,8 @@ def test_stop_database():
     mock_app = MagicMock()
     mock_charm.unit = mock_unit
     mock_charm.app = mock_app
-    mock_charm._peers.data = {mock_app: {}, mock_unit: {}}
+    mock_charm.app_peer_data = {}
+    mock_charm.unit_peer_data = {}
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
@@ -394,8 +392,8 @@ def test_stop_database():
         result = relation._stop_database(mock_event)
         assert result is True
         mock_charm._patroni.stop_patroni.assert_called_once()
-        assert mock_charm._peers.data[mock_app].get("cluster_initialised") == ""
-        assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
+        assert mock_charm.app_peer_data["cluster_initialised"] == ""
+        assert mock_charm.unit_peer_data["stopped"] == "True"
 
 
 def test__configure_primary_cluster():
@@ -486,9 +484,10 @@ def test_on_async_relation_joined():
     mock_peers = MagicMock()
     mock_unit_data = {}
 
-    mock_charm._unit_ip = "10.0.0.1"
     mock_charm._peers = mock_peers
-    mock_peers.data = {mock_charm.unit: mock_unit_data}
+    mock_charm.unit_peer_data = mock_unit_data
+
+    mock_charm._unit_ip = "10.0.0.1"
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
@@ -570,6 +569,25 @@ def test_on_create_replication():
     result = relation._on_create_replication(mock_event)
 
     assert result is None
+
+    # 5. No async-replication relation established (regression for #1675).
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    relation._get_primary_cluster = MagicMock(return_value=None)
+
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        result = relation._on_create_replication(mock_event)
+
+    assert result is None
+    mock_event.fail.assert_called_once_with(
+        "No async-replication relation has been established."
+        " Create the offer and relate the two clusters before running this action."
+    )
 
 
 def test_promote_to_primary():

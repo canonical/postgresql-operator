@@ -5,6 +5,7 @@
 
 import logging
 from time import sleep
+from typing import get_args
 
 import psycopg2
 import pytest
@@ -180,7 +181,7 @@ async def test_postgresql_locales(ops_test: OpsTest) -> None:
     # Juju 2 has an extra empty element
     if "" in locales:
         locales.remove("")
-    assert locales == SNAP_LOCALES
+    assert locales == list(get_args(SNAP_LOCALES))
 
 
 @pytest.mark.abort_on_fail
