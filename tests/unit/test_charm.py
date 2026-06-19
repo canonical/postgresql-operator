@@ -2233,11 +2233,12 @@ def test_on_peer_relation_changed(harness):
         _update_config.assert_called_once()
         _start_patroni.assert_not_called()
         _update_new_unit_status.assert_not_called()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
+        assert isinstance(harness.model.unit.status, MaintenanceStatus)
 
         # Test event is early exiting when in blocked status.
         _update_config.side_effect = None
         _member_started.return_value = False
+        harness.model.unit.status = BlockedStatus()
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_not_called()
 
@@ -2526,8 +2527,8 @@ def test_add_cluster_member(harness):
         _update_config.side_effect = RetryError(last_attempt=None)
         harness.charm.add_cluster_member("postgresql-0")
         _update_config.assert_called_once_with()
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-        assert harness.charm.unit.status.message == "failed to update cluster members on member"
+        assert isinstance(harness.charm.unit.status, MaintenanceStatus | WaitingStatus)
+        assert harness.charm.unit.status.message == "pending update cluster members on member"
         _update_config.reset_mock()
 
         # Not ready error if not all members are ready
