@@ -164,7 +164,7 @@ class PostgreSQLBackups(Object):
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             return False, STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE
 
         if self.charm.is_blocked:
@@ -188,16 +188,6 @@ class PostgreSQLBackups(Object):
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
-
-    def _is_standby_cluster(self) -> bool:
-        """Return whether this unit belongs to a standby cluster."""
-        if (
-            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
-            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
-        ):
-            return False
-
-        return not self.charm.async_replication.is_primary_cluster()
 
     def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
@@ -1096,7 +1086,7 @@ Stderr:
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.warning(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             event.fail(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             return
@@ -1282,7 +1272,7 @@ Stderr:
         Returns:
             a boolean indicating whether restore should be run.
         """
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.error(f"Restore failed: {STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE}")
             event.fail(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
             return False

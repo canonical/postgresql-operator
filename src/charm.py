@@ -1476,6 +1476,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self.unit.name == self._patroni.get_standby_leader(unit_name_pattern=True)
 
     @property
+    def is_standby_cluster(self) -> bool:
+        """Return whether this unit belongs to a standby (read-only) cluster."""
+        if (
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
+            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
+        ):
+            return False
+        return not self.async_replication.is_primary_cluster()
+
+    @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
         return all(self.tls.get_client_tls_files())
@@ -2048,6 +2058,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         postgres_snap.restart(services=["ldap-sync"])
 
     def _setup_users(self) -> None:
+        # A standby cluster's PostgreSQL is a read-only hot standby; these objects are
+        # provisioned on the primary cluster and replicated here, so the write DDL below
+        # would fail with ReadOnlySqlTransaction. Skip it (DPE-10284).
+        if self.is_standby_cluster:
+            logger.debug("Early exit _setup_users: standby cluster is read-only")
+            return
+
         self.postgresql.create_predefined_instance_roles()
 
         # Create the default postgres database user that is needed for some

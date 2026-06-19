@@ -164,7 +164,9 @@ def test_can_initialise_stanza(harness):
 def test_can_unit_perform_backup(harness):
     with (
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("ops.model.Application.planned_units") as _planned_units,
         patch(
@@ -232,33 +234,6 @@ def test_can_unit_perform_backup(harness):
         # Test when everything is ok to run a backup.
         _are_backup_settings_ok.return_value = (True, None)
         assert harness.charm.backup._can_unit_perform_backup() == (True, None)
-
-
-def test_is_standby_cluster(harness):
-    with (
-        patch.object(harness.charm.backup.model, "get_relation") as _get_relation,
-        patch.object(harness.charm.async_replication, "is_primary_cluster") as _is_primary_cluster,
-    ):
-        # Test when async replication relation is not present.
-        _get_relation.side_effect = [None, None]
-        assert not harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_not_called()
-
-        # Test when relation is present and this is the primary cluster.
-        _get_relation.reset_mock()
-        _is_primary_cluster.reset_mock()
-        _get_relation.side_effect = [object()]
-        _is_primary_cluster.return_value = True
-        assert not harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_called_once()
-
-        # Test when relation is present and this is the standby cluster.
-        _get_relation.reset_mock()
-        _is_primary_cluster.reset_mock()
-        _get_relation.side_effect = [object()]
-        _is_primary_cluster.return_value = False
-        assert harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_called_once()
 
 
 def test_can_use_s3_repository(harness):
@@ -1410,7 +1385,9 @@ def test_on_list_backups_action(harness):
         patch(
             "charm.PostgreSQLBackups._generate_backup_list_output"
         ) as _generate_backup_list_output,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
         # Test when unit belongs to a standby cluster.
@@ -1750,7 +1727,9 @@ def test_on_restore_action(harness):
 def test_pre_restore_checks(harness):
     with (
         patch("ops.model.Application.planned_units") as _planned_units,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
         # Test when unit belongs to a standby cluster.
