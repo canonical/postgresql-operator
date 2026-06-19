@@ -1792,7 +1792,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "stanza": "",
                 "s3-initialization-start": "",
                 "s3-initialization-done": "",
-                "s3-initialization-block-message": validation_message or "",
+                "s3-initialization-block-message": validation_message,
             })
 
         return True

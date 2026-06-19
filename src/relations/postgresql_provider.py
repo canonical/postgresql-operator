@@ -144,7 +144,7 @@ class PostgreSQLProvider(Object):
             )
 
             # Set the database name
-            self.database_provides.set_database(event.relation.id, database or "")
+            self.database_provides.set_database(event.relation.id, database)
 
             # Update the read/write and read-only endpoints.
             self.update_endpoints(event)

@@ -412,7 +412,7 @@ class DbProvides(Object):
             data = {
                 "allowed-subnets": allowed_subnets,
                 "allowed-units": allowed_units,
-                "host": self.charm.primary_endpoint,
+                "host": str(self.charm.primary_endpoint),
                 "port": DATABASE_PORT,
                 "user": user,
                 "schema_user": user,
@@ -428,7 +428,8 @@ class DbProvides(Object):
                 data["version"] = postgresql_version
 
             # Set the data only in the unit databag.
-            unit_relation_databag.update({k: v for k, v in data.items() if v is not None})
+            # unit_relation_databag.update({k: v for k, v in data.items() if v is not None})
+            unit_relation_databag.update(data)
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""
