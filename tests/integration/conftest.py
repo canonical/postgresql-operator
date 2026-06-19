@@ -4,11 +4,11 @@ import dataclasses
 import json
 import logging
 import os
-import socket
 import subprocess
 import uuid
 
 import boto3
+import jubilant
 import pytest
 from pytest_operator.plugin import OpsTest
 
@@ -19,6 +19,17 @@ AWS = "AWS"
 GCP = "GCP"
 
 logger = logging.getLogger(__name__)
+
+
+def _get_non_loopback_host_ip() -> str:
+    """Return the host IP reachable by LXD containers."""
+    output = subprocess.run(
+        ["ip", "-4", "route", "get", "1.1.1.1"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return output.split("src", maxsplit=1)[1].split()[0]
 
 
 @pytest.fixture(scope="session")
@@ -101,6 +112,20 @@ async def gcp_cloud_configs(ops_test: OpsTest) -> None:
     cleanup_cloud(config, credentials)
 
 
+@pytest.fixture(scope="module")
+def juju(request: pytest.FixtureRequest):
+    """Pytest fixture that wraps jubilant.temp_model."""
+    model = request.config.getoption("--model")
+    keep_models = bool(request.config.getoption("--keep-models"))
+
+    if model:
+        juju = jubilant.Juju(model=model)
+        yield juju
+    else:
+        with jubilant.temp_model(keep=keep_models) as juju:
+            yield juju
+
+
 @dataclasses.dataclass(frozen=True)
 class ConnectionInformation:
     access_key_id: str
@@ -151,7 +176,7 @@ def microceph():
         ],
         check=True,
     )
-    host_ip = socket.gethostbyname(socket.gethostname())
+    host_ip = _get_non_loopback_host_ip()
     subprocess.run(
         f'echo "subjectAltName = IP:{host_ip}" > ./extfile.cnf',
         shell=True,
@@ -209,7 +234,7 @@ def microceph():
     key_id = key["access_key"]
     secret_key = key["secret_key"]
     logger.info("Set up microceph")
-    host_ip = socket.gethostbyname(socket.gethostname())
+    host_ip = _get_non_loopback_host_ip()
     result = subprocess.run(
         "base64 -w0 ./ca.crt", shell=True, check=True, stdout=subprocess.PIPE, text=True
     )
