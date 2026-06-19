@@ -227,7 +227,7 @@ class PostgreSQLAsyncReplication(Object):
                 continue
             for databag in [
                 async_relation.data[async_relation.app],
-                self.charm.unit_peer_data,
+                self.charm.app_peer_data,
             ]:
                 relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):

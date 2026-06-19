@@ -127,7 +127,6 @@ def test_handle_database_start():
         mock_charm.app: MagicMock(),
     }
     mock_charm._peers = MagicMock()
-    # mock_charm._peers.data = mock_peers_data
     mock_charm._peers.units = [mock_unit1, mock_unit2]
 
     with (
