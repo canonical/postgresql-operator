@@ -20,6 +20,7 @@ from typing import Literal, get_args
 from urllib.parse import urlparse
 
 import psycopg2
+import psycopg2.errors
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
@@ -53,6 +54,7 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
+    RelationDataContent,
     StatusBase,
     Unit,
     WaitingStatus,
@@ -134,7 +136,7 @@ PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this u
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 EXTENSION_OBJECT_MESSAGE = "Cannot disable plugins: Existing objects depend on it. See logs"
 
-Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
+Scopes = Literal["app", "unit"]
 PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 
@@ -270,7 +272,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.update_config()
         logger.debug("databases changed")
         timestamp = datetime.now()
-        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        self.unit_peer_data.update({"pg_hba_needs_update_timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
 
     def patroni_scrape_config(self) -> list[dict]:
@@ -292,7 +294,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return {self.unit, *self._peers.units}
 
-    def scoped_peer_data(self, scope: Scopes) -> dict | None:
+    def scoped_peer_data(self, scope: Scopes) -> RelationDataContent | dict[str, str] | None:
         """Returns peer data based on scope."""
         if scope == APP_SCOPE:
             return self.app_peer_data
@@ -302,22 +304,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def app_peer_data(self) -> dict:
         """Application peer relation data object."""
-        relation = self.model.get_relation(PEER)
-        if relation is None:
-            return {}
-
-        return relation.data[self.app]
+        return self.all_peer_data.get(self.app, {})
 
     @property
     def unit_peer_data(self) -> dict:
         """Unit peer relation data object."""
-        relation = self.model.get_relation(PEER)
-        if relation is None:
+        return self.all_peer_data.get(self.unit, {})
+
+    @property
+    def all_peer_data(self) -> dict:
+        """Return all peer data if available."""
+        if self._peers is None:
             return {}
 
-        return relation.data[self.unit]
+        # RelationData has dict like API
+        return self._peers.data  # type: ignore
 
-    def _peer_data(self, scope: Scopes) -> dict:
+    def _peer_data(self, scope: Scopes) -> RelationDataContent | dict[str, str]:
         """Return corresponding databag for app/unit."""
         relation = self.model.get_relation(PEER)
         if relation is None:
@@ -337,6 +340,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return self.peer_relation_app
         elif scope == UNIT_SCOPE:
             return self.peer_relation_unit
+        raise ValueError(f"Unknown scope: {scope}")
 
     def _translate_field_to_secret_key(self, key: str) -> str:
         """Change 'key' to secrets-compatible key field."""
@@ -372,7 +376,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be deleted
-        self.scoped_peer_data(scope).pop(key, None)
+        (self.scoped_peer_data(scope) or {}).pop(key, None)
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
@@ -414,12 +418,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
+        # TODO: Port none handling in the lib
         return PostgreSQL(
-            primary_host=self.primary_endpoint,
+            primary_host=self.primary_endpoint,  # type: ignore
             # Connecting to local Postgresql socket
             current_host="/tmp/snap-private-tmp/snap.charmed-postgresql/tmp/",  # noqa: S108
             user=USER,
-            password=self.get_secret(APP_SCOPE, f"{USER}-password"),
+            password=self.get_secret(APP_SCOPE, f"{USER}-password"),  # type: ignore
             database=DATABASE_DEFAULT_NAME,
             system_users=SYSTEM_USERS,
         )
@@ -431,22 +436,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            primary = self._patroni.get_primary()
-            if primary is None and (standby_leader := self._patroni.get_standby_leader()):
-                primary = standby_leader
-            primary_endpoint = self._patroni.get_member_ip(primary)
+            primary = self._patroni.get_primary() or self._patroni.get_standby_leader()
+            primary_endpoint = self._patroni.get_member_ip(primary) if primary else None
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
             # (like when the cluster was not updated yet after a failed switchover).
-            if not primary_endpoint or primary_endpoint not in self._units_ips:
-                # TODO figure out why peer data is not available
-                if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
-                    logger.warning(
-                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
-                    )
-                    return primary_endpoint
-                logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
+            if not primary_endpoint:
+                logger.warning(f"Missing primary IP for {primary}")
                 primary_endpoint = None
+            elif primary_endpoint not in self._units_ips:
+                if len(self._peers.units) == 0:
+                    logger.info(f"The unit didn't join {PEER} relation? Using {primary_endpoint}")
+                elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                    logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
+                else:
+                    logger.debug("Early exit primary_endpoint: Primary IP not in cached peer list")
+                    primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -497,22 +502,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Unable to set synchronous_node_count")
             return False
 
-    def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """The leader removes the departing units from the list of cluster members."""
-        # Don't handle this event in the same unit that is departing.
+    def _on_peer_relation_departed_early_exit(self, event: RelationDepartedEvent) -> bool:
+        if not event.departing_unit:
+            logger.debug("Early exit on_peer_relation_departed: No departing unit")
+            return True
         if event.departing_unit == self.unit:
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
-            return
+            return True
 
         if self.has_raft_keys():
             logger.debug("Early exit on_peer_relation_departed: Raft recovery in progress")
+            return True
+        return False
+
+    def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
+        """The leader removes the departing units from the list of cluster members."""
+        # Don't handle this event in the same unit that is departing.
+        if self._on_peer_relation_departed_early_exit(event):
             return
 
         # Remove the departing member from the raft cluster.
         try:
-            departing_member = event.departing_unit.name.replace("/", "-")
-            member_ip = self._patroni.get_member_ip(departing_member)
-            self._patroni.remove_raft_member(member_ip)
+            departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
+            if member_ip := self._patroni.get_member_ip(departing_member):
+                self._patroni.remove_raft_member(member_ip)
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -521,7 +534,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
         except RetryError:
             logger.warning(
-                f"Early exit on_peer_relation_departed: Cannot get {event.departing_unit.name} member IP"
+                f"Early exit on_peer_relation_departed: Cannot get {event.departing_unit} member IP"
             )
             return
 
@@ -560,7 +573,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         raft_stuck = False
         all_units_stuck = True
         candidate = self.app_peer_data.get("raft_selected_candidate")
-        for key, data in self._peers.data.items():
+        for key, data in self.all_peer_data.items():
             if key == self.app:
                 continue
             if "raft_stuck" in data:
@@ -587,18 +600,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _stuck_raft_cluster_rejoin(self) -> None:
         """Reconnect cluster to new raft."""
         primary = None
-        for key, data in self._peers.data.items():
+        for key, data in self.all_peer_data.items():
             if key == self.app:
                 continue
             if "raft_primary" in data:
                 primary = key
                 break
+
         if primary and "raft_reset_primary" not in self.app_peer_data:
             logger.info("Updating the primary endpoint")
             self.app_peer_data.pop("members_ips", None)
-            for unit in self._peers.units:
-                self._add_to_members_ips(self._get_unit_ip(unit))
-            self._add_to_members_ips(self._get_unit_ip(self.unit))
+            if self._peers:
+                for unit in self._peers.units:
+                    if ip := self._get_unit_ip(unit):
+                        self._add_to_members_ips(ip)
+            if self._unit_ip:
+                self._add_to_members_ips(self._unit_ip)
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
@@ -611,7 +628,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _stuck_raft_cluster_stopped_check(self) -> None:
         """Check that the cluster is stopped."""
-        if "raft_followers_stopped" in self.app_peer_data:
+        if not self._peers or "raft_followers_stopped" in self.app_peer_data:
             return
 
         for key, data in self._peers.data.items():
@@ -624,18 +641,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.app_peer_data["raft_followers_stopped"] = "True"
 
     def _stuck_raft_cluster_cleanup(self) -> None:
-        for key, data in self._peers.data.items():
-            if key == self.app:
-                continue
-            for flag in data:
-                if flag.startswith("raft_"):
-                    return
+        if self._peers:
+            for key, data in self._peers.data.items():
+                if key == self.app:
+                    continue
+                for flag in data:
+                    if flag.startswith("raft_"):
+                        return
 
-        logger.info("Cleaning up raft app data")
-        self.app_peer_data.pop("raft_rejoin", None)
-        self.app_peer_data.pop("raft_reset_primary", None)
-        self.app_peer_data.pop("raft_selected_candidate", None)
-        self.app_peer_data.pop("raft_followers_stopped", None)
+            logger.info("Cleaning up raft app data")
+            self.app_peer_data.pop("raft_rejoin", None)
+            self.app_peer_data.pop("raft_reset_primary", None)
+            self.app_peer_data.pop("raft_selected_candidate", None)
+            self.app_peer_data.pop("raft_followers_stopped", None)
 
     def _raft_reinitialisation(self) -> None:
         """Handle raft cluster loss of quorum."""
@@ -822,13 +840,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if (
             hasattr(event, "unit")
-            and event.relation.data.get(event.unit) is not None
-            and event.relation.data[event.unit].get("ip-to-remove") is not None
+            and hasattr(event, "relation")
+            and event.relation.data.get(event.unit) is not None  # ty: ignore[unresolved-attribute]
+            and event.relation.data[event.unit].get("ip-to-remove") is not None  # ty: ignore[unresolved-attribute]
         ):
-            ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
+            ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")  # ty: ignore[unresolved-attribute]
             logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
-                self._patroni.remove_raft_member(ip_to_remove)
+                if ip_to_remove is not None:
+                    self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
@@ -928,7 +948,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise NotReadyError("not all members are ready")
 
         # Add the member to the list that should be updated in each other member.
-        self._add_to_members_ips(member_ip)
+        if member_ip:
+            self._add_to_members_ips(member_ip)
 
         # Update Patroni configuration file.
         try:
@@ -943,7 +964,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if unit == self.unit:
             ip = self.model.get_binding(PEER).network.bind_address
         # Check if host is a peer.
-        elif unit in self._peers.data:
+        elif self._peers is not None and unit in self._peers.data:
             ip = self._peers.data[unit].get("private-address")
         # Return None if the unit is not a peer neither the current unit.
         if ip:
@@ -961,7 +982,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         peers = self.model.get_relation(PEER)
         hosts = [self.unit.name.replace("/", "-")] + [
-            unit.name.replace("/", "-") for unit in peers.units
+            unit.name.replace("/", "-") for unit in (peers.units if peers is not None else [])
         ]
         return set(hosts)
 
@@ -1039,10 +1060,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = {self._get_unit_ip(unit) for unit in self._peers.units}
+        peer_units = self._peers.units if self._peers is not None else set()
+        addresses = {ip for unit in peer_units if (ip := self._get_unit_ip(unit)) is not None}
         addresses.add(self._unit_ip)
-        if None in addresses:
-            addresses.remove(None)
         return addresses
 
     @property
@@ -1075,6 +1095,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
+        if self._peers is None:
+            return
+
         ips = json.loads(self._peers.data[self.app].get("members_ips", "[]"))
         if ip_to_add and ip_to_add not in ips:
             ips.append(ip_to_add)
@@ -1099,6 +1122,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.switchover()
 
             # Wait for the switchover to complete.
+            if current_primary is None:
+                return
             self._patroni.primary_changed(current_primary)
 
             logger.info("successful switchover")
@@ -1282,7 +1307,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
-        except psycopg2.errors.DependentObjectsStillExist as e:
+        except psycopg2.errors.DependentObjectsStillExist as e:  # ty: ignore[unresolved-attribute]  # dynamically defined by psycopg2 C extension
             logger.error(
                 "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql-k8s plugin_<plugin_name>_enable=True`",
                 str(e),
@@ -1355,7 +1380,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the async replication data with the current unit IP.
         self.async_replication.update_async_replication_data()
 
-        self.unit.set_workload_version(self._patroni.get_postgresql_version())
+        self.unit.set_workload_version(self._patroni.get_postgresql_version() or "")
 
         # Open port
         try:
@@ -1527,7 +1552,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
-        self._peers.data[self.app]["cluster_initialised"] = "True"
+        if self._peers is not None:
+            self._peers.data[self.app]["cluster_initialised"] = "True"
 
         # Clear unit data if this unit became a replica after a failover/switchover.
         self._update_relation_endpoints()
@@ -1850,7 +1876,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is in a blocked state."""
         return isinstance(self.unit.status, BlockedStatus)
 
-    def _get_password(self) -> str:
+    def _get_password(self) -> str | None:
         """Get operator user password.
 
         Returns:
@@ -1860,7 +1886,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self.get_secret(APP_SCOPE, USER_PASSWORD_KEY)
 
     @property
-    def _replication_password(self) -> str:
+    def _replication_password(self) -> str | None:
         """Get replication user password.
 
         Returns:
@@ -1869,7 +1895,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: list[str], refresh: bool = False) -> None:
+    def _install_snap_packages(
+        self, packages: list[tuple[str, dict]], refresh: bool = False
+    ) -> None:
         """Installs package(s) to container.
 
         Args:
@@ -1906,13 +1934,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns if storage is attached."""
         try:
             # Storage path is constant
-            subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
+            subprocess.check_call(["/usr/bin/mountpoint", "-q", str(self._storage_path)])  # noqa: S603
             return True
         except subprocess.CalledProcessError:
             return False
 
     @property
-    def _peers(self) -> Relation:
+    def _peers(self) -> Relation | None:
         """Fetch the peer relation.
 
         Returns:
@@ -2001,7 +2029,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         try:
             self._patroni.restart_postgresql()
-            self._peers.data[self.unit]["postgresql_restarted"] = "True"
+            if self._peers is not None:
+                self._peers.data[self.unit]["postgresql_restarted"] = "True"
         except RetryError:
             error_message = "failed to restart PostgreSQL"
             logger.exception(error_message)
@@ -2181,7 +2210,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         max_connections = (
             self.config.experimental_max_connections
             if self.config.experimental_max_connections
-            else max(4 * os.cpu_count(), 100)
+            else max(4 * (os.cpu_count() or 1), 100)
         )
 
         # Build parameters for Patroni API update (restart-required parameters)
@@ -2195,11 +2224,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Add restart-required worker process parameters via Patroni API
         worker_configs = self._calculate_worker_process_config()
         if "max_worker_processes" in worker_configs:
-            cfg_patch["max_worker_processes"] = worker_configs["max_worker_processes"]
+            cfg_patch["max_worker_processes"] = int(worker_configs["max_worker_processes"])
         if "max_logical_replication_workers" in worker_configs:
-            cfg_patch["max_logical_replication_workers"] = worker_configs[
-                "max_logical_replication_workers"
-            ]
+            cfg_patch["max_logical_replication_workers"] = int(
+                worker_configs["max_logical_replication_workers"]
+            )
 
         base_patch = {
             **self._patroni.synchronous_configuration,
@@ -2225,7 +2254,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Build PostgreSQL parameters.
         pg_parameters = self.postgresql.build_postgresql_parameters(
-            self.model.config, self.get_available_memory(), limit_memory
+            dict(self.model.config), self.get_available_memory(), limit_memory
         )
 
         # Calculate and add worker process configurations
@@ -2332,7 +2361,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.postgresql.validate_group_map(self.config.ldap_map):
             raise ValueError("ldap_map config option has an invalid value")
 
-        if not self.postgresql.validate_date_style(self.config.request_date_style):
+        if not self.postgresql.validate_date_style(self.config.request_date_style or ""):
             raise ValueError("request_date_style config option has an invalid value")
 
         if self.config.request_time_zone not in self.postgresql.get_postgresql_timezones():
@@ -2382,7 +2411,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # (so the both old and new connections use the configuration).
         if restart_postgresql:
             logger.info("PostgreSQL restart required")
-            self._peers.data[self.unit].pop("postgresql_restarted", None)
+            if self._peers is not None:
+                self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
 
     def _update_relation_endpoints(self) -> None:
@@ -2647,9 +2677,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # LDAP authentication parameters that are exclusive to
         # one of the two supported modes (simple bind or search+bind)
         # must be put at the very end of the parameters string
-        params.update({
-            "ldapsearchfilter": self.config.ldap_search_filter,
-        })
+        if self.config.ldap_search_filter is not None:
+            params.update({
+                "ldapsearchfilter": self.config.ldap_search_filter,
+            })
 
         return params
 

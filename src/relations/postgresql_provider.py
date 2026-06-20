@@ -4,6 +4,7 @@
 """Postgres client relation hooks & helpers."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -19,9 +20,12 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
+from ops.charm import RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 from constants import (
     ALL_CLIENT_RELATIONS,
@@ -42,7 +46,7 @@ class PostgreSQLProvider(Object):
         - relation-broken
     """
 
-    def __init__(self, charm: CharmBase, relation_name: str = "database") -> None:
+    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str = "database") -> None:
         """Constructor for PostgreSQLClientProvides object.
 
         Args:
@@ -96,6 +100,8 @@ class PostgreSQLProvider(Object):
             return
 
         self.charm.update_config()
+        if self.charm._peers is None:
+            return
         for key in self.charm._peers.data:
             # We skip the leader so we don't have to wait on the defer
             if (
@@ -110,6 +116,9 @@ class PostgreSQLProvider(Object):
 
         # Retrieve the database name and extra user roles using the charm library.
         database = event.database
+        if database is None:
+            logger.warning("Database name is not set in the relation data, skipping.")
+            return
 
         # Make sure the relation access-group is added to the list
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
@@ -151,7 +160,7 @@ class PostgreSQLProvider(Object):
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(
                 e.message
-                if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
+                if isinstance(e, PostgreSQLCreateUserError) and e.message is not None
                 else f"Failed to initialize {self.relation_name} relation"
             )
 
@@ -199,7 +208,7 @@ class PostgreSQLProvider(Object):
             else:
                 logger.info("Stale relation user detected: %s", user)
 
-    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
+    def update_endpoints(self, event: DatabaseRequestedEvent | None = None) -> None:
         """Set the read/write and read-only endpoints."""
         if not self.charm.unit.is_leader():
             return
