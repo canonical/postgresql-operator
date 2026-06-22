@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast, get_args
+from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -149,9 +149,6 @@ from relations.postgresql_provider import PostgreSQLProvider
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
-if TYPE_CHECKING:
-    from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
-
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -173,26 +170,6 @@ class CannotConnectError(Exception):
 
 class StorageUnavailableError(Exception):
     """Cannot find storage mountpoint."""
-
-
-class _LazyPostgreSQLClient:
-    """Defer resolution of the charm's PostgreSQL client to first attribute access.
-
-    Passed to the lib TLSManager (which only stores the client and never uses it on
-    the TLS paths) so that the charm's expensive `postgresql` cached_property is not
-    materialised at charm construction time.
-    """
-
-    # INVARIANT: the lib's TLSManager/TLS must NEVER dereference the PostgreSQL client
-    # (verified: client is used only in managers/config.py and cluster.py).  If that
-    # changes, this proxy will silently trigger a blocking Patroni probe — fail fast
-    # instead.
-
-    def __init__(self, charm: "PostgresqlOperatorCharm") -> None:
-        self._charm = charm
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._charm.postgresql, name)
 
 
 @dataclasses.dataclass(eq=False)
@@ -408,21 +385,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        # The lib state/managers are typed against AbstractPostgreSQLCharm; this charm
-        # is structurally compatible (provides the attributes they read) but does not
-        # subclass it, so cast for the type checker.
-        self._state = CharmState(cast("AbstractPostgreSQLCharm", self), Substrates.VM)
+        self._state = CharmState(self, Substrates.VM)
         self._workload = VMWorkload(charm_dir=self.charm_dir)
-        # NOTE: pass the PostgreSQL client lazily. The lib TLSManager only stores the
-        # client (its TLS paths never dereference it), while the charm's `postgresql`
-        # is a cached_property that builds a real client (and probes Patroni for the
-        # primary endpoint). Resolving it eagerly here would (a) add a blocking Patroni
-        # call to every hook's __init__ and (b) cache a real client that shadows test
-        # patches of `postgresql`. The lazy proxy defers resolution to first attribute
-        # access, so the client is materialised only if/when actually used.
-        self.tls_manager = TLSManager(
-            self._state, self._workload, cast("PostgreSQL", _LazyPostgreSQLClient(self))
-        )
+        self.tls_manager = TLSManager(self._state, self._workload)
         self.tls = TLS(self, self._state, self._workload, self.tls_manager)
         # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
         # the handler stores+pushes certs on certificate_available, then we reload so
@@ -501,6 +466,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
         self.update_config()
 
+    def _regenerate_internal_cert(self, *, reload: bool = True) -> None:
+        """Generate the internal peer cert, push it to the workload, and (optionally) reload.
+
+        reload=False at cluster bootstrap, where bootstrap re-renders Patroni config and
+        reads the just-pushed TLS files itself.
+        """
+        self.tls_manager.generate_internal_peer_cert()
+        self.tls_manager.push_tls_files()
+        if reload:
+            self.update_config()
+
     def _check_and_update_internal_cert(self) -> None:
         """Check if the internal cert CN matches the unit IP and regenerate if needed."""
         try:
@@ -512,9 +488,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     != self._unit_ip
                 )
             ):
-                self.tls_manager.generate_internal_peer_cert()
-                self.tls_manager.push_tls_files()
-                self.update_config()
+                self._regenerate_internal_cert()
         except Exception:
             logger.exception("Unable to check or update internal cert")
 
@@ -2004,10 +1978,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
-            self.tls_manager.generate_internal_peer_cert()
-            # No update_config() here: bootstrap re-renders Patroni config and reads
-            # these just-pushed TLS files during cluster bootstrap.
-            self.tls_manager.push_tls_files()
+            self._regenerate_internal_cert(reload=False)
 
         self.unit_peer_data.update({"ip": self._unit_ip})
         self._ensure_storage_layout()
@@ -2552,9 +2523,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             self.tls.refresh_tls_certificates_event.emit()
         if self.get_secret(UNIT_SCOPE, "internal-cert"):
-            self.tls_manager.generate_internal_peer_cert()
-            self.tls_manager.push_tls_files()
-            self.update_config()
+            self._regenerate_internal_cert()
 
     @property
     def is_blocked(self) -> bool:
