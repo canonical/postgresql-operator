@@ -474,6 +474,42 @@ ops = "*"
 pydantic = "*"
 
 [[package]]
+name = "charmlibs-pathops"
+version = "1.3.0.post0"
+description = "A pathlib-like interface for Juju K8s charms to interact with files in their workload container."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "charmlibs_pathops-1.3.0.post0-py3-none-any.whl", hash = "sha256:c6fc3e3460ffa03a7d4273cc7784c9d74378609a098c728cd9bbb2ed90bdfa5b"},
+    {file = "charmlibs_pathops-1.3.0.post0.tar.gz", hash = "sha256:36ac11b0c7c55b71341a549a1803f5c8d61c2279204862b8d50736041b782f59"},
+]
+
+[package.dependencies]
+ops = ">=2.19,<4"
+
+[[package]]
+name = "charmlibs-rollingops"
+version = "1.1.1"
+description = "The charmlibs.rollingops package."
+optional = false
+python-versions = ">=3.12"
+groups = ["main"]
+files = [
+    {file = "charmlibs_rollingops-1.1.1-py3-none-any.whl", hash = "sha256:1e61347c7792ec11afefa60d36f77a5afccf867832854d5aeef2da0b536afec4"},
+    {file = "charmlibs_rollingops-1.1.1.tar.gz", hash = "sha256:831457d2ef12117794f89a483ee9a5c347cb209a87dafe82907e9dede7d4641c"},
+]
+
+[package.dependencies]
+charmlibs-interfaces-tls-certificates = ">=1.8.1"
+charmlibs-pathops = ">=1.2.1"
+dpcharmlibs-interfaces = "1.0.0"
+ops = ">=2.23.1,<4"
+pydantic = ">=2.12.5"
+shortuuid = ">=1.0.13"
+tenacity = "*"
+
+[[package]]
 name = "charmlibs-snap"
 version = "1.0.1"
 description = "The charmlibs.snap package."
@@ -859,6 +895,27 @@ cffi = {version = ">=2.0.0", markers = "platform_python_implementation != \"PyPy
 ssh = ["bcrypt (>=3.1.5)"]
 
 [[package]]
+name = "data-platform-helpers"
+version = "1.1.0"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.10"
+groups = ["main"]
+files = [
+    {file = "data_platform_helpers-1.1.0-py3-none-any.whl", hash = "sha256:71b2c2ba31d1bc01c55c9da82d02b0cb654b99231172916722ecaf4c469d27c4"},
+    {file = "data_platform_helpers-1.1.0.tar.gz", hash = "sha256:7539ef1c1047fec36ee8298aa4c75fe2bb36419544193b691805c12ca407a797"},
+]
+
+[package.dependencies]
+ops = ">=3,<4"
+pydantic = ">=2.11,<3"
+rich = "*"
+
+[package.extras]
+all = ["pytest-operator"]
+tests = ["pytest-operator"]
+
+[[package]]
 name = "decorator"
 version = "5.3.1"
 description = "Decorators for Humans"
@@ -869,6 +926,22 @@ files = [
     {file = "decorator-5.3.1-py3-none-any.whl", hash = "sha256:f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c"},
     {file = "decorator-5.3.1.tar.gz", hash = "sha256:4cbcdd55a6efadb9dbea26b858f4fb3264567b52d69ca0d25b721b553f60ea82"},
 ]
+
+[[package]]
+name = "dpcharmlibs-interfaces"
+version = "1.0.0"
+description = "The dpcharmlibs.interfaces package."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "dpcharmlibs_interfaces-1.0.0-py3-none-any.whl", hash = "sha256:afff80be30e3ff8c31f68557946e9d5959247f1973cbc00e96da55b095f95a21"},
+    {file = "dpcharmlibs_interfaces-1.0.0.tar.gz", hash = "sha256:a177653019781a7a165be52cf4293134ee58912cd93686082cdd82da347a3bed"},
+]
+
+[package.dependencies]
+ops = ">=3,<4"
+pydantic = ">=2.11,<3"
 
 [[package]]
 name = "dunamai"
@@ -1413,6 +1486,30 @@ lint = ["flake8 (>3.0)", "flake8-bugbear"]
 testing = ["falcon (>1.4.1)", "httpx", "mailman (>=3.3.1)", "pytest", "pytest-services"]
 
 [[package]]
+name = "markdown-it-py"
+version = "4.2.0"
+description = "Python port of markdown-it. Markdown parsing, done right!"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "markdown_it_py-4.2.0-py3-none-any.whl", hash = "sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"},
+    {file = "markdown_it_py-4.2.0.tar.gz", hash = "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49"},
+]
+
+[package.dependencies]
+mdurl = ">=0.1,<1.0"
+
+[package.extras]
+benchmarking = ["psutil", "pytest", "pytest-benchmark"]
+compare = ["commonmark (>=0.9,<1.0)", "markdown (>=3.4,<4.0)", "markdown-it-pyrs", "mistletoe (>=1.0,<2.0)", "mistune (>=3.0,<4.0)", "panflute (>=2.3,<3.0)"]
+linkify = ["linkify-it-py (>=1,<3)"]
+plugins = ["mdit-py-plugins (>=0.5.0)"]
+profiling = ["gprof2dot"]
+rtd = ["ipykernel", "jupyter_sphinx", "mdit-py-plugins (>=0.5.0)", "myst-parser", "pyyaml", "sphinx", "sphinx-book-theme (>=1.0,<2.0)", "sphinx-copybutton", "sphinx-design"]
+testing = ["coverage", "pytest", "pytest-cov", "pytest-regressions", "pytest-timeout", "requests"]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.3"
 description = "Safely add untrusted strings to HTML/XML markup."
@@ -1528,6 +1625,18 @@ traitlets = "*"
 
 [package.extras]
 test = ["flake8", "matplotlib", "nbdime", "nbval", "notebook", "pytest"]
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+description = "Markdown URL utilities"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
+    {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
+]
 
 [[package]]
 name = "mypy-extensions"
@@ -1756,24 +1865,34 @@ testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "postgresql-charms-single-kernel"
-version = "16.2.2"
+version = "16.3.0"
 description = "Shared and reusable code for PostgreSQL-related charms"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "postgresql_charms_single_kernel-16.2.2-py3-none-any.whl", hash = "sha256:53b485f34aa1159e9875fd8e4d73870bc92e855eeec5175aa76a33829f4446b2"},
-    {file = "postgresql_charms_single_kernel-16.2.2.tar.gz", hash = "sha256:95d027d1d52a4eb0237b2fd7cc6b548b279d7a99f82835659d9553f208dc2f81"},
+    {file = "postgresql_charms_single_kernel-16.3.0-py3-none-any.whl", hash = "sha256:3f0a392b3f26ce3676ac365b49f25baa6ac812f82143c517689935f42114efbd"},
+    {file = "postgresql_charms_single_kernel-16.3.0.tar.gz", hash = "sha256:7e0d7db80d0b1a5a97baf002809c101d55e4ffe5b9f26a3ae20b9b150c6ae51e"},
 ]
 
 [package.dependencies]
+charm-refresh = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-interfaces-tls-certificates = {version = ">=1.8.3", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-pathops = {version = ">=1.0.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-rollingops = {version = ">=1.1.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-snap = {version = ">=1.0.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+data-platform-helpers = {version = ">=0.1.7", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 httpx = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+jinja2 = {version = ">=3.1.6", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 ops = ">=2.0.0"
-psycopg2 = ">=2.9.10"
+psycopg2 = {version = ">=2.9.10", optional = true, markers = "extra == \"postgresql\""}
+pydantic = {version = ">=2.0", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+requests = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 tenacity = ">=9.0.0"
+tomli = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 
 [package.extras]
-postgresql = ["httpx ; python_full_version >= \"3.12.0\""]
+postgresql = ["charm-refresh ; python_full_version >= \"3.12.0\"", "charmlibs-interfaces-tls-certificates (>=1.8.3) ; python_full_version >= \"3.12.0\"", "charmlibs-pathops (>=1.0.1) ; python_full_version >= \"3.12.0\"", "charmlibs-rollingops (>=1.1.1) ; python_full_version >= \"3.12.0\"", "charmlibs-snap (>=1.0.1) ; python_full_version >= \"3.12.0\"", "data-platform-helpers (>=0.1.7) ; python_full_version >= \"3.12.0\"", "httpx ; python_full_version >= \"3.12.0\"", "jinja2 (>=3.1.6) ; python_full_version >= \"3.12.0\"", "psycopg2 (>=2.9.10)", "pydantic (>=2.0) ; python_full_version >= \"3.12.0\"", "requests ; python_full_version >= \"3.12.0\"", "tomli ; python_full_version >= \"3.12.0\""]
 
 [[package]]
 name = "prompt-toolkit"
@@ -2167,7 +2286,7 @@ version = "2.20.0"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.9"
-groups = ["integration", "unit"]
+groups = ["main", "integration", "unit"]
 files = [
     {file = "pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176"},
     {file = "pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f"},
@@ -2490,6 +2609,25 @@ requests = ">=2.0.0"
 rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
 
 [[package]]
+name = "rich"
+version = "15.0.0"
+description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+files = [
+    {file = "rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb"},
+    {file = "rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36"},
+]
+
+[package.dependencies]
+markdown-it-py = ">=2.2.0"
+pygments = ">=2.13.0,<3.0.0"
+
+[package.extras]
+jupyter = ["ipywidgets (>=7.5.1,<9)"]
+
+[[package]]
 name = "rpds-py"
 version = "2026.5.1"
 description = "Python bindings to Rust's persistent data structures (rpds)"
@@ -2674,6 +2812,18 @@ botocore = ">=1.37.4,<2.0a0"
 
 [package.extras]
 crt = ["botocore[crt] (>=1.37.4,<2.0a0)"]
+
+[[package]]
+name = "shortuuid"
+version = "1.0.13"
+description = "A generator library for concise, unambiguous and URL-safe UUIDs."
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "shortuuid-1.0.13-py3-none-any.whl", hash = "sha256:a482a497300b49b4953e15108a7913244e1bb0d41f9d332f5e9925dba33a3c5a"},
+    {file = "shortuuid-1.0.13.tar.gz", hash = "sha256:3bb9cf07f606260584b1df46399c0b87dd84773e7b25912b7e391e30797c5e72"},
+]
 
 [[package]]
 name = "six"
@@ -3040,4 +3190,4 @@ h11 = ">=0.16.0,<1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "b71f6a0877c412d0e74d9e3d3dbeb1df9e88257f40c578f5dd32b2a108e46fc8"
+content-hash = "433afa5359fa97a0559631f1c87511bd8b71869a207ceec91849d27693f0030d"
