@@ -20,12 +20,14 @@ from charmlibs import snap
 from ops import (
     ActiveStatus,
     BlockedStatus,
+    ErrorStatus,
     JujuVersion,
     MaintenanceStatus,
     ModelError,
     RelationDataTypeError,
     RelationEvent,
     Unit,
+    UnknownStatus,
     WaitingStatus,
 )
 from ops.framework import EventBase
@@ -378,6 +380,33 @@ def test_enable_disable_extensions(harness, caplog):
             assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
+@pytest.mark.parametrize("unsettable_status", [ErrorStatus(), UnknownStatus()])
+def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, unsettable_status):
+    # enable_disable_extensions caches the current unit status and restores it
+    # afterwards. The getter can return statuses the backend rejects on set
+    # (e.g. "error" or "unknown") left over from a previously failed hook;
+    # restoring such a cached status must not be attempted, otherwise the backend
+    # raises InvalidStatusError/ModelError and deadlocks the unit.
+    with (
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("subprocess.check_output", return_value=b"C"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+    ):
+        _get_primary.return_value = harness.charm.unit
+        postgresql_mock.enable_disable_extensions.side_effect = None
+
+        # Cache an unsettable status that would otherwise be restored verbatim.
+        harness.charm.unit._status = unsettable_status
+
+        # Must not raise when the cached status is restored at the end.
+        harness.charm.enable_disable_extensions()
+
+        # The unsettable cached status was skipped, not restored.
+        assert not isinstance(harness.charm.unit.status, ErrorStatus | UnknownStatus)
+
+
 def test_on_start_no_password(harness):
     """Test start is deferred when passwords are not yet generated."""
     with (
@@ -528,6 +557,73 @@ def test_on_start_success(harness):
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
+
+
+def test_setup_users_skips_writes_on_standby_cluster(harness):
+    """A standby cluster is read-only, so _setup_users must not issue write DDL (DPE-10284)."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+    ):
+        # Even though this would raise on a read-only standby, the guard must
+        # short-circuit before create_predefined_instance_roles is ever called.
+        _postgresql.create_predefined_instance_roles.side_effect = (
+            psycopg2.errors.ReadOnlySqlTransaction
+        )
+
+        harness.charm._setup_users()
+
+        _postgresql.create_predefined_instance_roles.assert_not_called()
+        _postgresql.create_user.assert_not_called()
+        _postgresql.set_up_database.assert_not_called()
+        _oversee_users.assert_not_called()
+
+
+def test_setup_users_runs_on_primary_cluster(harness):
+    """On a primary cluster _setup_users provisions the predefined roles and users."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+    ):
+        _postgresql.list_users.return_value = []
+        _postgresql.list_access_groups.return_value = set()
+
+        harness.charm._setup_users()
+
+        _postgresql.create_predefined_instance_roles.assert_called_once()
+        assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
+        _oversee_users.assert_called_once()
+
+
+def test_is_standby_cluster(harness):
+    """is_standby_cluster is relation-based and independent of the Patroni API."""
+    with (
+        patch("charm.PostgreSQLAsyncReplication.is_primary_cluster") as _is_primary_cluster,
+        patch.object(harness.charm.model, "get_relation") as _get_relation,
+    ):
+        # No replication relation at all -> not a standby cluster.
+        _get_relation.return_value = None
+        assert harness.charm.is_standby_cluster is False
+
+        # Replication relation present, and this app is the primary cluster.
+        _get_relation.return_value = Mock()
+        _is_primary_cluster.return_value = True
+        assert harness.charm.is_standby_cluster is False
+
+        # Replication relation present, and this app is NOT the primary cluster -> standby.
+        _is_primary_cluster.return_value = False
+        assert harness.charm.is_standby_cluster is True
 
 
 def test_on_start_replica(harness):
@@ -1199,6 +1295,18 @@ def test_check_detached_storage(harness):
         with pytest.raises(StorageUnavailableError):
             harness.charm._check_detached_storage()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
+
+
+@pytest.mark.parametrize("unsettable_status", [ErrorStatus(), UnknownStatus()])
+def test_check_detached_storage_does_not_restore_unsettable_status(harness, unsettable_status):
+    # The unit.status getter can return statuses that the juju backend rejects
+    # on set (e.g. "error" or "unknown"). Restoring such a cached status must not
+    # be attempted, otherwise the backend raises InvalidStatusError/ModelError.
+    harness.charm.unit._status = unsettable_status
+    with patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True):
+        # Storage is attached, so the cached status would be restored verbatim;
+        # this must not raise.
+        harness.charm._check_detached_storage()
 
 
 def test_restart(harness):
