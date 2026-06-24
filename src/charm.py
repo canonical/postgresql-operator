@@ -25,8 +25,25 @@ from urllib.parse import urlparse
 
 import charm_refresh
 import ops.log
-import psycopg2
-import psycopg2.errors
+
+# First platform-specific import, will fail on wrong architecture
+try:
+    import psycopg2
+    import psycopg2.errors
+except ModuleNotFoundError:
+    from ops.main import main
+    from single_kernel_postgresql.utils.arch import (
+        WrongArchitectureWarningCharm,
+        is_wrong_architecture,
+    )
+
+    # If the charm was deployed inside a host with different architecture
+    # (possibly due to user specifying an incompatible revision)
+    # then deploy an empty blocked charm with a warning.
+    if is_wrong_architecture() and __name__ == "__main__":
+        main(WrongArchitectureWarningCharm)
+    raise
+
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -60,16 +77,44 @@ from ops import (
 )
 from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.compat.postgresql import PostgreSQLBaseError
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
+    APP_SCOPE,
     BACKUP_USER,
+    DATABASE,
+    DATABASE_DEFAULT_NAME,
+    DATABASE_PORT,
+    METRICS_PORT,
+    MONITORING_PASSWORD_KEY,
     MONITORING_USER,
-    PEER,
+    PATRONI_PASSWORD_KEY,
+    PEER_RELATION,
+    PGBACKREST_METRICS_PORT,
+    PLUGIN_OVERRIDES,
+    RAFT_PASSWORD_KEY,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+    REPLICATION_PASSWORD_KEY,
     REPLICATION_USER,
+    REWIND_PASSWORD_KEY,
     REWIND_USER,
+    SECRET_DELETED_LABEL,
+    SECRET_INTERNAL_LABEL,
+    SECRET_KEY_OVERRIDES,
+    SNAP_USER,
+    SPI_MODULE,
     SYSTEM_USERS,
+    TLS_CA_BUNDLE_FILE,
+    TLS_CA_FILE,
+    TLS_CERT_FILE,
+    TLS_KEY_FILE,
+    TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
+    UNIT_SCOPE,
     USER,
-    Substrates,
+    USER_PASSWORD_KEY,
 )
+from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.utils import label2name, new_password, render_file
 from single_kernel_postgresql.utils.postgresql import (
@@ -103,44 +148,16 @@ from cluster_topology_observer import (
     ClusterTopologyObserver,
     start_raft_observer,
 )
-from config import CharmConfig
 from constants import (
-    APP_SCOPE,
-    DATABASE,
-    DATABASE_DEFAULT_NAME,
-    DATABASE_PORT,
-    METRICS_PORT,
-    MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
     PATRONI_CONF_PATH,
-    PATRONI_PASSWORD_KEY,
-    PGBACKREST_METRICS_PORT,
     PGBACKREST_MONITORING_SNAP_SERVICE,
-    PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_DIR,
     RAFT_PARTNER_PREFIX,
-    RAFT_PASSWORD_KEY,
     RAFT_PORT,
-    REPLICATION_CONSUMER_RELATION,
-    REPLICATION_OFFER_RELATION,
-    REPLICATION_PASSWORD_KEY,
-    REWIND_PASSWORD_KEY,
-    SECRET_DELETED_LABEL,
-    SECRET_INTERNAL_LABEL,
-    SECRET_KEY_OVERRIDES,
-    SNAP_DAEMON_USER,
-    SPI_MODULE,
     TEMP_DATA_DIR,
     TEMP_STORAGE_PATH,
-    TLS_CA_BUNDLE_FILE,
-    TLS_CA_FILE,
-    TLS_CERT_FILE,
-    TLS_KEY_FILE,
-    TRACING_PROTOCOL,
-    TRACING_RELATION_NAME,
-    UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
-    USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
@@ -344,13 +361,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.peer_relation_app = DataPeerData(
             self.model,
-            relation_name=PEER,
+            relation_name=PEER_RELATION,
             secret_field_name=SECRET_INTERNAL_LABEL,
             deleted_label=SECRET_DELETED_LABEL,
         )
         self.peer_relation_unit = DataPeerUnitData(
             self.model,
-            relation_name=PEER,
+            relation_name=PEER_RELATION,
             secret_field_name=SECRET_INTERNAL_LABEL,
             deleted_label=SECRET_DELETED_LABEL,
         )
@@ -364,11 +381,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
-        self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
+        self.framework.observe(
+            self.on[PEER_RELATION].relation_changed, self._on_peer_relation_changed
+        )
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         # add specific handler for updated system-user secrets
         self.framework.observe(self.on.secret_changed, self._on_secret_changed)
-        self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
+        self.framework.observe(
+            self.on[PEER_RELATION].relation_departed, self._on_peer_relation_departed
+        )
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -385,8 +406,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = TLS(self, PEER)
-        self.tls_transfer = TLSTransfer(self, PEER)
+        self.tls = TLS(self, PEER_RELATION)
+        self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
@@ -427,12 +448,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
-                {"path": "/metrics", "port": METRICS_PORT},
-                {"path": "/metrics", "port": PGBACKREST_METRICS_PORT},
+                {"path": "/metrics", "port": int(METRICS_PORT)},
+                {"path": "/metrics", "port": int(PGBACKREST_METRICS_PORT)},
             ],
             scrape_configs=self.patroni_scrape_config,
             refresh_events=[
-                self.on[PEER].relation_changed,
+                self.on[PEER_RELATION].relation_changed,
                 self.on.secret_changed,
                 self.on.secret_remove,
             ],
@@ -640,7 +661,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if scope not in get_args(SCOPES):
             raise RuntimeError("Unknown secret scope.")
 
-        if not (peers := self.model.get_relation(PEER)):
+        if not (peers := self.model.get_relation(PEER_RELATION)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
@@ -653,7 +674,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not value:
             return self.remove_secret(scope, key)
 
-        if not (peers := self.model.get_relation(PEER)):
+        if not (peers := self.model.get_relation(PEER_RELATION)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
@@ -663,7 +684,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if scope not in get_args(SCOPES):
             raise RuntimeError("Unknown secret scope.")
 
-        if not (peers := self.model.get_relation(PEER)):
+        if not (peers := self.model.get_relation(PEER_RELATION)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         self.peer_relation_data(scope).delete_relation_data(peers.id, [secret_key])
@@ -732,13 +753,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         temp_dir = Path(TEMP_DATA_DIR)
         temp_dir.mkdir(parents=True, exist_ok=True)
-        shutil.chown(temp_dir, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+        shutil.chown(temp_dir, user=SNAP_USER, group=SNAP_USER)
         if temp_dir.parent.exists():
-            shutil.chown(temp_dir.parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+            shutil.chown(temp_dir.parent, user=SNAP_USER, group=SNAP_USER)
 
         data_parent = Path(POSTGRESQL_DATA_DIR).parent
         if data_parent.exists():
-            shutil.chown(data_parent, user=SNAP_DAEMON_USER, group=SNAP_DAEMON_USER)
+            shutil.chown(data_parent, user=SNAP_USER, group=SNAP_USER)
 
     def _resolve_primary_host(self) -> str | None:
         """Wait for Patroni to settle and return the primary host.
@@ -906,7 +927,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 primary_endpoint = None
             elif primary_endpoint not in self._units_ips:
                 if len(self._peers.units) == 0:
-                    logger.info(f"The unit didn't join {PEER} relation? Using {primary_endpoint}")
+                    logger.info(
+                        f"The unit didn't join {PEER_RELATION} relation? Using {primary_endpoint}"
+                    )
                 elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
                 else:
@@ -1416,7 +1439,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
 
-    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> str | None:
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER_RELATION) -> str | None:
         """Get the IP address of a specific unit.
 
         Args:
@@ -1574,7 +1597,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def _unit_ip(self) -> str | None:
         """Current unit ip."""
-        if binding := self.model.get_binding(PEER):
+        if binding := self.model.get_binding(PEER_RELATION):
             return str(binding.network.bind_address)
 
     @property
@@ -1622,7 +1645,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Updating relation endpoints addresses")
         updates = {}
         for key, val in (
-            (f"{PEER}-address", self._unit_ip),
+            (f"{PEER_RELATION}-address", self._unit_ip),
             (f"{DATABASE}-address", self._database_ip),
             (f"{REPLICATION_OFFER_RELATION}-address", self._replication_offer_ip),
             (f"{REPLICATION_CONSUMER_RELATION}-address", self._replication_consumer_ip),
@@ -2217,7 +2240,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            updateable_users = [*SYSTEM_USERS, BACKUP_USER]
+            updateable_users = list(SYSTEM_USERS)
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
@@ -2574,7 +2597,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
              A:class:`ops.model.Relation` object representing
              the peer relation.
         """
-        return self.model.get_relation(PEER)
+        return self.model.get_relation(PEER_RELATION)
 
     def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""

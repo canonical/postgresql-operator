@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from charmlibs.systemd import daemon_reload, service_enable
 from jinja2 import Template
 from ops import ActiveStatus, CharmEvents, EventBase, EventSource, Object
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.utils import render_file
 
 if TYPE_CHECKING:

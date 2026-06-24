@@ -11,7 +11,8 @@ from charmlibs import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
-from single_kernel_postgresql.config.literals import REWIND_USER, Substrates
+from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.literals import REWIND_USER
 from tenacity import (
     RetryError,
     stop_after_delay,

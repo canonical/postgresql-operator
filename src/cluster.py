@@ -26,13 +26,15 @@ from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
+from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import (
     API_REQUEST_TIMEOUT,
-    PEER,
+    PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PEER_RELATION,
     POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
+    TLS_CA_BUNDLE_FILE,
     USER,
-    Substrates,
 )
 from single_kernel_postgresql.utils import (
     _change_owner,
@@ -54,7 +56,6 @@ from tenacity import (
 
 from constants import (
     LOGS_DATA_DIR,
-    PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
@@ -64,7 +65,6 @@ from constants import (
     POSTGRESQL_LOGS_PATH,
     RAFT_PARTNER_PREFIX,
     RAFT_PORT,
-    TLS_CA_BUNDLE_FILE,
 )
 
 logger = logging.getLogger(__name__)
@@ -963,10 +963,10 @@ class Patroni:
 
         # Leader doesn't always trigger when changing it's own peer data.
         if self.charm.unit.is_leader():
-            self.charm.on[PEER].relation_changed.emit(
+            self.charm.on[PEER_RELATION].relation_changed.emit(
                 unit=self.charm.unit,
                 app=self.charm.app,
-                relation=self.charm.model.get_relation(PEER),
+                relation=self.charm.model.get_relation(PEER_RELATION),
             )
 
     def get_raft_status(self) -> dict | None:

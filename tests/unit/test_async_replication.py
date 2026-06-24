@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from ops import Application
+from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
 from tenacity import RetryError
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
-    REPLICATION_CONSUMER_RELATION,
     PostgreSQLAsyncReplication,
 )
 

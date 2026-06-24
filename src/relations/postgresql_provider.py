@@ -20,7 +20,13 @@ from ops import (
     RelationBrokenEvent,
     RelationDepartedEvent,
 )
-from single_kernel_postgresql.config.literals import SYSTEM_USERS
+from single_kernel_postgresql.config.literals import (
+    APP_SCOPE,
+    DATABASE_MAPPING_LABEL,
+    DATABASE_PORT,
+    SYSTEM_USERS,
+    USERNAME_MAPPING_LABEL,
+)
 from single_kernel_postgresql.utils import label2name, new_password
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
@@ -33,8 +39,6 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
 )
-
-from constants import APP_SCOPE, DATABASE_MAPPING_LABEL, DATABASE_PORT, USERNAME_MAPPING_LABEL
 
 logger = logging.getLogger(__name__)
 

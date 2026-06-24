@@ -11,10 +11,10 @@ import psycopg2
 import pytest
 import requests
 from psycopg2 import sql
+from single_kernel_postgresql.config.locales import SNAP_LOCALES
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from constants import POSTGRESQL_DATA_DIR
-from locales import SNAP_LOCALES
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (
@@ -177,7 +177,7 @@ def test_postgresql_locales(juju: JujuFixture) -> None:
     # Juju 2 has an extra empty element
     if "" in locales:
         locales.remove("")
-    assert locales == list(get_args(SNAP_LOCALES))
+    assert locales == sorted(get_args(SNAP_LOCALES))
 
 
 def test_postgresql_parameters_change(juju: JujuFixture) -> None:

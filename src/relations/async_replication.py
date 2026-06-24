@@ -41,19 +41,21 @@ from ops import (
     SecretNotFoundError,
     WaitingStatus,
 )
+from single_kernel_postgresql.config.literals import (
+    APP_SCOPE,
+    PEER_RELATION,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+)
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 from cluster import ClusterNotPromotedError, NotReadyError, StandbyClusterAlreadyPromotedError
 from constants import (
-    APP_SCOPE,
     ARCHIVE_DATA_DIR,
     LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
-    PEER,
     POSTGRESQL_DATA_DIR,
     POSTGRESQL_DATA_PATH,
-    REPLICATION_CONSUMER_RELATION,
-    REPLICATION_OFFER_RELATION,
     TEMP_DATA_DIR,
 )
 
@@ -324,7 +326,9 @@ class PostgreSQLAsyncReplication(Object):
 
     def _get_secret(self) -> Secret | None:
         """Return async replication necessary secrets."""
-        app_secret = self.charm.model.get_secret(label=f"{PEER}.{self.model.app.name}.app")
+        app_secret = self.charm.model.get_secret(
+            label=f"{PEER_RELATION}.{self.model.app.name}.app"
+        )
         content = app_secret.peek_content()
 
         # Filter out unnecessary secrets.
@@ -669,7 +673,7 @@ class PostgreSQLAsyncReplication(Object):
 
         if (
             relation.name == REPLICATION_OFFER_RELATION
-            and event.secret.label == f"{PEER}.{self.model.app.name}.app"
+            and event.secret.label == f"{PEER_RELATION}.{self.model.app.name}.app"
         ):
             logger.info("Internal secret changed, updating relation secret")
             if not (secret := self._get_secret()):
