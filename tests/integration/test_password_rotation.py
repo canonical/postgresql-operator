@@ -51,6 +51,7 @@ async def test_password_rotation(ops_test: OpsTest):
     monitoring_password = await get_password(ops_test, any_unit_name, "monitoring")
     backup_password = await get_password(ops_test, any_unit_name, "backup")
     rewind_password = await get_password(ops_test, any_unit_name, "rewind")
+    ldap_password = await get_password(ops_test, any_unit_name, "ldap")
     patroni_password = await get_password(ops_test, any_unit_name, "patroni")
 
     # Get the leader unit name (because passwords can only be set through it).
@@ -97,6 +98,14 @@ async def test_password_rotation(ops_test: OpsTest):
     assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
+    # For ldap, generate a specific password and pass it to the action.
+    new_ldap_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="ldap", password=new_ldap_password
+    )
+    assert "password" in result
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
     new_superuser_password = await get_password(ops_test, any_unit_name)
     assert superuser_password != new_superuser_password
     assert new_replication_password == await get_password(ops_test, any_unit_name, "replication")
@@ -107,6 +116,8 @@ async def test_password_rotation(ops_test: OpsTest):
     assert backup_password != new_backup_password
     assert new_rewind_password == await get_password(ops_test, any_unit_name, "rewind")
     assert rewind_password != new_rewind_password
+    assert new_ldap_password == await get_password(ops_test, any_unit_name, "ldap")
+    assert ldap_password != new_ldap_password
 
     # Restart Patroni on any non-leader unit and check that
     # Patroni and PostgreSQL continue to work.
