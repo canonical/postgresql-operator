@@ -345,9 +345,11 @@ class PostgreSQLProvider(Object):
             not self.charm._peers
             or not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
+            or not self.charm.primary_endpoint
         ):
             logger.debug(
-                "Deferring on_relation_broken: Cluster must be initialized before user can be deleted"
+                "Deferring on_relation_broken: Cluster must be initialized and primary "
+                "available before user can be deleted"
             )
             event.defer()
             return

@@ -236,6 +236,10 @@ def test_on_relation_broken(harness):
         patch(
             "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
         ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock(return_value="1.1.1.1"),
+        ) as _primary_endpoint,
     ):
         rel_id = harness.model.get_relation(RELATION_NAME).id
         peer_rel_id = harness.model.get_relation(PEER).id
@@ -253,6 +257,30 @@ def test_on_relation_broken(harness):
                 peer_rel_id, harness.charm.unit.name, {"departing": "True"}
             )
         harness.charm.postgresql_client_relation._on_relation_broken(event)
+        postgresql_mock.delete_user.assert_not_called()
+
+
+def test_on_relation_broken_defers_without_primary(harness):
+    with harness.hooks_disabled():
+        harness.set_leader()
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch(
+            "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
+        ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock(return_value=None),
+        ) as _primary_endpoint,
+    ):
+        rel_id = harness.model.get_relation(RELATION_NAME).id
+        event = Mock()
+        event.relation.id = rel_id
+        # No primary available yet: the event must defer without touching PostgreSQL.
+        harness.charm.postgresql_client_relation._on_relation_broken(event)
+        event.defer.assert_called_once()
+        postgresql_mock.list_users.assert_not_called()
         postgresql_mock.delete_user.assert_not_called()
 
 
