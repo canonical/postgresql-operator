@@ -104,8 +104,8 @@ class ClusterTopologyObserver(Object):
                 new_env["PYTHONPATH"] = f"{venv_path.resolve()}:{new_env['PYTHONPATH']}"
                 break
 
-        urls = [self._charm._patroni._patroni_url] + [
-            self._charm._patroni._patroni_url.replace(self._charm._patroni.unit_ip, peer)
+        urls = [self._charm.state.patroni_url] + [
+            self._charm.state.patroni_url.replace(self._charm._patroni.unit_ip, peer)
             for peer in list(self._charm._patroni.peers_ips)
         ]
 

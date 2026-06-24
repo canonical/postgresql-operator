@@ -148,10 +148,10 @@ class PostgreSQLAsyncReplication(Object):
         # fail the action telling that there is no relation and no standby leader.
         relation = self._relation
         if relation is None:
-            standby_leader = self.charm._patroni.get_standby_leader()
+            standby_leader = self.charm.patroni_manager.get_standby_leader()
             if standby_leader is not None:
                 try:
-                    self.charm._patroni.promote_standby_cluster()
+                    self.charm.patroni_manager.promote_standby_cluster()
                     if self.charm.app.status.message == READ_ONLY_MODE_BLOCKING_MESSAGE:
                         self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
                         self.set_app_status()
@@ -190,8 +190,8 @@ class PostgreSQLAsyncReplication(Object):
                 self._update_primary_cluster_data()
                 # If this is a standby cluster, remove the information from DCS to make it
                 # a normal cluster.
-                if self.charm._patroni.get_standby_leader() is not None:
-                    self.charm._patroni.promote_standby_cluster()
+                if self.charm.patroni_manager.get_standby_leader() is not None:
+                    self.charm.patroni_manager.promote_standby_cluster()
                     try:
                         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                             with attempt:
@@ -386,7 +386,7 @@ class PostgreSQLAsyncReplication(Object):
         # Input is hardcoded
         process = run(  # noqa: S603
             [
-                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.patroni_manager.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_DIR,
             ],
             capture_output=True,
@@ -404,7 +404,7 @@ class PostgreSQLAsyncReplication(Object):
     def _handle_database_start(self, event: RelationChangedEvent) -> None:
         """Handle the database start in the standby cluster."""
         try:
-            if self.charm._patroni.member_started:
+            if self.charm.patroni_manager.member_started:
                 # If the database is started, update the databag in a way the unit is marked as configured
                 # for async replication.
                 self.charm.unit_peer_data.update({"stopped": ""})
@@ -433,7 +433,7 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm._set_primary_status_message()
             elif not self.charm.unit.is_leader():
                 with contextlib.suppress(RetryError):
-                    self.charm._patroni.reload_patroni_configuration()
+                    self.charm.patroni_manager.reload_patroni_configuration()
                 raise NotReadyError()
             else:
                 self.charm.set_unit_status(
@@ -451,7 +451,7 @@ class PostgreSQLAsyncReplication(Object):
             if len(all_primary_cluster_endpoints) > 0:
                 primary_cluster_reachable = False
                 try:
-                    primary = self.charm._patroni.get_primary(
+                    primary = self.charm.patroni_manager.get_primary(
                         alternative_endpoints=all_primary_cluster_endpoints
                     )
                     if primary is not None:
@@ -545,7 +545,7 @@ class PostgreSQLAsyncReplication(Object):
 
         # If this is the standby cluster, set 0 in the "promoted-cluster-counter" field to set
         # the cluster in read-only mode message also in the other units.
-        if self.charm._patroni.get_standby_leader() is not None:
+        if self.charm.patroni_manager.get_standby_leader() is not None:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": "0"})
                 self.set_app_status()
@@ -602,7 +602,7 @@ class PostgreSQLAsyncReplication(Object):
 
         # Update the asynchronous replication configuration and start the database.
         self.charm.update_config()
-        if not self.charm._patroni.start_patroni():
+        if not self.charm.patroni_manager.start_patroni():
             raise Exception("Failed to start patroni service.")
 
         self._handle_database_start(event)
@@ -699,7 +699,7 @@ class PostgreSQLAsyncReplication(Object):
     @property
     def _primary_cluster_endpoint(self) -> str | None:
         """Return the endpoint from one of the sync-standbys, or from the primary if there is no sync-standby."""
-        sync_standby_names = self.charm._patroni.get_sync_standby_names()
+        sync_standby_names = self.charm.patroni_manager.get_sync_standby_names()
         if len(sync_standby_names) > 0:
             unit = self.model.get_unit(sync_standby_names[0])
             return self.charm._get_unit_ip(unit, self._relation.name)  # type: ignore
@@ -786,7 +786,7 @@ class PostgreSQLAsyncReplication(Object):
             try:
                 for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
                     with attempt:
-                        if not self.charm._patroni.stop_patroni():
+                        if not self.charm.patroni_manager.stop_patroni():
                             raise Exception("Failed to stop patroni service.")
             except RetryError:
                 logger.debug("Deferring on_async_relation_changed: patroni hasn't stopped yet.")
@@ -885,12 +885,14 @@ class PostgreSQLAsyncReplication(Object):
     def _wait_for_standby_leader(self, event: RelationChangedEvent) -> bool:
         """Wait for the standby leader to be up and running."""
         try:
-            standby_leader = self.charm._patroni.get_standby_leader(check_whether_is_running=True)
+            standby_leader = self.charm.patroni_manager.get_standby_leader(
+                check_whether_is_running=True
+            )
         except RetryError:
             standby_leader = None
         if not self.charm.unit.is_leader() and standby_leader is None:
-            if self.charm._patroni.is_member_isolated:
-                self.charm._patroni.restart_patroni()
+            if self.charm.patroni_manager.is_member_isolated:
+                self.charm.patroni_manager.restart_patroni()
                 self.charm.set_unit_status(
                     WaitingStatus("Restarting Patroni to rejoin the cluster")
                 )

@@ -444,7 +444,7 @@ class PostgreSQLWatcherRelation(Object):
         if not (unit_ip := self.charm._unit_ip):
             return
 
-        relation.data[self.charm.unit]["version"] = self.charm._patroni.get_postgresql_version()
+        relation.data[self.charm.unit]["version"] = self.charm.workload.get_postgresql_version()
         if self.charm.refresh:
             relation.data[self.charm.unit]["snap"] = self.charm.refresh.pinned_snap_revision
         current_address = relation.data[self.charm.unit].get("unit-address")

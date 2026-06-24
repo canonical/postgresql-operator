@@ -251,7 +251,7 @@ class PostgreSQLProvider(Object):
 
         if (
             not self.charm.is_cluster_initialised
-            or not self.charm._patroni.member_started
+            or not self.charm.patroni_manager.member_started
             or not self.charm.primary_endpoint
         ):
             event.defer()
@@ -348,7 +348,7 @@ class PostgreSQLProvider(Object):
         if (
             not self.charm._peers
             or not self.charm.is_cluster_initialised
-            or not self.charm._patroni.member_started
+            or not self.charm.patroni_manager.member_started
             or not self.charm.primary_endpoint
         ):
             logger.debug(
@@ -453,7 +453,7 @@ class PostgreSQLProvider(Object):
         )
 
         # Get cluster status
-        online_members = self.charm._patroni.online_cluster_members()
+        online_members = self.charm.patroni_manager.online_cluster_members()
         # Filter out-of-sync members
         online_members = [
             member for member in online_members if not member.get("tags", {}).get("nosync", False)
