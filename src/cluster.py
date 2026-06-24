@@ -840,6 +840,7 @@ class Patroni:
         raft_host = "127.0.0.1:2222"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            logger.debug("Local raft status: %s", raft_status)
         except UtilityException:
             logger.warning("Has raft quorum: Cannot connect to raft cluster")
             return False
@@ -909,6 +910,16 @@ class Patroni:
         except Exception:
             return []
 
+    def log_raft_status(self) -> None:
+        """Best-effort dump of local raft status for debugging."""
+        raft_host = "127.0.0.1:2222"
+        try:
+            syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            logger.debug("Local raft status: %s", raft_status)
+        except UtilityException:
+            logger.debug("Local raft status unavailable")
+
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
 
@@ -930,12 +941,14 @@ class Patroni:
         raft_host = "127.0.0.1:2222"
         try:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+            logger.debug("Local raft status: %s", raft_status)
         except UtilityException:
             logger.warning("Remove raft member: Cannot connect to raft cluster")
             raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
+            logger.debug(f"Local raft member %s is missing in cluster", member_ip)
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
