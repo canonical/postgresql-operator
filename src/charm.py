@@ -2429,6 +2429,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
+            if not os.path.exists(POSTGRESQL_DATA_DIR):
+                # The data directory is created during bootstrap. If it does not exist yet,
+                # the member has not been initialised (e.g. update-status firing before the
+                # start event completes), so there is no frozen process to recover.
+                logger.debug(
+                    "Early exit handle_processes_failures: data directory does not exist yet"
+                )
+                return False
             data_directory_contents = os.listdir(POSTGRESQL_DATA_DIR)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
                 os.rename(

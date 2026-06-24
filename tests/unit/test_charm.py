@@ -3411,6 +3411,7 @@ def test_handle_processes_failures(harness):
             "charm.Patroni.restart_patroni",
         ) as _restart_patroni,
         patch("charm.os.listdir", return_value=["other_dirs", "pg_wal"]) as _listdir,
+        patch("charm.os.path.exists", return_value=True) as _exists,
         patch("charm.os.rename") as _rename,
         patch("charm.datetime") as _datetime,
     ):
@@ -3449,6 +3450,15 @@ def test_handle_processes_failures(harness):
         _restart_patroni.assert_called_once_with()
         assert not _rename.called
         _restart_patroni.reset_mock()
+
+        # Does nothing if the data directory does not exist yet (member not bootstrapped)
+        _listdir.reset_mock()
+        _exists.return_value = False
+        assert not harness.charm._handle_processes_failures()
+        assert not _restart_patroni.called
+        assert not _rename.called
+        assert not _listdir.called
+        _exists.return_value = True
 
 
 def test_on_databases_change(harness):
