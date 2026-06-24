@@ -145,14 +145,15 @@ def test_primary_endpoint(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PatroniManager") as _patroni,
     ):
-        _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
-        _patroni.return_value.get_primary.return_value = sentinel.primary
+        _patroni.get_member_ip.return_value = "1.1.1.1"
+        _patroni.get_primary.return_value = sentinel.primary
+
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
-        _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
-        _patroni.return_value.get_primary.assert_called_once_with()
+        _patroni.get_member_ip.assert_called_once_with(sentinel.primary)
+        _patroni.get_primary.assert_called_once_with()
 
 
 def test_primary_endpoint_no_peers(harness):

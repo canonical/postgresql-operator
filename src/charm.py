@@ -366,6 +366,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
+        self.peer_relation_app = DataPeerData(
+            self.model,
+            relation_name=PEER_RELATION,
+            secret_field_name=SECRET_INTERNAL_LABEL,
+            deleted_label=SECRET_DELETED_LABEL,
+        )
+        self.peer_relation_unit = DataPeerUnitData(
+            self.model,
+            relation_name=PEER_RELATION,
+            secret_field_name=SECRET_INTERNAL_LABEL,
+            deleted_label=SECRET_DELETED_LABEL,
+        )
+
         # TODO switch to the abstract class base
         # State
         self.state = CharmState(charm=self, substrate=self.substrate)  # type: ignore
@@ -378,19 +391,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self.config_manager = ConfigManager(
             state=self.state, workload=self.workload, client=self.postgresql
-        )
-
-        self.peer_relation_app = DataPeerData(
-            self.model,
-            relation_name=PEER_RELATION,
-            secret_field_name=SECRET_INTERNAL_LABEL,
-            deleted_label=SECRET_DELETED_LABEL,
-        )
-        self.peer_relation_unit = DataPeerUnitData(
-            self.model,
-            relation_name=PEER_RELATION,
-            secret_field_name=SECRET_INTERNAL_LABEL,
-            deleted_label=SECRET_DELETED_LABEL,
         )
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
