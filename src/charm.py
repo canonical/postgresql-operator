@@ -3030,7 +3030,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             watcher_raft_address=self.watcher_offer.watcher_raft_address
             if self.watcher_offer.is_active
             else None,
-            refresh=self.refresh,
+            refresh=refresh,
         )
         self.config_manager.render_patroni_yml_file(
             connectivity=self.is_connectivity_enabled,
