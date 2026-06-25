@@ -3031,21 +3031,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.watcher_offer.is_active
             else None,
             refresh=refresh,
-        )
-        self.config_manager.render_patroni_yml_file(
-            connectivity=self.is_connectivity_enabled,
-            is_creating_backup=is_creating_backup,
-            enable_ldap=self.is_ldap_enabled,
-            enable_tls=self.is_tls_enabled,
-            backup_id=self.app_peer_data.get("restoring-backup"),
-            pitr_target=self.app_peer_data.get("restore-to-time"),
-            restore_timeline=self.app_peer_data.get("restore-timeline"),
-            restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
-            stanza=self.app_peer_data.get("stanza", self.unit_peer_data.get("stanza")),
-            restore_stanza=self.app_peer_data.get("restore-stanza"),
-            parameters=pg_parameters,
             no_peers=no_peers,
-            user_databases_map=self.relations_user_databases_map,
             # slots=replication_slots,
         )
         if no_peers:
