@@ -95,38 +95,15 @@ class Patroni:
     def __init__(
         self,
         charm: "PostgresqlOperatorCharm",
-        unit_ip: str | None,
-        cluster_name: str,
-        member_name: str,
-        planned_units: int,
-        peers_ips: set[str],
-        superuser_password: str | None,
-        replication_password: str | None,
-        rewind_password: str | None,
         raft_password: str | None,
-        patroni_password: str | None,
     ):
         """Initialize the Patroni class.
 
         Args:
             charm: PostgreSQL charm instance.
-            unit_ip: IP address of the current unit
-            cluster_name: name of the cluster
-            member_name: name of the member inside the cluster
-            planned_units: number of units planned for the cluster
-            peers_ips: IP addresses of the peer units
-            superuser_password: password for the operator user
-            replication_password: password for the user used in the replication
-            rewind_password: password for the user used on rewinds
             raft_password: password for raft
-            patroni_password: password for the user used on patroni
         """
         self.charm = charm
-        self.unit_ip = unit_ip
-        self.cluster_name = cluster_name
-        self.member_name = member_name
-        self.planned_units = planned_units
-        self.peers_ips = peers_ips
         self.raft_password = raft_password
 
     def has_raft_quorum(self) -> bool:

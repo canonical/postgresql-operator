@@ -304,7 +304,7 @@ def test_on_config_changed(harness):
 
 def test_check_extension_dependencies(harness):
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()),
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
@@ -338,11 +338,11 @@ def test_check_extension_dependencies(harness):
 
 def test_enable_disable_extensions(harness, caplog):
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch.object(harness.charm, "patroni_manager"),
         patch("subprocess.check_output", return_value=b"C"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
         _get_primary.return_value = harness.charm.unit
 
@@ -389,11 +389,11 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     # restoring such a cached status must not be attempted, otherwise the backend
     # raises InvalidStatusError/ModelError and deadlocks the unit.
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch("charm.PostgresqlOperatorCharm._patroni"),
         patch("subprocess.check_output", return_value=b"C"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
         _get_primary.return_value = harness.charm.unit
         postgresql_mock.enable_disable_extensions.side_effect = None
@@ -430,8 +430,9 @@ def test_on_start_bootstrap_failure(harness):
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
-        patch(
-            "charm.PostgresqlOperatorCharm._replication_password",
+        patch.object(
+            harness.charm.state.application,
+            "replication_password",
             new_callable=PropertyMock,
         ) as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
@@ -439,7 +440,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("charm.start_raft_observer"),
     ):
@@ -470,9 +471,9 @@ def test_on_start_create_user_error(harness):
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
-            "charm.Patroni.member_started",
+            "charm.PatroniManager.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
         patch(
@@ -526,9 +527,9 @@ def test_on_start_success(harness):
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
-            "charm.Patroni.member_started",
+            "charm.PatroniManager.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
         patch(

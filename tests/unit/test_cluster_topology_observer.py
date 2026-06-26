@@ -6,18 +6,14 @@ from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
 from jinja2 import Template
-from ops.charm import CharmBase
-from ops.model import ActiveStatus, Relation, WaitingStatus
+from ops.model import ActiveStatus, WaitingStatus
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
 from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.literals import PEER_RELATION
 
-from cluster import Patroni
-from cluster_topology_observer import (
-    ClusterTopologyChangeCharmEvents,
-    ClusterTopologyObserver,
-    start_raft_observer,
-)
+from charm import PostgresqlOperatorCharm
+from cluster_topology_observer import start_raft_observer
 from scripts.cluster_topology_observer import (
     UnreachableUnitsError,
     check_for_database_changes,
@@ -27,30 +23,10 @@ from scripts.cluster_topology_observer import (
 from scripts.raft_observer import check_raft_connection
 
 
-class MockCharm(CharmBase):
-    on = ClusterTopologyChangeCharmEvents()
-
-    def __init__(self, *args):
-        super().__init__(*args)
-
-        self.observer = ClusterTopologyObserver(self, "test-command")
-        self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
-
-    def _on_cluster_topology_change(self, _) -> None:
-        self.unit.status = ActiveStatus("cluster topology changed")
-
-    @property
-    def _patroni(self) -> Patroni:
-        return Mock(_patroni_url="http://1.1.1.1:8008/", peers_ips={}, verify=True)
-
-    @property
-    def _peers(self) -> Relation | None:
-        return None
-
-
 @pytest.fixture(autouse=True)
 def harness():
-    harness = Harness(MockCharm, meta="name: test-charm")
+    harness = Harness(PostgresqlOperatorCharm)
+    harness.add_relation(PEER_RELATION, "postgresql")
     harness.begin()
     yield harness
     harness.cleanup()
@@ -60,29 +36,40 @@ def test_start_observer(harness):
     with (
         patch("builtins.open") as _open,
         patch("subprocess.Popen") as _popen,
-        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+        patch(
+            "single_kernel_postgresql.core.peer_relation.PostgreSQLPeer.data",
+            new_callable=PropertyMock,
+        ) as _peer_data,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip", new_callable=PropertyMock),
+        patch(
+            "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
+        ) as _peer_members_ips,
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=True
+        ) as _peers,
     ):
         # Test that nothing is done if there is already a running process.
-        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
-        harness.charm.observer.start_observer()
+        _peer_data.return_value = {"observer-pid": "1"}
+        harness.charm._observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if the charm is not in an active status.
         harness.charm.unit.status = WaitingStatus()
-        _peers.return_value = Mock(data={harness.charm.unit: {}})
-        harness.charm.observer.start_observer()
+        _peer_data.return_value = {}
+        harness.charm._observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if peer relation is not available yet.
         harness.charm.unit.status = ActiveStatus()
         _peers.return_value = None
-        harness.charm.observer.start_observer()
+        harness.charm._observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if there is already a running process.
-        _peers.return_value = Mock(data={harness.charm.unit: {}})
+        _peers.return_value = True
+        _peer_data.return_value = {harness.charm.unit: {}}
         _popen.return_value = Mock(pid=1)
-        harness.charm.observer.start_observer()
+        harness.charm._observer.start_observer()
         _popen.assert_called_once()
 
 
@@ -91,18 +78,28 @@ def test_start_observer_already_running(harness):
         patch("builtins.open") as _open,
         patch("subprocess.Popen") as _popen,
         patch("os.kill") as _kill,
-        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+        patch(
+            "single_kernel_postgresql.core.peer_relation.PostgreSQLPeer.data",
+            new_callable=PropertyMock,
+        ) as _peer_data,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip", new_callable=PropertyMock),
+        patch(
+            "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
+        ) as _peer_members_ips,
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=True
+        ),
     ):
         harness.charm.unit.status = ActiveStatus()
-        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1234"}})
-        harness.charm.observer.start_observer()
+        _peer_data.return_value = {"observer-pid": "1234"}
+        harness.charm._observer.start_observer()
         _kill.assert_called_once_with(1234, 0)
         assert not _popen.called
         _kill.reset_mock()
 
         # If process is already dead, it should restart
         _kill.side_effect = OSError
-        harness.charm.observer.start_observer()
+        harness.charm._observer.start_observer()
         _kill.assert_called_once_with(1234, 0)
         _popen.assert_called_once()
         _kill.reset_mock()
@@ -111,26 +108,36 @@ def test_start_observer_already_running(harness):
 def test_stop_observer(harness):
     with (
         patch("os.kill") as _kill,
-        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+        patch(
+            "single_kernel_postgresql.core.peer_relation.PostgreSQLPeer.data",
+            new_callable=PropertyMock,
+        ) as _peer_data,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip", new_callable=PropertyMock),
+        patch(
+            "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
+        ) as _peer_members_ips,
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=True
+        ),
     ):
         # Test that nothing is done if there is no process running.
-        harness.charm.observer.stop_observer()
+        harness.charm._observer.stop_observer()
         _kill.assert_not_called()
 
-        _peers.return_value = Mock(data={harness.charm.unit: {}})
-        harness.charm.observer.stop_observer()
+        _peer_data.return_value = {}
+        harness.charm._observer.stop_observer()
         _kill.assert_not_called()
 
         # Test that the process is killed.
-        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
-        harness.charm.observer.stop_observer()
+        _peer_data.return_value = {"observer-pid": "1"}
+        harness.charm._observer.stop_observer()
         _kill.assert_called_once_with(1, signal.SIGINT)
         _kill.reset_mock()
 
         # Dead process doesn't break the script
-        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
+        _peer_data.return_value = {"observer-pid": "1"}
         _kill.side_effect = OSError
-        harness.charm.observer.stop_observer()
+        harness.charm._observer.stop_observer()
         _kill.assert_called_once_with(1, signal.SIGINT)
         _kill.reset_mock()
 

@@ -1514,19 +1514,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
-        return Patroni(
-            self,
-            self._unit_ip,
-            self.cluster_name,
-            self._member_name,
-            self.app.planned_units(),
-            self._peer_members_ips,
-            self._get_password(),
-            self._replication_password,
-            self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
-            self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
-        )
+        return Patroni(self, self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY))
 
     @property
     def is_connectivity_enabled(self) -> bool:
