@@ -14,6 +14,7 @@ from unittest.mock import Mock, PropertyMock, patch, sentinel
 
 import pytest
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import TLS_CLIENT_RELATION, TLS_PEER_RELATION
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.managers.tls import TLSManager
 
@@ -183,6 +184,30 @@ def test_reload_bridge_skips_update_config_without_internal_ca(harness):
     with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
         harness.charm._reload_tls_after_push(Mock())
         _update_config.assert_not_called()
+
+
+def test_reload_bridge_wired_on_tls_relation_broken(harness):
+    """Detaching the TLS operator (relation_broken) must trigger the reload bridge.
+
+    Regression test: the VM charm previously observed only certificate_available, so
+    removing a TLS relation left Patroni ssl:on against cleared certs.  Both TLS
+    relations' relation_broken must reach the reload bridge (parity with K8s).
+    """
+    for relation in (TLS_CLIENT_RELATION, TLS_PEER_RELATION):
+        methods = _observers_for(harness, harness.charm.on[relation].relation_broken)
+        assert "_reload_tls_after_push" in methods, (relation, methods)
+
+
+def test_reload_bridge_defers_when_update_config_not_ready(harness):
+    """A transient config-apply failure must defer (retry), not leave stale TLS state."""
+    with harness.hooks_disabled():
+        harness.set_leader(True)
+        harness.charm.set_secret("app", "internal-ca", "ca-content")
+
+    event = Mock()
+    with patch("charm.PostgresqlOperatorCharm.update_config", return_value=False):
+        harness.charm._reload_tls_after_push(event)
+    event.defer.assert_called_once()
 
 
 def test_generate_internal_peer_cert_stores_material(harness):

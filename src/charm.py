@@ -67,6 +67,8 @@ from single_kernel_postgresql.config.literals import (
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
+    TLS_CLIENT_RELATION,
+    TLS_PEER_RELATION,
     USER,
 )
 from single_kernel_postgresql.config.literals import (
@@ -391,13 +393,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLS(self, self._state, self._workload, self.tls_manager)
         # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
         # the handler stores+pushes certs on certificate_available, then we reload so
-        # the new material is picked up. Registered after the handler's own observers
-        # so the push happens before the reload.
+        # the new material is picked up. Also fires on the TLS relations' relation_broken
+        # so detaching the TLS operator re-renders Patroni with TLS disabled and reloads.
+        # Registered after the handler's own observers so the clear+push happens first.
         self.framework.observe(
             self.tls.client_certificate.on.certificate_available, self._reload_tls_after_push
         )
         self.framework.observe(
             self.tls.peer_certificate.on.certificate_available, self._reload_tls_after_push
+        )
+        self.framework.observe(
+            self.on[TLS_CLIENT_RELATION].relation_broken, self._reload_tls_after_push
+        )
+        self.framework.observe(
+            self.on[TLS_PEER_RELATION].relation_broken, self._reload_tls_after_push
         )
         self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
@@ -455,16 +464,28 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         charm_tracing_config(self._grafana_agent)
 
-    def _reload_tls_after_push(self, _event) -> None:
+    def _reload_tls_after_push(self, event) -> None:
         """Reload PostgreSQL after the lib TLS handler stores+pushes certs.
+
+        Also fires on the TLS relations' relation_broken so detaching the TLS
+        operator re-renders Patroni with TLS disabled and reloads.
 
         Mirror the handler's readiness guard: when the internal CA is absent the
         handler defers its push (no files on disk), so skip the reload to avoid
         rendering ssl:on against missing TLS files on an already-running unit.
+
+        A transient config-apply failure (Patroni API unreachable, member not
+        started) defers and retries rather than leaving stale TLS state or failing
+        the hook.
         """
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             return
-        self.update_config()
+        try:
+            if not self.update_config():
+                event.defer()
+        except Exception:
+            logger.exception("TLS reload (update_config) failed; deferring")
+            event.defer()
 
     def _regenerate_internal_cert(self, *, reload: bool = True) -> None:
         """Generate the internal peer cert, push it to the workload, and (optionally) reload.
