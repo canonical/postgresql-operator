@@ -210,6 +210,24 @@ def test_reload_bridge_defers_when_update_config_not_ready(harness):
     event.defer.assert_called_once()
 
 
+def test_reload_bridge_defers_when_tls_files_not_yet_on_disk(harness):
+    """ssl:on must not be rendered until the lib has pushed the cert files to disk."""
+    with harness.hooks_disabled():
+        harness.set_leader(True)
+        harness.charm.set_secret("app", "internal-ca", "ca-content")
+    harness.charm.tls_manager.store_client_tls(
+        key="K", cert="C", ca="CA"
+    )  # is_tls_enabled -> True
+    event = Mock()
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _uc,
+        patch.object(harness.charm.tls_manager, "client_tls_files_on_disk", return_value=False),
+    ):
+        harness.charm._reload_tls_after_push(event)
+    event.defer.assert_called_once()
+    _uc.assert_not_called()
+
+
 def test_generate_internal_peer_cert_stores_material(harness):
     """TLSManager.generate_internal_peer_cert persists internal key/cert into state."""
     with harness.hooks_disabled():

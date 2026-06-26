@@ -480,6 +480,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             return
+        # Don't enable TLS in the config until the lib has written the cert files to
+        # disk (its push can defer on K8s while this local render would still succeed,
+        # which would start Patroni ssl:on against missing files).
+        if self.is_tls_enabled and not self.tls_manager.client_tls_files_on_disk():
+            event.defer()
+            return
         try:
             if not self.update_config():
                 event.defer()
@@ -490,8 +496,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _regenerate_internal_cert(self, *, reload: bool = True) -> None:
         """Generate the internal peer cert, push it to the workload, and (optionally) reload.
 
-        reload=False at cluster bootstrap, where bootstrap re-renders Patroni config and
-        reads the just-pushed TLS files itself.
+        reload=False is used at cluster bootstrap: the leader renders patroni.yml on
+        leader-elected and each replica renders it in _on_peer_relation_changed just
+        before starting Patroni, so a reload here would be redundant. The internal peer
+        cert does not toggle ssl in the config -- only the operator/client cert does, via
+        is_tls_enabled -- so skipping the reload cannot leave a stale ssl setting.
         """
         self.tls_manager.generate_internal_peer_cert()
         self.tls_manager.push_tls_files()
