@@ -3001,13 +3001,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # replication_slots = self.logical_replication.replication_slots()
 
         # Update and reload configuration based on TLS files availability.
+        # TODO move to config manager's update config
         logger.debug(f"Calling render_patroni_yml_file with parameters = {pg_parameters}")
-        self.config_manager.update_config(
+        self.config_manager.render_patroni_yml_file(
+            connectivity=self.state.peer.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
+            enable_ldap=self.state.application.is_ldap_enabled,
             # TODO add rel handler
-            is_tls_enabled=self.is_tls_enabled,
+            enable_tls=self.is_tls_enabled,
+            backup_id=self.state.application.data.get("restoring-backup"),
+            pitr_target=self.state.application.data.get("restore-to-time"),
+            restore_timeline=self.state.application.data.get("restore-timeline"),
+            restore_to_latest=self.state.application.data.get("restore-to-time", None) == "latest",
+            stanza=self.state.application.data.get("stanza", self.state.peer.data.get("stanza")),
+            restore_stanza=self.state.application.data.get("restore-stanza"),
+            parameters=pg_parameters,
             # TODO add rel handler
-            relations_user_databases_map=self.relations_user_databases_map,
+            user_databases_map=self.relations_user_databases_map,
             # TODO add rel handler
             ldap_parameters=self.get_ldap_parameters(),
             # TODO add rel handler
@@ -3018,9 +3028,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             watcher_raft_address=self.watcher_offer.watcher_raft_address
             if self.watcher_offer.is_active
             else None,
-            refresh=refresh,
             no_peers=no_peers,
-            # slots=replication_slots,
         )
         if no_peers:
             return True
