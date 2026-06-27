@@ -704,39 +704,41 @@ def test_on_start_replica(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-# def test_on_start_no_patroni_member(harness):
-#     with (
-#         patch("subprocess.check_output", return_value=b"C"),
-#         patch("charm.snap.SnapCache") as _snap_cache,
-#         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
-#         patch("charm.Patroni") as patroni,
-#         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-#         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
-#         patch(
-#             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
-#         ) as _is_storage_attached,
-#         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
-#         patch("charm.PostgresqlOperatorCharm.get_secret"),
-#         patch("charm.TLS.generate_internal_peer_cert"),
-#         patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
-#         patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
-#         patch("charm.start_raft_observer"),
-#     ):
-#         # Mock the passwords.
-#         patroni.return_value.member_started = False
-#         _get_password.return_value = "fake-operator-password"
-#         bootstrap_cluster = patroni.return_value.bootstrap_cluster
-#         bootstrap_cluster.return_value = True
+def test_on_start_no_patroni_member(harness):
+    with (
+        patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch(
+            "single_kernel_postgresql.workload.base.BaseWorkload.get_postgresql_version"
+        ) as _get_postgresql_version,
+        patch.object(harness.charm, "postgresql") as _postgresql,
+        patch.object(harness.charm, "patroni_manager") as _patroni_manager,
+        patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
+        patch(
+            "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
+        ) as _is_storage_attached,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
+        patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
+        patch("charm.start_raft_observer"),
+    ):
+        # Mock the passwords.
+        _get_postgresql_version.return_value = "16.6"
+        _patroni_manager.member_started = False
+        _get_password.return_value = "fake-operator-password"
+        bootstrap_cluster = _patroni_manager.bootstrap_cluster
+        bootstrap_cluster.return_value = True
 
-#         patroni.return_value.get_postgresql_version.return_value = "16.6"
-
-#         with harness.hooks_disabled():
-#             harness.set_leader()
-#         harness.charm.on.start.emit()
-#         bootstrap_cluster.assert_called_once()
-#         _postgresql.create_user.assert_not_called()
-#         assert isinstance(harness.model.unit.status, WaitingStatus)
-#         assert harness.model.unit.status.message == "awaiting for member to start"
+        with harness.hooks_disabled():
+            harness.set_leader()
+        harness.charm.on.start.emit()
+        bootstrap_cluster.assert_called_once()
+        _postgresql.create_user.assert_not_called()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+        assert harness.model.unit.status.message == "awaiting for member to start"
 
 
 def test_on_start_after_blocked_state(harness):
@@ -1349,156 +1351,166 @@ def test_restart(harness):
         mock_event.defer.assert_not_called()
 
 
-# def test_update_config(harness):
-#     with pathlib.Path("refresh_versions.toml").open("rb") as file:
-#         _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
+def test_update_config(harness):
+    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+        _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
 
-#     class _MockSnap:
-#         revision = _revision
+    class _MockSnap:
+        revision = _revision
 
-#     with (
-#         patch("subprocess.check_output", return_value=b"C"),
-#         patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
-#         patch(
-#             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
-#         ) as _handle_postgresql_restart_need,
-#         patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
-#         patch(
-#             "charm.PostgresqlOperatorCharm._restart_metrics_service"
-#         ) as _restart_metrics_service,
-#         patch(
-#             "charm.PostgresqlOperatorCharm._restart_ldap_sync_service"
-#         ) as _restart_ldap_sync_service,
-#         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
-#         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
-#         patch(
-#             "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock
-#         ) as _is_workload_running,
-#         patch("charm.PatroniManager.render_patroni_yml_file") as _render_patroni_yml_file,
-#         patch(
-#             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
-#         ) as _is_tls_enabled,
-#         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
-#         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
-#         patch.object(
-#             harness.charm,
-#             "_calculate_worker_process_config",
-#             return_value={
-#                 "wal_compression": "on",
-#                 "max_worker_processes": "8",
-#                 "max_parallel_workers": "8",
-#                 "max_parallel_maintenance_workers": "8",
-#                 "max_logical_replication_workers": "8",
-#                 "max_sync_workers_per_subscription": "8",
-#                 "max_parallel_apply_workers_per_subscription": "8",
-#             },
-#         ),
-#     ):
-#         rel_id = harness.model.get_relation(PEER_RELATION).id
-#         # Mock some properties.
-#         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-#         _is_workload_running.side_effect = [True, True, False, True]
-#         _member_started.side_effect = [True, True, False]
-#         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
+    with (
+        patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
+        patch(
+            "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
+        ) as _handle_postgresql_restart_need,
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_metrics_service"
+        ) as _restart_metrics_service,
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_ldap_sync_service"
+        ) as _restart_ldap_sync_service,
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock
+        ) as _is_workload_running,
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
+        ) as _is_tls_enabled,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
+        patch.object(
+            harness.charm,
+            "_calculate_worker_process_config",
+            return_value={
+                "wal_compression": "on",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "8",
+            },
+        ),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        # Mock some properties.
+        postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
+        _is_workload_running.side_effect = [True, True, False, True]
+        _member_started.side_effect = [True, True, False]
+        postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
-#         # Test without TLS files available.
-#         with harness.hooks_disabled():
-#             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
-#         _is_tls_enabled.return_value = False
-#         harness.charm.update_config()
-#         _render_patroni_yml_file.assert_called_once_with(
-#             connectivity=True,
-#             is_creating_backup=False,
-#             enable_ldap=False,
-#             enable_tls=False,
-#             backup_id=None,
-#             stanza=None,
-#             restore_stanza=None,
-#             restore_timeline=None,
-#             pitr_target=None,
-#             restore_to_latest=False,
-#             parameters={
-#                 "test": "test",
-#                 "wal_compression": "on",
-#                 "max_worker_processes": "8",
-#                 "max_parallel_workers": "8",
-#                 "max_parallel_maintenance_workers": "8",
-#                 "max_logical_replication_workers": "8",
-#                 "max_sync_workers_per_subscription": "8",
-#                 "max_parallel_apply_workers_per_subscription": "8",
-#             },
-#             no_peers=False,
-#             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-#             # slots={},
-#         )
-#         _handle_postgresql_restart_need.assert_called_once_with(True)
-#         _restart_ldap_sync_service.assert_called_once()
-#         _restart_metrics_service.assert_called_once()
-#         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        # Test without TLS files available.
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
+        _is_tls_enabled.return_value = False
+        harness.charm.update_config()
+        _render_patroni_yml_file.assert_called_once_with(
+            connectivity=True,
+            is_creating_backup=False,
+            enable_ldap=False,
+            enable_tls=False,
+            backup_id=None,
+            pitr_target=None,
+            restore_timeline=None,
+            restore_to_latest=False,
+            stanza=None,
+            restore_stanza=None,
+            parameters={
+                "test": "test",
+                "wal_compression": "on",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "8",
+            },
+            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            ldap_parameters={},
+            async_primary_cluster_endpoint=None,
+            async_partner_addresses=[],
+            async_standby_endpoints=[],
+            watcher_raft_address=None,
+            no_peers=False,
+            # slots={},
+        )
+        _handle_postgresql_restart_need.assert_called_once_with(True)
+        _restart_ldap_sync_service.assert_called_once()
+        _restart_metrics_service.assert_called_once()
+        assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
-#         # Test with TLS files available.
-#         _handle_postgresql_restart_need.reset_mock()
-#         _restart_ldap_sync_service.reset_mock()
-#         _restart_metrics_service.reset_mock()
-#         harness.update_relation_data(
-#             rel_id, harness.charm.unit.name, {"tls": ""}
-#         )  # Mock some data in the relation to test that it change.
-#         _is_tls_enabled.return_value = True
-#         _render_patroni_yml_file.reset_mock()
-#         harness.charm.update_config()
-#         _render_patroni_yml_file.assert_called_once_with(
-#             connectivity=True,
-#             is_creating_backup=False,
-#             enable_ldap=False,
-#             enable_tls=True,
-#             backup_id=None,
-#             stanza=None,
-#             restore_stanza=None,
-#             restore_timeline=None,
-#             pitr_target=None,
-#             restore_to_latest=False,
-#             parameters={
-#                 "test": "test",
-#                 "wal_compression": "on",
-#                 "max_worker_processes": "8",
-#                 "max_parallel_workers": "8",
-#                 "max_parallel_maintenance_workers": "8",
-#                 "max_logical_replication_workers": "8",
-#                 "max_sync_workers_per_subscription": "8",
-#                 "max_parallel_apply_workers_per_subscription": "8",
-#             },
-#             no_peers=False,
-#             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-#             # slots={},
-#         )
-#         _handle_postgresql_restart_need.assert_called_once()
-#         _restart_ldap_sync_service.assert_called_once()
-#         _restart_metrics_service.assert_called_once()
-#         assert "tls" not in harness.get_relation_data(
-#             rel_id, harness.charm.unit.name
-#         )  # The "tls" flag is set in handle_postgresql_restart_need.
+        # Test with TLS files available.
+        _handle_postgresql_restart_need.reset_mock()
+        _restart_ldap_sync_service.reset_mock()
+        _restart_metrics_service.reset_mock()
+        harness.update_relation_data(
+            rel_id, harness.charm.unit.name, {"tls": ""}
+        )  # Mock some data in the relation to test that it change.
+        _is_tls_enabled.return_value = True
+        _render_patroni_yml_file.reset_mock()
+        harness.charm.update_config()
+        _render_patroni_yml_file.assert_called_once_with(
+            connectivity=True,
+            is_creating_backup=False,
+            enable_ldap=False,
+            enable_tls=True,
+            backup_id=None,
+            pitr_target=None,
+            restore_timeline=None,
+            restore_to_latest=False,
+            stanza=None,
+            restore_stanza=None,
+            parameters={
+                "test": "test",
+                "wal_compression": "on",
+                "max_worker_processes": "8",
+                "max_parallel_workers": "8",
+                "max_parallel_maintenance_workers": "8",
+                "max_logical_replication_workers": "8",
+                "max_sync_workers_per_subscription": "8",
+                "max_parallel_apply_workers_per_subscription": "8",
+            },
+            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            ldap_parameters={},
+            async_primary_cluster_endpoint=None,
+            async_partner_addresses=[],
+            async_standby_endpoints=[],
+            watcher_raft_address=None,
+            no_peers=False,
+            # slots={},
+        )
+        _handle_postgresql_restart_need.assert_called_once()
+        _restart_ldap_sync_service.assert_called_once()
+        _restart_metrics_service.assert_called_once()
+        assert "tls" not in harness.get_relation_data(
+            rel_id, harness.charm.unit.name
+        )  # The "tls" flag is set in handle_postgresql_restart_need.
 
-#         # Test with workload not running yet.
-#         harness.update_relation_data(
-#             rel_id, harness.charm.unit.name, {"tls": ""}
-#         )  # Mock some data in the relation to test that it change.
-#         _handle_postgresql_restart_need.reset_mock()
-#         _restart_ldap_sync_service.reset_mock()
-#         _restart_metrics_service.reset_mock()
-#         harness.charm.update_config()
-#         _handle_postgresql_restart_need.assert_not_called()
-#         assert harness.get_relation_data(rel_id, harness.charm.unit.name)["tls"] == "enabled"
+        # Test with workload not running yet.
+        harness.update_relation_data(
+            rel_id, harness.charm.unit.name, {"tls": ""}
+        )  # Mock some data in the relation to test that it change.
+        _handle_postgresql_restart_need.reset_mock()
+        _restart_ldap_sync_service.reset_mock()
+        _restart_metrics_service.reset_mock()
+        harness.charm.update_config()
+        _handle_postgresql_restart_need.assert_not_called()
+        assert harness.get_relation_data(rel_id, harness.charm.unit.name)["tls"] == "enabled"
 
-#         # Test with member not started yet.
-#         harness.update_relation_data(
-#             rel_id, harness.charm.unit.name, {"tls": ""}
-#         )  # Mock some data in the relation to test that it doesn't change.
-#         _is_tls_enabled.return_value = False
-#         harness.charm.update_config()
-#         _handle_postgresql_restart_need.assert_not_called()
-#         _restart_ldap_sync_service.assert_not_called()
-#         _restart_metrics_service.assert_not_called()
-#         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        # Test with member not started yet.
+        harness.update_relation_data(
+            rel_id, harness.charm.unit.name, {"tls": ""}
+        )  # Mock some data in the relation to test that it doesn't change.
+        _is_tls_enabled.return_value = False
+        harness.charm.update_config()
+        _handle_postgresql_restart_need.assert_not_called()
+        _restart_ldap_sync_service.assert_not_called()
+        _restart_metrics_service.assert_not_called()
+        assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
 
 def test_on_cluster_topology_change(harness):
@@ -2003,60 +2015,60 @@ def test_calculate_worker_process_config_all_workers_validation_blocking(harness
         assert result["max_parallel_workers"] == "18"  # Should accept valid value
 
 
-# def test_update_config_integrates_worker_configs(harness):
-#     """Test that update_config properly integrates worker process configurations."""
-#     with pathlib.Path("refresh_versions.toml").open("rb") as file:
-#         _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
+def test_update_config_integrates_worker_configs(harness):
+    """Test that update_config properly integrates worker process configurations."""
+    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+        _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
 
-#     class _MockSnap:
-#         revision = _revision
+    class _MockSnap:
+        revision = _revision
 
-#     with (
-#         patch("subprocess.check_output", return_value=b"C"),
-#         patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
-#         patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
-#         patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
-#         patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
-#         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
-#         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
-#         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-#         patch(
-#             "charm.PostgresqlOperatorCharm._is_workload_running",
-#             new_callable=PropertyMock,
-#             return_value=True,
-#         ),
-#         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
-#         patch(
-#             "charm.PostgresqlOperatorCharm.is_tls_enabled",
-#             new_callable=PropertyMock,
-#             return_value=False,
-#         ),
-#         patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
-#         patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
-#         patch.object(
-#             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
-#         ),
-#     ):
-#         postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
-#         postgresql_mock.build_postgresql_parameters.return_value = {"shared_buffers": "128MB"}
+    with (
+        patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
+        patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
+        patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
+        patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_tls_enabled",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
+        patch.object(
+            PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
+        ),
+    ):
+        postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
+        postgresql_mock.build_postgresql_parameters.return_value = {"shared_buffers": "128MB"}
 
-#         # Configure worker processes
-#         with harness.hooks_disabled():
-#             harness.update_config({
-#                 "cpu-max-worker-processes": "auto",
-#                 "cpu-wal-compression": True,
-#             })
+        # Configure worker processes
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu-max-worker-processes": "auto",
+                "cpu-wal-compression": True,
+            })
 
-#         harness.charm.update_config()
+        harness.charm.update_config()
 
-#         # Verify render was called with merged parameters
-#         call_args = _render_patroni_yml_file.call_args
-#         parameters = call_args.kwargs["parameters"]
+        # Verify render was called with merged parameters
+        call_args = _render_patroni_yml_file.call_args
+        parameters = call_args.kwargs["parameters"]
 
-#         # Should have original params plus our calculated ones
-#         assert "shared_buffers" in parameters
-#         assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
-#         assert parameters["wal_compression"] == "on"
+        # Should have original params plus our calculated ones
+        assert "shared_buffers" in parameters
+        assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
+        assert parameters["wal_compression"] == "on"
 
 
 def test_config_validation_invalid_worker_values(harness):
@@ -2117,61 +2129,61 @@ def test_config_validation_valid_worker_values(harness):
         assert harness.charm.config.cpu_max_parallel_workers == 1000
 
 
-# def test_update_config_with_none_pg_parameters(harness):
-#     """Test update_config when build_postgresql_parameters returns None."""
-#     with pathlib.Path("refresh_versions.toml").open("rb") as file:
-#         _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
+def test_update_config_with_none_pg_parameters(harness):
+    """Test update_config when build_postgresql_parameters returns None."""
+    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+        _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
 
-#     class _MockSnap:
-#         revision = _revision
+    class _MockSnap:
+        revision = _revision
 
-#     with (
-#         patch("subprocess.check_output", return_value=b"C"),
-#         patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
-#         patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
-#         patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
-#         patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
-#         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
-#         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
-#         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-#         patch(
-#             "charm.PostgresqlOperatorCharm._is_workload_running",
-#             new_callable=PropertyMock,
-#             return_value=True,
-#         ),
-#         patch("charm.PatroniManager.render_patroni_yml_file") as _render_patroni_yml_file,
-#         patch(
-#             "charm.PostgresqlOperatorCharm.is_tls_enabled",
-#             new_callable=PropertyMock,
-#             return_value=False,
-#         ),
-#         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
-#         patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
-#         patch.object(
-#             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
-#         ),
-#     ):
-#         postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
-#         # Return None to test the case where build_postgresql_parameters returns None
-#         postgresql_mock.build_postgresql_parameters.return_value = None
+    with (
+        patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
+        patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
+        patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
+        patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_tls_enabled",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
+        patch.object(
+            PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
+        ),
+    ):
+        postgresql_mock.is_tls_enabled = PropertyMock(return_value=False)
+        # Return None to test the case where build_postgresql_parameters returns None
+        postgresql_mock.build_postgresql_parameters.return_value = None
 
-#         # Configure worker processes
-#         with harness.hooks_disabled():
-#             harness.update_config({
-#                 "cpu-max-worker-processes": "auto",
-#                 "cpu-wal-compression": True,
-#             })
+        # Configure worker processes
+        with harness.hooks_disabled():
+            harness.update_config({
+                "cpu-max-worker-processes": "auto",
+                "cpu-wal-compression": True,
+            })
 
-#         harness.charm.update_config()
+        harness.charm.update_config()
 
-#         # Verify render was called with worker configs only (no pg_parameters)
-#         call_args = _render_patroni_yml_file.call_args
-#         parameters = call_args.kwargs["parameters"]
+        # Verify render was called with worker configs only (no pg_parameters)
+        call_args = _render_patroni_yml_file.call_args
+        parameters = call_args.kwargs["parameters"]
 
-#         # Should only have worker configs since pg_parameters was None
-#         assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
-#         assert parameters["wal_compression"] == "on"
-#         assert "shared_buffers" not in parameters  # pg_parameters was None
+        # Should only have worker configs since pg_parameters was None
+        assert parameters["max_worker_processes"] == "8"  # min(8, 2*4)
+        assert parameters["wal_compression"] == "on"
+        assert "shared_buffers" not in parameters  # pg_parameters was None
 
 
 def test_on_peer_relation_changed(harness):

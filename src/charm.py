@@ -3001,8 +3001,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # replication_slots = self.logical_replication.replication_slots()
 
         # Update and reload configuration based on TLS files availability.
-        # TODO move to config manager's update config
         logger.debug(f"Calling render_patroni_yml_file with parameters = {pg_parameters}")
+        # TODO move to config manager's update config
         self.config_manager.render_patroni_yml_file(
             connectivity=self.state.peer.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
@@ -3029,6 +3029,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.watcher_offer.is_active
             else None,
             no_peers=no_peers,
+            # slots=replication_slots,
         )
         if no_peers:
             return True
