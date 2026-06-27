@@ -145,15 +145,18 @@ def test_primary_endpoint(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PatroniManager") as _patroni,
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=True
+        ),
+        patch("charm.PatroniManager.get_member_ip", return_value="1.1.1.1") as _get_member_ip,
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary) as _get_primary,
     ):
-        _patroni.get_member_ip.return_value = "1.1.1.1"
-        _patroni.get_primary.return_value = sentinel.primary
+        del harness.charm.primary_endpoint
 
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
-        _patroni.get_member_ip.assert_called_once_with(sentinel.primary)
-        _patroni.get_primary.assert_called_once_with()
+        _get_member_ip.assert_called_once_with(sentinel.primary)
+        _get_primary.assert_called_once_with()
 
 
 def test_primary_endpoint_no_peers(harness):
@@ -166,12 +169,14 @@ def test_primary_endpoint_no_peers(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PatroniManager.get_member_ip", return_value="1.1.1.1") as _get_member_ip,
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary) as _get_primary,
+        # patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
     ):
         assert harness.charm.primary_endpoint is None
 
-        assert not _patroni.return_value.get_member_ip.called
-        assert not _patroni.return_value.get_primary.called
+        assert not _get_member_ip.called
+        assert not _get_primary.called
 
 
 def test_on_leader_elected(harness):
@@ -430,9 +435,9 @@ def test_on_start_bootstrap_failure(harness):
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
-        patch.object(
-            harness.charm.state.application,
-            "replication_password",
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary),
+        patch(
+            "single_kernel_postgresql.core.peer_relation.PostgreSQLApplication.replication_password",
             new_callable=PropertyMock,
         ) as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
