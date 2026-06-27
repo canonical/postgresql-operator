@@ -97,7 +97,7 @@ def request_database(_harness):
 def test_on_database_requested(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints,
         patch(
@@ -234,13 +234,14 @@ def test_on_relation_broken(harness):
         harness.set_leader()
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch(
-            "charm.PatroniManager.member_started", new_callable=PropertyMock(return_value=True)
+            "charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True
         ) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock(return_value="1.1.1.1"),
+            new_callable=PropertyMock,
+            return_value="1.1.1.1",
         ) as _primary_endpoint,
     ):
         rel_id = harness.model.get_relation(RELATION_NAME).id
@@ -288,7 +289,7 @@ def test_on_relation_broken_defers_without_primary(harness):
 
 def test_oversee_users(harness):
     with (
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgreSQLProvider._on_relation_broken"),
     ):
         # Create two relations and add the username in their databags.
