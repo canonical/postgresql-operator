@@ -1,0 +1,265 @@
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.89:8008/patroni', 'host': '10.39.134.89', 'port': 5432, 'timeline': 4}, {'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 4, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:337 Shutting down primary: postgresql/0
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary (read-only)
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 5}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:360 Waiting for failover - current roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary (read-only)
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:379 Scaling back up after primary shutdown
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary
+  postgresql/3 [allocating] waiting: waiting for machine
+  postgresql-watcher/0 [idle] active: 
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql-b/0 [idle] active: 
+  postgresql-b/1 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary
+  postgresql/3 [allocating] waiting: waiting for machine
+  postgresql-watcher/0 [idle] active: 
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql-b/0 [idle] active: 
+  postgresql-b/1 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [executing] waiting: waiting to start PostgreSQL
+  postgresql-test-app/0 [executing] active: received database credentials of the first database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] blocked: failed to update cluster members on member
+  postgresql/3 [executing] waiting: waiting to start PostgreSQL
+  postgresql-watcher/0 [executing] active: 
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] maintenance: reconfiguring cluster
+  postgresql/3 [executing] waiting: waiting to start PostgreSQL
+  postgresql-watcher/0 [executing] active: 
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary (degraded)
+  postgresql/3 [executing] active: 
+  postgresql-watcher/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [executing] maintenance: reconfiguring cluster
+  postgresql/3 [executing] active: 
+  postgresql-watcher/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary (degraded)
+  postgresql/3 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: Primary (degraded)
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.39.134.52:8008/patroni', 'host': '10.39.134.52', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:392 Final cluster roles: {'replicas': [], 'primaries': ['postgresql/2'], 'sync_standbys': []}
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.24   unsupported  02:16:52Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.14    active      2  postgresql                          0  no       
+postgresql-b         16.14    active      2  postgresql                          1  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  556  no       received database credentials of the first database
+postgresql-watcher   16.14    active      1  postgresql-watcher   16/edge       32  no       
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-b/0          active    idle   4        10.39.134.224   5432/tcp  
+postgresql-b/1*         active    idle   5        10.39.134.223   5432/tcp  Primary
+postgresql-test-app/0*  active    idle   3        10.39.134.121             received database credentials of the first database
+postgresql-watcher/0*   active    idle   2        10.39.134.49              Raft connected, monitoring 2 PostgreSQL endpoints; WARNING: watcher shares AZ 'runnervmmklqx' with postgresql/3, post...
+postgresql/2*           active    idle   6        10.39.134.52    5432/tcp  Primary (degraded)
+postgresql/3            active    idle   7        10.39.134.183   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+2        started  10.39.134.49   juju-da016d-2  ubuntu@24.04  runnervmmklqx  Running
+3        started  10.39.134.121  juju-da016d-3  ubuntu@24.04  runnervmmklqx  Running
+4        started  10.39.134.224  juju-da016d-4  ubuntu@24.04  runnervmmklqx  Running
+5        started  10.39.134.223  juju-da016d-5  ubuntu@24.04  runnervmmklqx  Running
+6        started  10.39.134.52   juju-da016d-6  ubuntu@24.04  runnervmmklqx  Running
+7        started  10.39.134.183  juju-da016d-7  ubuntu@24.04  runnervmmklqx  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:46:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:46:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:46:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:46:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:47:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:47:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:48:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:48:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:48:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:48:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:48:58 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 576, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 291, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbae3f72ab0 state=finished raised Exception>]
+machine-4: 01:48:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:48:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:49:02 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 576, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 291, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdfc8d99820 state=finished raised Exception>]
+unit-postgresql-0: 01:49:07 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 576, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 291, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd7bbf55790 state=finished raised Exception>]
+unit-postgresql-0: 01:49:08 ERROR unit.postgresql/0.juju-log cluster:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 576, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 291, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd7bbf48e90 state=finished raised Exception>]
+unit-postgresql-b-0: 01:52:50 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+controller-0: 01:53:57 ERROR juju.worker.provisioner failed to remove dead machine "1"
+machine-6: 01:56:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:56:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+controller-0: 01:59:25 ERROR juju.worker.provisioner failed to remove dead machine "0"
+machine-7: 02:02:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 02:02:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
