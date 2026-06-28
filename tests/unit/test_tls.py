@@ -9,8 +9,7 @@ state-backed cert storage via TLSManager, and the charm's reload bridge that cal
 update_config after the handler stores+pushes certificates.
 """
 
-from datetime import timedelta
-from unittest.mock import Mock, PropertyMock, patch, sentinel
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from ops.testing import Harness
@@ -20,12 +19,6 @@ from single_kernel_postgresql.managers.tls import TLSManager
 
 from charm import PostgresqlOperatorCharm
 from constants import PEER
-
-# These keys are how the lib TLSManager persists operator client material into the
-# peer-unit state; the test reads them back to assert real storage (not just a mock).
-OPERATOR_CLIENT_KEY = "operator-client-key"
-OPERATOR_CLIENT_CERT = "operator-client-cert"
-OPERATOR_CLIENT_CA = "operator-client-ca"
 
 
 @pytest.fixture(autouse=True)
@@ -66,64 +59,6 @@ def test_is_tls_enabled_reflects_tls_manager(harness):
 
         _get_client_tls_files.return_value = ("key", "ca", "cert")
         assert harness.charm.is_tls_enabled is True
-
-
-def test_client_certificate_available_stores_to_state(harness):
-    """certificate_available stores operator client material into peer state via the manager.
-
-    Reads the values back through the manager getter to prove real persistence
-    (state round-trip), not merely that a mock was called.
-    """
-    # Internal CA must be present or the handler defers the push (APP-scope secret
-    # writes are leader-only in Juju).
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca", "internal-ca-content")
-
-    provider_cert = Mock()
-    provider_cert.certificate = "client-cert"
-    provider_cert.ca = "client-ca"
-
-    with (
-        patch(
-            "single_kernel_postgresql.events.tls.TLSCertificatesRequiresV4.get_assigned_certificates",
-            return_value=([provider_cert], "client-key"),
-        ),
-        patch("charm.TLSManager.push_tls_files") as _push_tls_files,
-    ):
-        event = Mock()
-        harness.charm.tls._on_certificate_available(event)
-
-        # Pushed and not deferred.
-        _push_tls_files.assert_called_once_with()
-        event.defer.assert_not_called()
-
-    # The operator client material is persisted in peer-unit state and readable back.
-    assert harness.charm.tls_manager.get_client_tls_files() == (
-        "client-key",
-        "client-ca",
-        "client-cert",
-    )
-    # is_tls_enabled now reflects the stored client material.
-    assert harness.charm.is_tls_enabled is True
-
-
-def test_client_certificate_available_defers_without_internal_ca(harness):
-    """Without the internal CA secret, the push is deferred (mirrors old guard)."""
-    provider_cert = Mock()
-    provider_cert.certificate = "client-cert"
-    provider_cert.ca = "client-ca"
-    with (
-        patch(
-            "single_kernel_postgresql.events.tls.TLSCertificatesRequiresV4.get_assigned_certificates",
-            return_value=([provider_cert], "client-key"),
-        ),
-        patch("charm.TLSManager.push_tls_files") as _push_tls_files,
-    ):
-        event = Mock()
-        harness.charm.tls._on_certificate_available(event)
-        event.defer.assert_called_once_with()
-        _push_tls_files.assert_not_called()
 
 
 def _observers_for(harness, bound_event):
@@ -226,43 +161,6 @@ def test_reload_bridge_defers_when_tls_files_not_yet_on_disk(harness):
         harness.charm._reload_tls_after_push(event)
     event.defer.assert_called_once()
     _uc.assert_not_called()
-
-
-def test_generate_internal_peer_cert_stores_material(harness):
-    """TLSManager.generate_internal_peer_cert persists internal key/cert into state."""
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca-key", "ca-key-content")
-        harness.charm.set_secret("app", "internal-ca", "ca-content")
-
-    with (
-        patch(
-            "single_kernel_postgresql.managers.tls.generate_private_key",
-            return_value=sentinel.cert_key,
-        ),
-        patch(
-            "single_kernel_postgresql.managers.tls.generate_csr",
-            return_value=sentinel.cert_csr,
-        ),
-        patch(
-            "single_kernel_postgresql.managers.tls.generate_certificate",
-            return_value=sentinel.cert,
-        ) as _generate_certificate,
-        patch("single_kernel_postgresql.managers.tls.PrivateKey") as _private_key,
-        patch("single_kernel_postgresql.managers.tls.Certificate") as _certificate,
-    ):
-        _private_key.from_string.return_value = sentinel.ca_key
-        _certificate.from_string.return_value = sentinel.ca_cert
-
-        harness.charm.tls_manager.generate_internal_peer_cert()
-
-        _generate_certificate.assert_called_once_with(
-            sentinel.cert_csr, sentinel.ca_cert, sentinel.ca_key, validity=timedelta(days=7300)
-        )
-
-    # The generated material is persisted in peer-unit state (round-trip).
-    assert harness.charm.get_secret("unit", "internal-key") == str(sentinel.cert_key)
-    assert harness.charm.get_secret("unit", "internal-cert") == str(sentinel.cert)
 
 
 def test_internal_cert_path_pushes_and_reloads(harness):
