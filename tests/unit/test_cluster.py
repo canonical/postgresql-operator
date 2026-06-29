@@ -47,11 +47,7 @@ def test_cleanup_raft_cluster(patroni):
         patch(
             "charm.PostgresqlOperatorCharm._remove_from_members_ips"
         ) as _remove_from_members_ips,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running",
-            new_callable=PropertyMock,
-            return_value=True,
-        ) as _is_workload_running,
+        patch("charm.PatroniManager.is_patroni_running", return_value=True),
     ):
         # Error connecting to raft
         _tcp_utility.side_effect = Exception

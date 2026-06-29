@@ -1476,7 +1476,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except RetryError:
                 self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
         else:
-            self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
+            self.set_unit_status(BlockedStatus("failed to update cluster members on member2"))
 
     def _get_unit_ip(self, unit: Unit, relation_name: str = PEER_RELATION) -> str | None:
         """Get the IP address of a specific unit.
@@ -2686,16 +2686,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.backup.start_stop_pgbackrest_service()
 
     @property
-    def _is_workload_running(self) -> bool:
-        """Returns whether the workload is running (in an active state)."""
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            return False
-
-        return charmed_postgresql_snap.services["patroni"]["active"]
-
-    @property
     def _can_connect_to_postgresql(self) -> bool:
         if not self.postgresql.password or not self.postgresql.current_host:
             return False
@@ -2983,7 +2973,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if no_peers:
             return True
 
-        if not self._is_workload_running:
+        if not self.patroni_manager.is_patroni_running():
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to

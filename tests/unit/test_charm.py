@@ -1373,9 +1373,7 @@ def test_update_config(harness):
         ) as _restart_ldap_sync_service,
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock
-        ) as _is_workload_running,
+        patch("charm.PatroniManager.is_patroni_running") as _is_patroni_running,
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
@@ -1399,7 +1397,7 @@ def test_update_config(harness):
         rel_id = harness.model.get_relation(PEER_RELATION).id
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-        _is_workload_running.side_effect = [True, True, False, True]
+        _is_patroni_running.side_effect = [True, True, False, True]
         _member_started.side_effect = [True, True, False]
         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
@@ -2032,11 +2030,7 @@ def test_update_config_integrates_worker_configs(harness):
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
+        patch("charm.PatroniManager.is_patroni_running", return_value=True),
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",
@@ -2146,11 +2140,7 @@ def test_update_config_with_none_pg_parameters(harness):
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
+        patch("charm.PatroniManager.is_patroni_running", return_value=True),
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",
@@ -2481,17 +2471,6 @@ def test_clean_ca_file_from_workload(harness):
         assert harness.charm.clean_ca_file_from_workload("ca-app")
         _unlink.assert_called_once()
         _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
-
-
-def test_is_workload_running(harness):
-    with patch("charm.snap.SnapCache") as _snap_cache:
-        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
-
-        pg_snap.present = False
-        assert not (harness.charm._is_workload_running)
-
-        pg_snap.present = True
-        assert harness.charm._is_workload_running
 
 
 def test_get_available_memory(harness):
