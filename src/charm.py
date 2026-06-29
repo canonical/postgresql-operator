@@ -1452,7 +1452,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
         except RetryError:
-            logger.exception("trace")
             logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
             event.defer()
 
