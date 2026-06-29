@@ -8,6 +8,7 @@ from ops import Unit
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
@@ -17,7 +18,6 @@ from single_kernel_postgresql.utils.postgresql import (
 )
 
 from charm import PostgresqlOperatorCharm
-from constants import PEER
 
 DATABASE = "test_database"
 EXTRA_USER_ROLES = "CREATEDB,CREATEROLE"
@@ -54,7 +54,7 @@ def harness():
     # Define some relations.
     rel_id = harness.add_relation(RELATION_NAME, "application")
     harness.add_relation_unit(rel_id, "application/0")
-    peer_rel_id = harness.add_relation(PEER, harness.charm.app.name)
+    peer_rel_id = harness.add_relation(PEER_RELATION, harness.charm.app.name)
     harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/0")
     harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/1")
     harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/2")
@@ -116,7 +116,7 @@ def test_on_database_requested(harness):
         ),
     ):
         rel_id = harness.model.get_relation(RELATION_NAME).id
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         with harness.hooks_disabled():
             harness.update_relation_data(peer_rel_id, "postgresql", {"user_hash": "relhash"})
             harness.update_relation_data(peer_rel_id, "postgresql/0", {"user_hash": "relhash"})
@@ -208,7 +208,7 @@ def test_on_database_requested(harness):
 
 def test_on_relation_departed(harness):
     with patch("charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when this unit is departing the relation (due to a scale down event).
         assert "departing" not in harness.get_relation_data(peer_rel_id, harness.charm.unit)
         event = Mock()
@@ -236,9 +236,13 @@ def test_on_relation_broken(harness):
         patch(
             "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
         ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock(return_value="1.1.1.1"),
+        ) as _primary_endpoint,
     ):
         rel_id = harness.model.get_relation(RELATION_NAME).id
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when this unit is departing the relation (due to the relation being broken between the apps).
         event = Mock()
         event.relation.id = rel_id
@@ -253,6 +257,30 @@ def test_on_relation_broken(harness):
                 peer_rel_id, harness.charm.unit.name, {"departing": "True"}
             )
         harness.charm.postgresql_client_relation._on_relation_broken(event)
+        postgresql_mock.delete_user.assert_not_called()
+
+
+def test_on_relation_broken_defers_without_primary(harness):
+    with harness.hooks_disabled():
+        harness.set_leader()
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch(
+            "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
+        ) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock(return_value=None),
+        ) as _primary_endpoint,
+    ):
+        rel_id = harness.model.get_relation(RELATION_NAME).id
+        event = Mock()
+        event.relation.id = rel_id
+        # No primary available yet: the event must defer without touching PostgreSQL.
+        harness.charm.postgresql_client_relation._on_relation_broken(event)
+        event.defer.assert_called_once()
+        postgresql_mock.list_users.assert_not_called()
         postgresql_mock.delete_user.assert_not_called()
 
 
@@ -319,7 +347,7 @@ def test_update_endpoints_with_event(harness: Harness):
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id,
@@ -401,7 +429,7 @@ def test_update_endpoints_without_event(harness):
 
         relation_ids = [rel.id for rel in harness.charm.model.relations[RELATION_NAME]]
         other_rel_ids = set(relation_ids) - set({rel_id, another_rel_id})
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
 
         with harness.hooks_disabled():
             harness.update_relation_data(

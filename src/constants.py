@@ -3,36 +3,13 @@
 
 """File containing constants to be used in the charm."""
 
-BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
-DATABASE = "database"
-DATABASE_DEFAULT_NAME = "postgres"
-DATABASE_PORT = "5432"
-PEER = "database-peers"
-ALL_CLIENT_RELATIONS = [DATABASE]
-REPLICATION_CONSUMER_RELATION = "replication"
-REPLICATION_OFFER_RELATION = "replication-offer"
-PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
-BACKUP_USER = "backup"
-TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PGBACKREST_MONITORING_SNAP_SERVICE = "pgbackrest-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
-SNAP_DAEMON_USER = "_daemon_"
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
-# pgBackRest logging configuration
-# We use stderr for all error/warning output to have a consistent, predictable error extraction
-# mechanism. By default, pgBackRest uses stdout (console) for warnings, but we standardize on
-# stderr to avoid potential log duplication and to make error handling more reliable.
-# Reference: https://pgbackrest.org/configuration.html#section-log
-PGBACKREST_LOG_LEVEL_STDERR = "--log-level-stderr=warn"
-# pgBackRest error codes
-PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE = (
-    82  # Archive timeout - unable to archive WAL files within configured timeout period
-)
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
@@ -63,47 +40,5 @@ UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
-METRICS_PORT = 9187
-PGBACKREST_METRICS_PORT = 9854
-
-# Labels are not confidential
-REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
-REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
-USER_PASSWORD_KEY = "operator-password"  # noqa: S105
-MONITORING_PASSWORD_KEY = "monitoring-password"  # noqa: S105
-RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
-PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
-SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
-SECRET_DELETED_LABEL = "None"  # noqa: S105
-SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
-
-USERNAME_MAPPING_LABEL = "custom-usernames"
-DATABASE_MAPPING_LABEL = "prefix-databases"
-
-APP_SCOPE = "app"
-UNIT_SCOPE = "unit"
-
-SECRET_KEY_OVERRIDES = {"ca": "cauth"}
-
-TRACING_PROTOCOL = "otlp_http"
-
-# Watcher constants
-WATCHER_OFFER_RELATION = "watcher-offer"
-WATCHER_RELATION = "watcher"
-WATCHER_USER = "watcher"
-
-# Labels are not confidential
-WATCHER_PASSWORD_KEY = "watcher-password"  # noqa: S105
-WATCHER_SECRET_LABEL = "watcher-secret"  # noqa: S105
-
 RAFT_PORT = 2222
 RAFT_PARTNER_PREFIX = "partner_node_status_server_"
-
-BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
-PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
-
-SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
-
-TRACING_RELATION_NAME = "tracing"
-
-PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"

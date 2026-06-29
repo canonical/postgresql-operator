@@ -27,18 +27,20 @@ from ops import (
     SecretNotFoundError,
 )
 from pysyncobj.utility import TcpUtility
-from single_kernel_postgresql.utils import new_password
-
-from constants import (
-    RAFT_PARTNER_PREFIX,
+from single_kernel_postgresql.config.literals import (
     RAFT_PASSWORD_KEY,
-    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     WATCHER_OFFER_RELATION,
     WATCHER_PASSWORD_KEY,
     WATCHER_SECRET_LABEL,
     WATCHER_USER,
+)
+from single_kernel_postgresql.utils import new_password
+
+from constants import (
+    RAFT_PARTNER_PREFIX,
+    RAFT_PORT,
 )
 
 if TYPE_CHECKING:

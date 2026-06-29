@@ -563,6 +563,7 @@ def test_member_inactive_true(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "stopped"}
 
@@ -581,6 +582,7 @@ def test_member_inactive_false(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "starting"}
 
@@ -599,6 +601,7 @@ def test_member_inactive_error(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.side_effect = Exception
 
@@ -610,6 +613,18 @@ def test_member_inactive_error(peers_ips, patroni):
             timeout=5,
             auth=patroni._patroni_auth,
         )
+
+
+def test_member_inactive_patroni_not_running(peers_ips, patroni):
+    with (
+        patch("cluster.requests.get") as _get,
+        patch("charm.Patroni.is_patroni_running", return_value=False),
+    ):
+        # When the Patroni snap service is not running, the member is inactive
+        # and we must not waste time querying the Patroni REST API.
+        assert patroni.member_inactive
+
+        _get.assert_not_called()
 
 
 def test_patroni_logs(patroni):

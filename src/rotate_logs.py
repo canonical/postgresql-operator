@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING
 
 from ops.framework import Object
 from ops.model import ActiveStatus
-
-from constants import PGBACKREST_LOGROTATE_FILE
+from single_kernel_postgresql.config.literals import PGBACKREST_LOGROTATE_FILE
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm

@@ -13,12 +13,15 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from ops.testing import Harness
-from single_kernel_postgresql.config.literals import TLS_CLIENT_RELATION, TLS_PEER_RELATION
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION,
+    TLS_CLIENT_RELATION,
+    TLS_PEER_RELATION,
+)
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.managers.tls import TLSManager
 
 from charm import PostgresqlOperatorCharm
-from constants import PEER
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +34,7 @@ def _platform_machine(monkeypatch):
 @pytest.fixture(autouse=True)
 def harness(_platform_machine):
     harness = Harness(PostgresqlOperatorCharm)
-    peer_rel_id = harness.add_relation(PEER, "postgresql")
+    peer_rel_id = harness.add_relation(PEER_RELATION, "postgresql")
     harness.add_relation_unit(peer_rel_id, "postgresql/0")
     harness.begin()
     yield harness
