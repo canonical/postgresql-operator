@@ -66,7 +66,6 @@ from ops import (
     Relation,
     RelationDepartedEvent,
     RelationEvent,
-    RelationNotFoundError,
     SecretChangedEvent,
     SecretNotFoundError,
     SecretRemoveEvent,
@@ -508,7 +507,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 and (cert := load_pem_x509_certificate(raw_cert.encode()))
                 and (
                     cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-                    != self._unit_ip
+                    != self.state.unit_ip
                 )
             ):
                 self.tls.generate_internal_peer_cert()
@@ -649,7 +648,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
+                "static_configs": [{"targets": [f"{self.state.unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
                 "scheme": "https",
             }
@@ -817,7 +816,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     target_host = self.patroni_manager.get_member_ip(primary)
                     if not target_host:
                         raise Exception("Primary IP not available yet")
-                    if target_host != self._unit_ip or self.is_primary:
+                    if target_host != self.state.unit_ip or self.is_primary:
                         return target_host
                     raise Exception("Patroni not settled yet")
         except RetryError:
@@ -1126,8 +1125,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 for unit in self._peers.units:
                     if ip := self._get_unit_ip(unit):
                         self._add_to_members_ips(ip)
-            if self._unit_ip:
-                self._add_to_members_ips(self._unit_ip)
+            if self.state.unit_ip:
+                self._add_to_members_ips(self.state.unit_ip)
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
@@ -1241,7 +1240,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Don't update this member before it's part of the members list.
-        if self._unit_ip not in self.members_ips:
+        if self.state.unit_ip not in self.members_ips:
             logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
             return False
         return True
@@ -1409,7 +1408,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # hook, the configuration is updated and the service is started - or only
         # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
-        current_ip = self._unit_ip
+        current_ip = self.state.unit_ip
         if stored_ip is None:
             self.unit_peer_data.update({"ip": current_ip})
             return False
@@ -1561,7 +1560,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         # Get all members IPs and remove the current unit IP from the list.
         addresses = self.members_ips
-        current_unit_ip = self._unit_ip
+        current_unit_ip = self.state.unit_ip
         if current_unit_ip in addresses:
             addresses.remove(current_unit_ip)
         return addresses
@@ -1576,8 +1575,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Get all members IPs and remove the current unit IP from the list.
         addresses = set()
 
-        if self._unit_ip:
-            addresses.add(self._unit_ip)
+        if self.state.unit_ip:
+            addresses.add(self.state.unit_ip)
         if self._peers:
             for unit in self._peers.units:
                 if ip := self._get_unit_ip(unit):
@@ -1622,61 +1621,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 ips.remove(ip_to_remove)
         self.app_peer_data["members_ips"] = json.dumps(ips)
 
-    @property
-    def _unit_ip(self) -> str | None:
-        """Current unit ip."""
-        if binding := self.model.get_binding(PEER_RELATION):
-            return str(binding.network.bind_address)
-
-    @property
-    def _database_ip(self) -> str | None:
-        """Database endpoint address."""
-        with suppress(RelationNotFoundError):
-            if binding := self.model.get_binding(DATABASE):
-                return str(binding.network.bind_address)
-
-    @property
-    def _replication_offer_ip(self) -> str | None:
-        """Async replication offer endpoint address."""
-        with suppress(RelationNotFoundError):
-            if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
-                return str(binding.network.bind_address)
-
-    @property
-    def _replication_consumer_ip(self) -> str | None:
-        """Async replication consumer endpoint address."""
-        with suppress(RelationNotFoundError):
-            if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
-                return str(binding.network.bind_address)
-
-    @property
-    def listen_ips(self) -> list[str]:
-        """Return the IPs to listen on.
-
-        This is used to configure the PostgreSQL server.
-        Peer relation IP must be first in list.
-        ref.: https://patroni.readthedocs.io/en/latest/yaml_configuration.html#postgresql
-        """
-        ips = []
-        if self._unit_ip:
-            ips.append(self._unit_ip)
-        if self._database_ip and self._database_ip not in ips:
-            ips.append(self._database_ip)
-        if self._replication_offer_ip and self._replication_offer_ip not in ips:
-            ips.append(self._replication_offer_ip)
-        if self._replication_consumer_ip and self._replication_consumer_ip not in ips:
-            ips.append(self._replication_consumer_ip)
-        return ips
-
     def update_endpoint_addresses(self) -> None:
         """Update ip addresses for relation endpoints on unit peer databag."""
         logger.debug("Updating relation endpoints addresses")
         updates = {}
         for key, val in (
-            (f"{PEER_RELATION}-address", self._unit_ip),
-            (f"{DATABASE}-address", self._database_ip),
-            (f"{REPLICATION_OFFER_RELATION}-address", self._replication_offer_ip),
-            (f"{REPLICATION_CONSUMER_RELATION}-address", self._replication_consumer_ip),
+            (f"{PEER_RELATION}-address", self.state.unit_ip),
+            (f"{DATABASE}-address", self.state.database_ip),
+            (f"{REPLICATION_OFFER_RELATION}-address", self.state.replication_offer_ip),
+            (f"{REPLICATION_CONSUMER_RELATION}-address", self.state.replication_consumer_ip),
         ):
             if val:
                 updates[key] = val
@@ -1696,9 +1649,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug(f"Local raft status: {raft_status}")
         if (
             not raft_status
-            or not self._unit_ip
+            or not self.state.unit_ip
             or not self.is_cluster_initialised
-            or self._unit_ip not in self.members_ips
+            or self.state.unit_ip not in self.members_ips
             or self.has_raft_keys()
             or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
         ):
@@ -1713,12 +1666,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
-        local_addr = f"{self._unit_ip}:{RAFT_PORT}"
+        local_addr = f"{self.state.unit_ip}:{RAFT_PORT}"
         remote_addr = (
             watcher_addr
             if (watcher_addr := self.watcher_offer.watcher_raft_address)
             and self.watcher_offer.is_active
-            else f"{next(member for member in self.members_ips if member != self._unit_ip)}:{RAFT_PORT}"
+            else f"{next(member for member in self.members_ips if member != self.state.unit_ip)}:{RAFT_PORT}"
         )
         try:
             self._patroni.remove_raft_member(
@@ -1795,8 +1748,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
         # (the cluster should start with only this member).
-        if self._unit_ip and self._unit_ip not in self.members_ips:
-            self._add_to_members_ips(self._unit_ip)
+        if self.state.unit_ip and self.state.unit_ip not in self.members_ips:
+            self._add_to_members_ips(self.state.unit_ip)
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
@@ -1996,7 +1949,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
             self.tls.generate_internal_peer_cert()
 
-        self.unit_peer_data.update({"ip": self._unit_ip})
+        self.unit_peer_data.update({"ip": self.state.unit_ip})
         self._ensure_storage_layout()
 
         # Open port
@@ -2019,7 +1972,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _restart_services_after_reboot(self):
         """Restart the Patroni and pgBackRest after a reboot."""
-        if self._unit_ip in self.members_ips:
+        if self.state.unit_ip in self.members_ips:
             self.patroni_manager.start_patroni()
             self.backup.start_stop_pgbackrest_service()
 
@@ -2479,7 +2432,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
-        if self._unit_ip in self.members_ips and self.patroni_manager.member_inactive:
+        if self.state.unit_ip in self.members_ips and self.patroni_manager.member_inactive:
             if not os.path.exists(POSTGRESQL_DATA_DIR):
                 # The data directory is created during bootstrap. If it does not exist yet,
                 # the member has not been initialised (e.g. update-status firing before the

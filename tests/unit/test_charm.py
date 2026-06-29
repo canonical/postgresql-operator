@@ -344,7 +344,7 @@ def test_enable_disable_extensions(harness, caplog):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _get_primary,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
         patch.object(harness.charm, "patroni_manager"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(harness.charm, "postgresql") as postgresql_mock,
@@ -395,7 +395,7 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     # raises InvalidStatusError/ModelError and deadlocks the unit.
     with (
         patch("charm.PatroniManager.get_primary") as _get_primary,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
         patch("charm.PostgresqlOperatorCharm._patroni"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
@@ -2872,7 +2872,7 @@ def test_handle_postgresql_restart_need(harness):
             "charm.PatroniManager.reload_patroni_configuration"
         ) as _reload_patroni_configuration,
         patch("charm.PostgresqlOperatorCharm.is_restart_pending") as _is_restart_pending,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
         ) as _is_tls_enabled,
@@ -2938,7 +2938,7 @@ def test_on_peer_relation_departed(harness):
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
         patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
-        patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
         patch("charm.PatroniManager.get_member_ip") as _get_member_ip,
     ):
         rel_id = harness.model.get_relation(PEER_RELATION).id
@@ -3203,7 +3203,7 @@ def test_override_patroni_restart_condition(harness):
             "charm.PatroniManager.update_patroni_restart_condition"
         ) as _update_restart_condition,
         patch("charm.PatroniManager.get_patroni_restart_condition") as _get_restart_condition,
-        patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
     ):
         _get_restart_condition.return_value = "always"
 
@@ -3276,7 +3276,7 @@ def test_restart_services_after_reboot(harness):
         ) as _start_stop_pgbackrest_service,
         patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch(
-            "charm.PostgresqlOperatorCharm._unit_ip",
+            "single_kernel_postgresql.core.state.CharmState.unit_ip",
             new_callable=PropertyMock(return_value="1.1.1.1"),
         ) as _unit_ip,
     ):

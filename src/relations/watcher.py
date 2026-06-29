@@ -441,7 +441,7 @@ class PostgreSQLWatcherRelation(Object):
         if not relation:
             return
 
-        if not (unit_ip := self.charm._unit_ip):
+        if not (unit_ip := self.charm.state.unit_ip):
             return
 
         relation.data[self.charm.unit]["version"] = self.charm.workload.get_postgresql_version()
