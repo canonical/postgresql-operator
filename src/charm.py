@@ -386,12 +386,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
         self.tls_manager = TLSManager(state=self.state, workload=self.workload)
-        self.cluster_manager = ClusterManager(
-            state=self.state, workload=self.workload, client=self.postgresql
-        )
-        self.config_manager = ConfigManager(
-            state=self.state, workload=self.workload, client=self.postgresql
-        )
+        self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
+        self.config_manager = ConfigManager(state=self.state, workload=self.workload)
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)

@@ -151,8 +151,6 @@ def test_primary_endpoint(harness):
         patch("charm.PatroniManager.get_member_ip", return_value="1.1.1.1") as _get_member_ip,
         patch("charm.PatroniManager.get_primary", return_value=sentinel.primary) as _get_primary,
     ):
-        del harness.charm.primary_endpoint
-
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
         _get_member_ip.assert_called_once_with(sentinel.primary)
@@ -343,11 +341,13 @@ def test_check_extension_dependencies(harness):
 
 def test_enable_disable_extensions(harness, caplog):
     with (
-        patch("charm.PatroniManager.get_primary") as _get_primary,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
+        ) as _get_primary,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch.object(harness.charm, "patroni_manager"),
         patch("subprocess.check_output", return_value=b"C"),
-        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql") as postgresql_mock,
     ):
         _get_primary.return_value = harness.charm.unit
 
