@@ -33,6 +33,12 @@ from ops import (
 )
 from ops.testing import Harness
 from psycopg2 import OperationalError
+from single_kernel_postgresql.config.exceptions import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
@@ -46,12 +52,6 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
     StorageUnavailableError,
-)
-from cluster import (
-    NotReadyError,
-    RemoveRaftMemberFailedError,
-    SwitchoverFailedError,
-    SwitchoverNotSyncError,
 )
 from constants import (
     POSTGRESQL_DATA_DIR,

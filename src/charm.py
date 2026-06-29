@@ -77,6 +77,12 @@ from ops import (
 from ops_tracing import Tracing, set_destination
 from single_kernel_postgresql.compat.postgresql import PostgreSQLBaseError
 from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.exceptions import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from single_kernel_postgresql.config.literals import (
     APP_SCOPE,
     BACKUP_USER,
@@ -142,13 +148,7 @@ from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
-from cluster import (
-    NotReadyError,
-    Patroni,
-    RemoveRaftMemberFailedError,
-    SwitchoverFailedError,
-    SwitchoverNotSyncError,
-)
+from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,

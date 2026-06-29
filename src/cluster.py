@@ -13,6 +13,13 @@ from typing import TYPE_CHECKING
 import psutil
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
+from single_kernel_postgresql.config.exceptions import (
+    AddRaftMemberFailedError,
+    RaftNotPromotedError,
+    RaftPostgresqlNotUpError,
+    RaftPostgresqlStillUpError,
+    RemoveRaftMemberFailedError,
+)
 from single_kernel_postgresql.config.literals import (
     PEER_RELATION,
 )
@@ -39,54 +46,6 @@ PATRONI_TIMEOUT = 10
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
-
-
-class RaftPostgresqlNotUpError(Exception):
-    """Postgresql not yet started."""
-
-
-class RaftPostgresqlStillUpError(Exception):
-    """Postgresql not yet down."""
-
-
-class RaftNotPromotedError(Exception):
-    """Leader not yet set when reinitialising raft."""
-
-
-class ClusterNotPromotedError(Exception):
-    """Raised when a cluster is not promoted."""
-
-
-class NotReadyError(Exception):
-    """Raised when not all cluster members healthy or finished initial sync."""
-
-
-class EndpointNotReadyError(Exception):
-    """Raised when an endpoint is not ready."""
-
-
-class StandbyClusterAlreadyPromotedError(Exception):
-    """Raised when a standby cluster is already promoted."""
-
-
-class AddRaftMemberFailedError(Exception):
-    """Raised when adding raft member failed for some reason."""
-
-
-class RemoveRaftMemberFailedError(Exception):
-    """Raised when a remove raft member failed for some reason."""
-
-
-class SwitchoverFailedError(Exception):
-    """Raised when a switchover failed for some reason."""
-
-
-class SwitchoverNotSyncError(SwitchoverFailedError):
-    """Raised when a switchover failed because node is not sync."""
-
-
-class UpdateSyncNodeCountError(Exception):
-    """Raised when updating synchronous_node_count failed for some reason."""
 
 
 class Patroni:

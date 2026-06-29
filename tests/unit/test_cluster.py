@@ -7,10 +7,14 @@ from unittest.mock import Mock, PropertyMock, patch, sentinel
 import pytest
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
+from single_kernel_postgresql.config.exceptions import (
+    AddRaftMemberFailedError,
+    RemoveRaftMemberFailedError,
+)
 from tenacity import wait_fixed
 
 from charm import PostgresqlOperatorCharm
-from cluster import AddRaftMemberFailedError, Patroni, RemoveRaftMemberFailedError
+from cluster import Patroni
 from constants import PATRONI_CONF_PATH, RAFT_PARTNER_PREFIX
 
 PATRONI_SERVICE = "patroni"
