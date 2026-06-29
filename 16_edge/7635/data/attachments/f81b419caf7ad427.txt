@@ -1,0 +1,39 @@
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network client created
+
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network peers created
+
+[32mINFO    [0m integration.spaces.conftest:conftest.py:37 LXD network created: Network isolated created
+
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju reload-spaces --model testing
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing client 10.0.0.1/24
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing peers 10.10.10.1/24
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing isolated 10.20.20.1/24
+[32mINFO    [0m root:test_spaced_async_replication.py:47 Creating model: testing-other
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-model --no-switch testing-other
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju reload-spaces --model testing-other
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing-other client 10.0.0.1/24
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing-other peers 10.10.10.1/24
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju add-space --model testing-other isolated 10.20.20.1/24
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju set-model-constraints --model testing-other arch=amd64
+[32mINFO    [0m root:test_spaced_async_replication.py:99 Deploying postgresql clusters
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing /root/snap/juju/common/tmp6yg0dpzo/_temp.charm db1 --base ubuntu@24.04 --bind 'database-peers=peers database=client watcher-offer=peers' --config profile=testing --constraints arch=amd64 --constraints spaces=client,peers --num-units 2
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing postgresql-watcher watcher1 --base ubuntu@24.04 --bind 'database-peers=peers watcher=peers' --channel 16/edge --config profile=testing --constraints arch=amd64 --constraints spaces=client,peers
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing-other /root/snap/juju/common/tmpa6i8smf4/_temp.charm db2 --base ubuntu@24.04 --bind 'database-peers=peers database=client watcher-offer=peers' --config profile=testing --constraints arch=amd64 --constraints spaces=client,peers --num-units 2
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing-other postgresql-watcher watcher2 --base ubuntu@24.04 --bind 'database-peers=peers watcher=peers' --channel 16/edge --config profile=testing --constraints arch=amd64 --constraints spaces=client,peers
+[32mINFO    [0m root:test_spaced_async_replication.py:140 Deploying tls operators
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing self-signed-certificates --base ubuntu@24.04 --channel 1/stable --constraints arch=amd64
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju offer testing.self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju consume --model testing-other testing.self-signed-certificates certificates-offer
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing db1 watcher1
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing db1:client-certificates self-signed-certificates
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing db1:peer-certificates self-signed-certificates
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing-other db2 watcher2
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing-other db2:client-certificates certificates-offer
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing-other db2:peer-certificates certificates-offer
+[32mINFO    [0m root:test_spaced_async_replication.py:159 Deploying test application
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing postgresql-test-app test-app1 --base ubuntu@24.04 --bind database=client --channel latest/edge --constraints arch=amd64 --constraints spaces=client
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju deploy --model testing-other postgresql-test-app test-app2 --base ubuntu@24.04 --bind database=client --channel latest/edge --constraints arch=amd64 --constraints spaces=client
+[32mINFO    [0m root:test_spaced_async_replication.py:181 Relating test application
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing test-app1:database db1:database
+[32mINFO    [0m jubilant:_juju.py:535 cli: juju integrate --model testing-other test-app2:database db2:database
+[32mINFO    [0m root:test_spaced_async_replication.py:185 Waiting for the applications to settle
