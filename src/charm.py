@@ -1452,6 +1452,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
         except RetryError:
+            logger.exception("trace")
             logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
             event.defer()
 
@@ -1476,7 +1477,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except RetryError:
                 self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
         else:
-            self.set_unit_status(BlockedStatus("failed to update cluster members on member2"))
+            self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
 
     def _get_unit_ip(self, unit: Unit, relation_name: str = PEER_RELATION) -> str | None:
         """Get the IP address of a specific unit.

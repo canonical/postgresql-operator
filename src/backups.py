@@ -167,7 +167,7 @@ class PostgreSQLBackups(Object):
         # yet while other unit already has TLS enabled.
         return not (
             not self.charm.patroni_manager.member_started
-            and (len(self.charm.all_peer_data.keys()) == 2)
+            and (len(self.charm._peers.data.keys()) == 2)  # type: ignore
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
