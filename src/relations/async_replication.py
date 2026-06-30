@@ -390,7 +390,7 @@ class PostgreSQLAsyncReplication(Object):
         # Input is hardcoded
         process = run(  # noqa: S603
             [
-                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.patroni_manager.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.workload.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_DIR,
             ],
             capture_output=True,

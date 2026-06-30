@@ -246,7 +246,7 @@ class PostgreSQLBackups(Object):
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
             return_code, system_identifier_from_instance, error = self._execute_command([
-                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.patroni_manager.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.workload.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_DIR,
             ])
             if return_code != 0:

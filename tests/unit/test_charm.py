@@ -1373,7 +1373,7 @@ def test_update_config(harness):
         ) as _restart_ldap_sync_service,
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
-        patch("charm.PatroniManager.is_patroni_running") as _is_patroni_running,
+        patch("charm.VMWorkload.is_patroni_running") as _is_patroni_running,
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
@@ -2030,7 +2030,7 @@ def test_update_config_integrates_worker_configs(harness):
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-        patch("charm.PatroniManager.is_patroni_running", return_value=True),
+        patch("charm.VMWorkload.is_patroni_running", return_value=True),
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",
@@ -2140,7 +2140,7 @@ def test_update_config_with_none_pg_parameters(harness):
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
         patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
-        patch("charm.PatroniManager.is_patroni_running", return_value=True),
+        patch("charm.VMWorkload.is_patroni_running", return_value=True),
         patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",

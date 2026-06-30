@@ -143,7 +143,6 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
-from single_kernel_postgresql.workload.base import BaseWorkload
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
@@ -480,7 +479,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         charm_tracing_config(self._grafana_agent)
 
     @property
-    def workload(self) -> BaseWorkload:
+    def workload(self) -> VMWorkload:
         """Access current workload instance.
 
         Returns the workload object.
@@ -2973,7 +2972,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if no_peers:
             return True
 
-        if not self.patroni_manager.is_patroni_running():
+        if not self.workload.is_patroni_running():
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
