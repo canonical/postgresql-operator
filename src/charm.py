@@ -2335,6 +2335,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
+        # Clear a promoted-cluster-counter orphaned by a dead-DC teardown whose relation-broken
+        # never fired (Juju CMR limitation); otherwise a newly-formed async relation re-counts it
+        # and create-replication wrongly reports "There is already a replication set up.".
+        self.async_replication.clear_stale_promotion()
+
         self.backup.coordinate_stanza_fields()
 
         # self.logical_replication.retry_validations()

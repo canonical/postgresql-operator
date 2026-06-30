@@ -553,19 +553,65 @@ class PostgreSQLAsyncReplication(Object):
             "unit-promoted-cluster-counter": "",
         })
 
+        # During a force-removal of a dead offerer the model/Patroni can transiently fail
+        # (network-get, goal-state, the Patroni REST API). That used to crash this hook and wedge
+        # BOTH units in error forever: update-status then never runs, so the cluster never reverts
+        # to standalone and create-replication stays blocked with "already a replication set up"
+        # (DPE-10203 / Issue B). Tolerate those failures so the counter is always cleared. A
+        # non-empty promoted-cluster-counter is only ever set on a promoted cluster, so if the
+        # standby check is unavailable, treating this as a primary (clearing the counter) is the
+        # safe default.
+        try:
+            is_standby = self.charm._patroni.get_standby_leader() is not None
+        except Exception:
+            is_standby = False
+
         # If this is the standby cluster, set 0 in the "promoted-cluster-counter" field to set
         # the cluster in read-only mode message also in the other units.
-        if self.charm._patroni.get_standby_leader() is not None:
+        if is_standby:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": "0"})
                 self.set_app_status()
         else:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
-            self.charm.update_config()
+            with contextlib.suppress(Exception):
+                self.charm.update_config()
 
         if self.charm.unit.is_leader():
-            self.charm.watcher_offer.update_endpoints()
+            with contextlib.suppress(Exception):
+                self.charm.watcher_offer.update_endpoints()
+
+    def clear_stale_promotion(self) -> None:
+        """Clear a promoted-cluster-counter left over from a removed async relation.
+
+        `_on_async_relation_broken` normally clears this, but a force-removed dead offerer may
+        never deliver `relation-broken` (a Juju cross-model teardown limitation). With no async
+        relation the counter is ignored by `_get_primary_cluster`, yet it would wrongly re-mark
+        this app as the primary cluster once a *new* async relation is formed — blocking
+        `create-replication` with "There is already a replication set up." Run from the
+        update-status reconciler so the surviving primary converges back to standalone (DPE-10203).
+        """
+        if not self.charm.unit.is_leader():
+            return
+        # Only act when there is no async relation; otherwise the counter is managed normally.
+        if self._relation is not None:
+            return
+        counter = self.charm.app_peer_data.get("promoted-cluster-counter")
+        # Empty -> standby/clean (nothing promoted). "0" -> a standby already in read-only mode
+        # (set by _on_async_relation_broken); leave it. A positive counter with no async relation
+        # means this cluster was promoted and the relation went away without relation-broken
+        # finishing the teardown (dead-DC force-removal) -> revert it to a standalone primary.
+        # Deciding this from peer data alone (no Patroni call) is deliberate: after a dead-DC
+        # promote Patroni is frequently unreachable, which is exactly when this must still run.
+        # A non-empty, non-"0" counter is only ever set by a promotion, so it is unambiguous.
+        if not counter or counter == "0":
+            return
+        logger.info(
+            "Clearing stale promoted-cluster-counter %s (no async relation present)", counter
+        )
+        self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
+        self.charm.update_config()
 
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""

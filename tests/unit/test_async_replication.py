@@ -587,6 +587,76 @@ def test_on_async_relation_broken():
 
     assert mock_charm.update_config.called
 
+    # 3. get_standby_leader raises (transient teardown failure, e.g. network-get during a dead-DC
+    # force-removal): the hook must NOT crash and must still clear the counter, so the unit does
+    # not wedge in error (DPE-10203 / Issue B).
+    mock_charm = MagicMock()
+    mock_charm._peers = MagicMock()
+    mock_charm.is_unit_departing = False
+    mock_charm._patroni.get_standby_leader.side_effect = Exception("network-get exited status 1")
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    mock_event = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._on_async_relation_broken(mock_event)  # must not raise
+
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+
+
+def test_clear_stale_promotion():
+    # Leader, no async relation, positive counter -> cleared + config re-rendered.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+    mock_charm.update_config.assert_called_once()
+
+    # An async relation exists -> no-op (the counter is managed by the relation lifecycle).
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=MagicMock(),
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
+    mock_charm.update_config.assert_not_called()
+
+    # Non-leader -> no-op.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
+
+    # Counter "0" (a standby already in read-only mode) -> left untouched, no Patroni call needed.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "0"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "0"
+    mock_charm.update_config.assert_not_called()
+    mock_charm._patroni.get_standby_leader.assert_not_called()
+
 
 def test_get_secret_creates_owned_secret_under_offer_label():
     # Regression for DPE-10203: the offer/primary side must own the shared secret under a label
