@@ -2335,6 +2335,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
+        # Prune Raft members left behind by a departed async-replication peer (e.g. a dead
+        # datacenter whose units linger in the Raft ring after the relation was force-removed).
+        # A dead async peer is not in database-peers, so no peer-relation event triggers the
+        # usual cleanup in _reconfigure_cluster; this periodic reconciler converges it away.
+        # Healthy foreign members are protected by the status guard in cleanup_raft_cluster.
+        if self.unit.is_leader() and self.is_cluster_initialised:
+            self._patroni.cleanup_raft_cluster()
+
         # Clear a promoted-cluster-counter orphaned by a dead-DC teardown whose relation-broken
         # never fired (Juju CMR limitation); otherwise a newly-formed async relation re-counts it
         # and create-replication wrongly reports "There is already a replication set up.".

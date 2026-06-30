@@ -986,6 +986,7 @@ def test_on_update_status(harness):
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
         patch("charm.Patroni.restart_patroni") as _restart_patroni,
+        patch("charm.Patroni.cleanup_raft_cluster") as _cleanup_raft_cluster,
         patch("charm.PostgreSQLAsyncReplication.clear_stale_promotion") as _clear_stale_promotion,
         patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
@@ -1055,6 +1056,8 @@ def test_on_update_status(harness):
         harness.charm.unit.status = ActiveStatus()
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
+        # Leader + initialised: stale Raft members (e.g. a dead async peer) are pruned here.
+        _cleanup_raft_cluster.assert_called_once_with()
         # A stale promoted-cluster-counter from a dead-DC teardown is reconciled here too.
         _clear_stale_promotion.assert_called_once_with()
 
