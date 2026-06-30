@@ -65,6 +65,14 @@ logger = logging.getLogger(__name__)
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
 # Labels are not confidential
 SECRET_LABEL = "async-replication-secret"  # noqa: S105
+# The offer/primary side owns the shared secret under its own label, kept distinct from the
+# consumer-side alias (SECRET_LABEL, set when the standby reads the secret by id). A cluster that
+# was a standby and later becomes the primary keeps a stale SECRET_LABEL alias that Juju leaves
+# reserved even after the remote secret is gone; creating the owned secret under SECRET_LABEL then
+# deadlocks ("secret with label async-replication-secret already exists" while the same label is
+# unreadable). Owning under a separate label sidesteps the collision and self-heals such a cluster
+# without a redeploy (DPE-10203). The consumer keeps SECRET_LABEL as its local alias.
+OFFER_SECRET_LABEL = "async-replication-secret-offer"  # noqa: S105
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -336,7 +344,7 @@ class PostgreSQLAsyncReplication(Object):
 
         try:
             # Avoid recreating the secret.
-            secret = self.charm.model.get_secret(label=SECRET_LABEL)
+            secret = self.charm.model.get_secret(label=OFFER_SECRET_LABEL)
             if not secret.id:
                 # Workaround for the secret id not being set with model uuid.
                 secret._id = f"secret://{self.model.uuid}/{secret.get_info().id.split(':')[1]}"
@@ -349,7 +357,9 @@ class PostgreSQLAsyncReplication(Object):
             pass
 
         if self.charm.unit.is_leader():
-            return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
+            return self.charm.model.app.add_secret(
+                content=shared_content, label=OFFER_SECRET_LABEL
+            )
 
     def get_standby_endpoints(self) -> list[str]:
         """Return the standby endpoints."""

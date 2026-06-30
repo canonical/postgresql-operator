@@ -4,12 +4,14 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from ops import Application
+from ops import Application, SecretNotFoundError
 from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
 from tenacity import RetryError
 
 from src.relations.async_replication import (
+    OFFER_SECRET_LABEL,
     READ_ONLY_MODE_BLOCKING_MESSAGE,
+    SECRET_LABEL,
     PostgreSQLAsyncReplication,
 )
 
@@ -584,3 +586,61 @@ def test_on_async_relation_broken():
     relation._on_async_relation_broken(mock_event)
 
     assert mock_charm.update_config.called
+
+
+def test_get_secret_creates_owned_secret_under_offer_label():
+    # Regression for DPE-10203: the offer/primary side must own the shared secret under a label
+    # distinct from the consumer alias (SECRET_LABEL). A former standby keeps a stale SECRET_LABEL
+    # alias that Juju leaves reserved after the remote secret is gone, so owning under SECRET_LABEL
+    # would deadlock with "secret with label already exists" on the next create-replication.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    app_secret = MagicMock()
+    app_secret.peek_content.return_value = {
+        "operator-password": "op",
+        "replication-password": "rep",
+        "system-id": "x",
+    }
+
+    # First get_secret: the peer app secret (content source). Second: the offer-label lookup,
+    # which is absent on a former standby -> triggers creation.
+    mock_charm.model.get_secret.side_effect = [app_secret, SecretNotFoundError()]
+    mock_charm.unit.is_leader.return_value = True
+
+    result = relation._get_secret()
+
+    # Owned secret is created under the offer-specific label, never the bare consumer alias.
+    mock_charm.model.app.add_secret.assert_called_once()
+    _, kwargs = mock_charm.model.app.add_secret.call_args
+    assert kwargs["label"] == OFFER_SECRET_LABEL
+    assert kwargs["label"] != SECRET_LABEL
+    # Only password fields are shared between clusters.
+    assert kwargs["content"] == {"operator-password": "op", "replication-password": "rep"}
+    assert result is mock_charm.model.app.add_secret.return_value
+
+
+def test_get_secret_reuses_existing_offer_secret():
+    # When the owned secret already exists under the offer label, reuse it (look it up by the
+    # offer label) instead of creating a new one; only rewrite content when it drifts.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    app_secret = MagicMock()
+    app_secret.peek_content.return_value = {"operator-password": "op"}
+
+    existing = MagicMock()
+    existing.id = "secret://uuid/abc"
+    existing.peek_content.return_value = {"operator-password": "op"}
+
+    mock_charm.model.get_secret.side_effect = [app_secret, existing]
+
+    result = relation._get_secret()
+
+    mock_charm.model.app.add_secret.assert_not_called()
+    existing.set_content.assert_not_called()
+    assert result is existing
+    assert any(
+        call.kwargs.get("label") == OFFER_SECRET_LABEL
+        for call in mock_charm.model.get_secret.call_args_list
+    )
