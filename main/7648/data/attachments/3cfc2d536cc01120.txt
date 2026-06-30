@@ -1,0 +1,103 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  00:55:28Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+another-application           active      1  postgresql-test-app  latest/edge  555  no       received database credentials of the first database
+another-database     14.23    active      2  postgresql                          1  no       
+database             14.23    active      2  postgresql                          0  no       
+postgresql-test-app           active      2  postgresql-test-app  latest/edge  555  no       received database credentials of the second database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*  active    idle   6        10.58.234.82              received database credentials of the first database
+another-database/0*     active    idle   2        10.58.234.173   5432/tcp  Primary
+another-database/1      active    idle   3        10.58.234.164   5432/tcp  
+database/2              active    idle   7        10.58.234.211   5432/tcp  
+database/3*             active    idle   8        10.58.234.25    5432/tcp  
+postgresql-test-app/0   active    idle   0        10.58.234.37              received database credentials of the second database
+postgresql-test-app/1*  active    idle   1        10.58.234.242             received database credentials of the second database
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.58.234.37   juju-3250a7-0  ubuntu@22.04  runnervmfmtub  Running
+1        started  10.58.234.242  juju-3250a7-1  ubuntu@22.04  runnervmfmtub  Running
+2        started  10.58.234.173  juju-3250a7-2  ubuntu@22.04  runnervmfmtub  Running
+3        started  10.58.234.164  juju-3250a7-3  ubuntu@22.04  runnervmfmtub  Running
+6        started  10.58.234.82   juju-3250a7-6  ubuntu@22.04  runnervmfmtub  Running
+7        started  10.58.234.211  juju-3250a7-7  ubuntu@22.04  runnervmfmtub  Running
+8        started  10.58.234.25   juju-3250a7-8  ubuntu@22.04  runnervmfmtub  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:27:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:27:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:29:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:29:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:29:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:29:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:30:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:30:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:30:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:30:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 00:31:01 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 581, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 372, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb999ff3c10 state=finished raised Exception>]
+unit-another-database-0: 00:31:14 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 581, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 372, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2d440abca0 state=finished raised Exception>]
+unit-another-database-0: 00:31:27 ERROR unit.another-database/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-5: 00:35:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:35:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-1: 00:36:24 ERROR unit.database/1.juju-log database:7: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-6: 00:40:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:40:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:46:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:46:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:46:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:46:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:51:57 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 00:53:22 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-database-3: 00:55:11 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "06909fc0-2efe-43e2-870f-006e523250a7:r#7#postgresql-test-app": settings 06909fc0-2efe-43e2-870f-006e523250a7:r#7#postgresql-test-app not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
