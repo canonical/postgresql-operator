@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
+# from ops.framework import EventBase
 import charm_refresh
 import psycopg2
 import pytest
@@ -30,9 +31,14 @@ from ops import (
     UnknownStatus,
     WaitingStatus,
 )
-from ops.framework import EventBase
 from ops.testing import Harness
 from psycopg2 import OperationalError
+from single_kernel_postgresql.config.exceptions import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
@@ -46,12 +52,6 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
     StorageUnavailableError,
-)
-from cluster import (
-    NotReadyError,
-    RemoveRaftMemberFailedError,
-    SwitchoverFailedError,
-    SwitchoverNotSyncError,
 )
 from constants import (
     POSTGRESQL_DATA_DIR,
@@ -145,14 +145,16 @@ def test_primary_endpoint(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=True
+        ),
+        patch("charm.PatroniManager.get_member_ip", return_value="1.1.1.1") as _get_member_ip,
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary) as _get_primary,
     ):
-        _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
-        _patroni.return_value.get_primary.return_value = sentinel.primary
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
-        _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
-        _patroni.return_value.get_primary.assert_called_once_with()
+        _get_member_ip.assert_called_once_with(sentinel.primary)
+        _get_primary.assert_called_once_with()
 
 
 def test_primary_endpoint_no_peers(harness):
@@ -165,12 +167,14 @@ def test_primary_endpoint_no_peers(harness):
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
-        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+        patch("charm.PatroniManager.get_member_ip", return_value="1.1.1.1") as _get_member_ip,
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary) as _get_primary,
+        # patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
     ):
         assert harness.charm.primary_endpoint is None
 
-        assert not _patroni.return_value.get_member_ip.called
-        assert not _patroni.return_value.get_primary.called
+        assert not _get_member_ip.called
+        assert not _get_primary.called
 
 
 def test_on_leader_elected(harness):
@@ -303,7 +307,7 @@ def test_on_config_changed(harness):
 
 def test_check_extension_dependencies(harness):
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()),
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
@@ -337,11 +341,13 @@ def test_check_extension_dependencies(harness):
 
 def test_enable_disable_extensions(harness, caplog):
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
+        ) as _get_primary,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
+        patch.object(harness.charm, "patroni_manager"),
         patch("subprocess.check_output", return_value=b"C"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql") as postgresql_mock,
     ):
         _get_primary.return_value = harness.charm.unit
 
@@ -388,11 +394,11 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     # restoring such a cached status must not be attempted, otherwise the backend
     # raises InvalidStatusError/ModelError and deadlocks the unit.
     with (
-        patch("charm.Patroni.get_primary") as _get_primary,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("charm.PatroniManager.get_primary") as _get_primary,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
         patch("charm.PostgresqlOperatorCharm._patroni"),
         patch("subprocess.check_output", return_value=b"C"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
         _get_primary.return_value = harness.charm.unit
         postgresql_mock.enable_disable_extensions.side_effect = None
@@ -429,8 +435,9 @@ def test_on_start_bootstrap_failure(harness):
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
+        patch("charm.PatroniManager.get_primary", return_value=sentinel.primary),
         patch(
-            "charm.PostgresqlOperatorCharm._replication_password",
+            "single_kernel_postgresql.core.peer_relation.PostgreSQLApplication.replication_password",
             new_callable=PropertyMock,
         ) as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
@@ -438,7 +445,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("charm.start_raft_observer"),
     ):
@@ -447,7 +454,8 @@ def test_on_start_bootstrap_failure(harness):
         _bootstrap_cluster.return_value = False
 
         # TODO: test replicas start (DPE-494).
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -461,17 +469,16 @@ def test_on_start_create_user_error(harness):
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
         patch(
-            "charm.PostgresqlOperatorCharm._replication_password",
-            new_callable=PropertyMock,
+            "charm.PostgresqlOperatorCharm._replication_password", new_callable=PropertyMock
         ) as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
-            "charm.Patroni.member_started",
+            "charm.PatroniManager.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
         patch(
@@ -484,7 +491,7 @@ def test_on_start_create_user_error(harness):
             new_callable=PropertyMock,
             return_value=True,
         ),
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("charm.start_raft_observer"),
     ):
@@ -495,7 +502,8 @@ def test_on_start_create_user_error(harness):
         _postgresql.list_users.return_value = []
         _postgresql.create_user.side_effect = PostgreSQLCreateUserError
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _restart_services_after_reboot.assert_called_once()
@@ -525,9 +533,9 @@ def test_on_start_success(harness):
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
-            "charm.Patroni.member_started",
+            "charm.PatroniManager.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
         patch(
@@ -540,7 +548,7 @@ def test_on_start_success(harness):
             new_callable=PropertyMock,
             return_value=True,
         ),
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("charm.start_raft_observer"),
     ):
@@ -550,7 +558,8 @@ def test_on_start_success(harness):
         _member_started.return_value = True
         _postgresql.list_users.return_value = []
 
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         assert _postgresql.create_user.call_count == 2  # backup user + monitoring user
         _oversee_users.assert_called_once()
@@ -594,7 +603,7 @@ def test_setup_users_runs_on_primary_cluster(harness):
         ),
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch.object(harness.charm, "postgresql") as _postgresql,
     ):
         _postgresql.list_users.return_value = []
         _postgresql.list_access_groups.return_value = set()
@@ -629,19 +638,21 @@ def test_is_standby_cluster(harness):
 def test_on_start_replica(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
+        patch(
+            "single_kernel_postgresql.workload.base.BaseWorkload.get_postgresql_version"
+        ) as _get_postgresql_version,
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
-        patch("charm.Patroni.configure_patroni_on_unit") as _configure_patroni_on_unit,
+        patch("charm.PatroniManager.configure_patroni_on_unit") as _configure_patroni_on_unit,
         patch(
-            "charm.Patroni.member_started",
+            "charm.PatroniManager.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
         ) as _update_relation_endpoints,
-        patch.object(EventBase, "defer") as _defer,
+        patch("ops.framework.EventBase.defer") as _defer,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
@@ -697,8 +708,11 @@ def test_on_start_no_patroni_member(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
-        patch("charm.Patroni") as patroni,
+        patch(
+            "single_kernel_postgresql.workload.base.BaseWorkload.get_postgresql_version"
+        ) as _get_postgresql_version,
+        patch.object(harness.charm, "postgresql") as _postgresql,
+        patch.object(harness.charm, "patroni_manager") as _patroni_manager,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch(
@@ -712,14 +726,14 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.start_raft_observer"),
     ):
         # Mock the passwords.
-        patroni.return_value.member_started = False
+        _get_postgresql_version.return_value = "16.6"
+        _patroni_manager.member_started = False
         _get_password.return_value = "fake-operator-password"
-        bootstrap_cluster = patroni.return_value.bootstrap_cluster
+        bootstrap_cluster = _patroni_manager.bootstrap_cluster
         bootstrap_cluster.return_value = True
 
-        patroni.return_value.get_postgresql_version.return_value = "16.6"
-
-        harness.set_leader()
+        with harness.hooks_disabled():
+            harness.set_leader()
         harness.charm.on.start.emit()
         bootstrap_cluster.assert_called_once()
         _postgresql.create_user.assert_not_called()
@@ -729,7 +743,7 @@ def test_on_start_no_patroni_member(harness):
 
 def test_on_start_after_blocked_state(harness):
     with (
-        patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
         patch(
@@ -985,9 +999,9 @@ def test_on_update_status(harness):
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
-        patch("charm.Patroni.restart_patroni") as _restart_patroni,
-        patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.restart_patroni") as _restart_patroni,
+        patch("charm.PatroniManager.is_member_isolated") as _is_member_isolated,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
         ) as _is_standby_leader,
@@ -1002,9 +1016,9 @@ def test_on_update_status(harness):
             new_callable=PropertyMock(return_value=True),
         ) as _primary_endpoint,
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
-        patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
-        patch("charm.Patroni.patroni_logs") as _patroni_logs,
-        patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.last_postgresql_logs") as _last_postgresql_logs,
+        patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
         patch(
             "charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)
         ) as _can_use_s3_repository,
@@ -1081,7 +1095,8 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _update_relation_endpoints,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock(return_value=True),
+            new_callable=PropertyMock,
+            return_value=True,
         ) as _primary_endpoint,
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
         patch(
@@ -1093,8 +1108,8 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm._setup_users") as _setup_users,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
-        patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
@@ -1311,8 +1326,8 @@ def test_check_detached_storage_does_not_restore_unsettable_status(harness, unse
 
 def test_restart(harness):
     with (
-        patch("charm.Patroni.restart_postgresql") as _restart_postgresql,
-        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+        patch("charm.PatroniManager.restart_postgresql") as _restart_postgresql,
+        patch("charm.PatroniManager.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._can_connect_to_postgresql", return_value=True),
     ):
         _are_all_members_ready.side_effect = [False, True, True]
@@ -1349,23 +1364,21 @@ def test_update_config(harness):
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
         ) as _handle_postgresql_restart_need,
-        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
         patch(
             "charm.PostgresqlOperatorCharm._restart_metrics_service"
         ) as _restart_metrics_service,
         patch(
             "charm.PostgresqlOperatorCharm._restart_ldap_sync_service"
         ) as _restart_ldap_sync_service,
-        patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock
-        ) as _is_workload_running,
-        patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.VMWorkload.is_patroni_running") as _is_patroni_running,
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
         ) as _is_tls_enabled,
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
         patch.object(
             harness.charm,
@@ -1384,7 +1397,7 @@ def test_update_config(harness):
         rel_id = harness.model.get_relation(PEER_RELATION).id
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-        _is_workload_running.side_effect = [True, True, False, True]
+        _is_patroni_running.side_effect = [True, True, False, True]
         _member_started.side_effect = [True, True, False]
         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
@@ -1399,11 +1412,11 @@ def test_update_config(harness):
             enable_ldap=False,
             enable_tls=False,
             backup_id=None,
+            pitr_target=None,
+            restore_timeline=None,
+            restore_to_latest=False,
             stanza=None,
             restore_stanza=None,
-            restore_timeline=None,
-            pitr_target=None,
-            restore_to_latest=False,
             parameters={
                 "test": "test",
                 "wal_compression": "on",
@@ -1414,8 +1427,13 @@ def test_update_config(harness):
                 "max_sync_workers_per_subscription": "8",
                 "max_parallel_apply_workers_per_subscription": "8",
             },
-            no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            ldap_parameters={},
+            async_primary_cluster_endpoint=None,
+            async_partner_addresses=[],
+            async_standby_endpoints=[],
+            watcher_raft_address=None,
+            no_peers=False,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with(True)
@@ -1439,11 +1457,11 @@ def test_update_config(harness):
             enable_ldap=False,
             enable_tls=True,
             backup_id=None,
+            pitr_target=None,
+            restore_timeline=None,
+            restore_to_latest=False,
             stanza=None,
             restore_stanza=None,
-            restore_timeline=None,
-            pitr_target=None,
-            restore_to_latest=False,
             parameters={
                 "test": "test",
                 "wal_compression": "on",
@@ -1454,8 +1472,13 @@ def test_update_config(harness):
                 "max_sync_workers_per_subscription": "8",
                 "max_parallel_apply_workers_per_subscription": "8",
             },
-            no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
+            ldap_parameters={},
+            async_primary_cluster_endpoint=None,
+            async_partner_addresses=[],
+            async_standby_endpoints=[],
+            watcher_raft_address=None,
+            no_peers=False,
             # slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
@@ -2002,23 +2025,19 @@ def test_update_config_integrates_worker_configs(harness):
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
         patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
-        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
         patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
-        patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
-        patch("charm.Patroni.member_started", new_callable=PropertyMock, return_value=True),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
+        patch("charm.VMWorkload.is_patroni_running", return_value=True),
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",
             new_callable=PropertyMock,
             return_value=False,
         ),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
@@ -2116,23 +2135,19 @@ def test_update_config_with_none_pg_parameters(harness):
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache", lambda: {"charmed-postgresql": _MockSnap()}),
         patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"),
-        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
+        patch("charm.PatroniManager.ensure_slots_controller_by_patroni"),
         patch("charm.PostgresqlOperatorCharm._restart_metrics_service"),
         patch("charm.PostgresqlOperatorCharm._restart_ldap_sync_service"),
-        patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
-        patch("charm.Patroni.member_started", new_callable=PropertyMock, return_value=True),
-        patch(
-            "charm.PostgresqlOperatorCharm._is_workload_running",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
-        patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
+        patch("charm.PatroniManager.bulk_update_parameters_controller_by_patroni"),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True),
+        patch("charm.VMWorkload.is_patroni_running", return_value=True),
+        patch("charm.ConfigManager.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled",
             new_callable=PropertyMock,
             return_value=False,
         ),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory", return_value=8000000),
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock, return_value=4
@@ -2172,11 +2187,10 @@ def test_on_peer_relation_changed(harness):
         patch(
             "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
-        patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
         patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
-        patch("charm.Patroni.start_patroni") as _start_patroni,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster") as _reconfigure_cluster,
@@ -2349,7 +2363,7 @@ def test_update_certificate(harness):
 def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
-        patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.PatroniManager.stop_patroni") as _stop_patroni,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(harness.charm.watcher_offer, "update_unit_address"),
@@ -2459,17 +2473,6 @@ def test_clean_ca_file_from_workload(harness):
         _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
 
 
-def test_is_workload_running(harness):
-    with patch("charm.snap.SnapCache") as _snap_cache:
-        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
-
-        pg_snap.present = False
-        assert not (harness.charm._is_workload_running)
-
-        pg_snap.present = True
-        assert harness.charm._is_workload_running
-
-
 def test_get_available_memory(harness):
     meminfo = (
         "MemTotal:       16089488 kB"
@@ -2513,7 +2516,7 @@ def test_add_cluster_member(harness):
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._get_unit_ip", return_value="1.1.1.1"),
         patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
-        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+        patch("charm.PatroniManager.are_all_members_ready") as _are_all_members_ready,
     ):
         harness.charm.add_cluster_member("postgresql-0")
 
@@ -2659,7 +2662,7 @@ def test_raft_reinitialisation(harness):
         patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
-        patch("charm.Patroni.start_patroni"),
+        patch("charm.PatroniManager.start_patroni"),
     ):
         # No data
         harness.charm._raft_reinitialisation()
@@ -2844,13 +2847,15 @@ def test_handle_postgresql_restart_need(harness):
     with (
         patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock") as _restart,
         patch("charm.wait_fixed", return_value=wait_fixed(0)),
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
         patch("charm.PostgresqlOperatorCharm.is_restart_pending") as _is_restart_pending,
-        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
         ) as _is_tls_enabled,
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
         rel_id = harness.model.get_relation(PEER_RELATION).id
         for values in itertools.product(
@@ -2906,14 +2911,14 @@ def test_on_peer_relation_departed(harness):
         patch(
             "charm.PostgresqlOperatorCharm._remove_from_members_ips"
         ) as _remove_from_members_ips,
-        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+        patch("charm.PatroniManager.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._get_ips_to_remove") as _get_ips_to_remove,
         patch(
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
         patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
-        patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
-        patch("charm.Patroni.get_member_ip") as _get_member_ip,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
+        patch("charm.PatroniManager.get_member_ip") as _get_member_ip,
     ):
         rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when the current unit is the departing unit.
@@ -3114,12 +3119,12 @@ def test_update_new_unit_status(harness):
 def test_set_primary_status_message(harness, is_leader):
     with (
         patch("charm.Patroni.has_raft_quorum", return_value=True),
-        patch("charm.Patroni.get_running_cluster_members", return_value=["test"]),
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.get_running_cluster_members", return_value=["test"]),
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
         ) as _is_standby_leader,
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
     ):
         for values in itertools.product(
             [
@@ -3173,9 +3178,11 @@ def test_set_primary_status_message(harness, is_leader):
 
 def test_override_patroni_restart_condition(harness):
     with (
-        patch("charm.Patroni.update_patroni_restart_condition") as _update_restart_condition,
-        patch("charm.Patroni.get_patroni_restart_condition") as _get_restart_condition,
-        patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
+        patch(
+            "charm.PatroniManager.update_patroni_restart_condition"
+        ) as _update_restart_condition,
+        patch("charm.PatroniManager.get_patroni_restart_condition") as _get_restart_condition,
+        patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
     ):
         _get_restart_condition.return_value = "always"
 
@@ -3246,9 +3253,9 @@ def test_restart_services_after_reboot(harness):
         patch(
             "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
-        patch("charm.Patroni.start_patroni") as _start_patroni,
+        patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch(
-            "charm.PostgresqlOperatorCharm._unit_ip",
+            "single_kernel_postgresql.core.state.CharmState.unit_ip",
             new_callable=PropertyMock(return_value="1.1.1.1"),
         ) as _unit_ip,
     ):
@@ -3310,7 +3317,7 @@ def test_on_promote_to_primary(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._raft_reinitialisation") as _raft_reinitialisation,
         patch("charm.PostgreSQLAsyncReplication.promote_to_primary") as _promote_to_primary,
-        patch("charm.Patroni.switchover") as _switchover,
+        patch("charm.PatroniManager.switchover") as _switchover,
     ):
         event = Mock()
         event.params = {"scope": "cluster"}
@@ -3402,12 +3409,12 @@ def test_handle_processes_failures(harness):
     _now = datetime.now(UTC)
     with (
         patch(
-            "charm.Patroni.member_inactive",
+            "charm.PatroniManager.member_inactive",
             new_callable=PropertyMock,
             return_value=False,
         ) as _member_inactive,
         patch(
-            "charm.Patroni.restart_patroni",
+            "charm.PatroniManager.restart_patroni",
         ) as _restart_patroni,
         patch("charm.os.listdir", return_value=["other_dirs", "pg_wal"]) as _listdir,
         patch("charm.os.path.exists", return_value=True) as _exists,
@@ -3486,8 +3493,8 @@ def test_generate_user_hash(harness):
 
 def test_relations_user_databases_map(harness):
     with (
-        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch.object(harness.charm, "postgresql") as _postgresql,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
@@ -3795,7 +3802,7 @@ def test_api_update_config_with_worker_processes(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni_manager") as mock_patroni_manager,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3815,10 +3822,10 @@ def test_api_update_config_with_worker_processes(harness):
         harness.charm._api_update_config()
 
         # Verify that bulk_update_parameters_controller_by_patroni was called
-        assert mock_patroni.bulk_update_parameters_controller_by_patroni.called
+        assert mock_patroni_manager.bulk_update_parameters_controller_by_patroni.called
 
         # Get the arguments passed to the mock
-        call_args = mock_patroni.bulk_update_parameters_controller_by_patroni.call_args
+        call_args = mock_patroni_manager.bulk_update_parameters_controller_by_patroni.call_args
         cfg_patch = call_args[0][0]  # First argument
 
         # Verify worker configs are included
@@ -3834,7 +3841,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
         patch.object(
             PostgresqlOperatorCharm, "cpu_count", new_callable=PropertyMock
         ) as _cpu_count,
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni_manager") as mock_patroni_manager,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3849,7 +3856,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
         harness.charm._api_update_config()
 
         # Get the cfg_patch argument
-        call_args = mock_patroni.bulk_update_parameters_controller_by_patroni.call_args
+        call_args = mock_patroni_manager.bulk_update_parameters_controller_by_patroni.call_args
         cfg_patch = call_args[0][0]
 
         # Should use experimental value instead of calculated value
@@ -3859,7 +3866,7 @@ def test_api_update_config_with_experimental_max_connections(harness):
 def test_api_update_config_with_async_replication_primary(harness):
     """Test _api_update_config when primary endpoint is available."""
     with (
-        patch.object(harness.charm, "_patroni") as mock_patroni,
+        patch.object(harness.charm, "patroni_manager") as mock_patroni_manager,
         patch.object(
             harness.charm.async_replication, "get_primary_cluster_endpoint"
         ) as mock_endpoint,
@@ -3870,7 +3877,7 @@ def test_api_update_config_with_async_replication_primary(harness):
         harness.charm._api_update_config()
 
         # Get the arguments
-        call_args = mock_patroni.bulk_update_parameters_controller_by_patroni.call_args
+        call_args = mock_patroni_manager.bulk_update_parameters_controller_by_patroni.call_args
         base_patch = call_args[0][1]
 
         # Verify standby_cluster is configured
