@@ -408,8 +408,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.ldap = PostgreSQLLDAP(self, "ldap")
         self._state = CharmState(self, Substrates.VM)
         self._workload = VMWorkload(charm_dir=self.charm_dir)
-        self.tls_manager = TLSManager(self._state, self._workload)
-        self.tls = TLS(self, self._state, self._workload, self.tls_manager)
+        # TLS events handler owns the two cert requirers; build it first so the
+        # TLS manager can constructor-inject them for its live-fetch getters.
+        self.tls = TLS(self, self._state, self._workload)
+        self.tls_manager = TLSManager(
+            self._state,
+            self._workload,
+            client_certificate=self.tls.client_certificate,
+            peer_certificate=self.tls.peer_certificate,
+        )
         # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
         # the handler stores+pushes certs on certificate_available, then we reload so
         # the new material is picked up. Also fires on the TLS relations' relation_broken
