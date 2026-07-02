@@ -97,7 +97,7 @@ def request_database(_harness):
 def test_on_database_requested(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints,
         patch(
@@ -108,7 +108,7 @@ def test_on_database_requested(harness):
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
         ) as _primary_endpoint,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.generate_user_hash",
             new_callable=PropertyMock,
@@ -207,7 +207,9 @@ def test_on_database_requested(harness):
 
 
 def test_on_relation_departed(harness):
-    with patch("charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)):
+    with patch(
+        "charm.PatroniManager.member_started", new_callable=PropertyMock(return_value=True)
+    ):
         peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when this unit is departing the relation (due to a scale down event).
         assert "departing" not in harness.get_relation_data(peer_rel_id, harness.charm.unit)
@@ -232,13 +234,14 @@ def test_on_relation_broken(harness):
         harness.set_leader()
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch(
-            "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
+            "charm.PatroniManager.member_started", new_callable=PropertyMock, return_value=True
         ) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock(return_value="1.1.1.1"),
+            new_callable=PropertyMock,
+            return_value="1.1.1.1",
         ) as _primary_endpoint,
     ):
         rel_id = harness.model.get_relation(RELATION_NAME).id
@@ -267,7 +270,7 @@ def test_on_relation_broken_defers_without_primary(harness):
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch(
-            "charm.Patroni.member_started", new_callable=PropertyMock(return_value=True)
+            "charm.PatroniManager.member_started", new_callable=PropertyMock(return_value=True)
         ) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -286,7 +289,7 @@ def test_on_relation_broken_defers_without_primary(harness):
 
 def test_oversee_users(harness):
     with (
-        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgreSQLProvider._on_relation_broken"),
     ):
         # Create two relations and add the username in their databags.
@@ -328,7 +331,7 @@ def test_oversee_users(harness):
 
 def test_update_endpoints_with_event(harness: Harness):
     with (
-        patch("charm.Patroni.cluster_status") as cluster_status,
+        patch("charm.PatroniManager.cluster_status") as cluster_status,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
@@ -395,7 +398,7 @@ def test_update_endpoints_with_event(harness: Harness):
 
 def test_update_endpoints_without_event(harness):
     with (
-        patch("charm.Patroni.cluster_status") as cluster_status,
+        patch("charm.PatroniManager.cluster_status") as cluster_status,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
