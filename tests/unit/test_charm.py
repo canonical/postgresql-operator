@@ -130,10 +130,23 @@ def test_on_storage_detaching(harness):
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
         patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+        patch.object(harness.charm.app, "planned_units") as _planned_units,
     ):
         _selected_snap = _snap_cache.return_value.__getitem__.return_value
-        # Every storage's detaching event releases the storage by stopping the
+
+        # Scale-down (units remain): the surviving cluster still needs this unit's
+        # Patroni reachable to remove it from raft, so the workload must NOT be
+        # stopped here.
+        _planned_units.return_value = 2
+        storage_id = harness.add_storage("data", attach=True)[0]
+        harness.detach_storage(storage_id)
+        _stop_observer.assert_not_called()
+        _stop_log_rotation.assert_not_called()
+        _selected_snap.stop.assert_not_called()
+
+        # Full teardown (no units remain): release the storage by stopping the
         # background processes and all the snap services.
+        _planned_units.return_value = 0
         for storage_name in ("archive", "data", "logs", "temp"):
             _stop_observer.reset_mock()
             _stop_log_rotation.reset_mock()
