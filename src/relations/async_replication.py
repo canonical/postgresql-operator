@@ -32,6 +32,7 @@ from ops import (
     Application,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Object,
     Relation,
     RelationChangedEvent,
@@ -319,7 +320,18 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app: self.charm.all_peer_data,
             }.items():
                 databag = relation_data[app]
-                relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
+                try:
+                    relation_promoted_cluster_counter = databag.get(
+                        "promoted-cluster-counter", "0"
+                    )
+                except ModelError:
+                    # A dead-DC teardown leaves the remote app's databag on the dying
+                    # cross-model async relation unreadable — `relation-get --app <remote>`
+                    # returns "permission denied" once the offering DC is gone. Skip that
+                    # peer so status reconciliation (and the update-status
+                    # clear_stale_promotion that unblocks recovery) still runs instead of
+                    # crashing every hook (DPE-10203).
+                    continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
@@ -815,13 +827,28 @@ class PostgreSQLAsyncReplication(Object):
 
     @property
     def _relation(self) -> Relation | None:
-        """Return the relation object."""
+        """Return the usable async-replication relation, or None.
+
+        A relation whose databags are unreadable is treated as absent. During a
+        dead-DC teardown the cross-model async relation lingers in a dying state
+        whose ``relation-get`` returns "permission denied" on every databag (yet
+        ``active`` can still read True and ``get_relation`` still returns it), so a
+        promoted primary must reconcile as a standalone cluster instead of
+        crashing every hook on the unreadable relation (DPE-10203). A cheap
+        own-unit read probes for that state.
+        """
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),
             self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
-            if relation is not None:
-                return relation
+            if relation is None:
+                continue
+            try:
+                relation.data[self.charm.unit].get("unit-address")
+            except ModelError:
+                continue
+            return relation
+        return None
 
     def set_app_status(self) -> None:
         """Set the app status."""

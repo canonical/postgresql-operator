@@ -4,7 +4,7 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from ops import Application, SecretNotFoundError
+from ops import Application, ModelError, SecretNotFoundError
 from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
 from tenacity import RetryError
 
@@ -14,6 +14,12 @@ from src.relations.async_replication import (
     SECRET_LABEL,
     PostgreSQLAsyncReplication,
 )
+
+# Several tests (e.g. ``test_on_create_replication``) reassign ``_relation`` on the class
+# via ``type(relation)._relation = PropertyMock(...)`` with no cleanup, leaking a mock over
+# the real property for later tests. Capture the real property once, before any test runs,
+# so a test that needs to exercise the real ``_relation`` can restore it for its own scope.
+_REAL_RELATION_PROPERTY = PostgreSQLAsyncReplication.__dict__["_relation"]
 
 
 def create_mock_unit(name="unit"):
@@ -716,3 +722,64 @@ def test_get_secret_reuses_existing_offer_secret():
         call.kwargs.get("label") == OFFER_SECRET_LABEL
         for call in mock_charm.model.get_secret.call_args_list
     )
+
+
+def test__get_primary_cluster_skips_unreadable_dead_peer_databag():
+    # DPE-10203: after a dead-DC teardown the remote app's databag on the dying
+    # cross-model async relation is unreadable — `relation-get --app <remote>`
+    # returns "permission denied" (surfaced as ModelError) once the offering DC is
+    # gone. _get_primary_cluster must skip that peer instead of crashing every hook,
+    # so the readable local peer is still evaluated.
+    mock_charm = MagicMock()
+    local_app = MagicMock()
+    mock_charm.app = local_app
+
+    remote_app = MagicMock()
+    dead_databag = MagicMock()
+    dead_databag.get.side_effect = ModelError("ERROR permission denied")
+    offer_relation = MagicMock()
+    offer_relation.app = remote_app
+    offer_relation.data = {remote_app: dead_databag}
+
+    local_databag = MagicMock()
+    local_databag.get.return_value = "1"
+    mock_charm.all_peer_data = {local_app: local_databag}
+
+    mock_model = MagicMock()
+    mock_model.get_relation.side_effect = [offer_relation, None]
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
+    ):
+        # Must not raise ModelError; the unreadable dead peer is skipped and the
+        # readable local peer (counter "1") is selected as the primary.
+        assert relation._get_primary_cluster() is local_app
+    dead_databag.get.assert_called_once_with("promoted-cluster-counter", "0")
+
+
+def test__relation_skips_unreadable_dying_relation(monkeypatch):
+    # DPE-10203: a dead-DC teardown leaves the cross-model async relation in a
+    # dying state whose databags raise ModelError ("permission denied") on any
+    # read, even though get_relation still returns it. _relation must probe and
+    # treat such a relation as absent, so the promoted primary reconciles as a
+    # standalone cluster instead of crashing every hook that writes relation data.
+    # Restore the real property for this test's scope (an earlier test may have
+    # leaked a class-level PropertyMock over it); monkeypatch reverts it afterwards.
+    monkeypatch.setattr(PostgreSQLAsyncReplication, "_relation", _REAL_RELATION_PROPERTY)
+    mock_charm = MagicMock()
+
+    dying = MagicMock()
+    dying_databag = MagicMock()
+    dying_databag.get.side_effect = ModelError("ERROR permission denied")
+    dying.data.__getitem__.return_value = dying_databag
+
+    readable = MagicMock()  # its databag read succeeds (default MagicMock, no raise)
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    # First candidate (offer) is the dying relation; second (consumer) is readable.
+    relation.model.get_relation.side_effect = [dying, readable]
+
+    # The dying relation is skipped (probe raised); the readable one is returned.
+    assert relation._relation is readable
+    dying_databag.get.assert_called_once_with("unit-address")
