@@ -1,0 +1,55 @@
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m integration.relations.test_relations:test_relations.py:116  remove relation with legacy endpoints
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] blocked: Please choose one endpoint to use. No need to relate all of them simultaneously!
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+[32mINFO    [0m integration.relations.test_relations:test_relations.py:128 check connect to = dbname='database_app_database' user='relation-8' host='10.61.113.24' password='R3RC8Ea6QBhWWrA3' connect_timeout=10
+[32mINFO    [0m integration.relations.test_relations:test_relations.py:133 remove relation database-app:database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  00:34:31Z
+
+App           Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+database-app           blocked      1  postgresql-test-app  latest/edge  559  no       No database integration available
+db-app                 blocked      1  postgresql-test-app  latest/edge  559  no       No database integration available
+postgresql    14.23    active       1  postgresql                          0  no       
+
+Unit             Workload  Agent  Machine  Public address  Ports     Message
+database-app/0*  blocked   idle   1        10.61.113.105             No database integration available
+db-app/0*        blocked   idle   0        10.61.113.217             No database integration available
+postgresql/0*    active    idle   2        10.61.113.24    5432/tcp  Primary
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.61.113.217  juju-dffd5b-0  ubuntu@22.04  runnervmjbsos  Running
+1        started  10.61.113.105  juju-dffd5b-1  ubuntu@22.04  runnervmjbsos  Running
+2        started  10.61.113.24   juju-dffd5b-2  ubuntu@22.04  runnervmjbsos  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:28:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:28:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:29:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:29:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:29:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:29:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:29:57 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 581, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 372, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa5718a0e80 state=finished raised Exception>]
+unit-postgresql-0: 00:30:57 ERROR juju.worker.uniter.context cannot apply changes: granting secrets access: cannot change access to "secret://a22c294b-8d5d-44b6-8381-da35b4dffd5b/f7h5peejprur8aapub40" for "application-database-app": cannot grant access to secret in scope of "relation-database-app.database#postgresql.database" which is not alive
+cannot change access to "secret://a22c294b-8d5d-44b6-8381-da35b4dffd5b/2odfattrcq4knkdinr3g" for "application-database-app": cannot grant access to secret in scope of "relation-database-app.database#postgresql.database" which is not alive
+unit-postgresql-0: 00:30:57 ERROR juju.worker.uniter.operation hook "database-relation-changed" (via hook dispatching script: dispatch) failed: granting secrets access: cannot change access to "secret://a22c294b-8d5d-44b6-8381-da35b4dffd5b/f7h5peejprur8aapub40" for "application-database-app": cannot grant access to secret in scope of "relation-database-app.database#postgresql.database" which is not alive
+cannot change access to "secret://a22c294b-8d5d-44b6-8381-da35b4dffd5b/2odfattrcq4knkdinr3g" for "application-database-app": cannot grant access to secret in scope of "relation-database-app.database#postgresql.database" which is not alive
+unit-database-app-0: 00:31:26 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#6#postgresql": settings a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#6#postgresql not found (not found)
+unit-postgresql-0: 00:31:29 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#6#database-app": settings a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#6#database-app not found (not found)
+unit-postgresql-0: 00:33:22 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#7#db-app": settings a22c294b-8d5d-44b6-8381-da35b4dffd5b:r#7#db-app not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
