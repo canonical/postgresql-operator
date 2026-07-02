@@ -27,30 +27,33 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.literals import (
+    BACKUP_ID_FORMAT,
+    BACKUP_TYPE_OVERRIDES,
+    BACKUP_USER,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
+    PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_LOG_LEVEL_STDERR,
+    PGBACKREST_LOGROTATE_FILE,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+    UNIT_SCOPE,
+)
 from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ARCHIVE_DATA_DIR,
-    BACKUP_ID_FORMAT,
-    BACKUP_TYPE_OVERRIDES,
-    BACKUP_USER,
     LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
-    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
-    PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
-    PGBACKREST_LOG_LEVEL_STDERR,
-    PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_DIR,
     TEMP_DATA_DIR,
-    UNIT_SCOPE,
 )
-from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +167,7 @@ class PostgreSQLBackups(Object):
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             return False, STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE
 
         if self.charm.is_blocked:
@@ -188,16 +191,6 @@ class PostgreSQLBackups(Object):
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
-
-    def _is_standby_cluster(self) -> bool:
-        """Return whether this unit belongs to a standby cluster."""
-        if (
-            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
-            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
-        ):
-            return False
-
-        return not self.charm.async_replication.is_primary_cluster()
 
     def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
@@ -1096,7 +1089,7 @@ Stderr:
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.warning(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             event.fail(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             return
@@ -1282,7 +1275,7 @@ Stderr:
         Returns:
             a boolean indicating whether restore should be run.
         """
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.error(f"Restore failed: {STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE}")
             event.fail(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
             return False

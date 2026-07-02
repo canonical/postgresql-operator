@@ -24,12 +24,11 @@ from ops import (
 from ops.framework import EventBase, Object
 from ops.pebble import ConnectionError as PebbleConnectionError
 from ops.pebble import PathError, ProtocolError
-from tenacity import RetryError
-
-from constants import (
+from single_kernel_postgresql.config.literals import (
     APP_SCOPE,
     UNIT_SCOPE,
 )
+from tenacity import RetryError
 
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm

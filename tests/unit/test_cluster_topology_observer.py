@@ -5,14 +5,18 @@ import sys
 from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
+from jinja2 import Template
 from ops.charm import CharmBase
 from ops.model import ActiveStatus, Relation, WaitingStatus
 from ops.testing import Harness
+from pysyncobj.utility import UtilityException
+from single_kernel_postgresql.config.enums import Substrates
 
 from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
+    start_raft_observer,
 )
 from scripts.cluster_topology_observer import (
     UnreachableUnitsError,
@@ -20,6 +24,7 @@ from scripts.cluster_topology_observer import (
     dispatch,
     main,
 )
+from scripts.raft_observer import check_raft_connection
 
 
 class MockCharm(CharmBase):
@@ -242,3 +247,130 @@ def test_check_for_database_changes():
             check_for_database_changes(run_cmd, unit, charm_dir, result)
             assert result == [sentinel.databases_changed, sentinel.relation_users]
             _subprocess.run.assert_not_called()
+
+
+def test_start_raft_observer(harness):
+    with (
+        patch("os.getcwd", return_value="testdir"),
+        patch("cluster_topology_observer.daemon_reload") as _daemon_reload,
+        patch("cluster_topology_observer.service_enable") as _service_enable,
+        patch("cluster_topology_observer.render_file") as _render_file,
+        patch(
+            "cluster_topology_observer.copy_environment", return_value={"ENV": "var"}
+        ) as _copy_environment,
+    ):
+        # Get the expected content from a file.
+        with open("templates/raft-observer.service.j2") as file:
+            contents = file.read()
+            template = Template(contents)
+        expected_service = template.render(
+            envvars={"ENV": "var"}, script="testdir/scripts/raft_observer.py"
+        )
+        with open("templates/raft-observer.timer.j2") as file:
+            contents = file.read()
+            template = Template(contents)
+        expected_timer = template.render()
+
+        start_raft_observer()
+
+        _daemon_reload.assert_called_once_with()
+        _service_enable.assert_called_once_with("/etc/systemd/system/raft-observer.timer", "--now")
+        assert _render_file.call_count == 2
+        _render_file.assert_any_call(
+            Substrates.VM,
+            "/etc/systemd/system/raft-observer.service",
+            expected_service,
+            0o644,
+            change_owner=False,
+        )
+        _render_file.assert_any_call(
+            Substrates.VM,
+            "/etc/systemd/system/raft-observer.timer",
+            expected_timer,
+            0o644,
+            change_owner=False,
+        )
+
+
+def test_check_raft_connection():
+    with (
+        patch("scripts.raft_observer.TcpUtility") as _tcp_utility,
+        patch("scripts.raft_observer.dispatch") as _dispatch,
+    ):
+        # No status
+        _tcp_utility.return_value.executeCommand.return_value = None
+        check_raft_connection("testpass")
+
+        _tcp_utility.assert_called_once_with(password="testpass", timeout=3)
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+        assert not _dispatch.called
+        _tcp_utility.reset_mock()
+
+        # No leader
+        _tcp_utility.return_value.executeCommand.return_value = {
+            "has_quorum": False,
+            "leader": None,
+        }
+
+        check_raft_connection("testpass")
+
+        _tcp_utility.assert_called_once_with(password="testpass", timeout=3)
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+        assert not _dispatch.called
+        _tcp_utility.reset_mock()
+
+        # Status exceeption
+        _tcp_utility.return_value.executeCommand.side_effect = UtilityException
+        check_raft_connection("testpass")
+
+        _tcp_utility.assert_called_once_with(password="testpass", timeout=3)
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+        assert not _dispatch.called
+        _tcp_utility.reset_mock()
+
+        # Disconneected partner
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            {
+                "partner_node_status_server_1.1.1.1:2222": 2,
+                "partner_node_status_server_2.2.2.2:2222": 0,
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+            UtilityException,
+        ]
+        check_raft_connection("testpass")
+
+        _tcp_utility.assert_called_once_with(password="testpass", timeout=3)
+        assert _tcp_utility.return_value.executeCommand.call_count == 2
+        _tcp_utility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
+        _tcp_utility.return_value.executeCommand.assert_any_call("2.2.2.2:2222", ["status"])
+        assert not _dispatch.called
+        _tcp_utility.reset_mock()
+
+        # Stuck partner
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            {
+                "partner_node_status_server_1.1.1.1:2222": 2,
+                "partner_node_status_server_2.2.2.2:2222": 0,
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+            {
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
+        ]
+        check_raft_connection("testpass")
+
+        _tcp_utility.assert_called_once_with(password="testpass", timeout=3)
+        assert _tcp_utility.return_value.executeCommand.call_count == 2
+        _tcp_utility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
+        _tcp_utility.return_value.executeCommand.assert_any_call("2.2.2.2:2222", ["status"])
+        _dispatch.assert_called_once_with("raft_reconnect")
+        _tcp_utility.reset_mock()
