@@ -1,6 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -13,6 +14,7 @@ from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
     SECRET_LABEL,
     PostgreSQLAsyncReplication,
+    _same_secret_id,
 )
 
 # Several tests (e.g. ``test_on_create_replication``) reassign ``_relation`` on the class
@@ -783,3 +785,141 @@ def test__relation_skips_unreadable_dying_relation(monkeypatch):
     # The dying relation is skipped (probe raised); the readable one is returned.
     assert relation._relation is readable
     dying_databag.get.assert_called_once_with("unit-address")
+
+
+# --- DPE-10203 follow-up: consumer reads the shared secret by id, never by label -------------
+# The consumer used to fetch the offer secret with ``get_secret(id=..., label=SECRET_LABEL)``,
+# registering a local consumer alias that Juju leaves reserved after a dead-DC teardown. Matching
+# MySQL's async-replication design, the consumer now references the secret purely by the id
+# published in relation data, so no alias can go stale. These tests pin that behaviour.
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "expected"),
+    [
+        ("secret://uuid/abc123", "secret://uuid/abc123", True),
+        ("secret://uuid/abc123", "secret:abc123", True),  # format-insensitive
+        ("secret:abc123", "secret://uuid/abc123", True),
+        ("secret://uuid/abc123", "secret://uuid/xyz789", False),
+        (None, "secret:abc123", False),
+        ("secret:abc123", None, False),
+        (None, None, False),
+    ],
+)
+def test_same_secret_id(a, b, expected):
+    assert _same_secret_id(a, b) is expected
+
+
+def _consumer_relation(secret_id):
+    relation = MagicMock()
+    relation.name = REPLICATION_CONSUMER_RELATION
+    relation.app = "primary-app"
+    relation.data = {"primary-app": {"primary-cluster-data": json.dumps({"secret-id": secret_id})}}
+    return relation
+
+
+def test_update_internal_secret_reads_by_id_without_label():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    secret = MagicMock()
+    secret.peek_content.return_value = {"operator-password": "pw"}
+    mock_charm.model.get_secret.return_value = secret
+
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=_consumer_relation("secret://uuid/abc123"),
+    ):
+        assert relation._update_internal_secret() is True
+
+    # Fetched purely by id, with no ``label=`` alias registered.
+    mock_charm.model.get_secret.assert_called_once_with(id="secret://uuid/abc123")
+
+
+def test_update_internal_secret_returns_false_without_secret_id():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=_consumer_relation(None),
+    ):
+        assert relation._update_internal_secret() is False
+
+    mock_charm.model.get_secret.assert_not_called()
+
+
+def test_on_secret_changed_consumer_matches_by_id_not_label():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    mock_event = MagicMock()
+    mock_event.secret.id = "secret://uuid/abc123"  # same key, different URI format
+    mock_event.secret.label = None  # no alias any more
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=_consumer_relation("secret:abc123"),
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update,
+    ):
+        relation._on_secret_changed(mock_event)
+
+    mock_update.assert_called_once()
+    mock_event.defer.assert_not_called()
+
+
+def test_on_secret_changed_consumer_ignores_unrelated_secret():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    mock_event = MagicMock()
+    mock_event.secret.id = "secret://uuid/DIFFERENT"
+    mock_event.secret.label = SECRET_LABEL  # a legacy label must NOT trigger the sync anymore
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=_consumer_relation("secret:abc123"),
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update,
+    ):
+        relation._on_secret_changed(mock_event)
+
+    mock_update.assert_not_called()
+    mock_event.defer.assert_not_called()
+
+
+def test_on_secret_changed_consumer_defers_when_secret_not_ready():
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    mock_event = MagicMock()
+    mock_event.secret.id = "secret://uuid/abc123"
+    mock_event.secret.label = None
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=_consumer_relation("secret:abc123"),
+        ),
+        patch.object(PostgreSQLAsyncReplication, "_update_internal_secret", return_value=False),
+    ):
+        relation._on_secret_changed(mock_event)
+
+    mock_event.defer.assert_called_once()

@@ -68,16 +68,29 @@ logger = logging.getLogger(__name__)
 
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
-# Labels are not confidential
+# Labels are not confidential.
+# The offer/primary side owns the shared cluster-credentials secret under OFFER_SECRET_LABEL and
+# publishes its id in the relation databag. The consumer/standby side references that secret purely
+# by id (see ``_update_internal_secret``) and never attaches a label, so no consumer-side alias is
+# registered. This matters after a dead-DC failover: Juju leaves a consumer alias reserved even
+# once the remote secret is gone, so a former standby that is later promoted would then deadlock
+# creating its own secret ("secret with label ... already exists" while the label is unreadable) —
+# DPE-10203. SECRET_LABEL is the legacy shared label; it is no longer attached by this charm and is
+# kept only to assert we never reintroduce it.
 SECRET_LABEL = "async-replication-secret"  # noqa: S105
-# The offer/primary side owns the shared secret under its own label, kept distinct from the
-# consumer-side alias (SECRET_LABEL, set when the standby reads the secret by id). A cluster that
-# was a standby and later becomes the primary keeps a stale SECRET_LABEL alias that Juju leaves
-# reserved even after the remote secret is gone; creating the owned secret under SECRET_LABEL then
-# deadlocks ("secret with label async-replication-secret already exists" while the same label is
-# unreadable). Owning under a separate label sidesteps the collision and self-heals such a cluster
-# without a redeploy (DPE-10203). The consumer keeps SECRET_LABEL as its local alias.
 OFFER_SECRET_LABEL = "async-replication-secret-offer"  # noqa: S105
+
+
+def _same_secret_id(a: str | None, b: str | None) -> bool:
+    """Whether two Juju secret ids refer to the same secret.
+
+    Juju/ops may render an id as ``secret:<key>`` or ``secret://<uuid>/<key>``; compare on the
+    trailing key so a format difference doesn't mask a real match.
+    """
+    if not a or not b:
+        return False
+    return a.rsplit("/", 1)[-1].split(":")[-1] == b.rsplit("/", 1)[-1].split(":")[-1]
+
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -771,7 +784,9 @@ class PostgreSQLAsyncReplication(Object):
             )
             return
 
-        if relation.name == REPLICATION_CONSUMER_RELATION and event.secret.label == SECRET_LABEL:
+        if relation.name == REPLICATION_CONSUMER_RELATION and _same_secret_id(
+            event.secret.id, self._remote_secret_id()
+        ):
             logger.info("Relation secret changed, updating internal secret")
             if not self._update_internal_secret():
                 logger.debug("Secret not found, deferring event")
@@ -927,17 +942,24 @@ class PostgreSQLAsyncReplication(Object):
         if self.is_primary_cluster() and self.charm.unit.is_leader():
             self._update_primary_cluster_data()
 
-    def _update_internal_secret(self) -> bool:
-        # Update the secrets between the clusters.
+    def _remote_secret_id(self) -> str | None:
+        """Return the shared secret id published by the primary cluster, or None."""
         relation = self._relation
-        primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")  # type: ignore
-        secret_id = (
-            None
-            if primary_cluster_info is None
-            else json.loads(primary_cluster_info).get("secret-id")
-        )
+        if relation is None:
+            return None
+        primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")
+        if primary_cluster_info is None:
+            return None
+        return json.loads(primary_cluster_info).get("secret-id")
+
+    def _update_internal_secret(self) -> bool:
+        # Update the secrets between the clusters. Reference the secret purely by the id published
+        # in relation data — never by label — so no consumer-side alias is registered (DPE-10203).
+        secret_id = self._remote_secret_id()
+        if secret_id is None:
+            return False
         try:
-            secret = self.charm.model.get_secret(id=secret_id, label=SECRET_LABEL)
+            secret = self.charm.model.get_secret(id=secret_id)
         except SecretNotFoundError:
             return False
         credentials = secret.peek_content()
