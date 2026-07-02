@@ -188,7 +188,7 @@ def test_on_leader_elected(harness):
         ) as _primary_endpoint,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
     ):
         # Assert that there is no password in the peer relation.
         assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) is None
@@ -444,7 +444,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("charm.start_raft_observer"),
@@ -475,7 +475,7 @@ def test_on_start_create_user_error(harness):
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
             "charm.PatroniManager.member_started",
@@ -532,7 +532,7 @@ def test_on_start_success(harness):
         patch("charm.PostgresqlOperatorCharm._ensure_storage_layout"),
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch(
             "charm.PatroniManager.member_started",
@@ -661,7 +661,7 @@ def test_on_start_replica(harness):
             return_value=True,
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
@@ -720,7 +720,7 @@ def test_on_start_no_patroni_member(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
-        patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
         patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
         patch("charm.start_raft_observer"),
@@ -2344,7 +2344,7 @@ def test_reconfigure_cluster(harness):
 
 def test_update_certificate(harness):
     with (
-        patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
+        patch("charm.TLSManager.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.refresh_tls_certificates_event") as _refresh_tls_certificates_event,
     ):
         # If there is no current TLS files, _request_certificate should be called
@@ -2400,41 +2400,6 @@ def test_update_member_ip(harness):
         assert relation_data.get("ip-to-remove") == "2.2.2.2"
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
-
-
-def test_push_tls_files_to_workload(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.render_file") as _render_file,
-        patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
-        patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
-        patch(
-            "charm.PostgresqlOperatorCharm.get_secret", return_value="internal_ca"
-        ) as _get_secret,
-    ):
-        _get_client_tls_files.side_effect = [
-            ("key", "ca", "cert"),
-            ("key", "ca", None),
-            ("key", None, "cert"),
-            (None, "ca", "cert"),
-        ]
-        _get_peer_tls_files.side_effect = [
-            ("key", "ca", "cert"),
-            ("key", "ca", None),
-            ("key", None, "cert"),
-            (None, "ca", "cert"),
-        ]
-        _update_config.side_effect = [True, False, False, False]
-
-        # Test when all TLS files are available.
-        assert harness.charm.push_tls_files_to_workload()
-        assert _render_file.call_count == 7
-
-        # Test when not all TLS files are available.
-        for _ in range(3):
-            _render_file.reset_mock()
-            assert not (harness.charm.push_tls_files_to_workload())
-            assert _render_file.call_count == 5
 
 
 def test_push_ca_file_into_workload(harness):
