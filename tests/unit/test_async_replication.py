@@ -14,6 +14,7 @@ from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
     SECRET_LABEL,
     PostgreSQLAsyncReplication,
+    _safe_databag_get,
     _same_secret_id,
 )
 
@@ -923,3 +924,79 @@ def test_on_secret_changed_consumer_defers_when_secret_not_ready():
         relation._on_secret_changed(mock_event)
 
     mock_event.defer.assert_called_once()
+
+
+def test__get_highest_promoted_cluster_counter_value_skips_unreadable_dead_peer():
+    # DPE-10203: after a dead-DC teardown the remote app's databag on the dying
+    # cross-model async relation is unreadable — `relation-get --app <remote>`
+    # raises ModelError ("permission denied") once the offering DC is gone. Like
+    # _get_primary_cluster, _get_highest_promoted_cluster_counter_value must skip
+    # that peer instead of crashing the hook (it crashed replication-offer-relation
+    # -joined on the promoted cluster, blocking re-replication), still honouring the
+    # readable local peer counter.
+    mock_charm = MagicMock()
+
+    remote_app = MagicMock()
+    dead_databag = MagicMock()
+    dead_databag.get.side_effect = ModelError("ERROR permission denied")
+    offer_relation = MagicMock()
+    offer_relation.app = remote_app
+    offer_relation.data = {remote_app: dead_databag}
+
+    # The local peer databag is readable and holds a higher counter.
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "3"}
+
+    mock_model = MagicMock()
+    mock_model.get_relation.side_effect = [offer_relation, None]
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
+    ):
+        # Must not raise; the unreadable dead peer is skipped and the local counter wins.
+        assert relation._get_highest_promoted_cluster_counter_value() == "3"
+    dead_databag.get.assert_called_once_with("promoted-cluster-counter", "0")
+
+
+# --- DPE-10203 dead-DC hardening: async-relation reads must survive an unreadable peer ---------
+
+
+def test_safe_databag_get_returns_value_when_readable():
+    assert _safe_databag_get({"k": "v"}, "k") == "v"
+    assert _safe_databag_get({}, "k", "default") == "default"
+
+
+def test_safe_databag_get_treats_unreadable_databag_as_absent():
+    # A dead-DC teardown makes the remote databag raise ModelError on any read; callers
+    # must see the key as absent instead of crashing the hook (DPE-10203).
+    dead_databag = MagicMock()
+    dead_databag.get.side_effect = ModelError("ERROR permission denied")
+    assert _safe_databag_get(dead_databag, "k") is None
+    assert _safe_databag_get(dead_databag, "k", "default") == "default"
+
+
+def test_remote_unit_addresses_skips_unreadable_dead_peer_units():
+    # The dying cross-model relation's unit databags raise ModelError on read;
+    # _remote_unit_addresses must skip them and still return the readable addresses.
+    mock_charm = MagicMock()
+
+    good_unit = MagicMock()
+    offer_relation = MagicMock()
+    offer_relation.units = [good_unit]
+    offer_relation.data = {good_unit: {"unit-address": "10.0.0.1"}}
+
+    dead_unit = MagicMock()
+    dead_databag = MagicMock()
+    dead_databag.get.side_effect = ModelError("ERROR permission denied")
+    dead_relation = MagicMock()
+    dead_relation.units = [dead_unit]
+    dead_relation.data = {dead_unit: dead_databag}
+
+    mock_model = MagicMock()
+    mock_model.get_relation.side_effect = [offer_relation, dead_relation]
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
+    ):
+        assert relation._remote_unit_addresses() == ["10.0.0.1"]

@@ -22,6 +22,7 @@ import pwd
 import shutil
 import subprocess
 import typing
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
@@ -90,6 +91,21 @@ def _same_secret_id(a: str | None, b: str | None) -> bool:
     if not a or not b:
         return False
     return a.rsplit("/", 1)[-1].split(":")[-1] == b.rsplit("/", 1)[-1].split(":")[-1]
+
+
+def _safe_databag_get(
+    databag: Mapping[str, str], key: str, default: str | None = None
+) -> str | None:
+    """Read a relation databag key, treating an unreadable databag as key-absent.
+
+    After a dead-DC teardown the remote app/unit databag on the dying cross-model async
+    relation raises ModelError ("permission denied") on any read; callers must behave as if
+    the key is unset rather than crash the hook (DPE-10203).
+    """
+    try:
+        return databag.get(key, default)
+    except ModelError:
+        return default
 
 
 if typing.TYPE_CHECKING:
@@ -204,7 +220,7 @@ class PostgreSQLAsyncReplication(Object):
         if self.charm.app == primary_cluster:
             counter = self._get_highest_promoted_cluster_counter_value()
             if not all(
-                event.relation.data[unit].get("stopped") == counter
+                _safe_databag_get(event.relation.data[unit], "stopped") == counter
                 for unit in event.relation.units
                 if unit.app == event.relation.app
             ):
@@ -248,7 +264,7 @@ class PostgreSQLAsyncReplication(Object):
         system_identifier, error = self.get_system_identifier()
         if error is not None:
             raise Exception(error)
-        if system_identifier != relation.data[relation.app].get("system-id"):
+        if system_identifier != _safe_databag_get(relation.data[relation.app], "system-id"):
             # Store current data in a tar.gz file.
             logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
@@ -267,16 +283,7 @@ class PostgreSQLAsyncReplication(Object):
         # List the primary endpoints only for the standby cluster.
         if relation is None or primary_cluster is None or self.charm.app == primary_cluster:
             return []
-        return [
-            relation.data[unit]["unit-address"]
-            for relation in [
-                self.model.get_relation(REPLICATION_OFFER_RELATION),
-                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
-            ]
-            if relation is not None
-            for unit in relation.units
-            if relation.data[unit].get("unit-address") is not None
-        ]
+        return self._remote_unit_addresses()
 
     def _get_highest_promoted_cluster_counter_value(self) -> str:
         """Return the highest promoted cluster counter."""
@@ -291,7 +298,17 @@ class PostgreSQLAsyncReplication(Object):
                 async_relation.data[async_relation.app],
                 self.charm.app_peer_data,
             ]:
-                relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
+                try:
+                    relation_promoted_cluster_counter = databag.get(
+                        "promoted-cluster-counter", "0"
+                    )
+                except ModelError:
+                    # A dead-DC teardown leaves the remote app's databag on the dying
+                    # cross-model async relation unreadable — `relation-get --app <remote>`
+                    # returns "permission denied" once the offering DC is gone. Skip that
+                    # peer instead of crashing replication-offer-relation-joined on the
+                    # promoted cluster, which would block re-replication (DPE-10203).
+                    continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
         return promoted_cluster_counter
@@ -356,7 +373,11 @@ class PostgreSQLAsyncReplication(Object):
         if primary_cluster is None or self.charm.app == primary_cluster:
             return None
         relation = self._relation
-        primary_cluster_data = relation.data[relation.app].get("primary-cluster-data")  # type: ignore
+        if relation is None:
+            return None
+        primary_cluster_data = _safe_databag_get(
+            relation.data[relation.app], "primary-cluster-data"
+        )
         if primary_cluster_data is None:
             return None
         return json.loads(primary_cluster_data).get("endpoint")
@@ -399,16 +420,26 @@ class PostgreSQLAsyncReplication(Object):
         # List the standby endpoints only for the primary cluster.
         if relation is None or primary_cluster is None or self.charm.app != primary_cluster:
             return []
-        return [
-            relation.data[unit]["unit-address"]
-            for relation in [
-                self.model.get_relation(REPLICATION_OFFER_RELATION),
-                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
-            ]
-            if relation is not None
-            for unit in relation.units
-            if relation.data[unit].get("unit-address") is not None
-        ]
+        return self._remote_unit_addresses()
+
+    def _remote_unit_addresses(self) -> list[str]:
+        """Return unit addresses published across both async relations.
+
+        Skips units whose databag is unreadable — a dead-DC teardown leaves the dying
+        cross-model relation's unit databags raising ModelError on read (DPE-10203).
+        """
+        addresses = []
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            for unit in relation.units:
+                address = _safe_databag_get(relation.data[unit], "unit-address")
+                if address is not None:
+                    addresses.append(address)
+        return addresses
 
     def get_system_identifier(self) -> tuple[str | None, str | None]:
         """Returns the PostgreSQL system identifier from this instance."""
@@ -538,7 +569,7 @@ class PostgreSQLAsyncReplication(Object):
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
         for unit in remote_units:
-            if "unit-address" not in relation.data[unit]:
+            if _safe_databag_get(relation.data[unit], "unit-address") is None:
                 event.fail(
                     "All units from the other cluster must publish their unit addresses in the relation data."
                 )
