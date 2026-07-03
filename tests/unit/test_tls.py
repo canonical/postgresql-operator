@@ -130,10 +130,24 @@ def test_reload_bridge_wired_on_tls_relation_broken(harness):
     Regression test: the VM charm previously observed only certificate_available, so
     removing a TLS relation left Patroni ssl:on against cleared certs.  Both TLS
     relations' relation_broken must reach the reload bridge (parity with K8s).
+
+    The ordering is also asserted: unlike the certificate_available wiring, these
+    registrations reference only ``self.on[...]``, so moving them above the lib
+    handler's construction in __init__ would silently reverse the order and run
+    the reload before the lib clears state and pushes files.
     """
-    for relation in (TLS_CLIENT_RELATION, TLS_PEER_RELATION):
+    for relation, lib_handler in (
+        (TLS_CLIENT_RELATION, "_on_certificate_available"),
+        (TLS_PEER_RELATION, "_on_peer_certificate_available"),
+    ):
         methods = _observers_for(harness, harness.charm.on[relation].relation_broken)
+        assert lib_handler in methods, (relation, methods)
         assert "_reload_tls_after_push" in methods, (relation, methods)
+        # Lib handler (clear+push) before charm bridge (reload).
+        assert methods.index(lib_handler) < methods.index("_reload_tls_after_push"), (
+            relation,
+            methods,
+        )
 
 
 def test_reload_bridge_defers_when_update_config_not_ready(harness):
@@ -163,6 +177,27 @@ def test_reload_bridge_defers_when_tls_files_not_yet_on_disk(harness):
         harness.charm._reload_tls_after_push(event)
     event.defer.assert_called_once()
     _uc.assert_not_called()
+
+
+def test_reload_bridge_defers_when_update_config_raises(harness):
+    """A raising update_config must be caught and deferred, not fail the hook.
+
+    The bridge mirrors the original charm's broad push-failure guard: a transient
+    Patroni/render failure defers and retries rather than propagating out of the
+    observer.
+    """
+    with harness.hooks_disabled():
+        harness.set_leader(True)
+        harness.charm.set_secret("app", "internal-ca", "ca-content")
+
+    event = Mock()
+    with patch(
+        "charm.PostgresqlOperatorCharm.update_config",
+        side_effect=RuntimeError("patroni render failed"),
+    ):
+        # Must not raise.
+        harness.charm._reload_tls_after_push(event)
+    event.defer.assert_called_once_with()
 
 
 def test_internal_cert_path_pushes_and_reloads(harness):
