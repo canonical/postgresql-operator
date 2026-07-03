@@ -419,7 +419,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.ldap = PostgreSQLLDAP(self, "ldap")
         # TLS events handler owns the two cert requirers; build it before the TLS
         # manager so the manager can constructor-inject them for its live-fetch getters.
-        self.tls = TLS(self, self.state, self.workload)
+        self.tls = TLS(self, self.state)
         self.tls_manager = TLSManager(
             state=self.state,
             workload=self.workload,
