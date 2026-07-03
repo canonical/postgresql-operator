@@ -2919,3 +2919,23 @@ def test_on_secret_remove(harness):
         event.secret.label = None
         harness.charm._on_secret_remove(event)
         assert not event.remove_revision.called
+
+
+def test_planned_units_returns_app_value_normally(harness):
+    charm = harness.charm
+    with patch.object(charm.app, "planned_units", return_value=5):
+        assert charm._planned_units == 5
+
+
+def test_planned_units_survives_goal_state_failure(harness):
+    # DPE-10203 Issue B: after a cross-model SAAS is force-removed, the goal-state hook
+    # command fails ("saas application ... not found"), so app.planned_units() raises
+    # ModelError. _planned_units must fall back to the current unit count instead of
+    # crashing the _patroni property (and every hook that touches it).
+    charm = harness.charm
+    with patch.object(
+        charm.app,
+        "planned_units",
+        side_effect=ModelError('ERROR saas application "db1" not found'),
+    ):
+        assert charm._planned_units == len(charm._hosts)
