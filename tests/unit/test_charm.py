@@ -3888,6 +3888,33 @@ def test_api_update_config_with_async_replication_primary(harness):
         assert base_patch["standby_cluster"]["host"] == "primary-host:5432"
 
 
+def test_api_update_config_clears_stale_standby_when_primary(harness):
+    """Test _api_update_config clears a stale DCS standby_cluster when this cluster is the primary.
+
+    A force-promote bumps the promoted-cluster-counter but, while the dead-DC relation still
+    lingers, does not call promote_standby_cluster() — so the reconciler must clear the stale
+    standby_cluster itself on the next update-config, or the cluster stays a read-only standby
+    leader (DPE-10203).
+    """
+    with (
+        patch.object(harness.charm, "patroni_manager") as mock_patroni_manager,
+        patch.object(
+            harness.charm.async_replication, "get_primary_cluster_endpoint"
+        ) as mock_endpoint,
+    ):
+        # This cluster is the primary -> no primary endpoint.
+        mock_endpoint.return_value = None
+
+        harness.charm._api_update_config()
+
+        call_args = mock_patroni_manager.bulk_update_parameters_controller_by_patroni.call_args
+        base_patch = call_args[0][1]
+
+        # standby_cluster must be explicitly cleared (patched to None) so the DCS converges;
+        # merely omitting it would leave the stale standby from before the promotion in place.
+        assert base_patch["standby_cluster"] is None
+
+
 def test_calculate_max_logical_replication_workers_with_base_value(harness):
     """Test max_logical_replication_workers uses base_max_workers consistently."""
     with patch.object(

@@ -2884,6 +2884,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
+        else:
+            # This cluster is the primary (or standalone): clear any stale standby_cluster
+            # the DCS still holds from before a promotion. A force-promote bumps the
+            # promoted-cluster-counter but — while the dead-DC relation still lingers — does
+            # not call promote_standby_cluster(), so without this the reconciler never clears
+            # the stale standby and the cluster stays a read-only standby leader (DPE-10203).
+            base_patch["standby_cluster"] = None
         try:
             self.patroni_manager.bulk_update_parameters_controller_by_patroni(
                 cfg_patch, base_patch
