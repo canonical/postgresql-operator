@@ -262,12 +262,12 @@ tests:
     interval: 1m
     input_series:
       - series: 'pg_stat_database_xact_rollback{instance="pg1",datname="appdb",datid="1"}'
-        values: '10 20 30'
+        values: '10 20 30 40 50 60 70 80 90'
       - series: 'pg_stat_database_xact_commit{instance="pg1",datname="appdb",datid="1"}'
-        values: '10 10 10'
+        values: '10 10 10 10 10 10 10 10 10'
     alert_rule_test:
       - alertname: PostgresqlHighRollbackRate
-        eval_time: 3m
+        eval_time: 8m
         exp_alerts:
           - exp_labels:
               alertname: PostgresqlHighRollbackRate
@@ -286,12 +286,12 @@ tests:
     interval: 1m
     input_series:
       - series: 'pg_stat_database_xact_rollback{instance="pg2",datname="appdb",datid="2"}'
-        values: '1 1 1'
+        values: '1 1 1 1 1 1 1 1 1'
       - series: 'pg_stat_database_xact_commit{instance="pg2",datname="appdb",datid="2"}'
-        values: '100 100 100'
+        values: '100 100 100 100 100 100 100 100 100'
     alert_rule_test:
       - alertname: PostgresqlHighRollbackRate
-        eval_time: 3m
+        eval_time: 8m
         exp_alerts: []
 
   # 2.2.10
@@ -310,7 +310,7 @@ tests:
               instance: pg1
               datname: appdb
             exp_annotations:
-              summary: PostgreSQL instance pg1 has a low commit rate. 
+              summary: PostgreSQL instance pg1 has a low commit rate.
               description: |
                 PostgreSQL seems to be processing very few transactions.
                 Please check for long-running queries and configuration issues, like insufficient cache size.
@@ -676,7 +676,7 @@ tests:
               relname: orders
               indexrelname: orders_ccnew_idx
             exp_annotations:
-              summary: PostgreSQL instance pg1)= has an invalid index. 
+              summary: PostgreSQL instance pg1)= has an invalid index.
               description: |
                 The table orders has an invalid index: orders_ccnew_idx.
                 Consider running `DROP INDEX orders_ccnew_idx;`
