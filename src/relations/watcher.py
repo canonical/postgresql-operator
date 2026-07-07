@@ -27,18 +27,20 @@ from ops import (
     SecretNotFoundError,
 )
 from pysyncobj.utility import TcpUtility
-from single_kernel_postgresql.utils import new_password
-
-from constants import (
-    RAFT_PARTNER_PREFIX,
+from single_kernel_postgresql.config.literals import (
     RAFT_PASSWORD_KEY,
-    RAFT_PORT,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     WATCHER_OFFER_RELATION,
     WATCHER_PASSWORD_KEY,
     WATCHER_SECRET_LABEL,
     WATCHER_USER,
+)
+from single_kernel_postgresql.utils import new_password
+
+from constants import (
+    RAFT_PARTNER_PREFIX,
+    RAFT_PORT,
 )
 
 if TYPE_CHECKING:
@@ -110,7 +112,8 @@ class PostgreSQLWatcherRelation(Object):
 
         self._relation.data[self.charm.app].update({"disable-watcher": "True"})
         try:
-            self.charm._patroni.remove_raft_member(self.watcher_raft_address)
+            if self.watcher_raft_address:
+                self.charm._patroni.remove_raft_member(self.watcher_raft_address)
         except Exception as e:
             logger.warning(f"Error remove Raft watcher: {e}")
 
@@ -438,10 +441,10 @@ class PostgreSQLWatcherRelation(Object):
         if not relation:
             return
 
-        if not (unit_ip := self.charm._unit_ip):
+        if not (unit_ip := self.charm.state.unit_ip):
             return
 
-        relation.data[self.charm.unit]["version"] = self.charm._patroni.get_postgresql_version()
+        relation.data[self.charm.unit]["version"] = self.charm.workload.get_postgresql_version()
         if self.charm.refresh:
             relation.data[self.charm.unit]["snap"] = self.charm.refresh.pinned_snap_revision
         current_address = relation.data[self.charm.unit].get("unit-address")

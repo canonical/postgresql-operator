@@ -15,6 +15,7 @@ from functools import cached_property
 from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
+from typing import TYPE_CHECKING
 
 from boto3.session import Session
 from botocore.client import Config
@@ -27,30 +28,36 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.literals import (
+    BACKUP_ID_FORMAT,
+    BACKUP_TYPE_OVERRIDES,
+    BACKUP_USER,
+    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
+    PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_LOG_LEVEL_STDERR,
+    PGBACKREST_LOGROTATE_FILE,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+    UNIT_SCOPE,
+)
 from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ARCHIVE_DATA_DIR,
-    BACKUP_ID_FORMAT,
-    BACKUP_TYPE_OVERRIDES,
-    BACKUP_USER,
     LOGS_DATA_DIR,
     PATRONI_CONF_PATH,
-    PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
-    PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
-    PGBACKREST_LOG_LEVEL_STDERR,
-    PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_DIR,
     TEMP_DATA_DIR,
-    UNIT_SCOPE,
 )
-from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +94,7 @@ class ListBackupsError(Exception):
 class PostgreSQLBackups(Object):
     """In this class, we manage PostgreSQL backups."""
 
-    def __init__(self, charm, relation_name: str):
+    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str):
         """Manager of PostgreSQL backups."""
         super().__init__(charm, "backup")
         self.charm = charm
@@ -159,12 +166,13 @@ class PostgreSQLBackups(Object):
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
         return not (
-            not self.charm._patroni.member_started and (len(self.charm._peers.data.keys()) == 2)
+            not self.charm.patroni_manager.member_started
+            and (len(self.charm._peers.data.keys()) == 2)  # type: ignore
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             return False, STANDBY_CLUSTER_CREATE_BACKUP_ERROR_MESSAGE
 
         if self.charm.is_blocked:
@@ -181,23 +189,13 @@ class PostgreSQLBackups(Object):
         if is_primary and self.charm.app.planned_units() > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
 
-        if not self.charm._patroni.member_started:
+        if not self.charm.patroni_manager.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
 
         if "stanza" not in self.charm.app_peer_data:
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
-
-    def _is_standby_cluster(self) -> bool:
-        """Return whether this unit belongs to a standby cluster."""
-        if (
-            self.model.get_relation(REPLICATION_CONSUMER_RELATION) is None
-            and self.model.get_relation(REPLICATION_OFFER_RELATION) is None
-        ):
-            return False
-
-        return not self.charm.async_replication.is_primary_cluster()
 
     def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
@@ -248,7 +246,7 @@ class PostgreSQLBackups(Object):
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
             return_code, system_identifier_from_instance, error = self._execute_command([
-                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm.workload.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_DIR,
             ])
             if return_code != 0:
@@ -803,7 +801,7 @@ class PostgreSQLBackups(Object):
         ):
             return
 
-        for _unit, unit_data in self.charm._peers.data.items():
+        for _unit, unit_data in self.charm.all_peer_data.items():
             if "s3-initialization-done" not in unit_data:
                 continue
 
@@ -1096,7 +1094,7 @@ Stderr:
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.warning(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             event.fail(STANDBY_CLUSTER_LIST_BACKUPS_ERROR_MESSAGE)
             return
@@ -1179,7 +1177,7 @@ Stderr:
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")
-        if not self.charm._patroni.stop_patroni():
+        if not self.charm.patroni_manager.stop_patroni():
             error_message = "Failed to stop database service"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
@@ -1217,7 +1215,7 @@ Stderr:
 
         # Start the database to start the restore process.
         logger.info("Configuring Patroni to restore the backup")
-        self.charm._patroni.start_patroni()
+        self.charm.patroni_manager.start_patroni()
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
@@ -1282,7 +1280,7 @@ Stderr:
         Returns:
             a boolean indicating whether restore should be run.
         """
-        if self._is_standby_cluster():
+        if self.charm.is_standby_cluster:
             logger.error(f"Restore failed: {STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE}")
             event.fail(STANDBY_CLUSTER_RESTORE_ERROR_MESSAGE)
             return False
@@ -1417,7 +1415,7 @@ Stderr:
         """Removes the restoring backup flag and restart the database."""
         self.charm.app_peer_data.update({"restoring-backup": "", "restore-to-time": ""})
         self.charm.update_config()
-        self.charm._patroni.start_patroni()
+        self.charm.patroni_manager.start_patroni()
 
     def _retrieve_s3_parameters(self) -> tuple[dict, list[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
@@ -1479,7 +1477,10 @@ Stderr:
             return False
 
         # Stop the service if TLS is not enabled or there are no replicas.
-        if len(self.charm._peer_members_ips) == 0 or self.charm._patroni.get_standby_leader():
+        if (
+            len(self.charm._peer_members_ips) == 0
+            or self.charm.patroni_manager.get_standby_leader()
+        ):
             charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 

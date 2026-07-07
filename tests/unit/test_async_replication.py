@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from ops import Application
+from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
 from tenacity import RetryError
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
-    REPLICATION_CONSUMER_RELATION,
     PostgreSQLAsyncReplication,
 )
 
@@ -306,14 +306,14 @@ def test_wait_for_standby_leader():
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni_manager.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
-    mock_charm._patroni.is_member_isolated = True
-    mock_charm._patroni.restart_patroni = MagicMock()
+    mock_charm.patroni_manager.is_member_isolated = True
+    mock_charm.patroni_manager.restart_patroni = MagicMock()
 
     result = relation._wait_for_standby_leader(mock_event)
     assert result is True
-    mock_charm._patroni.restart_patroni.assert_called_once()
+    mock_charm.patroni_manager.restart_patroni.assert_called_once()
     mock_event.defer.assert_called_once()
 
     # 2.
@@ -322,9 +322,9 @@ def test_wait_for_standby_leader():
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni_manager.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
-    mock_charm._patroni.is_member_isolated = False
+    mock_charm.patroni_manageer.is_member_isolated = False
 
     result = relation._wait_for_standby_leader(mock_event)
     assert result is True
@@ -335,7 +335,7 @@ def test_wait_for_standby_leader():
     mock_event = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni_manager.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = True
 
     result = relation._wait_for_standby_leader(mock_event)
@@ -436,7 +436,6 @@ def test_handle_replication_change():
     relation.get_system_identifier = MagicMock(return_value=(12345, None))
     relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
     relation._update_primary_cluster_data = MagicMock()
-    relation._re_emit_async_relation_changed_event = MagicMock()
 
     with patch.object(
         PostgreSQLAsyncReplication,
@@ -451,7 +450,6 @@ def test_handle_replication_change():
     relation.get_system_identifier.assert_called_once()
     relation._get_highest_promoted_cluster_counter_value.assert_called_once()
     relation._update_primary_cluster_data.assert_called_once_with(2, 12345)
-    relation._re_emit_async_relation_changed_event.assert_called_once()
     mock_event.fail.assert_not_called()
 
 
@@ -515,7 +513,7 @@ def test_handle_forceful_promotion():
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
-    mock_charm._patroni.get_primary.side_effect = RetryError("timeout")
+    mock_charm.patroni_manager.get_primary.side_effect = RetryError("timeout")
 
     result = relation._handle_forceful_promotion(mock_event)
 
@@ -578,7 +576,7 @@ def test_on_async_relation_broken():
     mock_charm = MagicMock()
     mock_charm._peers = MagicMock()
     mock_charm.is_unit_departing = False
-    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.patroni_manager.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = True
     mock_event = MagicMock()
 

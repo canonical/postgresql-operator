@@ -10,9 +10,8 @@ import jubilant
 import requests
 from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import Retrying, stop_after_delay, wait_fixed
-
-from constants import PEER
 
 from ..helpers import execute_queries_on_unit
 
@@ -188,6 +187,13 @@ def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
     raise Exception("No standby primary node found")
 
 
+def get_member_state(juju: Juju, app_name: str, member_name: str) -> str | None:
+    """Return a cluster member's reported state from the leader's /cluster endpoint."""
+    unit_address = get_unit_ip(juju, app_name, get_app_leader(juju, app_name))
+    members = requests.get(f"https://{unit_address}:8008/cluster", verify=False).json()["members"]
+    return next((member["state"] for member in members if member["name"] == member_name), None)
+
+
 def get_db_max_written_value(
     juju: Juju, app_name: str, unit_name: str, db_name: str = "postgresql_test_app_database"
 ) -> int:
@@ -247,7 +253,7 @@ def wait_for_unit_message(app_name: str, unit_name: str, unit_message: str) -> J
 def get_user_password(juju: Juju, app_name: str, user: str) -> str | None:
     """Get a system user's password."""
     for secret in juju.secrets():
-        if secret.label == f"{PEER}.{app_name}.app":
+        if secret.label == f"{PEER_RELATION}.{app_name}.app":
             revealed_secret = juju.show_secret(secret.uri, reveal=True)
             return revealed_secret.content.get(f"{user}-password")
 

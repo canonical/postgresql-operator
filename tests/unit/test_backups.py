@@ -11,7 +11,8 @@ from botocore.exceptions import ClientError
 from jinja2 import Template
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus, Unit
 from ops.testing import Harness
-from single_kernel_postgresql.config.literals import Substrates
+from single_kernel_postgresql.config.enums import Substrates
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from tenacity import RetryError, wait_fixed
 
 from backups import (
@@ -22,7 +23,7 @@ from backups import (
     PostgreSQLBackups,
 )
 from charm import PostgresqlOperatorCharm
-from constants import ARCHIVE_DATA_DIR, LOGS_DATA_DIR, PEER, POSTGRESQL_DATA_DIR, TEMP_DATA_DIR
+from constants import ARCHIVE_DATA_DIR, LOGS_DATA_DIR, POSTGRESQL_DATA_DIR, TEMP_DATA_DIR
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
@@ -37,7 +38,7 @@ def harness():
     harness = Harness(PostgresqlOperatorCharm)
 
     # Set up the initial relation and hooks.
-    peer_rel_id = harness.add_relation(PEER, "postgresql")
+    peer_rel_id = harness.add_relation(PEER_RELATION, "postgresql")
     harness.add_relation_unit(peer_rel_id, "postgresql/0")
     harness.begin()
     yield harness
@@ -150,7 +151,9 @@ def test_are_backup_settings_ok(harness):
 
 
 def test_can_initialise_stanza(harness):
-    with patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started:
+    with patch(
+        "charm.PatroniManager.member_started", new_callable=PropertyMock
+    ) as _member_started:
         # Test when Patroni or PostgreSQL hasn't started yet
         # and the unit hasn't joined the peer relation yet.
         _member_started.return_value = False
@@ -164,14 +167,16 @@ def test_can_initialise_stanza(harness):
 def test_can_unit_perform_backup(harness):
     with (
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch("ops.model.Application.planned_units") as _planned_units,
         patch(
             "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
         ) as _is_primary,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when unit belongs to a standby cluster.
         _is_standby_cluster.return_value = True
         assert harness.charm.backup._can_unit_perform_backup() == (
@@ -234,41 +239,16 @@ def test_can_unit_perform_backup(harness):
         assert harness.charm.backup._can_unit_perform_backup() == (True, None)
 
 
-def test_is_standby_cluster(harness):
-    with (
-        patch.object(harness.charm.backup.model, "get_relation") as _get_relation,
-        patch.object(harness.charm.async_replication, "is_primary_cluster") as _is_primary_cluster,
-    ):
-        # Test when async replication relation is not present.
-        _get_relation.side_effect = [None, None]
-        assert not harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_not_called()
-
-        # Test when relation is present and this is the primary cluster.
-        _get_relation.reset_mock()
-        _is_primary_cluster.reset_mock()
-        _get_relation.side_effect = [object()]
-        _is_primary_cluster.return_value = True
-        assert not harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_called_once()
-
-        # Test when relation is present and this is the standby cluster.
-        _get_relation.reset_mock()
-        _is_primary_cluster.reset_mock()
-        _get_relation.side_effect = [object()]
-        _is_primary_cluster.return_value = False
-        assert harness.charm.backup._is_standby_cluster()
-        _is_primary_cluster.assert_called_once()
-
-
 def test_can_use_s3_repository(harness):
     with (
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.Patroni.get_postgresql_version", return_value="16.6"
+            "charm.VMWorkload.get_postgresql_version", return_value="16.6"
         ) as _get_postgresql_version,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch(
@@ -572,7 +552,7 @@ def test_empty_data_files(harness):
 
 def test_change_connectivity_to_database(harness):
     with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Ensure that there is no connectivity info in the unit relation databag.
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -764,8 +744,10 @@ def test_list_backups(harness):
 
 def test_initialise_stanza(harness):
     with (
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
-        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch("backups.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
@@ -773,7 +755,7 @@ def test_initialise_stanza(harness):
             "charm.PostgreSQLBackups._s3_initialization_set_failure"
         ) as _s3_initialization_set_failure,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
 
         mock_event = MagicMock()
 
@@ -851,7 +833,9 @@ def test_check_stanza(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch("backups.wait_fixed", return_value=wait_fixed(0)),
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
@@ -863,7 +847,7 @@ def test_check_stanza(harness):
             "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
         ) as _is_primary,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Set peer data flag
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -908,9 +892,11 @@ def test_check_stanza(harness):
 def test_coordinate_stanza_fields(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         stanza_name = f"{harness.charm.model.name}.{harness.charm.app.name}"
 
         peer_data_primary_error = {
@@ -1013,7 +999,7 @@ def test_is_primary_pgbackrest_service_running(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
-        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PatroniManager.get_primary") as _get_primary,
     ):
         # Test when the pgBackRest fails to contact the primary server.
         _get_primary.side_effect = None
@@ -1063,7 +1049,7 @@ def test_on_s3_credential_changed(harness):
         patch("time.asctime", return_value="Thu Feb 24 05:00:00 2022"),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when the cluster was not initialised yet.
         s3_rel_id = harness.add_relation(S3_PARAMETERS_RELATION, "s3-integrator")
         harness.charm.backup.s3_client.on.credentials_changed.emit(
@@ -1142,7 +1128,9 @@ def test_on_s3_credential_changed(harness):
 def test_on_s3_credential_changed_primary(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch(
+            "charm.PatroniManager.reload_patroni_configuration"
+        ) as _reload_patroni_configuration,
         patch(
             "charm.PostgreSQLBackups._create_bucket_if_not_exists"
         ) as _create_bucket_if_not_exists,
@@ -1207,7 +1195,7 @@ def test_on_s3_credential_gone(harness):
             "s3-initialization-block-message": ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         }
 
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test that unrelated blocks will remain
         harness.charm.unit.status = BlockedStatus("test block")
         harness.charm.backup._on_s3_credential_gone(None)
@@ -1410,7 +1398,9 @@ def test_on_list_backups_action(harness):
         patch(
             "charm.PostgreSQLBackups._generate_backup_list_output"
         ) as _generate_backup_list_output,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
         # Test when unit belongs to a standby cluster.
@@ -1530,12 +1520,12 @@ def test_is_psql_timestamp(harness):
 
 def test_on_restore_action(harness):
     with (
-        patch("charm.Patroni.start_patroni") as _start_patroni,
+        patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgreSQLBackups._empty_data_files") as _empty_data_files,
         patch("charm.PostgreSQLBackups._restart_database") as _restart_database,
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
-        patch("charm.Patroni.stop_patroni") as _stop_patroni,
+        patch("charm.PatroniManager.stop_patroni") as _stop_patroni,
         patch("charm.PostgreSQLBackups._list_backups") as _list_backups,
         patch("charm.PostgreSQLBackups._list_timelines") as _list_timelines,
         patch("charm.PostgreSQLBackups._fetch_backup_from_id") as _fetch_backup_from_id,
@@ -1547,7 +1537,7 @@ def test_on_restore_action(harness):
             "charm.PostgresqlOperatorCharm.restore_patroni_restart_condition"
         ) as _restore_patroni_restart_condition,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         # Test when pre restore checks fail.
         mock_event = MagicMock()
         _pre_restore_checks.return_value = False
@@ -1750,7 +1740,9 @@ def test_on_restore_action(harness):
 def test_pre_restore_checks(harness):
     with (
         patch("ops.model.Application.planned_units") as _planned_units,
-        patch("charm.PostgreSQLBackups._is_standby_cluster") as _is_standby_cluster,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_standby_cluster", new_callable=PropertyMock
+        ) as _is_standby_cluster,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
     ):
         # Test when unit belongs to a standby cluster.
@@ -1906,10 +1898,10 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
 
 def test_restart_database(harness):
     with (
-        patch("charm.Patroni.start_patroni") as _start_patroni,
+        patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
+        peer_rel_id = harness.model.get_relation(PEER_RELATION).id
         with harness.hooks_disabled():
             harness.update_relation_data(
                 peer_rel_id,
@@ -1990,7 +1982,7 @@ def test_start_stop_pgbackrest_service(harness):
         patch(
             "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
         ) as _is_primary,
-        patch("charm.Patroni.get_standby_leader") as _get_standby_leader,
+        patch("charm.PatroniManager.get_standby_leader") as _get_standby_leader,
         patch("backups.snap.SnapCache") as _snap_cache,
         patch(
             "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock

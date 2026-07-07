@@ -8,9 +8,8 @@ import psycopg2
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from single_kernel_postgresql.config.literals import DATABASE_DEFAULT_NAME
 from tenacity import Retrying, stop_after_attempt, wait_fixed
-
-from constants import DATABASE_DEFAULT_NAME
 
 from ..helpers import (
     CHARM_BASE,

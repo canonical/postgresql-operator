@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch, sentinel
 
 import pytest
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import PEER_RELATION
 
 from charm import PostgresqlOperatorCharm
-from constants import PEER
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def harness():
         harness = Harness(PostgresqlOperatorCharm)
 
         # Set up the initial relation and hooks.
-        peer_rel_id = harness.add_relation(PEER, "postgresql")
+        peer_rel_id = harness.add_relation(PEER_RELATION, "postgresql")
         harness.add_relation_unit(peer_rel_id, "postgresql/0")
         harness.begin()
         yield harness
