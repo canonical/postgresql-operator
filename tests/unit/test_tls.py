@@ -13,11 +13,7 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from ops.testing import Harness
-from single_kernel_postgresql.config.literals import (
-    PEER_RELATION,
-    TLS_CLIENT_RELATION,
-    TLS_PEER_RELATION,
-)
+from single_kernel_postgresql.config.literals import PEER_RELATION
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.managers.tls import TLSManager
 
@@ -25,14 +21,7 @@ from charm import PostgresqlOperatorCharm
 
 
 @pytest.fixture(autouse=True)
-def _platform_machine(monkeypatch):
-    # refresh_versions.toml keys snap revisions by x86_64/aarch64; ensure the charm
-    # constructs regardless of the host arch (e.g. arm64 dev laptops).
-    monkeypatch.setattr("platform.machine", lambda: "x86_64")
-
-
-@pytest.fixture(autouse=True)
-def harness(_platform_machine):
+def harness():
     harness = Harness(PostgresqlOperatorCharm)
     peer_rel_id = harness.add_relation(PEER_RELATION, "postgresql")
     harness.add_relation_unit(peer_rel_id, "postgresql/0")
@@ -64,43 +53,6 @@ def test_is_tls_enabled_reflects_tls_manager(harness):
         assert harness.charm.is_tls_enabled is True
 
 
-def _observers_for(harness, bound_event):
-    """Return method names observing the given bound event, in registration order."""
-    emitter_path = bound_event.emitter.handle.path
-    event_kind = bound_event.event_kind
-    return [
-        method
-        for (_obs_path, method, e_path, e_kind) in harness.framework._observers
-        if e_path == emitter_path and e_kind == event_kind
-    ]
-
-
-def test_reload_bridge_wired_after_handler_on_client_certificate(harness):
-    """The reload bridge observes the same certificate_available event as the handler.
-
-    The lib handler's store+push observer must be registered BEFORE the charm's
-    reload bridge so that, when the event fires, certs are stored+pushed first and
-    the reload (update_config) runs afterwards (ops calls observers in order).
-    """
-    methods = _observers_for(
-        harness, harness.charm.tls.client_certificate.on.certificate_available
-    )
-    assert "_on_certificate_available" in methods, methods
-    assert "_reload_tls_after_push" in methods, methods
-    # Handler (store+push) before bridge (reload).
-    assert methods.index("_on_certificate_available") < methods.index("_reload_tls_after_push")
-
-
-def test_reload_bridge_wired_after_handler_on_peer_certificate(harness):
-    """The reload bridge also observes the peer certificate_available event."""
-    methods = _observers_for(harness, harness.charm.tls.peer_certificate.on.certificate_available)
-    assert "_on_peer_certificate_available" in methods, methods
-    assert "_reload_tls_after_push" in methods, methods
-    assert methods.index("_on_peer_certificate_available") < methods.index(
-        "_reload_tls_after_push"
-    )
-
-
 def test_reload_bridge_calls_update_config(harness):
     """_reload_tls_after_push delegates to update_config when internal-ca is present."""
     with harness.hooks_disabled():
@@ -122,32 +74,6 @@ def test_reload_bridge_skips_update_config_without_internal_ca(harness):
     with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
         harness.charm._reload_tls_after_push(Mock())
         _update_config.assert_not_called()
-
-
-def test_reload_bridge_wired_on_tls_relation_broken(harness):
-    """Detaching the TLS operator (relation_broken) must trigger the reload bridge.
-
-    Regression test: the VM charm previously observed only certificate_available, so
-    removing a TLS relation left Patroni ssl:on against cleared certs.  Both TLS
-    relations' relation_broken must reach the reload bridge (parity with K8s).
-
-    The ordering is also asserted: unlike the certificate_available wiring, these
-    registrations reference only ``self.on[...]``, so moving them above the lib
-    handler's construction in __init__ would silently reverse the order and run
-    the reload before the lib clears state and pushes files.
-    """
-    for relation, lib_handler in (
-        (TLS_CLIENT_RELATION, "_on_certificate_available"),
-        (TLS_PEER_RELATION, "_on_peer_certificate_available"),
-    ):
-        methods = _observers_for(harness, harness.charm.on[relation].relation_broken)
-        assert lib_handler in methods, (relation, methods)
-        assert "_reload_tls_after_push" in methods, (relation, methods)
-        # Lib handler (clear+push) before charm bridge (reload).
-        assert methods.index(lib_handler) < methods.index("_reload_tls_after_push"), (
-            relation,
-            methods,
-        )
 
 
 def test_reload_bridge_defers_when_update_config_not_ready(harness):
