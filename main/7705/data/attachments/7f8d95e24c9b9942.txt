@@ -1,0 +1,86 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:151 starting continuous writes to the database
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+  postgresql-test-app/0 [idle] blocked: No database integration available
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+  postgresql-test-app/0 [idle] blocked: No database integration available
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:154 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 2, 'testing.postgresql-1': 2, 'testing.postgresql-2': 2}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 4, 'testing.postgresql-1': 4, 'testing.postgresql-2': 4}
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:162 Standby leader: postgresql/0
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:167 Cutting network for postgresql/0 (hostname=juju-1c3558-0, ip=10.53.21.250)
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 7, 'testing.postgresql-1': 7, 'testing.postgresql-2': 7}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 9, 'testing.postgresql-1': 9, 'testing.postgresql-2': 9}
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Standby
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:192 IP changed from 10.53.21.250 to 10.53.21.33
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:195 checking whether writes are increasing on both clusters after IP change
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 65, 'testing.postgresql-1': 65, 'testing.postgresql-2': 65}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 66, 'testing.postgresql-1': 66, 'testing.postgresql-2': 66}
+[32mINFO    [0m integration.ha_tests.test_async_replication_ip_change:test_async_replication_ip_change.py:198 checking whether no writes were lost across both clusters
+[32mINFO    [0m integration.ha_tests.conftest:conftest.py:67 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  00:35:55Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.23    active      3  postgresql                          0  no       Primary
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  559  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.53.21.80               received database credentials of the first database
+postgresql/0*           active    idle   0        10.53.21.180    5432/tcp  Primary
+postgresql/1            active    idle   1        10.53.21.13     5432/tcp  
+postgresql/2            active    idle   2        10.53.21.108    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.53.21.180  juju-0ef19f-0  ubuntu@22.04  runnervmjbsos  Running
+1        started  10.53.21.13   juju-0ef19f-1  ubuntu@22.04  runnervmjbsos  Running
+2        started  10.53.21.108  juju-0ef19f-2  ubuntu@22.04  runnervmjbsos  Running
+3        started  10.53.21.80   juju-0ef19f-3  ubuntu@22.04  runnervmjbsos  Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication-offer  postgresql   postgresql  0    1/1        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:22:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:22:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:23:23 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 583, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 372, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8f2611fac0 state=finished raised Exception>]
+machine-1: 00:26:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:26:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:26:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:26:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:27:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:27:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:27:59 ERROR unit.postgresql/1.juju-log restart:1: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+unit-postgresql-2: 00:28:58 ERROR unit.postgresql/2.juju-log database-peers:0: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
