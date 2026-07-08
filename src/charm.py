@@ -1505,6 +1505,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
+    @property
+    def _planned_units(self) -> int:
+        """Number of planned units, resilient to a transient goal-state failure.
+
+        ops implements ``Application.planned_units()`` via ``goal-state``, which fails
+        ("saas application ... not found") while a cross-model SAAS force-removed during a
+        dead-DC teardown still lingers in goal-state. Fall back to the count of currently known
+        units so the hook reconciles instead of crashing the ``_patroni`` property and every
+        hook that touches it (DPE-10203).
+        """
+        try:
+            return self.app.planned_units()
+        except ModelError:
+            return len(self._hosts)
+
     @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
@@ -2485,10 +2500,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 danger_state = ""
                 if not self._patroni.has_raft_quorum():
                     danger_state = " (read-only)"
-                elif (
-                    len(self.patroni_manager.get_running_cluster_members())
-                    < self.app.planned_units()
-                ):
+                elif len(self.patroni_manager.get_running_cluster_members()) < self._planned_units:
                     danger_state = " (degraded)"
                 unit_status = "Standby" if self.is_standby_leader else "Primary"
                 self.set_unit_status(ActiveStatus(f"{unit_status}{danger_state}"))
