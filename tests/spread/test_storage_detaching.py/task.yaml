@@ -1,9 +1,8 @@
 summary: test_storage_detaching.py
 environment:
   TEST_MODULE: test_storage_detaching.py
-  # #1550 only reproduces on Juju 4.0: 3.6 masks it via a cleanup_storage shortcut
-  # that removes still-Dying storage. Pin this task to a 4.0 variant and drop the
-  # default juju36 variant so it runs ONLY on 4.0 (the rest of the suite stays 3.6).
+  # #1550 only reproduces on Juju 4.0 (3.6 masks it by removing still-Dying storage),
+  # so pin this task to a juju40 variant and drop the default juju36.
   CONCIERGE_JUJU_CHANNEL/juju40: 4.0/stable
 variants:
   - -juju36

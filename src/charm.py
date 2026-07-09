@@ -2568,24 +2568,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise
 
     def _on_storage_detaching(self, _) -> None:
-        """Release the storage so Juju can unmount it on unit teardown.
-
-        Only act when the whole application is going away (``planned_units == 0``,
-        i.e. remove-application/destroy-model), which is where the storage unmount
-        actually hangs. On scale-down the surviving units still need this unit's
-        Patroni reachable to remove it from the raft cluster, so stopping the
-        workload here would break primary election.
-
-        ``storage-detaching`` runs before ``stop``, so this is the earliest hook
-        where the snap services and background processes that keep the storage
-        mounts busy can be stopped.
-        """
+        """Stop the workload so Juju can unmount the storage on app teardown."""
+        # On scale-down the surviving cluster still needs this unit's Patroni to
+        # remove it from raft; only stop when the whole app is going away.
         if self.app.planned_units() > 0:
             return
         self._observer.stop_observer()
         self._rotate_logs.stop_log_rotation()
-        # Stop every charmed-postgresql snap service (PostgreSQL, pgBackRest, the
-        # exporters) so the snap releases the storage mounts before Juju unmounts them.
         try:
             snap.SnapCache()[charm_refresh.snap_name()].stop()
         except snap.SnapError:

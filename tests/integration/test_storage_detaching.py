@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import logging
@@ -11,11 +11,8 @@ from .jubilant_helpers import DATABASE_APP_NAME
 
 logger = logging.getLogger(__name__)
 
-# rootfs (machine-scoped) storage is the issue's scenario. It matters:
-# - Juju 3.6 masks the bug via a cleanup_storage shortcut that removes still-Dying
-#   storage, so this only reproduces on Juju 4.0 (see tests/spread/.../task.yaml).
-# - On 4.0 the detachable ``lxd`` pool lets Juju destroy the container before
-#   detaching, so only ``rootfs`` reproduces the stuck unmount.
+# rootfs (machine-scoped) is the only pool that reproduces the stuck unmount on
+# Juju 4.0: the detachable lxd pool destroys the container before detaching.
 ROOTFS_STORAGE = dict.fromkeys(("archive", "data", "logs", "temp"), "rootfs")
 
 
@@ -24,12 +21,8 @@ def test_storage_released_on_removal(juju: JujuFixture, charm):
     """Graceful removal must release the storage so teardown completes.
 
     Regression test for canonical/postgresql-operator#1550: without stopping the
-    workload in the ``storage-detaching`` hook the charmed-postgresql snap keeps the
-    storage mounts busy, so Juju's unmount fails ("target is busy") and the unit,
-    storage and machine removal hangs forever.
-
-    Pinned to Juju 4.0 with rootfs storage by its spread task. ``force=True`` is
-    required because the charm still declares ``assumes: juju < 4``.
+    workload in the ``storage-detaching`` hook the snap keeps the storage mounts
+    busy, so Juju's unmount fails ("target is busy") and teardown hangs.
     """
     juju.ext.model.deploy(
         charm,
