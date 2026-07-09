@@ -112,7 +112,7 @@ groups:
     # 2.2.9
     - alert: PostgresqlHighRollbackRate
       expr: 'sum by (namespace,datname,instance,datid) ((rate(pg_stat_database_xact_rollback{datname!~"template.*|postgres",datid!="0"}[3m])) / ((rate(pg_stat_database_xact_rollback{datname!~"template.*|postgres",datid!="0"}[3m])) + (rate(pg_stat_database_xact_commit{datname!~"template.*|postgres",datid!="0"}[3m])))) > 0.02'
-      for: 0m
+      for: 5m
       labels:
         severity: warning
       annotations:
