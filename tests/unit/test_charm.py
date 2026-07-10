@@ -131,34 +131,75 @@ def test_on_storage_detaching(harness):
         patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
         patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
         patch.object(harness.charm.app, "planned_units") as _planned_units,
+        patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
+        patch(
+            "charm.PostgresqlOperatorCharm._get_unit_ip", return_value="2.2.2.2"
+        ) as _get_unit_ip,
+        patch(
+            "single_kernel_postgresql.core.state.CharmState.unit_ip",
+            new_callable=PropertyMock,
+            return_value="1.1.1.1",
+        ),
     ):
         _selected_snap = _snap_cache.return_value.__getitem__.return_value
+        rel_id = harness.model.get_relation(PEER_RELATION).id
 
-        # Scale-down (units remain): the surviving cluster still needs this unit's
-        # Patroni reachable to remove it from raft, so the workload must NOT be
-        # stopped here.
+        def _reset():
+            for _m in (_stop_observer, _stop_log_rotation, _selected_snap, _remove_raft_member):
+                _m.reset_mock()
+
+        # Scale-down but no surviving peer to ask: skip the raft removal, yet still
+        # stop so Juju can unmount the departing unit's storage.
         _planned_units.return_value = 2
+        storage_id = harness.add_storage("archive", attach=True)[0]
+        harness.detach_storage(storage_id)
+        _remove_raft_member.assert_not_called()
+        _selected_snap.stop.assert_called_once_with(disable=True)
+        _reset()
+
+        # Scale-down with a surviving peer: a node cannot remove itself from its own
+        # raft endpoint, so drop this unit from raft via the peer, then stop.
+        harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/1")
         storage_id = harness.add_storage("data", attach=True)[0]
         harness.detach_storage(storage_id)
-        _stop_observer.assert_not_called()
-        _stop_log_rotation.assert_not_called()
-        _selected_snap.stop.assert_not_called()
+        _remove_raft_member.assert_called_once_with("1.1.1.1:2222", remote_address="2.2.2.2:2222")
+        _stop_observer.assert_called_once_with()
+        _stop_log_rotation.assert_called_once_with()
+        _selected_snap.stop.assert_called_once_with(disable=True)
+        _reset()
 
-        # Full teardown (no units remain): release the storage by stopping the
-        # background processes and disabling (so a mid-teardown restart can't
-        # re-grab the mount) all the snap services.
+        # Concurrent scale-down where the first peer tried is itself a departing unit
+        # whose raft endpoint is already down (removal fails against it): fall through to
+        # a still-live survivor and drop this member via that peer's endpoint instead of
+        # leaking it. Distinct peer IPs prove the retry lands on the live survivor.
+        harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/2")
+        _get_unit_ip.side_effect = ["2.2.2.2", "3.3.3.3"]
+        _remove_raft_member.side_effect = [RemoveRaftMemberFailedError, None]
+        storage_id = harness.add_storage("logs", attach=True)[0]
+        harness.detach_storage(storage_id)
+        assert _remove_raft_member.call_count == 2
+        _remove_raft_member.assert_called_with("1.1.1.1:2222", remote_address="3.3.3.3:2222")
+        _selected_snap.stop.assert_called_once_with(disable=True)
+        _get_unit_ip.side_effect = None
+        _reset()
+
+        # Scale-down where every peer's raft endpoint is unreachable: log and still
+        # stop rather than blocking the storage release.
+        _remove_raft_member.side_effect = RemoveRaftMemberFailedError
+        storage_id = harness.add_storage("temp", attach=True)[0]
+        harness.detach_storage(storage_id)
+        assert _remove_raft_member.call_count == 2
+        _selected_snap.stop.assert_called_once_with(disable=True)
+        _reset()
+
+        # Full teardown (no units remain): stop, no raft removal needed.
         _planned_units.return_value = 0
-        for storage_name in ("archive", "data", "logs", "temp"):
-            _stop_observer.reset_mock()
-            _stop_log_rotation.reset_mock()
-            _selected_snap.reset_mock()
-
-            storage_id = harness.add_storage(storage_name, attach=True)[0]
-            harness.detach_storage(storage_id)
-
-            _stop_observer.assert_called_once_with()
-            _stop_log_rotation.assert_called_once_with()
-            _selected_snap.stop.assert_called_once_with(disable=True)
+        storage_id = harness.add_storage("data", attach=True)[0]
+        harness.detach_storage(storage_id)
+        _remove_raft_member.assert_not_called()
+        _stop_observer.assert_called_once_with()
+        _stop_log_rotation.assert_called_once_with()
+        _selected_snap.stop.assert_called_once_with(disable=True)
 
 
 def test_patroni_scrape_config(harness):
