@@ -1254,7 +1254,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Update the members of the cluster in the Patroni configuration on this unit.
             self.update_config()
         except RetryError:
-            self.set_unit_status(MaintenanceStatus("updating cluster members"))
+            self.set_unit_status(MaintenanceStatus("cluster member update failed, retrying"))
             return
         except ValueError as e:
             self.set_unit_status(BlockedStatus("Configuration Error. Please check the logs"))
@@ -1473,7 +1473,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 self.update_config()
             except RetryError:
-                self.set_unit_status(MaintenanceStatus("updating cluster members"))
+                self.set_unit_status(MaintenanceStatus("cluster member update failed, retrying"))
         else:
             self.set_unit_status(WaitingStatus("waiting for peer IP"))
 
