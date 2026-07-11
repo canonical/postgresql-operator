@@ -381,7 +381,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
-        self.config_manager = ConfigManager(state=self.state, workload=self.workload)
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
@@ -425,6 +424,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             workload=self.workload,
             client_certificate=self.tls.client_certificate,
             peer_certificate=self.tls.peer_certificate,
+        )
+        self.config_manager = ConfigManager(
+            state=self.state,
+            workload=self.workload,
+            tls_manager=self.tls_manager,
+            patroni_manager=self.patroni_manager,
+            request_restart=self.request_restart,
+            refresh_endpoints=self.refresh_endpoints,
+            restart_services=self.restart_services,
         )
         # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
         # the lib handler stores+pushes certs on certificate_available, then we reload.
@@ -2733,228 +2741,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def _calculate_max_worker_processes(self) -> str | None:
-        """Calculate cpu_max_worker_processes configuration value."""
-        if self.config.cpu_max_worker_processes == "auto":
-            # auto = minimum(8, 2 * vCores)
-            return str(min(8, 2 * self.cpu_count))
-        elif self.config.cpu_max_worker_processes is not None:
-            value = self.config.cpu_max_worker_processes
-            cap = 10 * self.cpu_count
-            if value > cap:
-                raise ValueError(
-                    f"cpu_max_worker_processes value {value} exceeds maximum allowed "
-                    f"of {cap} (10 * vCores). Please set a value <= {cap}."
-                )
-            return str(value)
-        return None
+    def request_restart(self) -> None:
+        """Clear the restarted flag and acquire the rolling-restart lock. Bridge for ConfigManager."""
+        self.unit_peer_data.pop("postgresql_restarted", None)
+        self.on[str(self.restart_manager.name)].acquire_lock.emit()
 
-    def _validate_worker_config_value(self, param_name: str, value: int) -> str:
-        """Shared validation logic for worker process parameters.
+    def refresh_endpoints(self) -> None:
+        """Refresh client-relation endpoints. Bridge for ConfigManager."""
+        self.postgresql_client_relation.update_endpoints()
 
-        Args:
-            param_name: The configuration parameter name (for error messages)
-            value: The integer value to validate
-
-        Returns:
-            String representation of the validated value
-
-        Raises:
-            ValidationError: If value is less than 2
-            ValueError: If value exceeds 10 * vCores
-        """
-        cap = 10 * self.cpu_count
-        if value > cap:
-            raise ValueError(
-                f"{param_name} value {value} exceeds maximum allowed "
-                f"of {cap} (10 * vCores). Please set a value <= {cap}."
-            )
-        return str(value)
-
-    def _calculate_max_parallel_workers(self, base_max_workers: int) -> str | None:
-        """Calculate cpu_max_parallel_workers configuration value."""
-        if self.config.cpu_max_parallel_workers == "auto":
-            return str(base_max_workers)
-        elif self.config.cpu_max_parallel_workers is not None:
-            # Validate the value first
-            validated_value_str = self._validate_worker_config_value(
-                "cpu_max_parallel_workers", self.config.cpu_max_parallel_workers
-            )
-            # Apply the min constraint with base_max_workers
-            return str(min(int(validated_value_str), base_max_workers))
-        return None
-
-    def _calculate_max_parallel_maintenance_workers(self, base_max_workers: int) -> str | None:
-        """Calculate cpu_max_parallel_maintenance_workers configuration value."""
-        if self.config.cpu_max_parallel_maintenance_workers == "auto":
-            return str(base_max_workers)
-        elif self.config.cpu_max_parallel_maintenance_workers is not None:
-            return self._validate_worker_config_value(
-                "cpu_max_parallel_maintenance_workers",
-                self.config.cpu_max_parallel_maintenance_workers,
-            )
-        return None
-
-    def _calculate_max_logical_replication_workers(self, base_max_workers: int) -> str | None:
-        """Calculate cpu_max_logical_replication_workers configuration value."""
-        if self.config.cpu_max_logical_replication_workers == "auto":
-            return str(base_max_workers)
-        elif self.config.cpu_max_logical_replication_workers is not None:
-            return self._validate_worker_config_value(
-                "cpu_max_logical_replication_workers",
-                self.config.cpu_max_logical_replication_workers,
-            )
-        return None
-
-    def _calculate_max_sync_workers_per_subscription(self, base_max_workers: int) -> str | None:
-        """Calculate cpu_max_sync_workers_per_subscription configuration value."""
-        if self.config.cpu_max_sync_workers_per_subscription == "auto":
-            return str(base_max_workers)
-        elif self.config.cpu_max_sync_workers_per_subscription is not None:
-            return self._validate_worker_config_value(
-                "cpu_max_sync_workers_per_subscription",
-                self.config.cpu_max_sync_workers_per_subscription,
-            )
-        return None
-
-    def _calculate_max_parallel_apply_workers_per_subscription(
-        self, base_max_workers: int
-    ) -> str | None:
-        """Calculate cpu_max_parallel_apply_workers_per_subscription configuration value."""
-        if self.config.cpu_max_parallel_apply_workers_per_subscription == "auto":
-            return str(base_max_workers)
-        elif self.config.cpu_max_parallel_apply_workers_per_subscription is not None:
-            return self._validate_worker_config_value(
-                "cpu_max_parallel_apply_workers_per_subscription",
-                self.config.cpu_max_parallel_apply_workers_per_subscription,
-            )
-        return None
-
-    def _calculate_worker_process_config(self) -> dict[str, str]:
-        """Calculate worker process configuration values.
-
-        Handles 'auto' values and capping logic for worker process parameters.
-        Returns a dictionary with the calculated values ready for PostgreSQL.
-        """
-        result: dict[str, str] = {}
-
-        # Calculate cpu_max_worker_processes (baseline for other worker configs)
-        cpu_max_worker_processes_value = self._calculate_max_worker_processes()
-        if cpu_max_worker_processes_value is not None:
-            result["max_worker_processes"] = cpu_max_worker_processes_value
-
-        # Get the effective cpu_max_worker_processes for dependent configs
-        # Use the calculated value, or fall back to PostgreSQL default (8)
-        base_max_workers = int(result.get("max_worker_processes", "8"))
-
-        # Calculate other worker parameters
-        cpu_max_parallel_workers_value = self._calculate_max_parallel_workers(base_max_workers)
-        if cpu_max_parallel_workers_value is not None:
-            result["max_parallel_workers"] = cpu_max_parallel_workers_value
-
-        cpu_max_parallel_maintenance_workers_value = (
-            self._calculate_max_parallel_maintenance_workers(base_max_workers)
-        )
-        if cpu_max_parallel_maintenance_workers_value is not None:
-            result["max_parallel_maintenance_workers"] = cpu_max_parallel_maintenance_workers_value
-
-        cpu_max_logical_replication_workers_value = (
-            self._calculate_max_logical_replication_workers(base_max_workers)
-        )
-        if cpu_max_logical_replication_workers_value is not None:
-            result["max_logical_replication_workers"] = cpu_max_logical_replication_workers_value
-
-        cpu_max_sync_workers_per_subscription_value = (
-            self._calculate_max_sync_workers_per_subscription(base_max_workers)
-        )
-        if cpu_max_sync_workers_per_subscription_value is not None:
-            result["max_sync_workers_per_subscription"] = (
-                cpu_max_sync_workers_per_subscription_value
-            )
-
-        cpu_max_parallel_apply_workers_per_subscription_value = (
-            self._calculate_max_parallel_apply_workers_per_subscription(base_max_workers)
-        )
-        if cpu_max_parallel_apply_workers_per_subscription_value is not None:
-            result["max_parallel_apply_workers_per_subscription"] = (
-                cpu_max_parallel_apply_workers_per_subscription_value
-            )
-
-        return result
-
-    def _api_update_config(self) -> bool:
-        # Use config value if set, calculate otherwise
-        max_connections = (
-            self.config.experimental_max_connections
-            if self.config.experimental_max_connections
-            else max(4 * self.cpu_count, 100)
-        )
-        cfg_patch: dict[str, int | str | None] = {
-            "max_connections": max_connections,
-            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            "max_replication_slots": 25,
-            "max_wal_senders": 25,
-            "shared_buffers": self.config.memory_shared_buffers,
-            "wal_keep_size": self.config.durability_wal_keep_size,
-        }
-
-        # Add restart-required worker process parameters via Patroni API
-        worker_configs = self._calculate_worker_process_config()
-        if "max_worker_processes" in worker_configs:
-            cfg_patch["max_worker_processes"] = worker_configs["max_worker_processes"]
-        if "max_logical_replication_workers" in worker_configs:
-            cfg_patch["max_logical_replication_workers"] = worker_configs[
-                "max_logical_replication_workers"
-            ]
-
-        base_patch = {
-            **self.state.synchronous_configuration,
-            "maximum_lag_on_failover": self.config.durability_maximum_lag_on_failover,
-        }
-        if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
-            base_patch["standby_cluster"] = {"host": primary_endpoint}
-        try:
-            self.patroni_manager.bulk_update_parameters_controller_by_patroni(
-                cfg_patch, base_patch
-            )
-        except RetryError:
-            return False
-        return True
-
-    def _build_postgresql_parameters(self) -> dict[str, str] | None:
-        """Build PostgreSQL configuration parameters.
-
-        Returns:
-            Dictionary of PostgreSQL parameters or None if base parameters couldn't be built.
-        """
-        limit_memory = None
-        if self.config.profile_limit_memory:
-            limit_memory = self.config.profile_limit_memory * 10**6
-
-        # Build PostgreSQL parameters.
-        pg_parameters = self.postgresql.build_postgresql_parameters(
-            self.model.config, self.get_available_memory(), limit_memory
-        )
-
-        # Calculate and merge worker process configurations
-        worker_configs = self._calculate_worker_process_config()
-
-        # Add cpu_wal_compression configuration (separate from worker processes)
-        if self.config.cpu_wal_compression is not None:
-            cpu_wal_compression = "on" if self.config.cpu_wal_compression else "off"
-        else:
-            # Use config.yaml default when unset (default: true)
-            cpu_wal_compression = "on"
-
-        if pg_parameters is not None:
-            pg_parameters.update(worker_configs)
-            pg_parameters["wal_compression"] = cpu_wal_compression
-        else:
-            pg_parameters = dict(worker_configs)
-            pg_parameters["wal_compression"] = cpu_wal_compression
-            logger.debug(f"pg_parameters set to worker_configs = {pg_parameters}")
-
-        return pg_parameters
+    def restart_services(self) -> None:
+        """Restart the monitoring and LDAP sync snap services if needed. Bridge for ConfigManager."""
+        cache = snap.SnapCache()
+        postgres_snap = cache[charm_refresh.snap_name()]
+        self._restart_metrics_service(postgres_snap)
+        self._restart_ldap_sync_service(postgres_snap)
 
     def update_config(
         self,
@@ -2966,101 +2767,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Updates Patroni config file based on the existence of the TLS files."""
         if refresh is None:
             refresh = self.refresh
-
-        # Build PostgreSQL parameters
-        pg_parameters = self._build_postgresql_parameters()
-
-        # replication_slots = self.logical_replication.replication_slots()
-
-        # Update and reload configuration based on TLS files availability.
-        logger.debug(f"Calling render_patroni_yml_file with parameters = {pg_parameters}")
-        # TODO move to config manager's update config
-        self.config_manager.render_patroni_yml_file(
-            connectivity=self.state.peer.is_connectivity_enabled,
+        return self.config_manager.update_config(
+            self.postgresql,
+            self.generate_user_hash,
             is_creating_backup=is_creating_backup,
-            enable_ldap=self.state.application.is_ldap_enabled,
-            # TODO add rel handler
-            enable_tls=self.is_tls_enabled,
-            backup_id=self.state.application.data.get("restoring-backup"),
-            pitr_target=self.state.application.data.get("restore-to-time"),
-            restore_timeline=self.state.application.data.get("restore-timeline"),
-            restore_to_latest=self.state.application.data.get("restore-to-time", None) == "latest",
-            stanza=self.state.application.data.get("stanza", self.state.peer.data.get("stanza")),
-            restore_stanza=self.state.application.data.get("restore-stanza"),
-            parameters=pg_parameters,
-            # TODO add rel handler
-            user_databases_map=self.relations_user_databases_map,
-            # TODO add rel handler
+            relations_user_databases_map=self.relations_user_databases_map,
             ldap_parameters=self.get_ldap_parameters(),
-            # TODO add rel handler
             async_primary_cluster_endpoint=self.async_replication.get_primary_cluster_endpoint(),
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
-            # TODO add rel handler
             watcher_raft_address=self.watcher_offer.watcher_raft_address
             if self.watcher_offer.is_active
             else None,
             no_peers=no_peers,
-            # slots=replication_slots,
+            refresh=refresh,
         )
-        if no_peers:
-            return True
-
-        if not self.workload.is_patroni_running():
-            # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
-            # then mark TLS as enabled. This commonly happens when the charm is deployed
-            # in a bundle together with the TLS certificates operator. This flag is used to
-            # know when to call the Patroni API using HTTP or HTTPS.
-            self.unit_peer_data.update({
-                "tls": "enabled" if self.is_tls_enabled else "",
-            })
-            self.postgresql_client_relation.update_endpoints()
-            logger.debug("Early exit update_config: Workload not started yet")
-            return True
-
-        if not self.patroni_manager.member_started:
-            if self.is_tls_enabled:
-                logger.debug(
-                    "Early exit update_config: patroni not responding but TLS is enabled."
-                )
-                self._handle_postgresql_restart_need(True)
-                return True
-            logger.debug("Early exit update_config: Patroni not started yet")
-            return False
-
-        # Try to connect
-        if not self._can_connect_to_postgresql:
-            logger.warning("Early exit update_config: Cannot connect to Postgresql")
-            return False
-
-        if not self._api_update_config():
-            logger.warning("Early exit update_config: Unable to patch Patroni API")
-            return False
-
-        # self._patroni.ensure_slots_controller_by_patroni(replication_slots)
-
-        self._handle_postgresql_restart_need(
-            self.unit_peer_data.get("config_hash") != self.generate_config_hash
-        )
-
-        cache = snap.SnapCache()
-        postgres_snap = cache[charm_refresh.snap_name()]
-
-        # TODO handle case of scale up while refresh in progress & `refresh` is None
-        if refresh is not None and postgres_snap.revision != refresh.pinned_snap_revision:
-            logger.debug("Early exit: snap was not refreshed to the right version yet")
-            return True
-
-        self._restart_metrics_service(postgres_snap)
-        self._restart_ldap_sync_service(postgres_snap)
-
-        self.unit_peer_data.update({
-            "user_hash": self.generate_user_hash,
-            "config_hash": self.generate_config_hash,
-        })
-        if self.unit.is_leader():
-            self.app_peer_data.update({"user_hash": self.generate_user_hash})
-        return True
 
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
@@ -3091,56 +2812,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self, config_changed: bool) -> None:
-        """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
-        if self._can_connect_to_postgresql:
-            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled(
-                check_current_host=True
-            )
-        else:
-            restart_postgresql = False
-
-        try:
-            self.patroni_manager.reload_patroni_configuration()
-        except Exception as e:
-            logger.error(f"Reload patroni call failed! error: {e!s}")
-
-        if config_changed and not restart_postgresql:
-            # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
-            # which tells how much time Patroni will wait before checking the configuration
-            # file again to reload it.
-            try:
-                for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
-                    with attempt:
-                        restart_postgresql = restart_postgresql or self.is_restart_pending()
-                        if not restart_postgresql:
-                            raise Exception
-            except RetryError:
-                # Ignore the error, as it happens only to indicate that the configuration has not changed.
-                pass
-
-        self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
-        self.postgresql_client_relation.update_endpoints()
-
-        # Restart PostgreSQL if TLS configuration has changed
-        # (so the both old and new connections use the configuration).
-        if restart_postgresql:
-            logger.info("PostgreSQL restart required")
-            self.unit_peer_data.pop("postgresql_restarted", None)
-            self.on[str(self.restart_manager.name)].acquire_lock.emit()
-
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
         self.postgresql_client_relation.update_endpoints()
-
-    def get_available_memory(self) -> int:
-        """Returns the system available memory in bytes."""
-        with open("/proc/meminfo") as meminfo:
-            for line in meminfo:
-                if "MemTotal" in line:
-                    return int(line.split()[1]) * 1024
-
-        return 0
 
     @property
     def client_relations(self) -> list[Relation]:
@@ -3231,11 +2905,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         return shake_128(str(self._collect_user_relations()).encode()).hexdigest(16)
-
-    @cached_property
-    def generate_config_hash(self) -> str:
-        """Generate current configuration hash."""
-        return shake_128(str(self.config.model_dump()).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
@@ -3389,32 +3058,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
 
         return params
-
-    def is_restart_pending(self) -> bool:
-        """Query pg_settings for pending restart."""
-        connection = None
-        try:
-            with (
-                self.postgresql._connect_to_database(
-                    database_host=self.postgresql.current_host
-                ) as connection,
-                connection.cursor() as cursor,
-            ):
-                cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")
-                result = cursor.fetchone()
-                if result is not None:
-                    return result[0] > 0
-                else:
-                    return False
-        except psycopg2.OperationalError:
-            logger.warning("Failed to connect to PostgreSQL.")
-            return False
-        except psycopg2.Error as e:
-            logger.error(f"Failed to check if restart is pending: {e}")
-            return False
-        finally:
-            if connection:
-                connection.close()
 
 
 if __name__ == "__main__":
