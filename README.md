@@ -7,12 +7,12 @@
 
 This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines via the [Juju orchestration engine](https://juju.is/).
 
-To learn more about how to deploy and operate Charmed PostgreSQL, see the [official documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/).
+To learn more about how to deploy and operate Charmed PostgreSQL, see the [official documentation](https://canonical.com/data/postgresql/docs/16).
 
 ## Overview
 
 This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions distributed by Ubuntu Jammy series and adding [Patroni](https://github.com/zalando/patroni) on top of it, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
-  
+
 ## Basic usage
 
 ### Deployment
