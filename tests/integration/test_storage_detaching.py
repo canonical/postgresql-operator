@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import time
 
 import pytest
 
@@ -43,9 +44,14 @@ def test_storage_released_on_scale_down(juju: JujuFixture, charm):
         apps=[DATABASE_APP_NAME], status="active", wait_for_exact_units=2, timeout=15 * 60
     )
 
-    detaching = [
-        storage for storage in juju.ext.model.list_storage() if storage["life"] == "detaching"
-    ]
+    # destroy_unit returns once the removal is queued; the storage detach/destroy
+    # finishes asynchronously on a separate provisioner, so poll until no storage is
+    # stuck "detaching" — the #1550 symptom is a snap-held mount that never leaves it.
+    deadline = time.monotonic() + 3 * 60
+    detaching = [s for s in juju.ext.model.list_storage() if s["life"] == "detaching"]
+    while detaching and time.monotonic() < deadline:
+        time.sleep(10)
+        detaching = [s for s in juju.ext.model.list_storage() if s["life"] == "detaching"]
     assert not detaching, f"storage stuck detaching after scale-down: {detaching}"
 
 
