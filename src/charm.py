@@ -2634,10 +2634,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_storage_detaching(self, _) -> None:
         """Stop the workload so Juju can unmount the storage on teardown or scale-down."""
-        # storage-detaching runs before relation-departed/stop on Juju 4.0 and nothing
-        # else stops the snap. On scale-down drop this unit from raft via a surviving
-        # peer first (a node can't remove itself, and once stopped the leader can no
-        # longer resolve its member IP to remove it), then stop so Juju can unmount.
+        # storage-detaching runs before the relation-departed/stop hooks and nothing
+        # else stops the snap, so stop it here or the mount stays busy. (3.6 force-removes
+        # still-Dying storage and masks this; 4.0 leaves it for Juju to unmount.) On
+        # scale-down drop this unit from raft via a surviving peer first — a node can't
+        # remove itself, and once stopped the leader can no longer resolve its member IP.
         if self.app.planned_units() > 0:
             self._remove_from_raft_via_peer()
         self._observer.stop_observer()
