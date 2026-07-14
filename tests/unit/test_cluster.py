@@ -30,6 +30,7 @@ from constants import (
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
+    RAFT_PARTNER_PREFIX,
     REWIND_USER,
 )
 
@@ -704,12 +705,69 @@ def test_update_patroni_restart_condition(patroni, new_restart_condition):
         _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
 
 
+def test_cleanup_raft_cluster(patroni):
+    with (
+        patch("cluster.TcpUtility") as _tcp_utility,
+        patch("cluster.Patroni.remove_raft_member", return_value=True) as _remove_raft_member,
+        patch(
+            "charm.PostgresqlOperatorCharm._units_ips",
+            new_callable=PropertyMock,
+            return_value={"1.1.1.1"},
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm._remove_from_members_ips"
+        ) as _remove_from_members_ips,
+        patch(
+            "charm.PostgresqlOperatorCharm._is_workload_running",
+            new_callable=PropertyMock,
+            return_value=True,
+        ) as _is_workload_running,
+    ):
+        # Error connecting to raft
+        _tcp_utility.side_effect = Exception
+
+        assert not patroni.cleanup_raft_cluster()
+
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
+        _tcp_utility.reset_mock()
+
+        # No status
+        _tcp_utility.side_effect = None
+        _tcp_utility.return_value.executeCommand.return_value = {}
+
+        assert not patroni.cleanup_raft_cluster()
+
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+
+        # All members active
+        _tcp_utility.return_value.executeCommand.return_value = {
+            f"{RAFT_PARTNER_PREFIX}1.1.1.1:2222": 2
+        }
+
+        assert patroni.cleanup_raft_cluster()
+
+        assert not _remove_raft_member.called
+
+        # Filter by unit ips
+        _tcp_utility.return_value.executeCommand.return_value = {
+            f"{RAFT_PARTNER_PREFIX}1.1.1.1:2222": 0,
+            f"{RAFT_PARTNER_PREFIX}2.2.2.2:2222": 0,
+        }
+
+        assert patroni.cleanup_raft_cluster()
+
+        _remove_raft_member.assert_called_once_with("2.2.2.2:2222")
+        _remove_from_members_ips.assert_called_once_with("2.2.2.2")
+
+
 def test_remove_raft_member(patroni):
     with patch("cluster.TcpUtility") as _tcp_utility:
         # Member already removed
-        _tcp_utility.return_value.executeCommand.return_value = ""
+        _tcp_utility.return_value.executeCommand.return_value = "Response message"
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         _tcp_utility.return_value.executeCommand.assert_called_once_with(
@@ -719,11 +777,15 @@ def test_remove_raft_member(patroni):
 
         # Removing member
         _tcp_utility.return_value.executeCommand.side_effect = [
-            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
+            {
+                "partner_node_status_server_1.2.3.4:2222": 0,
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
             "SUCCESS",
         ]
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         assert _tcp_utility.return_value.executeCommand.call_count == 2
@@ -735,31 +797,37 @@ def test_remove_raft_member(patroni):
 
         # Raises on failed status
         _tcp_utility.return_value.executeCommand.side_effect = [
-            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
+            {
+                "partner_node_status_server_1.2.3.4:2222": 0,
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
             "FAIL",
         ]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
         # Raises on remove error
         _tcp_utility.return_value.executeCommand.side_effect = [
-            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
+            {
+                "partner_node_status_server_1.2.3.4:2222": 0,
+                "has_quorum": True,
+                "leader": sentinel.raft_leader,
+            },
             UtilityException,
         ]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
         # Raises on status error
-        _tcp_utility.return_value.executeCommand.side_effect = [
-            UtilityException,
-        ]
+        _tcp_utility.return_value.executeCommand.side_effect = [UtilityException]
 
         with pytest.raises(RemoveRaftMemberFailedError):
-            patroni.remove_raft_member("1.2.3.4")
+            patroni.remove_raft_member("1.2.3.4:2222")
             assert False
 
 
@@ -782,7 +850,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "members": [{"role": "async_replica", "name": "postgresql-0"}]
         }
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 
         # No health
@@ -794,14 +862,14 @@ def test_remove_raft_member_no_quorum(patroni, harness):
         }
         _get.side_effect = Exception
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 
         # Sync replica
         _unit_peer_data.return_value = {}
         leader_mock = Mock()
-        leader_mock.host = "1.2.3.4"
+        leader_mock.address = "1.2.3.4:2222"
         _tcp_utility.return_value.executeCommand.return_value = {
             "partner_node_status_server_1.2.3.4:2222": 0,
             "has_quorum": False,
@@ -812,7 +880,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "members": [{"role": "sync_standby", "name": "postgresql-0"}]
         }
 
-        patroni.remove_raft_member("1.2.3.4")
+        patroni.remove_raft_member("1.2.3.4:2222")
 
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 

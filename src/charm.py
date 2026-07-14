@@ -92,6 +92,7 @@ from constants import (
     PLUGIN_OVERRIDES,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
+    RAFT_PORT,
     REPLICATION_PASSWORD_KEY,
     REPLICATION_USER,
     REWIND_PASSWORD_KEY,
@@ -525,7 +526,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self._patroni.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(member_ip)
+                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -832,28 +833,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
-    def _reconfigure_cluster(self, event: HookEvent):
+    def _reconfigure_cluster(self, event: HookEvent) -> bool:
         """Reconfigure the cluster by adding and removing members IPs to it.
 
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
-        if (
-            hasattr(event, "unit")
-            and hasattr(event, "relation")
-            and event.relation.data.get(event.unit) is not None  # ty: ignore[unresolved-attribute]
-            and event.relation.data[event.unit].get("ip-to-remove") is not None  # ty: ignore[unresolved-attribute]
-        ):
-            ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")  # ty: ignore[unresolved-attribute]
-            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
-            try:
-                if ip_to_remove is not None:
-                    self._patroni.remove_raft_member(ip_to_remove)
-            except RemoveRaftMemberFailedError:
-                logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
-                return False
-            if ip_to_remove in self.members_ips:
-                self._remove_from_members_ips(ip_to_remove)
+        # Remove departing units when the leader changes.
+        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
+            logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
+            return False
         try:
             self._add_members(event)
         except Exception:
@@ -888,7 +877,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # will create fresh journal files for the new IP — the orphaned
             # old-IP files in the raft data_dir are harmless.
             try:
-                self._patroni.remove_raft_member(stored_ip)
+                self._patroni.remove_raft_member(f"{stored_ip}:{RAFT_PORT}")
             except RemoveRaftMemberFailedError:
                 logger.warning(
                     "Failed to remove old IP %s from Raft cluster during IP change", stored_ip
@@ -1205,6 +1194,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for ip in self._get_ips_to_remove():
             logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
+
+        if not self._reconfigure_cluster(event):
+            logger.debug("On leader elected failed to reconfigure cluster.")
 
         self.update_config()
 
