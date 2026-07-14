@@ -1848,38 +1848,31 @@ name = "postgresql-charms-single-kernel"
 version = "16.3.4"
 description = "Shared and reusable code for PostgreSQL-related charms"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 groups = ["main", "integration"]
 files = [
-    {file = "47448aeaa6271050573f32b9f1e8504c357b9f66.tar.gz", hash = "sha256:71673e00e30580579bacf5be234d5902aaed0092be21f5c3a2b3be7ae03089a3"},
+    {file = "postgresql_charms_single_kernel-16.3.4-py3-none-any.whl", hash = "sha256:2a8bd3a789b25df39e8e69a58fa00c943eb309644abf320df3364c5a4520361f"},
+    {file = "postgresql_charms_single_kernel-16.3.4.tar.gz", hash = "sha256:6df3fd4208e1b91869a9a00819b997b6d55213239c6ecb4549bb74010a2cc7e7"},
 ]
 
 [package.dependencies]
-charm-refresh = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-charmlibs-interfaces-tls-certificates = {version = ">=1.8.3", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-charmlibs-pathops = {version = ">=1.0.1", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-charmlibs-rollingops = {version = ">=1.1.1", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-charmlibs-snap = {version = ">=1.0.1", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
-charmlibs-systemd = {version = ">=1.0.0.post0", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
-data-platform-helpers = {version = ">=0.1.7", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-httpx = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-jinja2 = {version = ">=3.1.6", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+charm-refresh = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-interfaces-tls-certificates = {version = ">=1.8.3", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-pathops = {version = ">=1.0.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+charmlibs-rollingops = {version = ">=1.1.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+data-platform-helpers = {version = ">=0.1.7", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+httpx = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+jinja2 = {version = ">=3.1.6", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 ops = ">=2.0.0"
-psutil = {version = ">=7.2.2", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
-pydantic = {version = ">=2.0", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
-pysyncobj = {version = ">=0.3.15", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
-requests = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+pydantic = {version = ">=2.0", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+requests = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 tenacity = ">=9.0.0"
-tomli = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+tomli = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
 
 [package.extras]
 db-driver = ["psycopg2 (>=2.9.10)"]
-postgresql = ["charm-refresh ; python_version >= \"3.12\"", "charmlibs-interfaces-tls-certificates (>=1.8.3) ; python_version >= \"3.12\"", "charmlibs-pathops (>=1.0.1) ; python_version >= \"3.12\"", "charmlibs-rollingops (>=1.1.1) ; python_version >= \"3.12\"", "data-platform-helpers (>=0.1.7) ; python_version >= \"3.12\"", "httpx ; python_version >= \"3.12\"", "jinja2 (>=3.1.6) ; python_version >= \"3.12\"", "pydantic (>=2.0) ; python_version >= \"3.12\"", "requests ; python_version >= \"3.12\"", "tomli ; python_version >= \"3.12\""]
-vm = ["charmlibs-snap (>=1.0.1) ; python_version >= \"3.12\"", "charmlibs-systemd (>=1.0.0.post0) ; python_version >= \"3.12\"", "psutil (>=7.2.2) ; python_version >= \"3.12\"", "pysyncobj (>=0.3.15) ; python_version >= \"3.12\""]
-
-[package.source]
-type = "url"
-url = "https://github.com/canonical/postgresql-single-kernel-library/archive/47448aeaa6271050573f32b9f1e8504c357b9f66.tar.gz"
+postgresql = ["charm-refresh ; python_full_version >= \"3.12.0\"", "charmlibs-interfaces-tls-certificates (>=1.8.3) ; python_full_version >= \"3.12.0\"", "charmlibs-pathops (>=1.0.1) ; python_full_version >= \"3.12.0\"", "charmlibs-rollingops (>=1.1.1) ; python_full_version >= \"3.12.0\"", "data-platform-helpers (>=0.1.7) ; python_full_version >= \"3.12.0\"", "httpx ; python_full_version >= \"3.12.0\"", "jinja2 (>=3.1.6) ; python_full_version >= \"3.12.0\"", "pydantic (>=2.0) ; python_full_version >= \"3.12.0\"", "requests ; python_full_version >= \"3.12.0\"", "tomli ; python_full_version >= \"3.12.0\""]
+vm = ["charmlibs-snap (>=1.0.1) ; python_full_version >= \"3.12.0\"", "charmlibs-systemd (>=1.0.0.post0) ; python_full_version >= \"3.12.0\"", "psutil (>=7.2.2) ; python_full_version >= \"3.12.0\"", "pysyncobj (>=0.3.15) ; python_full_version >= \"3.12.0\""]
 
 [[package]]
 name = "prompt-toolkit"
@@ -3163,4 +3156,4 @@ h11 = ">=0.16.0,<1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "413801e3a2dcb5d7188c944d21e46857bcbef14b0d91d66e0d7346047cdf5d6f"
+content-hash = "38bb235a15413d12b324d69ab84d8d464263ecb4f0ac406a3a5da211547dede9"
