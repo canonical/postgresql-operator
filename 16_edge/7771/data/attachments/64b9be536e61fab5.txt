@@ -1,0 +1,262 @@
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:88 creating a table in the database
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:96 Downscaling the existing cluster
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:105 Upscaling the second cluster with the old data
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] waiting: waiting for peer IP
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] waiting: waiting for primary to be reachable from this unit
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/2 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/2 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] active: Primary (degraded)
+  second-cluster/2 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+  second-cluster/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [executing] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] maintenance: reconfiguring cluster
+  second-cluster/2 [executing] active: 
+  second-cluster/3 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+  second-cluster/3 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] active: Primary
+  second-cluster/2 [executing] active: 
+  second-cluster/3 [executing] active: 
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:116 checking that data was persisted
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  01:59:26Z
+
+App             Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+second-cluster  16.14    active      3  postgresql             1  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+second-cluster/1*  active    idle   4        10.233.189.157  5432/tcp  Primary
+second-cluster/2   active    idle   5        10.233.189.112  5432/tcp  
+second-cluster/3   active    idle   6        10.233.189.47   5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+4        started  10.233.189.157  juju-401995-4  ubuntu@24.04  runnervm5mmn9  Running
+5        started  10.233.189.112  juju-401995-5  ubuntu@24.04  runnervm5mmn9  Running
+6        started  10.233.189.47   juju-401995-6  ubuntu@24.04  runnervm5mmn9  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:40:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:40:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:41:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:41:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:41:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:41:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:41:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-0: 01:46:52 ERROR unit.second-cluster/0.juju-log single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  password authentication failed for user "operator"
+
+unit-second-cluster-0: 01:46:52 ERROR unit.second-cluster/0.juju-log single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server at "10.233.189.90", port 5432 failed: FATAL:  password authentication failed for user "operator"
+
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:49:00 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:49:23 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:49:23 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:49:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:49:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:49:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:49:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:49:24 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:49:25 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:50:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:50:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-1: 01:52:14 ERROR unit.second-cluster/1.juju-log single_kernel_postgresql.workload.vm:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'start', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 105, in start_patroni
+    selected_snap.start(services=["patroni"])
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 415, in start
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'start', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "start" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: patch.go:64: Patching system state level 6 to sublevel 2...
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: patch.go:64: Patching system state level 6 to sublevel 3...
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: daemon.go:277: started snapd/2.76 (series 16; classic) ubuntu/24.04 (amd64) linux/6.17.0-1018-azure.
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: daemon.go:371: adjusting startup timeout by 35s (pessimistic estimate of 30s plus 5s per snap)
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backends.go:70: AppArmor status: apparmor is enabled and all features are available (using snapd provided apparmor_parser)
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backend.go:141: delegating reload of snap-confine profiles to system snap security profiles setup
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: standby.go:95: will consider standby after: 5s
+Jul 15 01:50:34 juju-401995-4 systemd[1]: Started snapd.service - Snap Daemon.
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: autorepair.go:177: WARNING: the system booted with an old initrd without unlocked status reporting
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: devicemgr.go:1338: skipping boot ok check since it already ran for boot-id "4435dc8d-d009-4dee-acc0-fc1a07a043b0"
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:50:38 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:43 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:48 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: taskrunner.go:304: Change 12 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+unit-second-cluster-1: 01:52:15 ERROR unit.second-cluster/1.juju-log single_kernel_postgresql.workload.vm:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'start', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 105, in start_patroni
+    selected_snap.start(services=["patroni"])
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 415, in start
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'start', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "start" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: daemon.go:371: adjusting startup timeout by 35s (pessimistic estimate of 30s plus 5s per snap)
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backends.go:70: AppArmor status: apparmor is enabled and all features are available (using snapd provided apparmor_parser)
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backend.go:141: delegating reload of snap-confine profiles to system snap security profiles setup
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:50:34 juju-401995-4 snapd[3578]: standby.go:95: will consider standby after: 5s
+Jul 15 01:50:34 juju-401995-4 systemd[1]: Started snapd.service - Snap Daemon.
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: autorepair.go:177: WARNING: the system booted with an old initrd without unlocked status reporting
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: devicemgr.go:1338: skipping boot ok check since it already ran for boot-id "4435dc8d-d009-4dee-acc0-fc1a07a043b0"
+Jul 15 01:50:35 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:50:38 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:43 juju-401995-4 snapd[3578]: cache.go:320: removed 0 entries/    0 from downloads cache
+Jul 15 01:50:48 juju-401995-4 snapd[3578]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: taskrunner.go:304: Change 12 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Jul 15 01:52:14 juju-401995-4 snapd[3578]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+Jul 15 01:52:15 juju-401995-4 snapd[3578]: taskrunner.go:304: Change 13 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Jul 15 01:52:15 juju-401995-4 snapd[3578]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Jul 15 01:52:15 juju-401995-4 snapd[3578]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+unit-second-cluster-1: 01:52:49 ERROR unit.second-cluster/1.juju-log database-peers:4: __main__:failed to change plugins: Host not set
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/src/charm.py", line 1871, in enable_disable_extensions
+    self.postgresql.enable_disable_extensions(extensions, database)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/compat/postgresql.py", line 469, in enable_disable_extensions
+    with self._connect_to_database() as connection, connection.cursor() as cursor:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/compat/postgresql.py", line 178, in _connect_to_database
+    raise PostgreSQLUndefinedHostError("Host not set")
+single_kernel_postgresql.compat.postgresql.PostgreSQLUndefinedHostError: Host not set
+machine-5: 01:54:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:54:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:56:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:56:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-3: 01:58:17 ERROR unit.second-cluster/3.juju-log database-peers:4: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
