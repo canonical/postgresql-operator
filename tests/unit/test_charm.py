@@ -145,7 +145,8 @@ def test_on_storage_detaching(harness):
         _selected_snap.stop.assert_not_called()
 
         # Full teardown (no units remain): release the storage by stopping the
-        # background processes and all the snap services.
+        # background processes and disabling (so a mid-teardown restart can't
+        # re-grab the mount) all the snap services.
         _planned_units.return_value = 0
         for storage_name in ("archive", "data", "logs", "temp"):
             _stop_observer.reset_mock()
@@ -157,7 +158,7 @@ def test_on_storage_detaching(harness):
 
             _stop_observer.assert_called_once_with()
             _stop_log_rotation.assert_called_once_with()
-            _selected_snap.stop.assert_called_once_with()
+            _selected_snap.stop.assert_called_once_with(disable=True)
 
 
 def test_patroni_scrape_config(harness):

@@ -2576,7 +2576,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.stop_observer()
         self._rotate_logs.stop_log_rotation()
         try:
-            snap.SnapCache()[charm_refresh.snap_name()].stop()
+            # Disable too, so a mid-teardown restart of the unit can't re-enable the
+            # services and re-grab the storage mounts before Juju finishes unmounting.
+            snap.SnapCache()[charm_refresh.snap_name()].stop(disable=True)
         except snap.SnapError:
             logger.exception("Failed to stop charmed-postgresql snap services")
 
