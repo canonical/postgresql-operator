@@ -409,6 +409,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # incorrectly
         # https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/#implementation
         self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
+        for storage_name in self.meta.storages:
+            self.framework.observe(
+                self.on[storage_name].storage_detaching, self._on_storage_detaching
+            )
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._certs_path = "/usr/local/share/ca-certificates"
@@ -2627,6 +2631,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 str(e),
             )
             raise
+
+    def _on_storage_detaching(self, _) -> None:
+        """Stop the workload so Juju can unmount the storage on app teardown."""
+        # On scale-down the surviving cluster still needs this unit's Patroni to
+        # remove it from raft; only stop when the whole app is going away.
+        if self.app.planned_units() > 0:
+            return
+        self._observer.stop_observer()
+        self._rotate_logs.stop_log_rotation()
+        try:
+            # Disable too, so a mid-teardown restart of the unit can't re-enable the
+            # services and re-grab the storage mounts before Juju finishes unmounting.
+            snap.SnapCache()[charm_refresh.snap_name()].stop(disable=True)
+        except snap.SnapError:
+            logger.exception("Failed to stop charmed-postgresql snap services")
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
