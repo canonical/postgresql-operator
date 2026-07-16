@@ -1008,6 +1008,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Return whether this unit can be connected externally."""
         return self.unit_peer_data.get("connectivity", "on") == "on"
 
+    def reset_stale_connectivity_flag(self) -> None:
+        """Reset a stale "connectivity: off" left by an interrupted backup.
+
+        The flag is written to the unit peer databag during replica backups and survives
+        restarts/upgrades; without this recovery a unit stuck "off" stays externally
+        disconnected (pg_hba rejects peer/replica connections). Skipped while any backup
+        is in progress cluster-wide to avoid un-hiding a unit mid-backup.
+        """
+        if self.unit_peer_data.get("connectivity") != "off":
+            return
+        if self._patroni.is_creating_backup:
+            return
+        logger.info("Resetting stale connectivity flag left by an interrupted backup")
+        self.unit_peer_data["connectivity"] = "on"
+
     @property
     def is_ldap_charm_related(self) -> bool:
         """Return whether this unit has an LDAP charm related."""
@@ -1233,6 +1248,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_config_changed: upgrade in progress")
             event.defer()
             return
+        # Recover from a stale "connectivity: off" left by an interrupted backup before
+        # re-rendering the Patroni configuration below.
+        self.reset_stale_connectivity_flag()
         try:
             self._validate_config_options()
             # update config on every run
@@ -1362,6 +1380,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Handle the start event."""
         if not self._can_start(event):
             return
+
+        # Recover from a stale "connectivity: off" left by an interrupted backup before
+        # the cluster is rendered/started.
+        self.reset_stale_connectivity_flag()
 
         try:
             postgres_password = self._get_password()
