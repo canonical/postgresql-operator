@@ -1,0 +1,52 @@
+[32mINFO    [0m integration.ha_tests.conftest:conftest.py:67 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  01:11:07Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active      1  data-integrator      latest/edge  440  no       
+postgresql           14.23    active      3  postgresql                          0  no       Primary
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  559  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+data-integrator/0*      active    idle   3        10.187.196.96             
+postgresql-test-app/0*  active    idle   4        10.187.196.81             received database credentials of the first database
+postgresql/0*           active    idle   0        10.187.196.195  5432/tcp  Primary
+postgresql/1            active    idle   1        10.187.196.190  5432/tcp  
+postgresql/2            active    idle   2        10.187.196.249  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.187.196.195  juju-db509e-0  ubuntu@22.04  runnervmos4r4  Running
+1        started  10.187.196.190  juju-db509e-1  ubuntu@22.04  runnervmos4r4  Running
+2        started  10.187.196.249  juju-db509e-2  ubuntu@22.04  runnervmos4r4  Running
+3        started  10.187.196.96   juju-db509e-3  ubuntu@24.04  runnervmos4r4  Running
+4        started  10.187.196.81   juju-db509e-4  ubuntu@22.04  runnervmos4r4  Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication-offer  postgresql   postgresql  0    1/1        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:22:34 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:22:34 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:23:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:23:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:25:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:25:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:25:55 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 583, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 372, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa1a9e728c0 state=finished raised Exception>]
+machine-2: 00:27:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:27:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:27:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:27:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:30:00 ERROR unit.postgresql/2.juju-log restart:0: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
