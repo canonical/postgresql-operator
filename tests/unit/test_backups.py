@@ -575,6 +575,126 @@ def test_change_connectivity_to_database(harness):
         _update_config.assert_called_once()
 
 
+def test_create_backup_resets_connectivity_when_run_backup_raises(harness):
+    # Regression: if the backup run is interrupted (raises) on a replica, the connectivity
+    # flag must still be reset to "on" via the finally block — otherwise pg_hba keeps
+    # rejecting peer/replica connections across restarts/upgrades.
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch(
+            "charm.PostgreSQLBackups._change_connectivity_to_database"
+        ) as _change_connectivity_to_database,
+        patch(
+            "charm.PostgreSQLBackups._run_backup", side_effect=RuntimeError("boom")
+        ) as _run_backup,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
+        ) as _is_primary,
+        patch("charm.PostgreSQLBackups._upload_content_to_s3", return_value=True),
+        patch("backups.datetime"),
+        patch("ops.JujuVersion.from_environ"),
+        patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
+        patch("charm.PostgreSQLBackups._can_unit_perform_backup", return_value=(True, None)),
+    ):
+        # This unit is a replica, so connectivity is disabled before the backup runs.
+        _is_primary.return_value = False
+        _retrieve_s3_parameters.return_value = (
+            {
+                "bucket": "test-bucket",
+                "access-key": "test-access-key",
+                "secret-key": "test-secret-key",
+                "endpoint": "test-endpoint",
+                "path": "test-path",
+                "region": "test-region",
+            },
+            [],
+        )
+        mock_event = MagicMock()
+        mock_event.params = {"type": "full"}
+
+        # The backup run raises; the reset must still run.
+        with pytest.raises(RuntimeError):
+            harness.charm.backup._on_create_backup_action(mock_event)
+
+        # Connectivity disabled then re-enabled despite the exception.
+        _change_connectivity_to_database.assert_has_calls([
+            call(connectivity=False),
+            call(connectivity=True),
+        ])
+        _run_backup.assert_called_once()
+
+
+def test_create_backup_resets_connectivity_when_disabling_raises(harness):
+    # Regression: if disabling connectivity itself raises (after the databag was written),
+    # the reset must still run — the latch is decided before any side effect, so the finally
+    # fires even though disabled_connectivity was never set inside the try body.
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch(
+            "charm.PostgreSQLBackups._change_connectivity_to_database",
+            side_effect=[RuntimeError("boom"), None],
+        ) as _change_connectivity_to_database,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
+        ) as _is_primary,
+        patch("charm.PostgreSQLBackups._upload_content_to_s3", return_value=True),
+        patch("backups.datetime"),
+        patch("ops.JujuVersion.from_environ"),
+        patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
+        patch("charm.PostgreSQLBackups._can_unit_perform_backup", return_value=(True, None)),
+    ):
+        _is_primary.return_value = False
+        _retrieve_s3_parameters.return_value = (
+            {
+                "bucket": "test-bucket",
+                "access-key": "test-access-key",
+                "secret-key": "test-secret-key",
+                "endpoint": "test-endpoint",
+                "path": "test-path",
+                "region": "test-region",
+            },
+            [],
+        )
+        mock_event = MagicMock()
+        mock_event.params = {"type": "full"}
+
+        # Disabling connectivity raises; the reset must still run.
+        with pytest.raises(RuntimeError):
+            harness.charm.backup._on_create_backup_action(mock_event)
+
+        # Disable (which raised) then re-enable despite the exception.
+        _change_connectivity_to_database.assert_has_calls([
+            call(connectivity=False),
+            call(connectivity=True),
+        ])
+
+
+def test_reset_stale_connectivity_flag(harness):
+    harness.charm.patroni_manager = MagicMock()
+    peer_rel_id = harness.model.get_relation(PEER_RELATION).id
+
+    # Stale "off" with no backup in progress: reset to "on".
+    harness.charm.patroni_manager.is_creating_backup = False
+    with harness.hooks_disabled():
+        harness.update_relation_data(peer_rel_id, harness.charm.unit.name, {"connectivity": "off"})
+    harness.charm.reset_stale_connectivity_flag()
+    assert harness.get_relation_data(peer_rel_id, harness.charm.unit)["connectivity"] == "on"
+
+    # While a backup is in progress cluster-wide: do not reset (stay "off").
+    with harness.hooks_disabled():
+        harness.update_relation_data(peer_rel_id, harness.charm.unit.name, {"connectivity": "off"})
+    harness.charm.patroni_manager.is_creating_backup = True
+    harness.charm.reset_stale_connectivity_flag()
+    assert harness.get_relation_data(peer_rel_id, harness.charm.unit)["connectivity"] == "off"
+
+    # Already "on": no-op (does not even consult the backup flag).
+    harness.charm.patroni_manager.is_creating_backup = False
+    with harness.hooks_disabled():
+        harness.update_relation_data(peer_rel_id, harness.charm.unit.name, {"connectivity": "on"})
+    harness.charm.reset_stale_connectivity_flag()
+    assert harness.get_relation_data(peer_rel_id, harness.charm.unit)["connectivity"] == "on"
+
+
 def test_execute_command(harness):
     with (
         patch("backups.run") as _run,
