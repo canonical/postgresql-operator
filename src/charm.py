@@ -2382,6 +2382,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
+        # Clear a promoted-cluster-counter orphaned by a dead-DC teardown whose relation-broken
+        # never fired (Juju CMR limitation); otherwise a newly-formed async relation re-counts it
+        # and create-replication wrongly reports "There is already a replication set up.".
+        self.async_replication.clear_stale_promotion()
+
         self.backup.coordinate_stanza_fields()
 
         # self.logical_replication.retry_validations()
@@ -2932,6 +2937,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
             base_patch["standby_cluster"] = {"host": primary_endpoint}
+        else:
+            # This cluster is the primary (or standalone): clear any stale standby_cluster
+            # the DCS still holds from before a promotion. A force-promote bumps the
+            # promoted-cluster-counter but — while the dead-DC relation still lingers — does
+            # not call promote_standby_cluster(), so without this the reconciler never clears
+            # the stale standby and the cluster stays a read-only standby leader (DPE-10203).
+            base_patch["standby_cluster"] = None
         try:
             self.patroni_manager.bulk_update_parameters_controller_by_patroni(
                 cfg_patch, base_patch

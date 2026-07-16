@@ -32,6 +32,7 @@ from ops import (
     Application,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Object,
     Relation,
     RelationChangedEvent,
@@ -69,6 +70,14 @@ logger = logging.getLogger(__name__)
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
 # Labels are not confidential
 SECRET_LABEL = "async-replication-secret"  # noqa: S105
+# The offer/primary side owns the shared secret under its own label, kept distinct from the
+# consumer-side alias (SECRET_LABEL, set when the standby reads the secret by id). A cluster that
+# was a standby and later becomes the primary keeps a stale SECRET_LABEL alias that Juju leaves
+# reserved even after the remote secret is gone; creating the owned secret under SECRET_LABEL then
+# deadlocks ("secret with label async-replication-secret already exists" while the same label is
+# unreadable). Owning under a separate label sidesteps the collision and self-heals such a cluster
+# without a redeploy (DPE-10203). The consumer keeps SECRET_LABEL as its local alias.
+OFFER_SECRET_LABEL = "async-replication-secret-offer"  # noqa: S105
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -311,7 +320,18 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app: self.charm.all_peer_data,
             }.items():
                 databag = relation_data[app]
-                relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
+                try:
+                    relation_promoted_cluster_counter = databag.get(
+                        "promoted-cluster-counter", "0"
+                    )
+                except ModelError:
+                    # A dead-DC teardown leaves the remote app's databag on the dying
+                    # cross-model async relation unreadable — `relation-get --app <remote>`
+                    # returns "permission denied" once the offering DC is gone. Skip that
+                    # peer so status reconciliation (and the update-status
+                    # clear_stale_promotion that unblocks recovery) still runs instead of
+                    # crashing every hook (DPE-10203).
+                    continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
@@ -340,7 +360,7 @@ class PostgreSQLAsyncReplication(Object):
 
         try:
             # Avoid recreating the secret.
-            secret = self.charm.model.get_secret(label=SECRET_LABEL)
+            secret = self.charm.model.get_secret(label=OFFER_SECRET_LABEL)
             if not secret.id:
                 # Workaround for the secret id not being set with model uuid.
                 secret._id = f"secret://{self.model.uuid}/{secret.get_info().id.split(':')[1]}"
@@ -353,7 +373,9 @@ class PostgreSQLAsyncReplication(Object):
             pass
 
         if self.charm.unit.is_leader():
-            return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
+            return self.charm.model.app.add_secret(
+                content=shared_content, label=OFFER_SECRET_LABEL
+            )
 
     def get_standby_endpoints(self) -> list[str]:
         """Return the standby endpoints."""
@@ -547,19 +569,74 @@ class PostgreSQLAsyncReplication(Object):
             "unit-promoted-cluster-counter": "",
         })
 
+        # During a force-removal of a dead offerer the model/Patroni can transiently fail
+        # (network-get, goal-state, the Patroni REST API). That used to crash this hook and wedge
+        # BOTH units in error forever: update-status then never runs, so the cluster never reverts
+        # to standalone and create-replication stays blocked with "already a replication set up"
+        # (DPE-10203 / Issue B). Tolerate those failures so the counter is always cleared. A
+        # non-empty promoted-cluster-counter is only ever set on a promoted cluster, so if the
+        # standby check is unavailable, treating this as a primary (clearing the counter) is the
+        # safe default.
+        try:
+            is_standby = self.charm.patroni_manager.get_standby_leader() is not None
+        except Exception as e:
+            logger.warning(
+                "get_standby_leader unavailable during teardown, assuming primary: %s", e
+            )
+            is_standby = False
+
         # If this is the standby cluster, set 0 in the "promoted-cluster-counter" field to set
         # the cluster in read-only mode message also in the other units.
-        if self.charm.patroni_manager.get_standby_leader() is not None:
+        if is_standby:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": "0"})
                 self.set_app_status()
         else:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
-            self.charm.update_config()
+            try:
+                self.charm.update_config()
+            except Exception as e:
+                logger.warning("update_config failed during teardown (continuing): %s", e)
 
         if self.charm.unit.is_leader():
-            self.charm.watcher_offer.update_endpoints()
+            try:
+                self.charm.watcher_offer.update_endpoints()
+            except Exception as e:
+                logger.warning(
+                    "watcher endpoint update failed during teardown (continuing): %s", e
+                )
+
+    def clear_stale_promotion(self) -> None:
+        """Clear a promoted-cluster-counter left over from a removed async relation.
+
+        `_on_async_relation_broken` normally clears this, but a force-removed dead offerer may
+        never deliver `relation-broken` (a Juju cross-model teardown limitation). With no async
+        relation the counter is ignored by `_get_primary_cluster`, yet it would wrongly re-mark
+        this app as the primary cluster once a *new* async relation is formed — blocking
+        `create-replication` with "There is already a replication set up." Run from the
+        update-status reconciler so the surviving primary converges back to standalone (DPE-10203).
+        """
+        if not self.charm.unit.is_leader():
+            return
+        # Only act when there is no async relation; otherwise the counter is managed normally.
+        if self._relation is not None:
+            return
+        counter = self.charm.app_peer_data.get("promoted-cluster-counter")
+        # Empty -> standby/clean (nothing promoted). "0" -> a standby already in read-only mode
+        # (set by _on_async_relation_broken); leave it. A positive counter with no async relation
+        # means this cluster was promoted and the relation went away without relation-broken
+        # finishing the teardown (dead-DC force-removal) -> revert it to a standalone primary.
+        # Deciding this from peer data alone (no Patroni call) is deliberate: after a dead-DC
+        # promote Patroni is frequently unreachable, which is exactly when this must still run.
+        # A non-empty, non-"0" counter is only ever set by a promotion, so it is unambiguous.
+        if not counter or counter == "0":
+            return
+        logger.info(
+            "Clearing stale promoted-cluster-counter %s (no async relation present)", counter
+        )
+        self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
+        self.charm.update_config()
 
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
@@ -750,13 +827,28 @@ class PostgreSQLAsyncReplication(Object):
 
     @property
     def _relation(self) -> Relation | None:
-        """Return the relation object."""
+        """Return the usable async-replication relation, or None.
+
+        A relation whose databags are unreadable is treated as absent. During a
+        dead-DC teardown the cross-model async relation lingers in a dying state
+        whose ``relation-get`` returns "permission denied" on every databag (yet
+        ``active`` can still read True and ``get_relation`` still returns it), so a
+        promoted primary must reconcile as a standalone cluster instead of
+        crashing every hook on the unreadable relation (DPE-10203). A cheap
+        own-unit read probes for that state.
+        """
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),
             self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
-            if relation is not None:
-                return relation
+            if relation is None:
+                continue
+            try:
+                relation.data[self.charm.unit].get("unit-address")
+            except ModelError:
+                continue
+            return relation
+        return None
 
     def set_app_status(self) -> None:
         """Set the app status."""

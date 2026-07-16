@@ -4,14 +4,22 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from ops import Application
+from ops import Application, ModelError, SecretNotFoundError
 from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
 from tenacity import RetryError
 
 from src.relations.async_replication import (
+    OFFER_SECRET_LABEL,
     READ_ONLY_MODE_BLOCKING_MESSAGE,
+    SECRET_LABEL,
     PostgreSQLAsyncReplication,
 )
+
+# Several tests (e.g. ``test_on_create_replication``) reassign ``_relation`` on the class
+# via ``type(relation)._relation = PropertyMock(...)`` with no cleanup, leaking a mock over
+# the real property for later tests. Capture the real property once, before any test runs,
+# so a test that needs to exercise the real ``_relation`` can restore it for its own scope.
+_REAL_RELATION_PROPERTY = PostgreSQLAsyncReplication.__dict__["_relation"]
 
 
 def create_mock_unit(name="unit"):
@@ -584,3 +592,194 @@ def test_on_async_relation_broken():
     relation._on_async_relation_broken(mock_event)
 
     assert mock_charm.update_config.called
+
+    # 3. get_standby_leader raises (transient teardown failure, e.g. network-get during a dead-DC
+    # force-removal): the hook must NOT crash and must still clear the counter, so the unit does
+    # not wedge in error (DPE-10203 / Issue B).
+    mock_charm = MagicMock()
+    mock_charm._peers = MagicMock()
+    mock_charm.is_unit_departing = False
+    mock_charm.patroni_manager.get_standby_leader.side_effect = Exception(
+        "network-get exited status 1"
+    )
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    mock_event = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._on_async_relation_broken(mock_event)  # must not raise
+
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+
+
+def test_clear_stale_promotion():
+    # Leader, no async relation, positive counter -> cleared + config re-rendered.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+    mock_charm.update_config.assert_called_once()
+
+    # An async relation exists -> no-op (the counter is managed by the relation lifecycle).
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=MagicMock(),
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
+    mock_charm.update_config.assert_not_called()
+
+    # Non-leader -> no-op.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
+
+    # Counter "0" (a standby already in read-only mode) -> left untouched, no Patroni call needed.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "0"}
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
+    ):
+        relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "0"
+    mock_charm.update_config.assert_not_called()
+    mock_charm._patroni.get_standby_leader.assert_not_called()
+
+
+def test_get_secret_creates_owned_secret_under_offer_label():
+    # Regression for DPE-10203: the offer/primary side must own the shared secret under a label
+    # distinct from the consumer alias (SECRET_LABEL). A former standby keeps a stale SECRET_LABEL
+    # alias that Juju leaves reserved after the remote secret is gone, so owning under SECRET_LABEL
+    # would deadlock with "secret with label already exists" on the next create-replication.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    app_secret = MagicMock()
+    app_secret.peek_content.return_value = {
+        "operator-password": "op",
+        "replication-password": "rep",
+        "system-id": "x",
+    }
+
+    # First get_secret: the peer app secret (content source). Second: the offer-label lookup,
+    # which is absent on a former standby -> triggers creation.
+    mock_charm.model.get_secret.side_effect = [app_secret, SecretNotFoundError()]
+    mock_charm.unit.is_leader.return_value = True
+
+    result = relation._get_secret()
+
+    # Owned secret is created under the offer-specific label, never the bare consumer alias.
+    mock_charm.model.app.add_secret.assert_called_once()
+    _, kwargs = mock_charm.model.app.add_secret.call_args
+    assert kwargs["label"] == OFFER_SECRET_LABEL
+    assert kwargs["label"] != SECRET_LABEL
+    # Only password fields are shared between clusters.
+    assert kwargs["content"] == {"operator-password": "op", "replication-password": "rep"}
+    assert result is mock_charm.model.app.add_secret.return_value
+
+
+def test_get_secret_reuses_existing_offer_secret():
+    # When the owned secret already exists under the offer label, reuse it (look it up by the
+    # offer label) instead of creating a new one; only rewrite content when it drifts.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    app_secret = MagicMock()
+    app_secret.peek_content.return_value = {"operator-password": "op"}
+
+    existing = MagicMock()
+    existing.id = "secret://uuid/abc"
+    existing.peek_content.return_value = {"operator-password": "op"}
+
+    mock_charm.model.get_secret.side_effect = [app_secret, existing]
+
+    result = relation._get_secret()
+
+    mock_charm.model.app.add_secret.assert_not_called()
+    existing.set_content.assert_not_called()
+    assert result is existing
+    assert any(
+        call.kwargs.get("label") == OFFER_SECRET_LABEL
+        for call in mock_charm.model.get_secret.call_args_list
+    )
+
+
+def test__get_primary_cluster_skips_unreadable_dead_peer_databag():
+    # DPE-10203: after a dead-DC teardown the remote app's databag on the dying
+    # cross-model async relation is unreadable — `relation-get --app <remote>`
+    # returns "permission denied" (surfaced as ModelError) once the offering DC is
+    # gone. _get_primary_cluster must skip that peer instead of crashing every hook,
+    # so the readable local peer is still evaluated.
+    mock_charm = MagicMock()
+    local_app = MagicMock()
+    mock_charm.app = local_app
+
+    remote_app = MagicMock()
+    dead_databag = MagicMock()
+    dead_databag.get.side_effect = ModelError("ERROR permission denied")
+    offer_relation = MagicMock()
+    offer_relation.app = remote_app
+    offer_relation.data = {remote_app: dead_databag}
+
+    local_databag = MagicMock()
+    local_databag.get.return_value = "1"
+    mock_charm.all_peer_data = {local_app: local_databag}
+
+    mock_model = MagicMock()
+    mock_model.get_relation.side_effect = [offer_relation, None]
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    with patch.object(
+        PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
+    ):
+        # Must not raise ModelError; the unreadable dead peer is skipped and the
+        # readable local peer (counter "1") is selected as the primary.
+        assert relation._get_primary_cluster() is local_app
+    dead_databag.get.assert_called_once_with("promoted-cluster-counter", "0")
+
+
+def test__relation_skips_unreadable_dying_relation(monkeypatch):
+    # DPE-10203: a dead-DC teardown leaves the cross-model async relation in a
+    # dying state whose databags raise ModelError ("permission denied") on any
+    # read, even though get_relation still returns it. _relation must probe and
+    # treat such a relation as absent, so the promoted primary reconciles as a
+    # standalone cluster instead of crashing every hook that writes relation data.
+    # Restore the real property for this test's scope (an earlier test may have
+    # leaked a class-level PropertyMock over it); monkeypatch reverts it afterwards.
+    monkeypatch.setattr(PostgreSQLAsyncReplication, "_relation", _REAL_RELATION_PROPERTY)
+    mock_charm = MagicMock()
+
+    dying = MagicMock()
+    dying_databag = MagicMock()
+    dying_databag.get.side_effect = ModelError("ERROR permission denied")
+    dying.data.__getitem__.return_value = dying_databag
+
+    readable = MagicMock()  # its databag read succeeds (default MagicMock, no raise)
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    # First candidate (offer) is the dying relation; second (consumer) is readable.
+    relation.model.get_relation.side_effect = [dying, readable]
+
+    # The dying relation is skipped (probe raised); the readable one is returned.
+    assert relation._relation is readable
+    dying_databag.get.assert_called_once_with("unit-address")
