@@ -96,3 +96,6 @@ PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
 SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
 
 PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"
+
+RAFT_PORT = 2222
+RAFT_PARTNER_PREFIX = "partner_node_status_server_"
