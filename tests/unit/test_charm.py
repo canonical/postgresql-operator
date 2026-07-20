@@ -162,7 +162,9 @@ def test_on_storage_detaching(harness):
         harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/1")
         storage_id = harness.add_storage("data", attach=True)[0]
         harness.detach_storage(storage_id)
-        _remove_raft_member.assert_called_once_with("1.1.1.1:2222", remote_address="2.2.2.2:2222")
+        _remove_raft_member.assert_called_once_with(
+            "1.1.1.1:2222", remote_address="2.2.2.2:2222", set_raft_flags=False
+        )
         _stop_observer.assert_called_once_with()
         _stop_log_rotation.assert_called_once_with()
         _selected_snap.stop.assert_called_once_with(disable=True)
@@ -178,7 +180,9 @@ def test_on_storage_detaching(harness):
         storage_id = harness.add_storage("logs", attach=True)[0]
         harness.detach_storage(storage_id)
         assert _remove_raft_member.call_count == 2
-        _remove_raft_member.assert_called_with("1.1.1.1:2222", remote_address="3.3.3.3:2222")
+        _remove_raft_member.assert_called_with(
+            "1.1.1.1:2222", remote_address="3.3.3.3:2222", set_raft_flags=False
+        )
         _selected_snap.stop.assert_called_once_with(disable=True)
         _get_unit_ip.side_effect = None
         _reset()

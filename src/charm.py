@@ -2667,7 +2667,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 continue
             try:
                 self._patroni.remove_raft_member(
-                    f"{self.state.unit_ip}:{RAFT_PORT}", remote_address=f"{peer_ip}:{RAFT_PORT}"
+                    f"{self.state.unit_ip}:{RAFT_PORT}",
+                    remote_address=f"{peer_ip}:{RAFT_PORT}",
+                    set_raft_flags=False,
                 )
                 return
             except RemoveRaftMemberFailedError:
