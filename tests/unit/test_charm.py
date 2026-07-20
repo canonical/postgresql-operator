@@ -124,6 +124,42 @@ def test_on_install(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
+def test_on_storage_detaching(harness):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
+        patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+        patch.object(harness.charm.app, "planned_units") as _planned_units,
+    ):
+        _selected_snap = _snap_cache.return_value.__getitem__.return_value
+
+        # Scale-down (units remain): the surviving cluster still needs this unit's
+        # Patroni reachable to remove it from raft, so the workload must NOT be
+        # stopped here.
+        _planned_units.return_value = 2
+        storage_id = harness.add_storage("data", attach=True)[0]
+        harness.detach_storage(storage_id)
+        _stop_observer.assert_not_called()
+        _stop_log_rotation.assert_not_called()
+        _selected_snap.stop.assert_not_called()
+
+        # Full teardown (no units remain): release the storage by stopping the
+        # background processes and disabling (so a mid-teardown restart can't
+        # re-grab the mount) all the snap services.
+        _planned_units.return_value = 0
+        for storage_name in ("archive", "data", "logs", "temp"):
+            _stop_observer.reset_mock()
+            _stop_log_rotation.reset_mock()
+            _selected_snap.reset_mock()
+
+            storage_id = harness.add_storage(storage_name, attach=True)[0]
+            harness.detach_storage(storage_id)
+
+            _stop_observer.assert_called_once_with()
+            _stop_log_rotation.assert_called_once_with()
+            _selected_snap.stop.assert_called_once_with(disable=True)
+
+
 def test_patroni_scrape_config(harness):
     result = harness.charm.patroni_scrape_config()
 
@@ -1673,11 +1709,12 @@ def test_on_peer_relation_changed(harness):
         _update_config.assert_called_once()
         _start_patroni.assert_not_called()
         _update_new_unit_status.assert_not_called()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
+        assert isinstance(harness.model.unit.status, MaintenanceStatus)
 
         # Test event is early exiting when in blocked status.
         _update_config.side_effect = None
         _member_started.return_value = False
+        harness.model.unit.status = BlockedStatus()
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_not_called()
 
@@ -1898,12 +1935,11 @@ def test_add_cluster_member(harness):
         _update_config.assert_called_once_with()
         _update_config.reset_mock()
 
-        # Charm blocks when update_config fails
+        # Charm goes into maintenance when update_config fails
         _update_config.side_effect = RetryError(last_attempt=None)
         harness.charm.add_cluster_member("postgresql-0")
         _update_config.assert_called_once_with()
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-        assert harness.charm.unit.status.message == "failed to update cluster members on member"
+        assert isinstance(harness.charm.unit.status, MaintenanceStatus | WaitingStatus)
         _update_config.reset_mock()
 
         # Not ready error if not all members are ready
