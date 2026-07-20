@@ -109,8 +109,6 @@ from single_kernel_postgresql.config.literals import (
     SNAP_USER,
     SPI_MODULE,
     SYSTEM_USERS,
-    TLS_CLIENT_RELATION,
-    TLS_PEER_RELATION,
     TRACING_PROTOCOL,
     TRACING_RELATION_NAME,
     UNIT_SCOPE,
@@ -438,22 +436,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             refresh_endpoints=self.refresh_endpoints,
             restart_services=self.restart_services,
         )
-        # Bridge the lib TLS handler's requirer events back into a PostgreSQL reload:
-        # the lib handler stores+pushes certs on certificate_available, then we reload.
-        # Also fires on relation_broken so detaching the TLS operator re-renders Patroni
-        # with TLS disabled.
-        self.framework.observe(
-            self.tls.client_certificate.on.certificate_available, self._reload_tls_after_push
-        )
-        self.framework.observe(
-            self.tls.peer_certificate.on.certificate_available, self._reload_tls_after_push
-        )
-        self.framework.observe(
-            self.on[TLS_CLIENT_RELATION].relation_broken, self._reload_tls_after_push
-        )
-        self.framework.observe(
-            self.on[TLS_PEER_RELATION].relation_broken, self._reload_tls_after_push
-        )
+        # Reload PostgreSQL after the lib TLS handler has actually pushed the cert files.
+        # tls_files_pushed fires only on a completed push (the handler routes both
+        # certificate_available and relation_broken through that push), so a deferred push
+        # never triggers a reload against files that were never written.
+        self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
@@ -531,27 +518,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return Substrates.VM
 
     def _reload_tls_after_push(self, event) -> None:
-        """Reload PostgreSQL after the lib TLS handler stores+pushes certs.
+        """Reload PostgreSQL after the lib TLS handler has pushed the cert files.
 
-        Also fires on the TLS relations' relation_broken so detaching the TLS
-        operator re-renders Patroni with TLS disabled and reloads.
-
-        Mirror the handler's readiness guard: when the internal CA is absent the
-        handler defers its push (no files on disk), so skip the reload to avoid
-        rendering ssl:on against missing TLS files on an already-running unit.
-
-        A transient config-apply failure (Patroni API unreachable, member not
-        started) defers and retries rather than leaving stale TLS state or failing
-        the hook.
+        Observes the handler's ``tls_files_pushed`` event, which fires only after a
+        successful push (cert renewal or relation_broken), so the files are on disk and
+        the internal CA is present by the time this runs -- no local readiness guard is
+        needed. A transient config-apply failure (Patroni API unreachable, member not
+        started) defers and retries rather than leaving stale TLS state or failing the hook.
         """
-        if not self.get_secret(APP_SCOPE, "internal-ca"):
-            return
-        # Don't enable TLS in the config until the lib has written the cert files to
-        # disk (its push can defer while this local render would still succeed, which
-        # would start Patroni ssl:on against missing files).
-        if self.is_tls_enabled and not self.tls_manager.client_tls_files_on_disk():
-            event.defer()
-            return
         try:
             if not self.update_config():
                 event.defer()
