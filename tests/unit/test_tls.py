@@ -54,55 +54,18 @@ def test_is_tls_enabled_reflects_tls_manager(harness):
 
 
 def test_reload_bridge_calls_update_config(harness):
-    """_reload_tls_after_push delegates to update_config when internal-ca is present."""
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca", "ca-content")
-
+    """_reload_tls_after_push delegates to update_config (the event guarantees readiness)."""
     with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
         harness.charm._reload_tls_after_push(Mock())
         _update_config.assert_called_once_with()
 
 
-def test_reload_bridge_skips_update_config_without_internal_ca(harness):
-    """_reload_tls_after_push is a no-op when internal-ca is absent (defer path).
-
-    The lib TLS handler defers its push when the internal CA isn't present yet
-    (no files written to disk).  The bridge must not call update_config in that
-    case, or it would render ssl:on against TLS files that don't exist yet.
-    """
-    with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
-        harness.charm._reload_tls_after_push(Mock())
-        _update_config.assert_not_called()
-
-
 def test_reload_bridge_defers_when_update_config_not_ready(harness):
     """A transient config-apply failure must defer (retry), not leave stale TLS state."""
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca", "ca-content")
-
     event = Mock()
     with patch("charm.PostgresqlOperatorCharm.update_config", return_value=False):
         harness.charm._reload_tls_after_push(event)
     event.defer.assert_called_once()
-
-
-def test_reload_bridge_defers_when_tls_files_not_yet_on_disk(harness):
-    """ssl:on must not be rendered until the lib has pushed the cert files to disk."""
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca", "ca-content")
-    event = Mock()
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _uc,
-        # is_tls_enabled -> True via the live-fetch getter
-        patch("charm.TLSManager.get_client_tls_files", return_value=("K", "CA", "C")),
-        patch.object(harness.charm.tls_manager, "client_tls_files_on_disk", return_value=False),
-    ):
-        harness.charm._reload_tls_after_push(event)
-    event.defer.assert_called_once()
-    _uc.assert_not_called()
 
 
 def test_reload_bridge_defers_when_update_config_raises(harness):
@@ -112,10 +75,6 @@ def test_reload_bridge_defers_when_update_config_raises(harness):
     Patroni/render failure defers and retries rather than propagating out of the
     observer.
     """
-    with harness.hooks_disabled():
-        harness.set_leader(True)
-        harness.charm.set_secret("app", "internal-ca", "ca-content")
-
     event = Mock()
     with patch(
         "charm.PostgresqlOperatorCharm.update_config",
@@ -124,6 +83,17 @@ def test_reload_bridge_defers_when_update_config_raises(harness):
         # Must not raise.
         harness.charm._reload_tls_after_push(event)
     event.defer.assert_called_once_with()
+
+
+def test_reload_bridge_observes_tls_files_pushed(harness):
+    """The reload bridge fires on the lib's tls_files_pushed event, not certificate_available.
+
+    The lib emits tls_files_pushed only after a successful push, so the reload runs once the
+    files are on disk; a deferred push never emits and never triggers a stale reload.
+    """
+    with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
+        harness.charm.tls.tls_files_pushed.emit()
+        _update_config.assert_called_once_with()
 
 
 def test_internal_cert_path_pushes_and_reloads(harness):
