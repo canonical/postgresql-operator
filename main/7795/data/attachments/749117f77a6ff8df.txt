@@ -1,0 +1,75 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  00:37:10Z
+
+App               Version  Status       Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           maintenance      3  landscape-client  latest/edge   73  no       Configuring landscape client..
+pg                14.23    active           3  postgresql                       0  no       
+ubuntu-advantage           active           3  ubuntu-advantage  latest/edge  148  no       Attached (esm-apps,esm-infra)
+
+Unit                   Workload     Agent      Machine  Public address  Ports     Message
+pg/0                   active       idle       0        10.8.86.143     5432/tcp  
+  landscape-client/3   active       idle                10.8.86.143               Client registered!
+  ubuntu-advantage/2   active       idle                10.8.86.143               Attached (esm-apps,esm-infra)
+pg/1*                  active       idle       1        10.8.86.142     5432/tcp  Primary
+  landscape-client/2   active       idle                10.8.86.142               Client registered!
+  ubuntu-advantage/1   active       idle                10.8.86.142               Attached (esm-apps,esm-infra)
+pg/2                   active       idle       2        10.8.86.106     5432/tcp  
+  landscape-client/0*  maintenance  executing           10.8.86.106               (config-changed) Configuring landscape client..
+  ubuntu-advantage/0*  active       executing           10.8.86.106               (config-changed) Attached (esm-apps,esm-infra)
+
+Machine  State    Address      Inst id        Base          AZ             Message
+0        started  10.8.86.143  juju-409931-0  ubuntu@22.04  runnervm76tkm  Running
+1        started  10.8.86.142  juju-409931-1  ubuntu@22.04  runnervm76tkm  Running
+2        started  10.8.86.106  juju-409931-2  ubuntu@22.04  runnervm76tkm  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:23:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:23:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-1: 00:23:50 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fefca247af0 state=finished raised Exception>]
+unit-pg-1: 00:23:54 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f807ec12650 state=finished raised Exception>]
+unit-pg-1: 00:23:56 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb6eeb66650 state=finished raised Exception>]
+unit-pg-1: 00:23:59 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f96fadae650 state=finished raised Exception>]
+unit-pg-1: 00:24:02 ERROR unit.pg/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-pg-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f45d36066e0 state=finished raised Exception>]
+unit-pg-1: 00:24:31 ERROR unit.pg/1.juju-log upgrade:1: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 00:24:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:24:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:25:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:25:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-2: 00:26:19 ERROR unit.pg/2.juju-log database-peers:2: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  the database system is starting up
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
