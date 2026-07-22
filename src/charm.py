@@ -2633,11 +2633,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise
 
     def _on_storage_detaching(self, _) -> None:
-        """Stop the workload so Juju can unmount the storage on app teardown."""
-        # On scale-down the surviving cluster still needs this unit's Patroni to
-        # remove it from raft; only stop when the whole app is going away.
+        """Stop the workload so Juju can unmount the storage on teardown or scale-down."""
+        # storage-detaching runs before the relation-departed/stop hooks and nothing
+        # else stops the snap, so stop it here or the mount stays busy. (3.6 force-removes
+        # still-Dying storage and masks this; 4.0 leaves it for Juju to unmount.) On
+        # scale-down drop this unit from raft via a surviving peer first — a node can't
+        # remove itself, and once stopped the leader can no longer resolve its member IP.
         if self.app.planned_units() > 0:
-            return
+            self._remove_from_raft_via_peer()
         self._observer.stop_observer()
         self._rotate_logs.stop_log_rotation()
         try:
@@ -2646,6 +2649,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             snap.SnapCache()[charm_refresh.snap_name()].stop(disable=True)
         except snap.SnapError:
             logger.exception("Failed to stop charmed-postgresql snap services")
+
+    def _remove_from_raft_via_peer(self) -> None:
+        """Drop this departing unit from raft using a surviving peer's endpoint.
+
+        pysyncobj rejects a node removing itself from its own endpoint, so the
+        removal is issued against a peer. When several units are removed together the
+        first peer tried may itself be departing (snap already stopped), so try each
+        peer until one reachable raft node accepts the removal — any live node routes
+        it to the leader, and on scale-down at least one survivor stays up.
+        """
+        if not self._peers:
+            return
+        for unit in self._peers.units:
+            peer_ip = self._get_unit_ip(unit)
+            if not peer_ip:
+                continue
+            try:
+                self._patroni.remove_raft_member(
+                    f"{self.state.unit_ip}:{RAFT_PORT}",
+                    remote_address=f"{peer_ip}:{RAFT_PORT}",
+                    set_raft_flags=False,
+                )
+                return
+            except RemoveRaftMemberFailedError:
+                continue
+        logger.warning("Failed to remove departing unit from raft: no reachable peer")
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
