@@ -7,6 +7,7 @@ import logging
 import os
 import pathlib
 import platform
+import stat
 import subprocess
 from datetime import UTC, datetime
 from typing import ClassVar
@@ -39,7 +40,11 @@ from single_kernel_postgresql.config.exceptions import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
+from single_kernel_postgresql.config.literals import (
+    PEER_RELATION,
+    POSTGRESQL_STORAGE_PERMISSIONS,
+    SECRET_INTERNAL_LABEL,
+)
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -1027,6 +1032,22 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
     ):
         harness.charm._ensure_storage_layout()
     assert temp_root.is_dir()
+
+
+def test_ensure_storage_layout_sets_temp_dir_permissions(harness, tmp_path):
+    """TEMP_DATA_DIR is created with POSTGRESQL_STORAGE_PERMISSIONS (0o700).
+
+    set_up_database renames the temp tablespace and leaves a leftover when the
+    dir's mode differs from POSTGRESQL_STORAGE_PERMISSIONS after a reboot. Creating
+    it with the expected mode avoids triggering that rename-and-leave on every reboot.
+    """
+    temp_root = tmp_path / "temp" / "16" / "main"
+    with (
+        patch("charm.TEMP_DATA_DIR", str(temp_root)),
+        patch("charm.shutil"),
+    ):
+        harness.charm._ensure_storage_layout()
+    assert stat.S_IMODE(temp_root.stat().st_mode) == POSTGRESQL_STORAGE_PERMISSIONS
 
 
 def test_was_restore_successful_migrates_temp_tablespace_before_clearing_flags(harness):
