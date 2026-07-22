@@ -1029,6 +1029,72 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
     assert temp_root.is_dir()
 
 
+def test_was_restore_successful_migrates_temp_tablespace_before_clearing_flags(harness):
+    """A restore migrates an old-layout temp tablespace to the versioned path.
+
+    A backup taken on a pre-versioned-storage revision restores the temp tablespace
+    at the non-versioned path; the restore must migrate it to the versioned path
+    before replicas stream it, or their pg_basebackup hits a non-empty target dir.
+    """
+    harness.disable_hooks()
+    harness.set_leader(True)
+    harness.charm.app_peer_data["restoring-backup"] = "20260722-130654F"
+    with (
+        patch("charm.PatroniManager.get_member_status", return_value="running"),
+        patch(
+            "charm.PatroniManager.member_started",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgresqlOperatorCharm._setup_users"),
+        patch("charm.PostgreSQL.get_current_timeline", return_value="2"),
+        patch("charm.PostgresqlOperatorCharm.enable_disable_extensions"),
+        patch("charm.PostgresqlOperatorCharm._migrate_temp_tablespace_location") as _migrate,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.PostgresqlOperatorCharm.restore_patroni_restart_condition"),
+        patch("charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)),
+    ):
+        _migrate.return_value = True
+
+        assert harness.charm._was_restore_successful()
+
+    _migrate.assert_called_once_with(required=True)
+    # Flags are cleared only after a successful migration.
+    assert not harness.charm.app_peer_data.get("restoring-backup")
+
+
+def test_was_restore_successful_defers_when_temp_tablespace_migration_incomplete(harness):
+    """When the temp tablespace migration is not complete, the restore check defers.
+
+    The restoring-backup flag must not be cleared until the migration finishes, so
+    the check is retried on the next update-status.
+    """
+    harness.disable_hooks()
+    harness.set_leader(True)
+    harness.charm.app_peer_data["restoring-backup"] = "20260722-130654F"
+    with (
+        patch("charm.PatroniManager.get_member_status", return_value="running"),
+        patch(
+            "charm.PatroniManager.member_started",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch("charm.PostgresqlOperatorCharm._setup_users"),
+        patch("charm.PostgreSQL.get_current_timeline", return_value="2"),
+        patch("charm.PostgresqlOperatorCharm.enable_disable_extensions"),
+        patch("charm.PostgresqlOperatorCharm._migrate_temp_tablespace_location") as _migrate,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+    ):
+        _migrate.return_value = False
+
+        assert not harness.charm._was_restore_successful()
+
+    _migrate.assert_called_once_with(required=True)
+    # The restoring-backup flag is preserved so the check retries.
+    assert harness.charm.app_peer_data["restoring-backup"] == "20260722-130654F"
+    _update_config.assert_not_called()
+
+
 def test_on_update_status(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
@@ -1144,6 +1210,9 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm._setup_users") as _setup_users,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch(
+            "charm.PostgresqlOperatorCharm._migrate_temp_tablespace_location", return_value=True
+        ) as _migrate_temp_tablespace_location,
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.PatroniManager.get_member_status") as _get_member_status,
         patch(

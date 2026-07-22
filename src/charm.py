@@ -2434,6 +2434,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.enable_disable_extensions()
 
+        # Migrate an old-layout temp tablespace to the versioned path before replicas
+        # stream it, or their pg_basebackup hits a non-empty target directory.
+        if not self._migrate_temp_tablespace_location(required=True):
+            logger.debug("Restore check early exit: temp tablespace migration not complete")
+            return False
+
         # Remove the restoring backup flag and the restore stanza name.
         self.app_peer_data.update({
             "restoring-backup": "",
