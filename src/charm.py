@@ -375,6 +375,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # TODO switch to the abstract class base
         # State
         self.state = CharmState(charm=self, substrate=self.substrate)
+        # The workload provides this unit's available (cpu, memory) for config sizing.
+        self.state.resource_provider = self.workload
 
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
