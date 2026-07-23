@@ -1,0 +1,89 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.25   unsupported  00:25:08Z
+
+App           Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+database-app           waiting    0/1  postgresql-test-app  latest/edge  565  no       waiting for machine
+db-app                 blocked      1  postgresql-test-app  latest/edge  565  no       No database integration available
+postgresql             error        1  postgresql                          0  no       hook failed: "install"
+
+Unit            Workload  Agent       Machine  Public address  Ports  Message
+database-app/0  waiting   allocating  1                               waiting for machine
+db-app/0*       blocked   idle        0        10.74.112.167          No database integration available
+postgresql/0*   error     idle        2        10.74.112.180          hook failed: "install"
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.74.112.167  juju-da62d3-0  ubuntu@22.04  runnervmliwqe  Running
+1        down                    juju-da62d3-1  ubuntu@22.04  runnervmliwqe  Container started
+2        started  10.74.112.180  juju-da62d3-2  ubuntu@22.04  runnervmliwqe  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:23:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:23:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:25:06 ERROR unit.postgresql/0.juju-log An exception occurred when installing charmed-postgresql. Reason: Snap 'charmed-postgresql' not found!
+unit-postgresql-0: 00:25:06 ERROR unit.postgresql/0.juju-log Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 888, in _request_raw
+    response = self.opener.open(request, timeout=self.timeout)
+  File "/usr/lib/python3.10/urllib/request.py", line 525, in open
+    response = meth(req, response)
+  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response
+    response = self.parent.error(
+  File "/usr/lib/python3.10/urllib/request.py", line 563, in error
+    return self._call_chain(*args)
+  File "/usr/lib/python3.10/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+  File "/usr/lib/python3.10/urllib/request.py", line 643, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 965, in __getitem__
+    snap = self._snap_map[snap_name] = self._load_info(snap_name)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 1014, in _load_info
+    info = self._snap_client.get_snap_information(name)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 914, in get_snap_information
+    return self._request('GET', 'find', {'name': name})[0]  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 840, in _request
+    response = self._request_raw(method, path, query, headers, data)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 900, in _request_raw
+    raise SnapAPIError(body, code, status, message) from e
+charmlibs.snap._snap.SnapAPIError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 2681, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/__init__.py", line 360, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 522, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 506, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 439, in _emit
+    self._emit_charm_event(self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 483, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 336, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 916, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 1036, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 1144, in _on_install
+    self._install_snap_packages(packages=SNAP_PACKAGES)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/charm.py", line 1903, in _install_snap_packages
+    snap_package = snap_cache[snap_name]
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/charmlibs/snap/_snap.py", line 967, in __getitem__
+    raise SnapNotFoundError(f"Snap '{snap_name}' not found!") from e
+charmlibs.snap._snap.SnapNotFoundError: Snap 'charmed-postgresql' not found!
+unit-postgresql-0: 00:25:07 ERROR juju.worker.uniter.operation hook "install" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
