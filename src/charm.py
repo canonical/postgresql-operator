@@ -96,6 +96,7 @@ from single_kernel_postgresql.config.literals import (
     PEER_RELATION,
     PGBACKREST_METRICS_PORT,
     PLUGIN_OVERRIDES,
+    POSTGRESQL_STORAGE_PERMISSIONS,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
@@ -856,6 +857,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         temp_dir = Path(TEMP_DATA_DIR)
         temp_dir.mkdir(parents=True, exist_ok=True)
+        # Match the mode set_up_database expects, so it does not rename-and-leave a
+        # temp_<timestamp> tablespace on every reboot when the mode would otherwise differ.
+        temp_dir.chmod(POSTGRESQL_STORAGE_PERMISSIONS)
         shutil.chown(temp_dir, user=SNAP_USER, group=SNAP_USER)
         if temp_dir.parent.exists():
             shutil.chown(temp_dir.parent, user=SNAP_USER, group=SNAP_USER)
@@ -2433,6 +2437,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         self.enable_disable_extensions()
+
+        # Migrate an old-layout temp tablespace to the versioned path before replicas
+        # stream it, or their pg_basebackup hits a non-empty target directory.
+        if not self._migrate_temp_tablespace_location(required=True):
+            logger.debug("Restore check early exit: temp tablespace migration not complete")
+            return False
 
         # Remove the restoring backup flag and the restore stanza name.
         self.app_peer_data.update({
