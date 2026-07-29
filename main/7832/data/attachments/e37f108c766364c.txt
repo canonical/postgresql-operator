@@ -1,0 +1,175 @@
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:242 waiting for the database charm to become blocked
+[32mINFO    [0m integration.conftest:conftest.py:70 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.27   unsupported  00:43:18Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  14.23    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable  145  no       
+
+Unit               Workload  Agent      Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   executing  5        10.57.37.226    5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle       0        10.57.37.34               
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.57.37.34   juju-1a84d2-0  ubuntu@22.04  runnervmliwqe  Running
+5        started  10.57.37.226  juju-1a84d2-5  ubuntu@22.04  runnervmliwqe  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:21:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:21:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:22:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:22:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:23:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:23:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:23:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:23:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-1: 00:24:25 ERROR unit.postgresql-gcp/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7cef586530 state=finished raised Exception>]
+unit-postgresql-gcp-1: 00:24:27 ERROR unit.postgresql-gcp/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff9258664d0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 00:24:29 ERROR unit.postgresql-gcp/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5836b2a500 state=finished raised Exception>]
+unit-postgresql-gcp-1: 00:24:31 ERROR unit.postgresql-gcp/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa180f1ed40 state=finished raised Exception>]
+unit-postgresql-gcp-1: 00:24:33 ERROR unit.postgresql-gcp/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fae41bfe500 state=finished raised Exception>]
+unit-postgresql-gcp-1: 00:24:41 ERROR unit.postgresql-gcp/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-gcp-1: 00:26:29 ERROR unit.postgresql-gcp/1.juju-log s3-parameters:5: Failed to read content from S3 bucket=data-charms-testing, path=postgresql-k8s/556d7624-8ae3-11f1-aad7-25e5d6618dbc/model-uuid.txt
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/backups.py", line 1521, in _read_content_from_s3
+    bucket.download_fileobj(processed_s3_path, buf)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/boto3/s3/inject.py", line 904, in bucket_download_fileobj
+    return self.meta.client.download_fileobj(
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/botocore/context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/boto3/s3/inject.py", line 862, in download_fileobj
+    return future.result()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/s3transfer/futures.py", line 111, in result
+    return self._coordinator.result()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/s3transfer/futures.py", line 287, in result
+    raise self._exception
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/s3transfer/tasks.py", line 142, in __call__
+    return self._execute_main(kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/s3transfer/tasks.py", line 165, in _execute_main
+    return_value = self._main(**kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/s3transfer/download.py", line 809, in _main
+    response = client.get_object(
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/botocore/client.py", line 606, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/botocore/context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/lib/python3.10/site-packages/botocore/client.py", line 1094, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.NoSuchKey: An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.
+machine-4: 00:39:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:39:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:39:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:39:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-2: 00:39:39 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fcf6ac53640 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:39:41 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f88941823b0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:39:43 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd520b4e0e0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:39:45 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb68d636d40 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:39:47 ERROR unit.postgresql-gcp/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4a83a5a3b0 state=finished raised Exception>]
+unit-new-postgresql-0: 00:39:51 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f60ae58b640 state=finished raised Exception>]
+unit-new-postgresql-0: 00:39:53 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0ddd63ed40 state=finished raised Exception>]
+unit-new-postgresql-0: 00:39:54 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f59dcbfe3b0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 00:39:55 ERROR unit.postgresql-gcp/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-new-postgresql-0: 00:39:56 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe59fd56d40 state=finished raised Exception>]
+unit-new-postgresql-0: 00:39:58 ERROR unit.new-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f607990a0e0 state=finished raised Exception>]
+unit-new-postgresql-0: 00:40:06 ERROR unit.new-postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-gcp-2: 00:40:54 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "9ef18f5f-761d-4233-8c5b-538b801a84d2:r#12#s3-integrator": settings 9ef18f5f-761d-4233-8c5b-538b801a84d2:r#12#s3-integrator not found (not found)
+unit-postgresql-gcp-2: 00:41:00 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "9ef18f5f-761d-4233-8c5b-538b801a84d2:r#6#postgresql-gcp": settings 9ef18f5f-761d-4233-8c5b-538b801a84d2:r#6#postgresql-gcp not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
