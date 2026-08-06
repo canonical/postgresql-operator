@@ -1,0 +1,95 @@
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+  self-signed-certificates/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] waiting: Awaiting restart operation
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+  self-signed-certificates/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.27   unsupported  00:33:05Z
+
+App                       Version  Status  Scale  Charm                     Channel   Rev  Exposed  Message
+postgresql                14.23    active      3  postgresql                            0  no       
+self-signed-certificates           active      1  self-signed-certificates  1/stable  586  no       
+
+Unit                         Workload  Agent      Machine  Public address  Ports     Message
+postgresql/0                 active    executing  0        10.28.96.222    5432/tcp  
+postgresql/1                 active    executing  1        10.28.96.104    5432/tcp  
+postgresql/2*                active    idle       2        10.28.96.216    5432/tcp  
+self-signed-certificates/0*  active    idle       3        10.28.96.177              
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.28.96.222  juju-0bf95f-0  ubuntu@22.04  runnervmliwqe  Running
+1        started  10.28.96.104  juju-0bf95f-1  ubuntu@22.04  runnervmliwqe  Running
+2        started  10.28.96.216  juju-0bf95f-2  ubuntu@22.04  runnervmliwqe  Running
+3        started  10.28.96.177  juju-0bf95f-3  ubuntu@24.04  runnervmliwqe  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 00:22:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:22:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:24:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:25:13 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1488caf670 state=finished raised Exception>]
+unit-postgresql-2: 00:25:17 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f30dc50a6e0 state=finished raised Exception>]
+unit-postgresql-2: 00:25:20 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4c2c9de5f0 state=finished raised Exception>]
+unit-postgresql-2: 00:25:22 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb577e925c0 state=finished raised Exception>]
+unit-postgresql-2: 00:25:25 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3127d32470 state=finished raised Exception>]
+unit-postgresql-2: 00:25:34 ERROR unit.postgresql/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 00:25:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:25:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:25:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:25:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:29:54 ERROR unit.postgresql/2.juju-log certificates:3: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: Connection refused
+	Is the server running locally and accepting connections on that socket?
+
+unit-postgresql-1: 00:30:14 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates": settings 5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates not found (not found)
+unit-postgresql-2: 00:30:16 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates": settings 5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates not found (not found)
+unit-postgresql-0: 00:30:16 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates": settings 5ae2ead9-ba89-4374-8841-a8331b0bf95f:r#3#self-signed-certificates not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
