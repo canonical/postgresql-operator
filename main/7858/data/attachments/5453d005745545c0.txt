@@ -1,0 +1,292 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.27   unsupported  02:18:42Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.23    active      3  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/2   active    idle   2        10.117.163.183  5432/tcp  
+postgresql/5   active    idle   5        10.117.163.221  5432/tcp  
+postgresql/6*  active    idle   6        10.117.163.186  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+2        started  10.117.163.183  juju-ec52e6-2  ubuntu@22.04  runnervmliwqe  Running
+5        started  10.117.163.221  juju-ec52e6-5  ubuntu@22.04  runnervmliwqe  Running
+6        started  10.117.163.186  juju-ec52e6-6  ubuntu@22.04  runnervmliwqe  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 01:15:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:15:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:16:06 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa18f8ba950 state=finished raised Exception>]
+unit-postgresql-1: 01:16:09 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1b2599fd60 state=finished raised Exception>]
+unit-postgresql-1: 01:16:11 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1f59f83d90 state=finished raised Exception>]
+unit-postgresql-1: 01:16:14 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f62ae6b3d60 state=finished raised Exception>]
+unit-postgresql-1: 01:16:18 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3fd16a3bb0 state=finished raised Exception>]
+machine-2: 01:17:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:17:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:17:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:17:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:20:47 ERROR unit.postgresql/2.juju-log restart:0: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  the database system is starting up
+
+machine-0: 01:22:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:22:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:25:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:25:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:25:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:25:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:26:50 ERROR unit.postgresql/3.juju-log database-peers:2: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 01:29:07 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 01:31:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:31:56 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:32:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:32:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-6: 01:33:51 ERROR unit.postgresql/6.juju-log upgrade:1: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:36:43 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:36:47 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 01:36:47 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql-6: 01:40:26 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:40:37 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:40:48 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:40:59 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:19 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:30 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:41 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:50 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:41:58 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:42:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:42:21 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:42:30 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:42:39 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:42:49 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:00 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:20 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:29 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:41 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:49 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:43:59 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:19 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:29 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:37 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:48 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:44:56 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:08 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:18 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:27 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:38 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:47 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:45:57 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:08 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:17 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:26 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:34 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:44 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:46:55 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:04 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:12 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:24 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:33 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:43 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:47:53 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:01 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:12 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:22 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:30 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:41 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:48:50 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:01 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:20 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:28 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:39 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:49:50 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:50:00 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:50:09 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:50:20 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:50:28 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 01:50:38 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:02:33 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:02:42 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:02:53 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:03 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:11 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:23 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:34 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:46 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:03:55 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:15:59 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:08 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:20 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:31 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:39 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:50 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:16:59 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:17:08 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:17:19 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:17:30 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:17:42 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:17:52 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:18:02 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:18:13 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:18:21 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:18:29 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-6: 02:18:38 ERROR unit.postgresql/6.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
