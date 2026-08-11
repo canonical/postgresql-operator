@@ -529,7 +529,8 @@ def test_update_endpoints_without_event(harness):
         }
 
 
-def test_on_database_requested_without_database_name(harness, caplog):
+@pytest.mark.parametrize("missing_database", [None, ""])
+def test_on_database_requested_without_database_name(harness, caplog, missing_database):
     """A replayed request whose databag no longer carries a database name is skipped."""
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
@@ -553,7 +554,7 @@ def test_on_database_requested_without_database_name(harness, caplog):
         event.requested_entity_secret_content = None
         # The remote app databag is empty on this replay, so the library
         # properties read back as None.
-        event.database = None
+        event.database = missing_database
         event.extra_user_roles = None
 
         with caplog.at_level(logging.WARNING):
