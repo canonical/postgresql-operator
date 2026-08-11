@@ -563,3 +563,6 @@ def test_on_database_requested_without_database_name(harness, caplog):
         postgresql_mock.create_database.assert_not_called()
         postgresql_mock.create_user.assert_not_called()
         _update_endpoints.assert_not_called()
+        # Returning without deferring is what lets ops drop the stale notice; a
+        # handler that defers again would replay it forever.
+        event.defer.assert_not_called()
