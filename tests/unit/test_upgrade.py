@@ -196,6 +196,23 @@ def test_on_upgrade_granted(harness):
         _updated_synchronous_node_count.assert_called_once_with()
 
 
+def test_pre_upgrade_switchover_skips_standby(harness):
+    with (
+        patch(
+            "charm.PostgreSQLAsyncReplication.get_primary_cluster_endpoint"
+        ) as _get_primary_cluster_endpoint,
+        patch("charm.Patroni.switchover") as _switchover,
+    ):
+        # A standby (async-replica) cluster is read-only: there is no client write
+        # downtime to avoid, so the pre-upgrade switchover must be skipped.
+        _get_primary_cluster_endpoint.return_value = "10.1.1.1"
+        mock_event = MagicMock()
+
+        assert harness.charm.upgrade._pre_upgrade_switchover(mock_event) is False
+        _switchover.assert_not_called()
+        mock_event.defer.assert_not_called()
+
+
 def test_pre_upgrade_check(harness):
     with (
         patch(
