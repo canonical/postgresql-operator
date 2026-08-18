@@ -213,7 +213,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 scram-sha-256
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ peer_ip }}/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ peer_ip }}/32 scram-sha-256
     {%- endfor %}
 
   pg_ident:
