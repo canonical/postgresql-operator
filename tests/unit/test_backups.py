@@ -771,7 +771,6 @@ def test_initialise_stanza(harness):
         stanza_creation_command = [
             "charmed-postgresql.pgbackrest",
             "--config=/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
-            "--log-level-stderr=warn",
             f"--stanza={harness.charm.backup.stanza_name}",
             "stanza-create",
         ]
@@ -1894,6 +1893,11 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         if tls_ca_chain_filename != "":
             calls.insert(0, call(Substrates.VM, tls_ca_chain_filename, "fake-tls-ca-chain", 0o644))
         _render_file.assert_has_calls(calls)
+
+        # pgBackRest's own stderr log level should come from the config file, not a
+        # per-command CLI flag, so it's applied consistently to every invocation that
+        # loads this config.
+        assert "log-level-stderr=warn" in expected_content
 
 
 def test_restart_database(harness):
