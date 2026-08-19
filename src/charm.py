@@ -23,9 +23,6 @@ from pathlib import Path
 from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
-import charm_refresh
-import ops.log
-
 # First platform-specific import, will fail on wrong architecture
 try:
     import psycopg2
@@ -44,6 +41,8 @@ except ModuleNotFoundError:
         main(WrongArchitectureWarningCharm)
     raise
 
+import charm_refresh
+import ops.log
 import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
