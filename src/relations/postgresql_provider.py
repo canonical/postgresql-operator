@@ -216,7 +216,10 @@ class PostgreSQLProvider(Object):
         self, user: str, event: DatabaseRequestedEvent
     ) -> tuple[str, list[str]] | None:
         # Retrieve the database name and extra user roles using the charm library.
-        database = event.database or ""
+        database = event.database
+        if not database:
+            logger.warning("Database name is not set in the relation data, skipping.")
+            return
         if database and database[-1] == "*":
             if len(database) < 4:
                 self.charm.unit.status = BlockedStatus(PREFIX_TOO_SHORT_MSG)
