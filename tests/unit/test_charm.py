@@ -558,7 +558,9 @@ def test_on_start_success(harness):
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
         patch("charm.PostgresqlOperatorCharm._update_relation_endpoints"),
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.oversee_users"
+        ) as _oversee_users,
         patch(
             "charm.PostgresqlOperatorCharm._replication_password",
             new_callable=PropertyMock,
@@ -611,7 +613,9 @@ def test_setup_users_skips_writes_on_standby_cluster(harness):
             new_callable=PropertyMock,
             return_value=True,
         ),
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.oversee_users"
+        ) as _oversee_users,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
     ):
         # Even though this would raise on a read-only standby, the guard must
@@ -636,7 +640,9 @@ def test_setup_users_runs_on_primary_cluster(harness):
             new_callable=PropertyMock,
             return_value=False,
         ),
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.oversee_users"
+        ) as _oversee_users,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch.object(harness.charm, "postgresql") as _postgresql,
     ):
@@ -755,8 +761,14 @@ def test_on_start_no_patroni_member(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLSManager.generate_internal_peer_cert"),
-        patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
-        patch("charm.PostgreSQLProvider.get_databases_prefix_mapping", return_value={}),
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.get_username_mapping",
+            return_value={},
+        ),
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.get_databases_prefix_mapping",
+            return_value={},
+        ),
         patch("charm.start_raft_observer"),
     ):
         # Mock the passwords.
@@ -1049,7 +1061,9 @@ def test_on_update_status(harness):
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock(return_value=True),
         ) as _primary_endpoint,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.oversee_users"
+        ) as _oversee_users,
         patch("charm.PatroniManager.last_postgresql_logs") as _last_postgresql_logs,
         patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
         patch("charm.PatroniManager.get_member_status") as _get_member_status,
@@ -1132,7 +1146,9 @@ def test_on_update_status_after_restore_operation(harness):
             new_callable=PropertyMock,
             return_value=True,
         ) as _primary_endpoint,
-        patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
+        patch(
+            "single_kernel_postgresql.managers.database.DatabaseManager.oversee_users"
+        ) as _oversee_users,
         patch(
             "charm.PostgresqlOperatorCharm._handle_processes_failures"
         ) as _handle_processes_failures,
@@ -1402,14 +1418,6 @@ def test_request_restart(harness):
         _on_acquire_lock.assert_called_once()
 
 
-def test_refresh_endpoints(harness):
-    """Bridge for ConfigManager: refreshes the client-relation endpoints."""
-    with patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints:
-        harness.charm.refresh_endpoints()
-
-        _update_endpoints.assert_called_once()
-
-
 def test_restart_services(harness):
     """Bridge for ConfigManager: restarts the metrics and LDAP sync snap services."""
     with (
@@ -1430,7 +1438,7 @@ def test_restart_services(harness):
 
 
 def test_update_config_delegates_to_config_manager(harness):
-    """update_config forwards to the lib's ConfigManager with the charm-owned user hash/refresh."""
+    """update_config forwards to the lib's ConfigManager with the charm-owned refresh."""
     with patch.object(harness.charm, "config_manager") as _config_manager:
         _config_manager.update_config.return_value = True
 
@@ -1438,8 +1446,7 @@ def test_update_config_delegates_to_config_manager(harness):
 
         assert result is True
         _config_manager.update_config.assert_called_once()
-        args, kwargs = _config_manager.update_config.call_args
-        assert args[1] == harness.charm.generate_user_hash
+        _, kwargs = _config_manager.update_config.call_args
         assert kwargs["no_peers"] is True
         assert kwargs["refresh"] is harness.charm.refresh
 
@@ -2829,20 +2836,6 @@ def test_on_databases_change(harness):
 
         _update_config.assert_called_once_with()
         assert "timestamp" in harness.charm.unit_peer_data
-
-
-def test_generate_user_hash(harness):
-    with harness.hooks_disabled():
-        rel_id = harness.add_relation("database", "application")
-        harness.update_relation_data(rel_id, "application", {"database": "test_db"})
-    with (
-        patch("charm.shake_128") as _shake_128,
-    ):
-        _shake_128.return_value.hexdigest.return_value = sentinel.hash
-
-        assert harness.charm.generate_user_hash == sentinel.hash
-
-        _shake_128.assert_called_once_with(b"{'relation-2': 'test_db'}")
 
 
 def test_relations_user_databases_map(harness):
