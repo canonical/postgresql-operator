@@ -1458,9 +1458,7 @@ def test_update_config_clears_stale_standby_when_primary(harness):
     with (
         patch.object(harness.charm, "patroni_manager") as _patroni_manager,
         patch.object(harness.charm, "config_manager") as _config_manager,
-        patch.object(
-            harness.charm.async_replication, "get_primary_cluster_endpoint"
-        ) as _endpoint,
+        patch.object(harness.charm.async_replication, "get_primary_cluster_endpoint") as _endpoint,
     ):
         # This cluster is the primary -> no primary endpoint.
         _endpoint.return_value = None
