@@ -5,14 +5,15 @@ import json
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from ops import Application, ModelError, SecretNotFoundError
-from single_kernel_postgresql.config.literals import REPLICATION_CONSUMER_RELATION
+from ops import Application, ModelError
+from single_kernel_postgresql.config.literals import (
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+)
 from tenacity import RetryError
 
 from src.relations.async_replication import (
-    OFFER_SECRET_LABEL,
     READ_ONLY_MODE_BLOCKING_MESSAGE,
-    SECRET_LABEL,
     PostgreSQLAsyncReplication,
     _safe_databag_get,
     _same_secret_id,
@@ -673,11 +674,11 @@ def test_clear_stale_promotion():
     mock_charm._patroni.get_standby_leader.assert_not_called()
 
 
-def test_get_secret_creates_owned_secret_under_offer_label():
-    # Regression for DPE-10203: the offer/primary side must own the shared secret under a label
-    # distinct from the consumer alias (SECRET_LABEL). A former standby keeps a stale SECRET_LABEL
-    # alias that Juju leaves reserved after the remote secret is gone, so owning under SECRET_LABEL
-    # would deadlock with "secret with label already exists" on the next create-replication.
+def test_get_secret_creates_labelless_owned_secret_and_persists_id():
+    # Regression for DPE-10203: the owner creates the shared secret with NO label and
+    # persists its id in app peer data. Owning under any label risks colliding with a
+    # stale consumer alias Juju keeps reserved after a dead-DC teardown ("secret with
+    # label already exists"); labelless + id-in-peer-data has no label to collide.
     mock_charm = MagicMock()
     relation = PostgreSQLAsyncReplication(mock_charm)
 
@@ -687,27 +688,67 @@ def test_get_secret_creates_owned_secret_under_offer_label():
         "replication-password": "rep",
         "system-id": "x",
     }
-
-    # First get_secret: the peer app secret (content source). Second: the offer-label lookup,
-    # which is absent on a former standby -> triggers creation.
-    mock_charm.model.get_secret.side_effect = [app_secret, SecretNotFoundError()]
+    mock_charm.model.get_secret.return_value = app_secret
     mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {}
+    mock_charm.framework.model.get_relation.return_value = None  # no relation yet
+
+    created = MagicMock()
+    created.id = "secret://uuid/new"
+    mock_charm.model.app.add_secret.return_value = created
 
     result = relation._get_secret()
 
-    # Owned secret is created under the offer-specific label, never the bare consumer alias.
+    # Created with NO label; only password fields are shared between clusters.
     mock_charm.model.app.add_secret.assert_called_once()
     _, kwargs = mock_charm.model.app.add_secret.call_args
-    assert kwargs["label"] == OFFER_SECRET_LABEL
-    assert kwargs["label"] != SECRET_LABEL
-    # Only password fields are shared between clusters.
+    assert "label" not in kwargs
     assert kwargs["content"] == {"operator-password": "op", "replication-password": "rep"}
-    assert result is mock_charm.model.app.add_secret.return_value
+    # The id is persisted so later hooks re-find the secret without a label.
+    assert mock_charm.app_peer_data.get("async-replication-secret-id") == "secret://uuid/new"
+    assert result is created
 
 
-def test_get_secret_reuses_existing_offer_secret():
-    # When the owned secret already exists under the offer label, reuse it (look it up by the
-    # offer label) instead of creating a new one; only rewrite content when it drifts.
+def test_get_secret_adopts_secret_from_own_relation_data_on_migration():
+    # A cluster refreshed from the legacy charm (which owned the secret under the old
+    # label) has no id in peer data, but its own offer-relation data still publishes the
+    # last-known secret id. Adopt that secret instead of creating a second one — an id
+    # switch would wedge any consumer still running label-attaching code (Juju refuses
+    # to rebind a consumer label to a new secret id; DPE-10203).
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    app_secret = MagicMock()
+    app_secret.peek_content.return_value = {"operator-password": "op"}
+    existing = MagicMock()
+    existing.id = "secret://uuid/legacy"
+    existing.peek_content.return_value = {"operator-password": "op"}
+    # First get_secret: the peer app secret. Second: the adopted secret by id.
+    mock_charm.model.get_secret.side_effect = [app_secret, existing]
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {}
+
+    offer_relation = MagicMock()
+    offer_relation.name = REPLICATION_OFFER_RELATION
+    offer_relation.data = {
+        mock_charm.app: {"primary-cluster-data": json.dumps({"secret-id": "secret://uuid/legacy"})}
+    }
+    mock_model = MagicMock()
+    mock_model.get_relation.return_value = offer_relation
+    with patch.object(
+        PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
+    ):
+        result = relation._get_secret()
+
+    mock_charm.model.app.add_secret.assert_not_called()
+    assert result is existing
+    # Adoption persists the id for future hooks.
+    assert mock_charm.app_peer_data.get("async-replication-secret-id") == "secret://uuid/legacy"
+
+
+def test_get_secret_reuses_secret_by_persisted_id():
+    # Later hooks re-find the owned secret purely by the id persisted in app peer data —
+    # no label anywhere — and only rewrite content when it drifts.
     mock_charm = MagicMock()
     relation = PostgreSQLAsyncReplication(mock_charm)
 
@@ -719,16 +760,17 @@ def test_get_secret_reuses_existing_offer_secret():
     existing.peek_content.return_value = {"operator-password": "op"}
 
     mock_charm.model.get_secret.side_effect = [app_secret, existing]
+    mock_charm.app_peer_data = {"async-replication-secret-id": "secret://uuid/abc"}
 
     result = relation._get_secret()
 
     mock_charm.model.app.add_secret.assert_not_called()
     existing.set_content.assert_not_called()
     assert result is existing
-    assert any(
-        call.kwargs.get("label") == OFFER_SECRET_LABEL
-        for call in mock_charm.model.get_secret.call_args_list
-    )
+    # The second lookup is by the persisted id, not by any label.
+    second = mock_charm.model.get_secret.call_args_list[1]
+    assert second.kwargs.get("id") == "secret://uuid/abc"
+    assert "label" not in second.kwargs
 
 
 def test__get_primary_cluster_skips_unreadable_dead_peer_databag():
@@ -793,7 +835,7 @@ def test__relation_skips_unreadable_dying_relation(monkeypatch):
 
 
 # --- DPE-10203 follow-up: consumer reads the shared secret by id, never by label -------------
-# The consumer used to fetch the offer secret with ``get_secret(id=..., label=SECRET_LABEL)``,
+# The consumer used to fetch the offer secret with ``get_secret(id=..., label=<legacy>)``,
 # registering a local consumer alias that Juju leaves reserved after a dead-DC teardown. Matching
 # MySQL's async-replication design, the consumer now references the secret purely by the id
 # published in relation data, so no alias can go stale. These tests pin that behaviour.
@@ -889,7 +931,7 @@ def test_on_secret_changed_consumer_ignores_unrelated_secret():
 
     mock_event = MagicMock()
     mock_event.secret.id = "secret://uuid/DIFFERENT"
-    mock_event.secret.label = SECRET_LABEL  # a legacy label must NOT trigger the sync anymore
+    mock_event.secret.label = "async-replication-secret"  # legacy label must NOT trigger the sync
 
     with (
         patch.object(

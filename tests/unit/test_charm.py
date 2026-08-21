@@ -1454,6 +1454,33 @@ def test_update_config_delegates_to_config_manager(harness):
         assert kwargs["refresh"] is harness.charm.refresh
 
 
+def test_update_config_clears_stale_standby_when_primary(harness):
+    """Test update_config clears a stale DCS standby_cluster when this cluster is the primary.
+
+    A force-promote bumps the promoted-cluster-counter but, while the dead-DC relation still
+    lingers, does not call promote_standby_cluster() — so the reconciler must clear the stale
+    standby_cluster itself on the next update-config, or the cluster stays a read-only standby
+    leader (DPE-10203).
+    """
+    with (
+        patch.object(harness.charm, "patroni_manager") as _patroni_manager,
+        patch.object(harness.charm, "config_manager") as _config_manager,
+        patch.object(harness.charm.async_replication, "get_primary_cluster_endpoint") as _endpoint,
+    ):
+        # This cluster is the primary -> no primary endpoint.
+        _endpoint.return_value = None
+        _config_manager.update_config.return_value = True
+        _patroni_manager.member_started = True
+
+        assert harness.charm.update_config() is True
+
+        base_patch = _patroni_manager.bulk_update_parameters_controller_by_patroni.call_args[0][1]
+
+        # standby_cluster must be explicitly cleared (patched to None) so the DCS converges;
+        # merely omitting it would leave the stale standby from before the promotion in place.
+        assert base_patch["standby_cluster"] is None
+
+
 def test_on_cluster_topology_change(harness):
     with (
         patch(
