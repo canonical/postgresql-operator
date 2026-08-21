@@ -2778,13 +2778,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Updates Patroni config file based on the existence of the TLS files."""
         if refresh is None:
             refresh = self.refresh
-        return self.config_manager.update_config(
+        primary_cluster_endpoint = self.async_replication.get_primary_cluster_endpoint()
+        result = self.config_manager.update_config(
             self.postgresql,
             self.generate_user_hash,
             is_creating_backup=is_creating_backup,
             relations_user_databases_map=self.relations_user_databases_map,
             ldap_parameters=self.get_ldap_parameters(),
-            async_primary_cluster_endpoint=self.async_replication.get_primary_cluster_endpoint(),
+            async_primary_cluster_endpoint=primary_cluster_endpoint,
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
             watcher_raft_address=self.watcher_offer.watcher_raft_address
@@ -2793,6 +2794,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             no_peers=no_peers,
             refresh=refresh,
         )
+        # The lib's apply_api_config only SETS the DCS standby_cluster (when another
+        # cluster is primary) and never CLEARS it. A force-promote bumps the
+        # promoted-cluster-counter but — while the dead-DC relation still lingers — does
+        # not call promote_standby_cluster(), so without this the reconciler never clears
+        # the stale standby and the cluster stays a read-only standby leader (DPE-10203).
+        if (
+            result
+            and not no_peers
+            and self.patroni_manager.member_started
+            and primary_cluster_endpoint is None
+        ):
+            self.patroni_manager.bulk_update_parameters_controller_by_patroni(
+                {}, {"standby_cluster": None}
+            )
+        return result
 
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""

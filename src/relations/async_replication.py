@@ -69,17 +69,16 @@ logger = logging.getLogger(__name__)
 
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
-# Labels are not confidential.
-# The offer/primary side owns the shared cluster-credentials secret under OFFER_SECRET_LABEL and
-# publishes its id in the relation databag. The consumer/standby side references that secret purely
-# by id (see ``_update_internal_secret``) and never attaches a label, so no consumer-side alias is
-# registered. This matters after a dead-DC failover: Juju leaves a consumer alias reserved even
-# once the remote secret is gone, so a former standby that is later promoted would then deadlock
-# creating its own secret ("secret with label ... already exists" while the label is unreadable) —
-# DPE-10203. SECRET_LABEL is the legacy shared label; it is no longer attached by this charm and is
-# kept only to assert we never reintroduce it.
-SECRET_LABEL = "async-replication-secret"  # noqa: S105
-OFFER_SECRET_LABEL = "async-replication-secret-offer"  # noqa: S105
+# Neither side of the async-replication relation attaches any label to the shared
+# cluster-credentials secret (DPE-10203): the owner creates it labelless and references it by the
+# id persisted in app peer data (``_get_secret``); the consumer references it purely by the id
+# published in the relation databag (``_update_internal_secret``). Juju reserves labels even
+# after the secret they pointed at is gone — a stale consumer alias deadlocks a later
+# owner-create ("secret with label already exists" while the label is unreadable), and a stale
+# owner label makes a refreshed owner mint a second secret whose id switch wedges any consumer
+# still running label-attaching code. The legacy labels "async-replication-secret" and
+# "async-replication-secret-offer" are intentionally not defined anywhere: this charm must
+# never attach either again.
 
 
 def _same_secret_id(a: str | None, b: str | None) -> bool:
@@ -392,24 +391,56 @@ class PostgreSQLAsyncReplication(Object):
         # Filter out unnecessary secrets.
         shared_content = dict(filter(lambda x: "password" in x[0], content.items()))
 
-        try:
-            # Avoid recreating the secret.
-            secret = self.charm.model.get_secret(label=OFFER_SECRET_LABEL)
-            if not secret.id:
-                # Workaround for the secret id not being set with model uuid.
-                secret._id = f"secret://{self.model.uuid}/{secret.get_info().id.split(':')[1]}"
-            if secret.peek_content() != shared_content:
-                logger.info("Updating outdated secret content")
-                secret.set_content(shared_content)
-            return secret
-        except SecretNotFoundError:
-            logger.debug("Secret not found, creating a new one")
-            pass
+        # The owner references its secret purely by the id persisted in app peer data —
+        # no label. Owning under a label risks colliding with a stale consumer alias Juju
+        # keeps reserved after a dead-DC teardown ("secret with label already exists"),
+        # and a label lookup cannot survive the secret's own id churn (DPE-10203).
+        secret_id = self.charm.app_peer_data.get("async-replication-secret-id")
+        if not secret_id:
+            # Migration from the legacy charm (which owned the secret under a label):
+            # this cluster's own relation data still publishes the last-known id. Adopt
+            # that secret instead of creating a second one — an id switch would wedge
+            # any consumer still running label-attaching code, since Juju refuses to
+            # rebind a consumer label to a new secret id.
+            secret_id = self._own_published_secret_id()
+        if secret_id:
+            try:
+                secret = self.charm.model.get_secret(id=secret_id)
+            except SecretNotFoundError:
+                logger.debug("Persisted async-replication secret is gone; recreating")
+            else:
+                if secret.peek_content() != shared_content:
+                    logger.info("Updating outdated secret content")
+                    secret.set_content(shared_content)
+                # Persist the id (covers the migration path, where the id came from
+                # this cluster's own relation data rather than peer data).
+                self.charm.app_peer_data.update({"async-replication-secret-id": secret.id})
+                return secret
 
         if self.charm.unit.is_leader():
-            return self.charm.model.app.add_secret(
-                content=shared_content, label=OFFER_SECRET_LABEL
-            )
+            secret = self.charm.model.app.add_secret(content=shared_content)
+            self.charm.app_peer_data.update({"async-replication-secret-id": secret.id})
+            return secret
+
+    def _own_published_secret_id(self) -> str | None:
+        """Return the secret id this cluster last published, from its own relation data."""
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            try:
+                primary_cluster_data = _safe_databag_get(
+                    relation.data[self.charm.app], "primary-cluster-data"
+                )
+            except ModelError:
+                continue
+            if primary_cluster_data is None:
+                continue
+            if secret_id := json.loads(primary_cluster_data).get("secret-id"):
+                return secret_id
+        return None
 
     def get_standby_endpoints(self) -> list[str]:
         """Return the standby endpoints."""
