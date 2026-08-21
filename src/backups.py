@@ -186,7 +186,7 @@ class PostgreSQLBackups(Object):
             return False, "Unit cannot perform backups as the database seems to be offline"
 
         # Only enable backups on primary if there are replicas but TLS is not enabled.
-        if is_primary and self.charm.app.planned_units() > 1:
+        if is_primary and self.charm._planned_units > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
 
         if not self.charm.patroni_manager.member_started:
@@ -1320,7 +1320,7 @@ Stderr:
             return False
 
         logger.info("Checking that the cluster does not have more than one unit")
-        if self.charm.app.planned_units() > 1:
+        if self.charm._planned_units > 1:
             error_message = (
                 "Unit cannot restore backup as there are more than one unit in the cluster"
             )
