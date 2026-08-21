@@ -419,7 +419,7 @@ class PostgreSQLWatcherRelation(Object):
             "raft-secret-id": secret_id,
             "raft-partner-addrs": json.dumps(pg_endpoints),
             "raft-port": str(RAFT_PORT),
-            "patroni-cas": self.charm.tls.get_peer_ca_bundle(),
+            "patroni-cas": self.charm.tls_manager.get_peer_ca_bundle(),
             "standby-clusters": json.dumps(self._get_standby_clusters()),
             "tls-enabled": "true" if self.charm.is_tls_enabled else "false",
         })

@@ -1,0 +1,11 @@
+summary: test_storage_detaching.py
+environment:
+  TEST_MODULE: test_storage_detaching.py
+  # #1550 only reproduces on Juju 4.0 (3.6 masks it by removing still-Dying storage),
+  # so juju40 is the real regression test. Run juju36 too as a no-regression guard:
+  # stopping/disabling the snap in storage-detaching must not break 3.6 teardown.
+  CONCIERGE_JUJU_CHANNEL/juju40: 4.0/stable
+execute: |
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results

@@ -379,7 +379,8 @@ class ModelAdapter:
     def list_storage(self, filesystem: bool = False, volume: bool = False) -> list[TStorageInfo]:
         """Lists storage details."""
         raw = self._juju.cli("list-storage", "--format", "json")
-        json_ = json.loads(raw)
+        # Juju 4.0 prints nothing (not `{}`) for a model with no storage.
+        json_ = json.loads(raw) if raw.strip() else {}
         ret = []
         for storage_key, storage_details in json_.get("storage", {}).items():
             ret.append({"key": storage_key, **storage_details})
