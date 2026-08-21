@@ -76,9 +76,8 @@ READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
 # registered. This matters after a dead-DC failover: Juju leaves a consumer alias reserved even
 # once the remote secret is gone, so a former standby that is later promoted would then deadlock
 # creating its own secret ("secret with label ... already exists" while the label is unreadable) —
-# DPE-10203. SECRET_LABEL is the legacy shared label; it is no longer attached by this charm and is
-# kept only to assert we never reintroduce it.
-SECRET_LABEL = "async-replication-secret"  # noqa: S105
+# DPE-10203. The legacy shared label "async-replication-secret" is intentionally not defined
+# anywhere: this charm must never attach it again (owner or consumer side).
 OFFER_SECRET_LABEL = "async-replication-secret-offer"  # noqa: S105
 
 

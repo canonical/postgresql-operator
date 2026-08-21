@@ -12,7 +12,6 @@ from tenacity import RetryError
 from src.relations.async_replication import (
     OFFER_SECRET_LABEL,
     READ_ONLY_MODE_BLOCKING_MESSAGE,
-    SECRET_LABEL,
     PostgreSQLAsyncReplication,
     _safe_databag_get,
     _same_secret_id,
@@ -675,8 +674,8 @@ def test_clear_stale_promotion():
 
 def test_get_secret_creates_owned_secret_under_offer_label():
     # Regression for DPE-10203: the offer/primary side must own the shared secret under a label
-    # distinct from the consumer alias (SECRET_LABEL). A former standby keeps a stale SECRET_LABEL
-    # alias that Juju leaves reserved after the remote secret is gone, so owning under SECRET_LABEL
+    # distinct from the legacy consumer alias label. A former standby keeps a stale
+    # alias that Juju leaves reserved after the remote secret is gone, so owning under that label
     # would deadlock with "secret with label already exists" on the next create-replication.
     mock_charm = MagicMock()
     relation = PostgreSQLAsyncReplication(mock_charm)
@@ -699,7 +698,7 @@ def test_get_secret_creates_owned_secret_under_offer_label():
     mock_charm.model.app.add_secret.assert_called_once()
     _, kwargs = mock_charm.model.app.add_secret.call_args
     assert kwargs["label"] == OFFER_SECRET_LABEL
-    assert kwargs["label"] != SECRET_LABEL
+    assert kwargs["label"] != "async-replication-secret"
     # Only password fields are shared between clusters.
     assert kwargs["content"] == {"operator-password": "op", "replication-password": "rep"}
     assert result is mock_charm.model.app.add_secret.return_value
@@ -793,7 +792,7 @@ def test__relation_skips_unreadable_dying_relation(monkeypatch):
 
 
 # --- DPE-10203 follow-up: consumer reads the shared secret by id, never by label -------------
-# The consumer used to fetch the offer secret with ``get_secret(id=..., label=SECRET_LABEL)``,
+# The consumer used to fetch the offer secret with ``get_secret(id=..., label=<legacy>)``,
 # registering a local consumer alias that Juju leaves reserved after a dead-DC teardown. Matching
 # MySQL's async-replication design, the consumer now references the secret purely by the id
 # published in relation data, so no alias can go stale. These tests pin that behaviour.
@@ -889,7 +888,7 @@ def test_on_secret_changed_consumer_ignores_unrelated_secret():
 
     mock_event = MagicMock()
     mock_event.secret.id = "secret://uuid/DIFFERENT"
-    mock_event.secret.label = SECRET_LABEL  # a legacy label must NOT trigger the sync anymore
+    mock_event.secret.label = "async-replication-secret"  # legacy label must NOT trigger the sync
 
     with (
         patch.object(
