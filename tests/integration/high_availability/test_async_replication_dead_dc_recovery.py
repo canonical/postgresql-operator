@@ -7,10 +7,13 @@
 After a dead-datacenter failover, re-establishing async replication to a fresh
 cluster used to deadlock. The teardown ordering that triggers it:
 
-  1. the primary cluster's units all go away (a dead DC),
+  1. the primary datacenter dies — every machine in it is force-stopped, the
+     cluster's units and its Raft-witness watcher alike,
   2. the standby is promoted to primary with ``force``,
-  3. the now-dead consumed offer is cleared with ``remove-saas --force`` (which,
-     unlike a graceful ``remove-relation``, never delivers ``relation-broken``),
+  3. the dead relation is attacked with ``remove-relation --force`` first — the
+     ticket's Issue 1, for which Juju delivers no events — and the consumed
+     offer is then cleared with ``remove-saas --force``; neither delivers
+     ``relation-broken``,
   4. ``create-replication`` is run to replicate to a fresh cluster.
 
 Step 4 failed with "committing requested changes failed" / "secret with label
@@ -248,11 +251,16 @@ def test_dead_dc_failover_and_recreate_replication(
     model_2 = Juju(model=second_model)
     model_3 = Juju(model=third_model)
 
-    # 1. Kill the primary datacenter: force-stop every db1 machine and leave it down.
+    # 1. Kill the primary datacenter: force-stop every machine in it — db1's units
+    #    and the watcher alike ("all Rome units" in the ticket) — and leave them down.
     status = model_1.status()
-    machines = [
-        status.machines[unit.machine].instance_id for unit in status.get_units(DB_APP_1).values()
-    ]
+    machines = sorted({
+        status.machines[unit.machine].instance_id
+        for unit in (
+            *status.get_units(DB_APP_1).values(),
+            *status.get_units(WATCHER_APP_1).values(),
+        )
+    })
     logging.info(f"Killing the primary DC by force-stopping machines: {machines}")
     for machine in machines:
         subprocess.run(["lxc", "stop", "--force", machine], check=True)
@@ -267,10 +275,25 @@ def test_dead_dc_failover_and_recreate_replication(
         wait=5 * MINUTE_SECS,
     ).raise_on_failure()
 
-    # 3. Clear the dead consumed offer with --force. This is the ordering that skips
-    #    relation-broken and leaves the stale consumer label + promotion counter.
+    # 3. Issue 1 from the ticket: attack the dead relation with remove-relation
+    #    --force, for which Juju delivers no events. While that limitation stands the
+    #    offer survives it, so the ticket's workaround — remove-saas --force — runs
+    #    next; if Juju ever honors the removal, the offer is already gone and the
+    #    workaround's "not found" is tolerated (the _consumer_alias_exists idiom).
+    #    Either way no relation-broken reaches the charm, which is what leaves the
+    #    stale consumer label + promotion counter.
+    logging.info("Attempting remove-relation --force on the dead relation (ticket Issue 1)")
+    model_2.cli(
+        "remove-relation", f"{DB_APP_1}:replication-offer", f"{DB_APP_2}:replication", "--force"
+    )
     logging.info("Clearing the dead offer with remove-saas --force")
-    model_2.cli("remove-saas", DB_APP_1, "--force")
+    try:
+        model_2.cli("remove-saas", DB_APP_1, "--force")
+    except jubilant.CLIError as error:
+        haystack = f"{error} {getattr(error, 'stderr', '')} {getattr(error, 'stdout', '')}".lower()
+        if "not found" not in haystack:
+            raise
+        logging.info("Offer already gone; remove-relation --force had cleared it")
     _wait_resilient(
         model_2,
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
