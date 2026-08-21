@@ -620,27 +620,37 @@ def test_clear_stale_promotion():
     mock_charm = MagicMock()
     mock_charm.unit.is_leader.return_value = True
     mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    mock_charm.framework.model.get_relation.return_value = None
     relation = PostgreSQLAsyncReplication(mock_charm)
-    with patch.object(
-        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
-    ):
-        relation.clear_stale_promotion()
+    relation.clear_stale_promotion()
     assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
     mock_charm.update_config.assert_called_once()
 
-    # An async relation exists -> no-op (the counter is managed by the relation lifecycle).
+    # A relation formed AFTER the promotion (the recovery sequence offers to a fresh
+    # cluster before create-replication) carries no counter mirror -> the orphaned
+    # counter must still clear, or create-replication stays blocked with "There is
+    # already a replication set up." (DPE-10203 dead-DC live-run regression).
     mock_charm = MagicMock()
     mock_charm.unit.is_leader.return_value = True
-    mock_charm._patroni.get_standby_leader.return_value = None
     mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    async_relation = MagicMock()
+    async_relation.data = {mock_charm.unit: {}, mock_charm.app: {}}
+    mock_charm.framework.model.get_relation.return_value = async_relation
     relation = PostgreSQLAsyncReplication(mock_charm)
-    with patch.object(
-        PostgreSQLAsyncReplication,
-        "_relation",
-        new_callable=PropertyMock,
-        return_value=MagicMock(),
-    ):
-        relation.clear_stale_promotion()
+    relation.clear_stale_promotion()
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+    mock_charm.update_config.assert_called_once()
+
+    # A relation that mirrors the counter (an active replication) -> no-op: the
+    # counter is managed by the relation lifecycle.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    async_relation = MagicMock()
+    async_relation.data = {mock_charm.unit: {}, mock_charm.app: {"promoted-cluster-counter": "2"}}
+    mock_charm.framework.model.get_relation.return_value = async_relation
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation.clear_stale_promotion()
     assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
     mock_charm.update_config.assert_not_called()
 
@@ -649,10 +659,7 @@ def test_clear_stale_promotion():
     mock_charm.unit.is_leader.return_value = False
     mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
     relation = PostgreSQLAsyncReplication(mock_charm)
-    with patch.object(
-        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
-    ):
-        relation.clear_stale_promotion()
+    relation.clear_stale_promotion()
     assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
 
     # Counter "0" (a standby already in read-only mode) -> left untouched, no Patroni call needed.
@@ -660,10 +667,7 @@ def test_clear_stale_promotion():
     mock_charm.unit.is_leader.return_value = True
     mock_charm.app_peer_data = {"promoted-cluster-counter": "0"}
     relation = PostgreSQLAsyncReplication(mock_charm)
-    with patch.object(
-        PostgreSQLAsyncReplication, "_relation", new_callable=PropertyMock, return_value=None
-    ):
-        relation.clear_stale_promotion()
+    relation.clear_stale_promotion()
     assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "0"
     mock_charm.update_config.assert_not_called()
     mock_charm._patroni.get_standby_leader.assert_not_called()
