@@ -619,21 +619,37 @@ class PostgreSQLAsyncReplication(Object):
         """
         if not self.charm.unit.is_leader():
             return
-        # Only act when there is no async relation; otherwise the counter is managed normally.
-        if self._relation is not None:
-            return
         counter = self.charm.app_peer_data.get("promoted-cluster-counter")
         # Empty -> standby/clean (nothing promoted). "0" -> a standby already in read-only mode
-        # (set by _on_async_relation_broken); leave it. A positive counter with no async relation
-        # means this cluster was promoted and the relation went away without relation-broken
-        # finishing the teardown (dead-DC force-removal) -> revert it to a standalone primary.
-        # Deciding this from peer data alone (no Patroni call) is deliberate: after a dead-DC
-        # promote Patroni is frequently unreachable, which is exactly when this must still run.
-        # A non-empty, non-"0" counter is only ever set by a promotion, so it is unambiguous.
+        # (set by _on_async_relation_broken); leave it. A positive counter means this cluster
+        # was promoted -> revert it to a standalone primary unless a live relation still
+        # records that promotion. Deciding this from relation/peer data alone (no Patroni call)
+        # is deliberate: after a dead-DC promote Patroni is frequently unreachable, which is
+        # exactly when this must still run.
         if not counter or counter == "0":
             return
+        # A promotion writes the counter to both the async relation it was promoted under and
+        # the peers databag, so a counter mirrored on a current relation is a live replication
+        # and is managed by the relation lifecycle. The recovery sequence forms a *new* offer
+        # relation before running create-replication, and that relation carries no mirror —
+        # the counter left by the dead relation is stale exactly then and must clear even
+        # though a relation now exists (DPE-10203).
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            try:
+                if relation.data[self.charm.app].get("promoted-cluster-counter") == counter:
+                    return
+            except ModelError:
+                # A dying relation whose databags are unreadable cannot vouch for the
+                # counter either: the promotion's relation is gone for all purposes.
+                continue
         logger.info(
-            "Clearing stale promoted-cluster-counter %s (no async relation present)", counter
+            "Clearing stale promoted-cluster-counter %s (no live async relation records it)",
+            counter,
         )
         self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
         self.charm.update_config()
