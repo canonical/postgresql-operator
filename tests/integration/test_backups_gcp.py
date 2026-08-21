@@ -120,15 +120,28 @@ def test_restore_on_new_cluster(
     ):
         with attempt:
             logger.info("restoring the backup")
-            # Last two entries are 'action: restore', that cannot be used without restore-to-time parameter
-            most_recent_real_backup = backups.split("\n")[-3]
-            backup_id = most_recent_real_backup.split()[0]
+            # The list-backups output contains real backup entries (action = "full backup",
+            # "differential backup", "incremental backup") as well as restore/timeline entries
+            # (action = "restore") that cannot be used without the restore-to-time parameter.
+            # Select only lines where the action column contains "backup" to avoid picking
+            # a timeline entry that would cause: "Cannot restore to the timeline without
+            # restore-to-time parameter".
+            real_backup_lines = [
+                line
+                for line in backups.splitlines()
+                for parts in [line.split("|")]
+                if len(parts) > 1 and "backup" in parts[1].lower()
+            ]
+            assert real_backup_lines, (
+                f"No valid backup entry found in list-backups output:\n{backups}"
+            )
+            backup_id = real_backup_lines[-1].split()[0]
             action = juju.ext.model.units.get(unit_name).run_action(
                 "restore", **{"backup-id": backup_id}
             )
             action.wait()
             restore_status = action.results.get("restore-status")
-            assert restore_status, "restore hasn't succeeded"
+            assert restore_status, f"restore hasn't succeeded: {action.results}"
 
     # Wait for the restore to complete.
     with juju.ext.fast_forward():

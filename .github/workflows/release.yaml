@@ -8,7 +8,6 @@ on:
       - '*/edge'
     paths-ignore:
       - 'tests/**'
-      - 'docs/**'
       - .github/renovate.json5
       - pyproject.toml
       - '.github/workflows/ci.yaml'
@@ -18,7 +17,7 @@ on:
 jobs:
   tag:
     name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v50.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v50.2.1
     with:
       track: '16'
     permissions:
@@ -45,7 +44,7 @@ jobs:
     needs:
       - tag
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v50.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v50.2.1
     with:
       track: 16
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
