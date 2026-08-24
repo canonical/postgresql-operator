@@ -18,7 +18,6 @@ import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
-from hashlib import shake_128
 from pathlib import Path
 from typing import Any, Literal, get_args
 from urllib.parse import urlparse
@@ -116,6 +115,7 @@ from single_kernel_postgresql.config.literals import (
 )
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
+from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.managers.cluster import ClusterManager
@@ -161,7 +161,6 @@ from constants import (
 )
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
-from relations.postgresql_provider import PostgreSQLProvider
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
@@ -374,8 +373,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # TODO switch to the abstract class base
         # State
         self.state = CharmState(charm=self, substrate=self.substrate)
-        # The workload provides this unit's available (cpu, memory) for config sizing.
-        self.state.resource_provider = self.workload
 
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
@@ -416,7 +413,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["data"].location
 
-        self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
         # TLS events handler owns the two cert requirers; build it before the TLS
@@ -428,13 +424,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             client_certificate=self.tls.client_certificate,
             peer_certificate=self.tls.peer_certificate,
         )
+        self.database = DatabaseEventsHandler(
+            self, self.state, self.patroni_manager, self.tls_manager
+        )
+        self.database_manager = self.database.manager
         self.config_manager = ConfigManager(
             state=self.state,
             workload=self.workload,
             tls_manager=self.tls_manager,
             patroni_manager=self.patroni_manager,
+            database_manager=self.database_manager,
+            resource_provider=self.get_resource_provider,
             request_restart=self.request_restart,
-            refresh_endpoints=self.refresh_endpoints,
             restart_services=self.restart_services,
         )
         # Reload PostgreSQL after the lib TLS handler has actually pushed the cert files.
@@ -2158,7 +2159,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.postgresql.create_access_groups()
             self.postgresql.grant_internal_access_group_memberships()
 
-        self.postgresql_client_relation.oversee_users()
+        self.database_manager.oversee_users(self.postgresql)
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -2333,7 +2334,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.patroni_manager.switchover(self._member_name)
                 self.unit_peer_data.update({"timestamp": str(datetime.now())})
                 if self.unit.is_leader():
-                    self.postgresql_client_relation.update_endpoints()
+                    self.database_manager.update_endpoints()
                     self.async_replication.update_async_replication_data()
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
@@ -2353,7 +2354,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._handle_processes_failures():
             return
 
-        self.postgresql_client_relation.oversee_users()
+        self.database_manager.oversee_users(self.postgresql)
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
@@ -2735,14 +2736,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def get_resource_provider(self) -> VMWorkload:
+        """Return this unit's (cpu_cores, memory_bytes) introspector. Bridge for ConfigManager."""
+        return self.workload
+
     def request_restart(self) -> None:
         """Clear the restarted flag and acquire the rolling-restart lock. Bridge for ConfigManager."""
         self.unit_peer_data.pop("postgresql_restarted", None)
         self.on[str(self.restart_manager.name)].acquire_lock.emit()
-
-    def refresh_endpoints(self) -> None:
-        """Refresh client-relation endpoints. Bridge for ConfigManager."""
-        self.postgresql_client_relation.update_endpoints()
 
     def restart_services(self) -> None:
         """Restart the monitoring and LDAP sync snap services if needed. Bridge for ConfigManager."""
@@ -2763,7 +2764,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             refresh = self.refresh
         return self.config_manager.update_config(
             self.postgresql,
-            self.generate_user_hash,
             is_creating_backup=is_creating_backup,
             relations_user_databases_map=self.relations_user_databases_map,
             ldap_parameters=self.get_ldap_parameters(),
@@ -2808,7 +2808,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
-        self.postgresql_client_relation.update_endpoints()
+        self.database_manager.update_endpoints()
 
     @property
     def client_relations(self) -> list[Relation]:
@@ -2882,23 +2882,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return user_database_map
 
     def _collect_user_relations(self) -> dict[str, str]:
-        user_db_pairs = {}
-        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
-        prefix_database_mapping = self.postgresql_client_relation.get_databases_prefix_mapping()
-
-        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
-                relation.id, "database"
-            ):
-                user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
-                database = ",".join(prefix_database_mapping.get(str(relation.id), [database]))
-                user_db_pairs[user] = database
-        return user_db_pairs
-
-    @cached_property
-    def generate_user_hash(self) -> str:
-        """Generate expected user and database hash."""
-        return shake_128(str(self._collect_user_relations()).encode()).hexdigest(16)
+        return self.database_manager.collect_user_relations()
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
