@@ -118,8 +118,12 @@ from single_kernel_postgresql.core.state import CharmState
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
+from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseProvides,
+)
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
+from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
@@ -424,10 +428,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             client_certificate=self.tls.client_certificate,
             peer_certificate=self.tls.peer_certificate,
         )
-        self.database = DatabaseEventsHandler(
-            self, self.state, self.patroni_manager, self.tls_manager
+        self.database_manager = DatabaseManager(
+            state=self.state,
+            workload=self.workload,
+            database_provides=DatabaseProvides(self, relation_name=DATABASE),
+            set_unit_status=self.set_unit_status,
         )
-        self.database_manager = self.database.manager
+        self.database = DatabaseEventsHandler(
+            self, self.state, self.database_manager, self.patroni_manager, self.tls_manager
+        )
         self.config_manager = ConfigManager(
             state=self.state,
             workload=self.workload,
@@ -2334,7 +2343,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.patroni_manager.switchover(self._member_name)
                 self.unit_peer_data.update({"timestamp": str(datetime.now())})
                 if self.unit.is_leader():
-                    self.database_manager.update_endpoints()
+                    self.database_manager.update_endpoints(**self._client_endpoint_inputs())
                     self.async_replication.update_async_replication_data()
             except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
@@ -2806,9 +2815,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
+    def _client_endpoint_inputs(self) -> dict:
+        """Gather the update_endpoints inputs the manager takes caller-side.
+
+        The Patroni cluster-status query is a live REST call: gather it only on the
+        leader (update_endpoints returns early otherwise), so non-leader units fire
+        no extra REST calls.
+        """
+        return {
+            "online_members": (
+                self.patroni_manager.online_cluster_members() if self.unit.is_leader() else None
+            ),
+            "client_tls_files": self.tls_manager.get_client_tls_files(),
+        }
+
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
-        self.database_manager.update_endpoints()
+        self.database_manager.update_endpoints(**self._client_endpoint_inputs())
 
     @property
     def client_relations(self) -> list[Relation]:
