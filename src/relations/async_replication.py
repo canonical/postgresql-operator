@@ -69,16 +69,6 @@ logger = logging.getLogger(__name__)
 
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
-# Neither side of the async-replication relation attaches any label to the shared
-# cluster-credentials secret (DPE-10203): the owner creates it labelless and references it by the
-# id persisted in app peer data (``_get_secret``); the consumer references it purely by the id
-# published in the relation databag (``_update_internal_secret``). Juju reserves labels even
-# after the secret they pointed at is gone — a stale consumer alias deadlocks a later
-# owner-create ("secret with label already exists" while the label is unreadable), and a stale
-# owner label makes a refreshed owner mint a second secret whose id switch wedges any consumer
-# still running label-attaching code. The legacy labels "async-replication-secret" and
-# "async-replication-secret-offer" are intentionally not defined anywhere: this charm must
-# never attach either again.
 
 
 def _same_secret_id(a: str | None, b: str | None) -> bool:
