@@ -53,9 +53,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
 
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
     await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
-    await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active"
-    )
+    await ops_test.model.wait_for_idle(apps=[LS_CLIENT, DATABASE_APP_NAME], status="active")
 
 
 async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
