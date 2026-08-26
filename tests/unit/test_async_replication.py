@@ -19,12 +19,6 @@ from src.relations.async_replication import (
     _same_secret_id,
 )
 
-# Several tests (e.g. ``test_on_create_replication``) reassign ``_relation`` on the class
-# via ``type(relation)._relation = PropertyMock(...)`` with no cleanup, leaking a mock over
-# the real property for later tests. Capture the real property once, before any test runs,
-# so a test that needs to exercise the real ``_relation`` can restore it for its own scope.
-_REAL_RELATION_PROPERTY = PostgreSQLAsyncReplication.__dict__["_relation"]
-
 
 def create_mock_unit(name="unit"):
     unit = MagicMock()
@@ -176,9 +170,13 @@ def test_on_create_replication():
 
     mock_relation = MagicMock()
     mock_relation.name = REPLICATION_CONSUMER_RELATION
-    type(relation)._relation = PropertyMock(return_value=mock_relation)
-
-    result = relation._on_create_replication(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._on_create_replication(mock_event)
 
     assert result is None
     mock_event.fail.assert_called_once_with(
@@ -196,9 +194,13 @@ def test_on_create_replication():
 
     mock_relation = MagicMock()
     mock_relation.name = "Something"
-    type(relation)._relation = PropertyMock(return_value=mock_relation)
-
-    result = relation._on_create_replication(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._on_create_replication(mock_event)
 
     assert result is None
 
@@ -214,9 +216,13 @@ def test_on_create_replication():
 
     mock_relation = MagicMock()
     mock_relation.name = "Something"
-    type(relation)._relation = PropertyMock(return_value=mock_relation)
-
-    result = relation._on_create_replication(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._on_create_replication(mock_event)
 
     assert result is None
 
@@ -232,7 +238,6 @@ def test_promote_to_primary():
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._get_primary_cluster = MagicMock(return_value=None)
 
-    type(relation).app = PropertyMock(return_value=mock_relation)
     result = relation.promote_to_primary(mock_event)
     assert result is None
 
@@ -244,14 +249,12 @@ def test_promote_to_primary():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
-    mock_app = MagicMock(spec=Application)
     mock_relation.status = MagicMock()
     mock_relation.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
 
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._get_primary_cluster = MagicMock(return_value=None)
 
-    type(relation).app = PropertyMock(return_value=mock_app)
     relation._handle_replication_change = MagicMock(return_value=False)
 
     result = relation.promote_to_primary(mock_event)
@@ -264,11 +267,17 @@ def test__configure_standby_cluster():
     mock_event = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._relation = MagicMock()
-    relation._relation.name = REPLICATION_CONSUMER_RELATION
+    mock_relation = MagicMock()
+    mock_relation.name = REPLICATION_CONSUMER_RELATION
     relation._update_internal_secret = MagicMock(return_value=False)
 
-    result = relation._configure_standby_cluster(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._configure_standby_cluster(mock_event)
 
     assert result is False
 
@@ -279,12 +288,20 @@ def test__configure_standby_cluster():
     mock_event = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._relation = MagicMock()
-    relation._relation.name = "something_else"
+    mock_relation = MagicMock()
+    mock_relation.name = "something_else"
     relation._update_internal_secret = MagicMock(return_value=True)
     relation.get_system_identifier = MagicMock(return_value=(None, 2))
 
-    with pytest.raises(Exception) as exc_info:
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=mock_relation,
+        ),
+        pytest.raises(Exception) as exc_info,
+    ):
         relation._configure_standby_cluster(mock_event)
 
     assert str(exc_info.value) == "2"
@@ -294,17 +311,25 @@ def test__configure_standby_cluster():
     mock_event = MagicMock()
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._relation = MagicMock()
-    relation._relation.name = "some_relation"
-    relation._relation.app = "remote-app"
-    relation._relation.data = {relation._relation.app: {"system-id": "123"}}
+    mock_relation = MagicMock()
+    mock_relation.name = "some_relation"
+    mock_relation.app = "remote-app"
+    mock_relation.data = {"remote-app": {"system-id": "123"}}
 
     relation._update_internal_secret = MagicMock(return_value=True)
     relation.get_system_identifier = MagicMock(return_value=("456", None))
     relation.charm = MagicMock()
     relation.charm.app_peer_data = {}
 
-    with patch("subprocess.check_call") as mock_check_call:
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=mock_relation,
+        ),
+        patch("subprocess.check_call") as mock_check_call,
+    ):
         result = relation._configure_standby_cluster(mock_event)
 
         assert result is True
@@ -518,16 +543,20 @@ def test_handle_forceful_promotion():
     mock_event.params.get.return_value = False
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-
-    relation._relation = MagicMock()
-    relation._relation.app = MagicMock()
-    relation._relation.app.name = "test-app"
+    mock_relation = MagicMock()
+    mock_relation.app.name = "test-app"
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
     mock_charm.patroni_manager.get_primary.side_effect = RetryError("timeout")
 
-    result = relation._handle_forceful_promotion(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_forceful_promotion(mock_event)
 
     mock_event.fail.assert_called_once_with(
         "test-app isn't reachable. Pass `force=true` to promote anyway."
@@ -540,16 +569,20 @@ def test_handle_forceful_promotion():
     mock_event.params.get.return_value = False
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-
-    relation._relation = MagicMock()
-    relation._relation.app = MagicMock()
-    relation._relation.app.name = "test-app"
+    mock_relation = MagicMock()
+    mock_relation.app.name = "test-app"
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
     mock_charm._patroni.get_primary.side_effect = None
 
-    result = relation._handle_forceful_promotion(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_forceful_promotion(mock_event)
 
     assert result is True
     # 4.
@@ -559,16 +592,20 @@ def test_handle_forceful_promotion():
     mock_event.params.get.return_value = False
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-
-    relation._relation = MagicMock()
-    relation._relation.app = MagicMock()
-    relation._relation.app.name = "test-app"
+    mock_relation = MagicMock()
+    mock_relation.app.name = "test-app"
 
     relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[])
 
     mock_charm._patroni.get_primary.side_effect = None
 
-    result = relation._handle_forceful_promotion(mock_event)
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._handle_forceful_promotion(mock_event)
 
     assert result is True
 
@@ -813,9 +850,6 @@ def test__relation_skips_unreadable_dying_relation(monkeypatch):
     # read, even though get_relation still returns it. _relation must probe and
     # treat such a relation as absent, so the promoted primary reconciles as a
     # standalone cluster instead of crashing every hook that writes relation data.
-    # Restore the real property for this test's scope (an earlier test may have
-    # leaked a class-level PropertyMock over it); monkeypatch reverts it afterwards.
-    monkeypatch.setattr(PostgreSQLAsyncReplication, "_relation", _REAL_RELATION_PROPERTY)
     mock_charm = MagicMock()
 
     dying = MagicMock()
