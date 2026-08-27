@@ -1,0 +1,841 @@
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:89 Invalid combinations: [('backup',), ('charmed_backup',), ('charmed_dba',), ('invalid',), ('invalid', 'invalid'), ('monitoring',), ('postgres',), ('pg_monitor',), ('replication',), ('rewind',), ('charmed_stats', 'charmed_read'), ('charmed_stats', 'charmed_dml'), ('charmed_stats', 'charmed_backup'), ('charmed_stats', 'charmed_dba'), ('charmed_stats', 'charmed_admin'), ('charmed_stats', 'CREATEDB'), ('charmed_read', 'charmed_dml'), ('charmed_read', 'charmed_backup'), ('charmed_read', 'charmed_dba'), ('charmed_read', 'charmed_admin'), ('charmed_read', 'CREATEDB'), ('charmed_dml', 'charmed_backup'), ('charmed_dml', 'charmed_dba'), ('charmed_dml', 'charmed_admin'), ('charmed_dml', 'CREATEDB'), ('charmed_backup', 'charmed_dba'), ('charmed_backup', 'charmed_admin'), ('charmed_backup', 'CREATEDB'), ('charmed_dba', 'charmed_admin'), ('charmed_dba', 'CREATEDB')]
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=backup
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_backup
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dba
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dba
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: invalid
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=invalid
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: invalid, invalid
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=invalid,invalid
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: monitoring
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=monitoring
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: postgres
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=postgres
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: pg_monitor
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=pg_monitor
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: replication
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=replication
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: rewind
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=rewind
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, charmed_read
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,charmed_read
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, charmed_dml
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,charmed_dml
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, charmed_backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,charmed_backup
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, charmed_dba
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,charmed_dba
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, charmed_admin
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,charmed_admin
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_stats, CREATEDB
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_stats,CREATEDB
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_read, charmed_dml
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_read,charmed_dml
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_read, charmed_backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_read,charmed_backup
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_read, charmed_dba
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_read,charmed_dba
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_read, charmed_admin
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_read,charmed_admin
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_read, CREATEDB
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_read,CREATEDB
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dml, charmed_backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dml,charmed_backup
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dml, charmed_dba
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dml,charmed_dba
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dml, charmed_admin
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dml,charmed_admin
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dml, CREATEDB
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dml,CREATEDB
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_backup, charmed_dba
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_backup,charmed_dba
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_backup, charmed_admin
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_backup,charmed_admin
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_backup, CREATEDB
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_backup,CREATEDB
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dba, charmed_admin
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dba,charmed_admin
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:92 Requesting invalid extra user roles combination: charmed_dba, CREATEDB
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing data-integrator extra-user-roles=charmed_dba,CREATEDB
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:103 Adding relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing data-integrator postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:108 Waiting for the database charm to block due to invalid extra user roles
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active (Primary) -> blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:127 Removing relation between charms
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing data-integrator:postgresql postgresql
+[32mINFO    [0m integration.test_invalid_extra_user_roles:test_invalid_extra_user_roles.py:130 Waiting for the database charm to become active again
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: blocked (invalid role(s) for extra user roles)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: blocked (invalid role(s) for extra user roles) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [data-integrator/0] status: blocked (Please relate the data-integrator with the desired product)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql/0] status changed: active () -> active (Primary)
