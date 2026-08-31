@@ -39,8 +39,9 @@ def test_deploy(juju: JujuFixture, charm: str):
         # Bind the peer relation to a space that only contains the IPv6
         # subnet: the charm then publishes and queries IPv6 addresses
         # for all of its own cluster networking.
-        juju.cli("reload-spaces")
-        juju.cli("add-space", "ipv6", V6_SUBNET)
+        existing = json.loads(juju.cli("spaces", "--format", "json"))
+        if not any(space["name"] == "ipv6" for space in existing["spaces"]):
+            juju.cli("add-space", "ipv6", V6_SUBNET)
         juju.ext.model.deploy(
             charm,
             application_name=DATABASE_APP_NAME,
