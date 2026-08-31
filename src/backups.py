@@ -216,7 +216,6 @@ class PostgreSQLBackups(Object):
                 [
                     PGBACKREST_EXECUTABLE,
                     PGBACKREST_CONFIGURATION_FILE,
-                    PGBACKREST_LOG_LEVEL_STDERR,
                     "info",
                     "--output=json",
                 ],
@@ -469,7 +468,6 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
-            PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
         ])
@@ -542,7 +540,6 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
-            PGBACKREST_LOG_LEVEL_STDERR,
             "info",
             "--output=json",
         ])
@@ -578,7 +575,6 @@ class PostgreSQLBackups(Object):
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
-            PGBACKREST_LOG_LEVEL_STDERR,
             "repo-ls",
             "archive",
             "--recurse",
@@ -698,7 +694,6 @@ class PostgreSQLBackups(Object):
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
-                        PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "stanza-create",
                     ])
@@ -757,7 +752,6 @@ class PostgreSQLBackups(Object):
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
-                        PGBACKREST_LOG_LEVEL_STDERR,
                         f"--stanza={self.stanza_name}",
                         "check",
                     ])
@@ -1022,7 +1016,6 @@ Juju Version: {self.charm.model.juju_version!s}
         command = [
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
-            PGBACKREST_LOG_LEVEL_STDERR,
             f"--stanza={self.stanza_name}",
             "--log-level-console=debug",
             f"--type={BACKUP_TYPE_OVERRIDES[backup_type]}",
