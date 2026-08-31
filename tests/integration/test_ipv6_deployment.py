@@ -67,7 +67,10 @@ def test_peer_binding_address_family(juju: JujuFixture):
     )
     binding = json.loads(output)
     addresses = [
-        entry["address"] for entry in binding["binding-addresses"] if entry.get("address")
+        address["value"]
+        for entry in binding["bind-addresses"]
+        for address in entry.get("addresses", [])
+        if address.get("value")
     ]
     assert addresses, "no addresses on the peer relation binding"
     if IP_FAMILY == "ipv6":
