@@ -387,17 +387,14 @@ def test_dead_dc_failover_and_recreate_replication(
     )
 
     # 5. THE TICKET POINT: create-replication must SUCCEED, not deadlock on a label
-    #    collision. Retry to absorb the update-status latency of clear_stale_promotion
-    #    (the orphaned promoted-cluster-counter is reconciled from update-status); on
-    #    the pre-fix charm it fails with the label collision every time and this raises.
-    db2_leader = get_app_leader(model_2, DB_APP_2)
-    for attempt in Retrying(
-        stop=stop_after_delay(10 * MINUTE_SECS), wait=wait_fixed(30), reraise=True
-    ):
-        with attempt:
-            model_2.run(
-                unit=db2_leader, action="create-replication", wait=5 * MINUTE_SECS
-            ).raise_on_failure()
+    #    collision. The action itself clears an orphaned promoted-cluster-counter
+    #    before its guard runs (no update-status round-trip needed); on the pre-fix
+    #    charm it fails with the label collision every time and this raises.
+    model_2.run(
+        unit=get_app_leader(model_2, DB_APP_2),
+        action="create-replication",
+        wait=5 * MINUTE_SECS,
+    ).raise_on_failure()
 
     _wait_resilient(
         model_2,
