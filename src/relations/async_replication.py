@@ -45,6 +45,7 @@ from ops import (
 )
 from single_kernel_postgresql.config.exceptions import (
     ClusterNotPromotedError,
+    DeployedWithoutTrustError,
     NotReadyError,
     StandbyClusterAlreadyPromotedError,
 )
@@ -91,9 +92,8 @@ def _safe_databag_get(
 ) -> str | None:
     """Read a relation databag key, treating an unreadable databag as key-absent.
 
-    After a dead-DC teardown the remote app/unit databag on the dying cross-model async
-    relation raises ModelError ("permission denied") on any read; callers must behave as if
-    the key is unset rather than crash the hook (DPE-10203).
+    A force-removed dead DC leaves the remote databag raising ModelError on read
+    (DPE-10203); callers must behave as if the key is unset.
     """
     try:
         return databag.get(key, default)
@@ -296,11 +296,8 @@ class PostgreSQLAsyncReplication(Object):
                         "promoted-cluster-counter", "0"
                     )
                 except ModelError:
-                    # A dead-DC teardown leaves the remote app's databag on the dying
-                    # cross-model async relation unreadable — `relation-get --app <remote>`
-                    # returns "permission denied" once the offering DC is gone. Skip that
-                    # peer instead of crashing replication-offer-relation-joined on the
-                    # promoted cluster, which would block re-replication (DPE-10203).
+                    # A force-removed dead DC leaves its databag unreadable; skip the
+                    # peer instead of crashing the hook (DPE-10203).
                     continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
@@ -348,12 +345,8 @@ class PostgreSQLAsyncReplication(Object):
                         "promoted-cluster-counter", "0"
                     )
                 except ModelError:
-                    # A dead-DC teardown leaves the remote app's databag on the dying
-                    # cross-model async relation unreadable — `relation-get --app <remote>`
-                    # returns "permission denied" once the offering DC is gone. Skip that
-                    # peer so status reconciliation (and the update-status
-                    # clear_stale_promotion that unblocks recovery) still runs instead of
-                    # crashing every hook (DPE-10203).
+                    # A force-removed dead DC leaves its databag unreadable; skip the
+                    # peer so reconciliation still runs (DPE-10203).
                     continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
@@ -638,14 +631,9 @@ class PostgreSQLAsyncReplication(Object):
             "unit-promoted-cluster-counter": "",
         })
 
-        # During a force-removal of a dead offerer the model/Patroni can transiently fail
-        # (network-get, goal-state, the Patroni REST API). That used to crash this hook and wedge
-        # BOTH units in error forever: update-status then never runs, so the cluster never reverts
-        # to standalone and create-replication stays blocked with "already a replication set up"
-        # (DPE-10203 / Issue B). Tolerate those failures so the counter is always cleared. A
-        # non-empty promoted-cluster-counter is only ever set on a promoted cluster, so if the
-        # standby check is unavailable, treating this as a primary (clearing the counter) is the
-        # safe default.
+        # A force-removed dead offerer can make the standby check fail transiently;
+        # crashing here would wedge the unit before the counter is cleared, so treat
+        # the cluster as primary (DPE-10203 / Issue B).
         try:
             is_standby = self.charm.patroni_manager.get_standby_leader() is not None
         except Exception as e:
@@ -665,13 +653,13 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
             try:
                 self.charm.update_config()
-            except Exception as e:
+            except (DeployedWithoutTrustError, RetryError, ModelError) as e:
                 logger.warning("update_config failed during teardown (continuing): %s", e)
 
         if self.charm.unit.is_leader():
             try:
                 self.charm.watcher_offer.update_endpoints()
-            except Exception as e:
+            except (ModelError, RetryError) as e:
                 logger.warning(
                     "watcher endpoint update failed during teardown (continuing): %s", e
                 )
@@ -679,12 +667,9 @@ class PostgreSQLAsyncReplication(Object):
     def clear_stale_promotion(self) -> None:
         """Clear a promoted-cluster-counter left over from a removed async relation.
 
-        `_on_async_relation_broken` normally clears this, but a force-removed dead offerer may
-        never deliver `relation-broken` (a Juju cross-model teardown limitation). With no async
-        relation the counter is ignored by `_get_primary_cluster`, yet it would wrongly re-mark
-        this app as the primary cluster once a *new* async relation is formed — blocking
-        `create-replication` with "There is already a replication set up." Run from the
-        update-status reconciler so the surviving primary converges back to standalone (DPE-10203).
+        A force-removed dead offerer never delivers ``relation-broken``, leaving the
+        counter behind; on a new async relation it would wrongly mark this app as the
+        primary and block ``create-replication`` (DPE-10203).
         """
         if not self.charm.unit.is_leader():
             return
@@ -924,13 +909,9 @@ class PostgreSQLAsyncReplication(Object):
     def _relation(self) -> Relation | None:
         """Return the usable async-replication relation, or None.
 
-        A relation whose databags are unreadable is treated as absent. During a
-        dead-DC teardown the cross-model async relation lingers in a dying state
-        whose ``relation-get`` returns "permission denied" on every databag (yet
-        ``active`` can still read True and ``get_relation`` still returns it), so a
-        promoted primary must reconcile as a standalone cluster instead of
-        crashing every hook on the unreadable relation (DPE-10203). A cheap
-        own-unit read probes for that state.
+        A relation whose databags are unreadable is treated as absent — the dying
+        cross-model relation left by a force-removed dead DC reads as "permission
+        denied" on every databag (DPE-10203). A cheap own-unit read probes for that.
         """
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),
