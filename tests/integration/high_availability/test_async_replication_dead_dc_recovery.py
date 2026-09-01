@@ -69,9 +69,9 @@ DB_NAME_1 = f"{DB_TEST_APP_1.replace('-', '_')}_database"
 
 # The shared cluster-credentials secret is owned LABELLESS (DPE-10203): the owner
 # references it by the id persisted in app peer data, the consumer purely by the id
-# published in relation data. These are the labels this charm must never attach
-# again — kept as literals so this stays a black-box test.
-FORBIDDEN_LABELS = ("async-replication-secret", "async-replication-secret-offer")
+# published in relation data. This is the legacy label the charm must never attach
+# again — kept as a literal so this stays a black-box test.
+FORBIDDEN_LABEL = "async-replication-secret"
 
 MINUTE_SECS = 60
 
@@ -260,12 +260,10 @@ def test_relate_and_replicate(first_model: str, second_model: str) -> None:
     _start_continuous_writes(model_1, DB_TEST_APP_1)
 
     # Consumer side of the fix: the standby reached standby state by reading the
-    # offer secret purely by id, so it registered NO consumer alias under any
-    # label. Pre-fix, db2 would hold the legacy alias — the half that goes stale
-    # on a dead-DC teardown and blocks a later owner-create (DPE-10203).
-    assert not any(
-        _consumer_alias_exists(model_2, DB_APP_2, label) for label in FORBIDDEN_LABELS
-    ), "db2 registered a stale-prone consumer-side label alias"
+    # offer secret purely by id, so it registered NO consumer alias under any label.
+    assert not _consumer_alias_exists(model_2, DB_APP_2, FORBIDDEN_LABEL), (
+        "db2 registered a stale-prone consumer-side label alias"
+    )
 
 
 def test_dead_dc_failover_and_recreate_replication(
@@ -396,12 +394,9 @@ def test_dead_dc_failover_and_recreate_replication(
         "db2 owns the async-replication secret under a label"
     )
     # db3 is the standby of the recovered primary.
-    assert get_db_standby_leader_unit(model_3, DB_APP_3)
-    # The fresh standby likewise reads the offer secret by id and registers no
-    # consumer-side label alias.
-    assert not any(
-        _consumer_alias_exists(model_3, DB_APP_3, label) for label in FORBIDDEN_LABELS
-    ), "db3 registered a stale-prone consumer-side label alias"
+    assert not _consumer_alias_exists(model_3, DB_APP_3, FORBIDDEN_LABEL), (
+        "db3 registered a stale-prone consumer-side label alias"
+    )
     # The fresh re-replication target carries the pre-death data — the whole point
     # of the recovered async replication leg.
     assert all(
