@@ -102,14 +102,19 @@ def first_model(juju: Juju) -> Generator:
 
 
 def _extra_model(juju: Juju, request: pytest.FixtureRequest, suffix: str) -> Generator:
-    model_name = f"{juju.model}-{suffix}"
+    previous_model = juju.model
+    model_name = f"{previous_model}-{suffix}"
     logging.info(f"Creating model: {model_name}")
     juju.add_model(model_name)
     yield model_name
     if request.config.getoption("--keep-models"):
+        juju.switch(previous_model)
         return
     logging.info(f"Destroying model: {model_name}")
     juju.destroy_model(model_name, destroy_storage=True, force=True)
+    # destroy_model nulls the fixture's model when it matches the destroyed one;
+    # restore the previous model so the temp-model teardown assert holds.
+    juju.switch(previous_model)
 
 
 @pytest.fixture(scope="module")
