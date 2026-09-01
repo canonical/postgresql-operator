@@ -17,7 +17,7 @@ on:
 jobs:
   ci-tests:
     name: Tests
-    uses: ./.github/workflows/ci.yaml
+    uses: $/.github/workflows/ci.yaml
     secrets:
       AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
       AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
@@ -33,7 +33,7 @@ jobs:
     name: Release charm
     needs:
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v51.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v52.0.0
     with:
       track: 14
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
