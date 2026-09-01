@@ -5,36 +5,19 @@
 """Regression test for DPE-10203.
 
 After a dead-datacenter failover, re-establishing async replication to a fresh
-cluster used to deadlock. The teardown ordering that triggers it:
+cluster used to deadlock: the offer/primary and consumer/standby sides shared one
+fixed Juju secret label, and a cluster that had been a standby kept that label
+reserved as a consumer alias, so the later owner-create collided. The force-removed
+cross-model relation delivers no ``relation-broken``, which also leaves a stale
+``promoted-cluster-counter`` behind.
 
-  1. the primary datacenter dies — every machine in it is force-stopped, the
-     cluster's units and its Raft-witness watcher alike,
-  2. the standby is promoted to primary with ``force``,
-  3. the dead relation is attacked with ``remove-relation --force`` first — the
-     ticket's Issue 1, for which Juju delivers no events — and the consumed
-     offer is then cleared with ``remove-saas --force``; neither delivers
-     ``relation-broken``,
-  4. ``create-replication`` is run to replicate to a fresh cluster.
+This test kills the primary datacenter (cluster units and its Raft-witness watcher),
+force-promotes the standby, clears the dead relation and offer, runs
+``create-replication`` against a fresh cluster, and asserts recovery succeeds with
+the pre-death data intact.
 
-Step 4 failed with "committing requested changes failed" / "secret with label
-async-replication-secret already exists": the offer/primary and consumer/standby
-sides shared one fixed Juju secret label, and a cluster that had been a standby
-kept that label reserved as a consumer alias, so the later owner-create collided.
-A stale ``promoted-cluster-counter`` left by the force-removal compounded it.
-
-The fix owns the shared secret under a distinct owner label
-(``async-replication-secret-offer``), has the consumer read it purely by
-secret-id — registering no consumer-side alias that could go stale — and
-reconciles the orphaned counter from update-status. This test drives the exact
-ordering above and asserts recovery succeeds — it fails on the pre-fix charm and
-passes on the fixed one.
-
-NOTE: this mirrors the ticket scenario — 2xPG + 1 watcher per datacenter. The
-watcher is a stereo-mode Raft witness built for 2-node clusters: 2 PG + 1 watcher
-= 3 members (odd, healthy quorum). Deploying 3 PG + 1 watcher instead forms a
-4-member (even) raft that stalls standby formation, so clusters use 2 units, not 3.
-The watcher keeps cross-cluster Raft quorum through the datacenter death so the
-promoted cluster can complete its standby->primary promotion and recovery proceeds.
+Clusters use 2 units so that 2 PG + 1 watcher form a 3-member (odd) Raft; a
+4-member raft stalls standby formation.
 """
 
 import logging
