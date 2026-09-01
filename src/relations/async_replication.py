@@ -70,6 +70,10 @@ logger = logging.getLogger(__name__)
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
 
+# Peer-data key holding the id of the labelless shared cluster-credentials secret the
+# owner persists (DPE-10203): referenced by id everywhere, never by label.
+ASYNC_SHARED_SECRET_ID_KEY = "async-replication-secret-id"  # noqa: S105 — a databag key name, not a credential
+
 
 def _same_secret_id(a: str | None, b: str | None) -> bool:
     """Whether two Juju secret ids refer to the same secret.
@@ -385,7 +389,7 @@ class PostgreSQLAsyncReplication(Object):
         # no label. Owning under a label risks colliding with a stale consumer alias Juju
         # keeps reserved after a dead-DC teardown ("secret with label already exists"),
         # and a label lookup cannot survive the secret's own id churn (DPE-10203).
-        secret_id = self.charm.app_peer_data.get("async-replication-secret-id")
+        secret_id = self.charm.app_peer_data.get(ASYNC_SHARED_SECRET_ID_KEY)
         if not secret_id:
             # Migration from the legacy charm (which owned the secret under a label):
             # this cluster's own relation data still publishes the last-known id. Adopt
@@ -404,12 +408,12 @@ class PostgreSQLAsyncReplication(Object):
                     secret.set_content(shared_content)
                 # Persist the id (covers the migration path, where the id came from
                 # this cluster's own relation data rather than peer data).
-                self.charm.app_peer_data.update({"async-replication-secret-id": secret.id})
+                self.charm.app_peer_data.update({ASYNC_SHARED_SECRET_ID_KEY: secret.id})
                 return secret
 
         if self.charm.unit.is_leader():
             secret = self.charm.model.app.add_secret(content=shared_content)
-            self.charm.app_peer_data.update({"async-replication-secret-id": secret.id})
+            self.charm.app_peer_data.update({ASYNC_SHARED_SECRET_ID_KEY: secret.id})
             return secret
 
     def _own_published_secret_id(self) -> str | None:
