@@ -45,11 +45,19 @@ from collections.abc import Generator
 import jubilant
 import pytest
 from jubilant import Juju
-from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
 from .. import architecture
 from .high_availability_helpers_new import (
     get_app_leader,
+    get_app_units,
+    get_db_max_written_value,
     get_db_standby_leader_unit,
     wait_for_apps_status,
 )
@@ -65,6 +73,16 @@ WATCHER_CHARM = "postgresql-watcher"
 WATCHER_APP_1 = "watcher1"
 WATCHER_APP_2 = "watcher2"
 WATCHER_APP_3 = "watcher3"
+
+# Each cluster also gets a client application so the regression covers real data:
+# writes made through the pre-death primary must survive the force-promotion and
+# re-appear on the fresh re-replication target (mirrors the original async
+# replication tests, which relate the test app to every cluster).
+DB_TEST_APP_NAME = "postgresql-test-app"
+DB_TEST_APP_1 = "test-app1"
+DB_TEST_APP_2 = "test-app2"
+DB_TEST_APP_3 = "test-app3"
+DB_NAME_1 = f"{DB_TEST_APP_1.replace('-', '_')}_database"
 
 # The shared cluster-credentials secret is owned LABELLESS (DPE-10203): the owner
 # references it by the id persisted in app peer data, the consumer purely by the id
@@ -159,17 +177,17 @@ def _wait_resilient(juju: Juju, **kwargs) -> None:
 
 
 def test_deploy(first_model: str, second_model: str, third_model: str, charm: str) -> None:
-    """Deploy three 2-unit PostgreSQL clusters, each with its own watcher, one per model."""
+    """Deploy three 2-unit PostgreSQL clusters, each with its own watcher and test app."""
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture.architecture}
 
     clusters = (
-        (first_model, DB_APP_1, WATCHER_APP_1),
-        (second_model, DB_APP_2, WATCHER_APP_2),
-        (third_model, DB_APP_3, WATCHER_APP_3),
+        (first_model, DB_APP_1, WATCHER_APP_1, DB_TEST_APP_1),
+        (second_model, DB_APP_2, WATCHER_APP_2, DB_TEST_APP_2),
+        (third_model, DB_APP_3, WATCHER_APP_3, DB_TEST_APP_3),
     )
 
-    for model_name, app, watcher in clusters:
+    for model_name, app, watcher, test_app in clusters:
         model = Juju(model=model_name)
         model.deploy(
             charm=charm,
@@ -188,13 +206,31 @@ def test_deploy(first_model: str, second_model: str, third_model: str, charm: st
             constraints=constraints,
             num_units=1,
         )
+        model.deploy(
+            charm=DB_TEST_APP_NAME,
+            app=test_app,
+            base="ubuntu@24.04",
+            channel="latest/edge",
+            constraints=constraints,
+            num_units=1,
+        )
         model.integrate(f"{app}:watcher-offer", f"{watcher}:watcher")
+        model.integrate(f"{test_app}:database", f"{app}:database")
 
-    for model_name, app, watcher in clusters:
+    for model_name, app, watcher, test_app in clusters:
         Juju(model=model_name).wait(
-            ready=wait_for_apps_status(jubilant.all_active, app, watcher),
+            ready=wait_for_apps_status(jubilant.all_active, app, watcher, test_app),
             timeout=25 * MINUTE_SECS,
         )
+
+
+def _start_continuous_writes(model: Juju, test_app: str) -> None:
+    """Start continuous writes through the test application (retry through transient errors)."""
+    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
+        with attempt:
+            model.run(
+                unit=get_app_leader(model, test_app), action="start-continuous-writes"
+            ).raise_on_failure()
 
 
 def test_relate_and_replicate(first_model: str, second_model: str) -> None:
@@ -231,6 +267,10 @@ def test_relate_and_replicate(first_model: str, second_model: str) -> None:
     assert _async_secret_labels(model_1, DB_APP_1) == set()
     assert get_db_standby_leader_unit(model_2, DB_APP_2)
 
+    # Start client writes on the primary: the data they produce must survive the
+    # dead-DC teardown and re-appear on the fresh re-replication target.
+    _start_continuous_writes(model_1, DB_TEST_APP_1)
+
     # Consumer side of the fix: the standby reached standby state by reading the
     # offer secret purely by id, so it registered NO consumer alias under any
     # label. Pre-fix, db2 would hold the legacy alias — the half that goes stale
@@ -248,8 +288,27 @@ def test_dead_dc_failover_and_recreate_replication(
     model_2 = Juju(model=second_model)
     model_3 = Juju(model=third_model)
 
-    # 1. Kill the primary datacenter: force-stop every machine in it — db1's units
-    #    and the watcher alike ("all Rome units" in the ticket) — and leave them down.
+    # 1. Stop the client writes, capture the last written value, and wait until async
+    #    replication has caught up — the data written so far must survive everything
+    #    that follows. Then kill the primary datacenter: force-stop every machine in
+    #    it — db1's units and the watcher alike ("all Rome units" in the ticket) —
+    #    and leave them down.
+    model_1.run(
+        unit=get_app_leader(model_1, DB_TEST_APP_1),
+        action="stop-continuous-writes",
+        wait=2 * MINUTE_SECS,
+    ).raise_on_failure()
+    max_written = get_db_max_written_value(
+        model_1, DB_APP_1, get_app_leader(model_1, DB_APP_1), DB_NAME_1
+    )
+    for attempt in Retrying(
+        stop=stop_after_delay(5 * MINUTE_SECS), wait=wait_fixed(10), reraise=True
+    ):
+        with attempt:
+            assert all(
+                get_db_max_written_value(model_2, DB_APP_2, unit, DB_NAME_1) == max_written
+                for unit in get_app_units(model_2, DB_APP_2)
+            ), "async replication has not caught up with the pre-death writes"
     status = model_1.status()
     machines = sorted({
         status.machines[unit.machine].instance_id
@@ -271,6 +330,16 @@ def test_dead_dc_failover_and_recreate_replication(
         params={"scope": "cluster", "force": True},
         wait=5 * MINUTE_SECS,
     ).raise_on_failure()
+    _wait_resilient(
+        model_2,
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
+        timeout=20 * MINUTE_SECS,
+    )
+    # The pre-death data must have survived the force-promotion.
+    assert all(
+        get_db_max_written_value(model_2, DB_APP_2, unit, DB_NAME_1) == max_written
+        for unit in get_app_units(model_2, DB_APP_2)
+    ), "pre-death data did not survive the force-promotion"
 
     # 3. Issue 1 from the ticket: attack the dead relation with remove-relation
     #    --force, for which Juju delivers no events. While that limitation stands the
@@ -348,3 +417,9 @@ def test_dead_dc_failover_and_recreate_replication(
     assert not any(
         _consumer_alias_exists(model_3, DB_APP_3, label) for label in FORBIDDEN_LABELS
     ), "db3 registered a stale-prone consumer-side label alias"
+    # The fresh re-replication target carries the pre-death data — the whole point
+    # of the recovered async replication leg.
+    assert all(
+        get_db_max_written_value(model_3, DB_APP_3, unit, DB_NAME_1) == max_written
+        for unit in get_app_units(model_3, DB_APP_3)
+    ), "pre-death data did not re-replicate to the fresh cluster"
