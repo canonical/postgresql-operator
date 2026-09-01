@@ -792,6 +792,11 @@ class PostgreSQLAsyncReplication(Object):
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""
+        # A dead-DC teardown whose relation-broken never fired leaves the promoted-
+        # cluster-counter orphaned in peer data; clear it before the guard reads it,
+        # or create-replication reports "There is already a replication set up."
+        # until an update-status cycle happens to reconcile (DPE-10203).
+        self.clear_stale_promotion()
         if self._get_primary_cluster() is not None:
             event.fail("There is already a replication set up.")
             return
@@ -811,6 +816,9 @@ class PostgreSQLAsyncReplication(Object):
 
     def promote_to_primary(self, event: ActionEvent) -> None:
         """Promote this cluster to the primary cluster."""
+        # Same stale-counter exposure as create-replication: a counter orphaned by a
+        # teardown without events would mask the "no primary" condition below.
+        self.clear_stale_promotion()
         if (
             self.charm.app.status.message != READ_ONLY_MODE_BLOCKING_MESSAGE
             and self._get_primary_cluster() is None

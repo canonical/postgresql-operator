@@ -226,6 +226,59 @@ def test_on_create_replication():
 
     assert result is None
 
+    # Stale orphaned counter (set by a dead-DC teardown whose relation-broken never
+    # fired) is cleared BEFORE the guard runs, so create-replication succeeds on the
+    # first call instead of failing with "There is already a replication set up."
+    # until an update-status cycle happens to run (DPE-10203 dead-DC live-run regression).
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    stale_relation = MagicMock()
+    stale_relation.data = {mock_charm.unit: {}, mock_charm.app: {}}
+    mock_charm.framework.model.get_relation.return_value = stale_relation
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._handle_replication_change = MagicMock(return_value=True)
+    relation._get_primary_cluster = MagicMock(return_value=None)
+    mock_relation = MagicMock()
+    mock_relation.name = "Something"
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._on_create_replication(mock_event)
+
+    assert result is None
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == ""
+    mock_event.fail.assert_not_called()
+    relation._handle_replication_change.assert_called_once()
+
+    # A counter mirrored on a live relation (an actual replication) survives the
+    # pre-guard clearing: the action still refuses with "already a replication set up."
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.app_peer_data = {"promoted-cluster-counter": "2"}
+    mirror_relation = MagicMock()
+    mirror_relation.data = {mock_charm.unit: {}, mock_charm.app: {"promoted-cluster-counter": "2"}}
+    mock_charm.framework.model.get_relation.return_value = mirror_relation
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._handle_replication_change = MagicMock(return_value=True)
+    relation._get_primary_cluster = MagicMock(return_value=mock_charm.app)
+    mock_relation = MagicMock()
+    mock_relation.name = "Something"
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        "_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation._on_create_replication(mock_event)
+
+    assert result is None
+    assert mock_charm.app_peer_data.get("promoted-cluster-counter") == "2"
+    mock_event.fail.assert_called_once_with("There is already a replication set up.")
+
 
 def test_promote_to_primary():
     # 1.
