@@ -38,7 +38,10 @@ def test_deploy(juju: JujuFixture, charm: str):
     if IP_FAMILY == "ipv6":
         # Bind the peer relation to a space that only contains the IPv6
         # subnet: the charm then publishes and queries IPv6 addresses
-        # for all of its own cluster networking.
+        # for all of its own cluster networking. Re-discover subnets first:
+        # the deterministic IPv6 prefix is configured on lxdbr0 after the
+        # controller bootstrapped, so Juju does not know it yet.
+        juju.cli("reload-spaces")
         existing = json.loads(juju.cli("spaces", "--format", "json"))
         if not any(space["name"] == "ipv6" for space in existing["spaces"]):
             juju.cli("add-space", "ipv6", V6_SUBNET)
