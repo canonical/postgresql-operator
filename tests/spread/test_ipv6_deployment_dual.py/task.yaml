@@ -1,0 +1,10 @@
+summary: test_ipv6_deployment.py with dual-stack networking
+environment:
+  TEST_MODULE: test_ipv6_deployment.py
+  PG_IP_FAMILY: dual
+execute: |
+  # Both families on the bridge; Juju picks the binding address freely.
+  lxc network set lxdbr0 ipv6.address=fd42:1928:642::1/64
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results
