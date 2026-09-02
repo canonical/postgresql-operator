@@ -2736,9 +2736,9 @@ def test_on_promote_to_primary(harness):
 
 def test_get_ldap_parameters(harness):
     with (
-        patch("charm.PostgreSQLLDAP.get_relation_data") as _get_relation_data,
+        patch("single_kernel_postgresql.events.ldap.LDAP.get_relation_data") as _get_relation_data,
         patch(
-            target="charm.PostgresqlOperatorCharm.is_cluster_initialised",
+            target="single_kernel_postgresql.core.peer_relation.PostgreSQLApplication.is_cluster_initialised",
             new_callable=PropertyMock,
             return_value=True,
         ) as _cluster_initialised,
@@ -2750,7 +2750,7 @@ def test_get_ldap_parameters(harness):
                 {"ldap_enabled": "False"},
             )
 
-        harness.charm.get_ldap_parameters()
+        harness.charm.ldap.get_ldap_parameters()
         _get_relation_data.assert_not_called()
         _get_relation_data.reset_mock()
 
@@ -2761,7 +2761,7 @@ def test_get_ldap_parameters(harness):
                 {"ldap_enabled": "True"},
             )
 
-        harness.charm.get_ldap_parameters()
+        harness.charm.ldap.get_ldap_parameters()
         _get_relation_data.assert_called_once()
         _get_relation_data.reset_mock()
 
