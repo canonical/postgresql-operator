@@ -240,8 +240,7 @@ def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
 
 def _published_secret_id(juju: Juju, unit_name: str) -> str | None:
     """Return the secret id the offer side publishes in primary-cluster-data."""
-    result = juju.cli("show-unit", unit_name, "--format", "json")
-    data = json.loads(result.stdout)
+    data = json.loads(juju.cli("show-unit", unit_name, "--format", "json"))
     unit = next(iter(data.values()))
     for relation in unit.get("relation-info", []):
         if relation.get("endpoint") == "replication":
