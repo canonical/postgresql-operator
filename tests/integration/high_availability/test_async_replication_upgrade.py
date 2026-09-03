@@ -237,6 +237,8 @@ def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
         unit_max_value = get_db_max_written_value(model_2, DB_APP_2, unit_name)
         results.append(unit_max_value)
 
+    return results
+
 
 def _published_secret_id(juju: Juju, unit_name: str) -> str | None:
     """Return the secret id the offer side publishes in primary-cluster-data."""
