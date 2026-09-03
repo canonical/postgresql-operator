@@ -22,6 +22,7 @@ import pwd
 import shutil
 import subprocess
 import typing
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
@@ -32,6 +33,7 @@ from ops import (
     Application,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Object,
     Relation,
     RelationChangedEvent,
@@ -43,6 +45,7 @@ from ops import (
 )
 from single_kernel_postgresql.config.exceptions import (
     ClusterNotPromotedError,
+    DeployedWithoutTrustError,
     NotReadyError,
     StandbyClusterAlreadyPromotedError,
 )
@@ -67,8 +70,36 @@ logger = logging.getLogger(__name__)
 
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
-# Labels are not confidential
-SECRET_LABEL = "async-replication-secret"  # noqa: S105
+
+# Peer-data key holding the id of the labelless shared cluster-credentials secret the
+# owner persists (DPE-10203): referenced by id everywhere, never by label.
+ASYNC_SHARED_SECRET_ID_KEY = "async-replication-secret-id"  # noqa: S105 — a databag key name, not a credential
+
+
+def _same_secret_id(a: str | None, b: str | None) -> bool:
+    """Whether two Juju secret ids refer to the same secret.
+
+    Juju/ops may render an id as ``secret:<key>`` or ``secret://<uuid>/<key>``; compare on the
+    trailing key so a format difference doesn't mask a real match.
+    """
+    if not a or not b:
+        return False
+    return a.rsplit("/", 1)[-1].split(":")[-1] == b.rsplit("/", 1)[-1].split(":")[-1]
+
+
+def _safe_databag_get(
+    databag: Mapping[str, str], key: str, default: str | None = None
+) -> str | None:
+    """Read a relation databag key, treating an unreadable databag as key-absent.
+
+    A force-removed dead DC leaves the remote databag raising ModelError on read
+    (DPE-10203); callers must behave as if the key is unset.
+    """
+    try:
+        return databag.get(key, default)
+    except ModelError:
+        return default
+
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -182,7 +213,7 @@ class PostgreSQLAsyncReplication(Object):
         if self.charm.app == primary_cluster:
             counter = self._get_highest_promoted_cluster_counter_value()
             if not all(
-                event.relation.data[unit].get("stopped") == counter
+                _safe_databag_get(event.relation.data[unit], "stopped") == counter
                 for unit in event.relation.units
                 if unit.app == event.relation.app
             ):
@@ -226,7 +257,7 @@ class PostgreSQLAsyncReplication(Object):
         system_identifier, error = self.get_system_identifier()
         if error is not None:
             raise Exception(error)
-        if system_identifier != relation.data[relation.app].get("system-id"):
+        if system_identifier != _safe_databag_get(relation.data[relation.app], "system-id"):
             # Store current data in a tar.gz file.
             logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
@@ -245,16 +276,7 @@ class PostgreSQLAsyncReplication(Object):
         # List the primary endpoints only for the standby cluster.
         if relation is None or primary_cluster is None or self.charm.app == primary_cluster:
             return []
-        return [
-            relation.data[unit]["unit-address"]
-            for relation in [
-                self.model.get_relation(REPLICATION_OFFER_RELATION),
-                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
-            ]
-            if relation is not None
-            for unit in relation.units
-            if relation.data[unit].get("unit-address") is not None
-        ]
+        return self._remote_unit_addresses()
 
     def _get_highest_promoted_cluster_counter_value(self) -> str:
         """Return the highest promoted cluster counter."""
@@ -269,7 +291,14 @@ class PostgreSQLAsyncReplication(Object):
                 async_relation.data[async_relation.app],
                 self.charm.app_peer_data,
             ]:
-                relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
+                try:
+                    relation_promoted_cluster_counter = databag.get(
+                        "promoted-cluster-counter", "0"
+                    )
+                except ModelError:
+                    # A force-removed dead DC leaves its databag unreadable; skip the
+                    # peer instead of crashing the hook (DPE-10203).
+                    continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
         return promoted_cluster_counter
@@ -311,7 +340,14 @@ class PostgreSQLAsyncReplication(Object):
                 self.charm.app: self.charm.all_peer_data,
             }.items():
                 databag = relation_data[app]
-                relation_promoted_cluster_counter = databag.get("promoted-cluster-counter", "0")
+                try:
+                    relation_promoted_cluster_counter = databag.get(
+                        "promoted-cluster-counter", "0"
+                    )
+                except ModelError:
+                    # A force-removed dead DC leaves its databag unreadable; skip the
+                    # peer so reconciliation still runs (DPE-10203).
+                    continue
                 if int(relation_promoted_cluster_counter) > int(promoted_cluster_counter):
                     promoted_cluster_counter = relation_promoted_cluster_counter
                     primary_cluster = app
@@ -323,7 +359,11 @@ class PostgreSQLAsyncReplication(Object):
         if primary_cluster is None or self.charm.app == primary_cluster:
             return None
         relation = self._relation
-        primary_cluster_data = relation.data[relation.app].get("primary-cluster-data")  # type: ignore
+        if relation is None:
+            return None
+        primary_cluster_data = _safe_databag_get(
+            relation.data[relation.app], "primary-cluster-data"
+        )
         if primary_cluster_data is None:
             return None
         return json.loads(primary_cluster_data).get("endpoint")
@@ -338,22 +378,56 @@ class PostgreSQLAsyncReplication(Object):
         # Filter out unnecessary secrets.
         shared_content = dict(filter(lambda x: "password" in x[0], content.items()))
 
-        try:
-            # Avoid recreating the secret.
-            secret = self.charm.model.get_secret(label=SECRET_LABEL)
-            if not secret.id:
-                # Workaround for the secret id not being set with model uuid.
-                secret._id = f"secret://{self.model.uuid}/{secret.get_info().id.split(':')[1]}"
-            if secret.peek_content() != shared_content:
-                logger.info("Updating outdated secret content")
-                secret.set_content(shared_content)
-            return secret
-        except SecretNotFoundError:
-            logger.debug("Secret not found, creating a new one")
-            pass
+        # The owner references its secret purely by the id persisted in app peer data —
+        # no label. Owning under a label risks colliding with a stale consumer alias Juju
+        # keeps reserved after a dead-DC teardown ("secret with label already exists"),
+        # and a label lookup cannot survive the secret's own id churn (DPE-10203).
+        secret_id = self.charm.app_peer_data.get(ASYNC_SHARED_SECRET_ID_KEY)
+        if not secret_id:
+            # Migration from the legacy charm (which owned the secret under a label):
+            # this cluster's own relation data still publishes the last-known id. Adopt
+            # that secret instead of creating a second one — an id switch would wedge
+            # any consumer still running label-attaching code, since Juju refuses to
+            # rebind a consumer label to a new secret id.
+            secret_id = self._own_published_secret_id()
+        if secret_id:
+            try:
+                secret = self.charm.model.get_secret(id=secret_id)
+            except SecretNotFoundError:
+                logger.debug("Persisted async-replication secret is gone; recreating")
+            else:
+                if secret.peek_content() != shared_content:
+                    logger.info("Updating outdated secret content")
+                    secret.set_content(shared_content)
+                # Persist the id (covers the migration path, where the id came from
+                # this cluster's own relation data rather than peer data).
+                self.charm.app_peer_data.update({ASYNC_SHARED_SECRET_ID_KEY: secret.id})
+                return secret
 
         if self.charm.unit.is_leader():
-            return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
+            secret = self.charm.model.app.add_secret(content=shared_content)
+            self.charm.app_peer_data.update({ASYNC_SHARED_SECRET_ID_KEY: secret.id})
+            return secret
+
+    def _own_published_secret_id(self) -> str | None:
+        """Return the secret id this cluster last published, from its own relation data."""
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            try:
+                primary_cluster_data = _safe_databag_get(
+                    relation.data[self.charm.app], "primary-cluster-data"
+                )
+            except ModelError:
+                continue
+            if primary_cluster_data is None:
+                continue
+            if secret_id := json.loads(primary_cluster_data).get("secret-id"):
+                return secret_id
+        return None
 
     def get_standby_endpoints(self) -> list[str]:
         """Return the standby endpoints."""
@@ -364,16 +438,26 @@ class PostgreSQLAsyncReplication(Object):
         # List the standby endpoints only for the primary cluster.
         if relation is None or primary_cluster is None or self.charm.app != primary_cluster:
             return []
-        return [
-            relation.data[unit]["unit-address"]
-            for relation in [
-                self.model.get_relation(REPLICATION_OFFER_RELATION),
-                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
-            ]
-            if relation is not None
-            for unit in relation.units
-            if relation.data[unit].get("unit-address") is not None
-        ]
+        return self._remote_unit_addresses()
+
+    def _remote_unit_addresses(self) -> list[str]:
+        """Return unit addresses published across both async relations.
+
+        Skips units whose databag is unreadable — a dead-DC teardown leaves the dying
+        cross-model relation's unit databags raising ModelError on read (DPE-10203).
+        """
+        addresses = []
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            for unit in relation.units:
+                address = _safe_databag_get(relation.data[unit], "unit-address")
+                if address is not None:
+                    addresses.append(address)
+        return addresses
 
     def get_system_identifier(self) -> tuple[str | None, str | None]:
         """Returns the PostgreSQL system identifier from this instance."""
@@ -503,7 +587,7 @@ class PostgreSQLAsyncReplication(Object):
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
         for unit in remote_units:
-            if "unit-address" not in relation.data[unit]:
+            if _safe_databag_get(relation.data[unit], "unit-address") is None:
                 event.fail(
                     "All units from the other cluster must publish their unit addresses in the relation data."
                 )
@@ -547,19 +631,82 @@ class PostgreSQLAsyncReplication(Object):
             "unit-promoted-cluster-counter": "",
         })
 
+        # A force-removed dead offerer can make the standby check fail transiently;
+        # crashing here would wedge the unit before the counter is cleared, so treat
+        # the cluster as primary (DPE-10203 / Issue B).
+        try:
+            is_standby = self.charm.patroni_manager.get_standby_leader() is not None
+        except Exception as e:
+            logger.warning(
+                "get_standby_leader unavailable during teardown, assuming primary: %s", e
+            )
+            is_standby = False
+
         # If this is the standby cluster, set 0 in the "promoted-cluster-counter" field to set
         # the cluster in read-only mode message also in the other units.
-        if self.charm.patroni_manager.get_standby_leader() is not None:
+        if is_standby:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": "0"})
                 self.set_app_status()
         else:
             if self.charm.unit.is_leader():
                 self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
-            self.charm.update_config()
+            try:
+                self.charm.update_config()
+            except (DeployedWithoutTrustError, RetryError, ModelError) as e:
+                logger.warning("update_config failed during teardown (continuing): %s", e)
 
         if self.charm.unit.is_leader():
-            self.charm.watcher_offer.update_endpoints()
+            try:
+                self.charm.watcher_offer.update_endpoints()
+            except (ModelError, RetryError) as e:
+                logger.warning(
+                    "watcher endpoint update failed during teardown (continuing): %s", e
+                )
+
+    def clear_stale_promotion(self) -> None:
+        """Clear a promoted-cluster-counter left over from a removed async relation.
+
+        A force-removed dead offerer never delivers ``relation-broken``, leaving the
+        counter behind; on a new async relation it would wrongly mark this app as the
+        primary and block ``create-replication`` (DPE-10203).
+        """
+        if not self.charm.unit.is_leader():
+            return
+        counter = self.charm.app_peer_data.get("promoted-cluster-counter")
+        # Empty -> standby/clean (nothing promoted). "0" -> a standby already in read-only mode
+        # (set by _on_async_relation_broken); leave it. A positive counter means this cluster
+        # was promoted -> revert it to a standalone primary unless a live relation still
+        # records that promotion. Deciding this from relation/peer data alone (no Patroni call)
+        # is deliberate: after a dead-DC promote Patroni is frequently unreachable, which is
+        # exactly when this must still run.
+        if not counter or counter == "0":
+            return
+        # A promotion writes the counter to both the async relation it was promoted under and
+        # the peers databag, so a counter mirrored on a current relation is a live replication
+        # and is managed by the relation lifecycle. The recovery sequence forms a *new* offer
+        # relation before running create-replication, and that relation carries no mirror —
+        # the counter left by the dead relation is stale exactly then and must clear even
+        # though a relation now exists (DPE-10203).
+        for relation in [
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+        ]:
+            if relation is None:
+                continue
+            try:
+                if relation.data[self.charm.app].get("promoted-cluster-counter") == counter:
+                    return
+            except ModelError:
+                # A dying relation whose databags are unreadable cannot vouch for the
+                # counter either: the promotion's relation is gone for all purposes.
+                continue
+        logger.info(
+            "Clearing stale promoted-cluster-counter %s (no live async relation records it)",
+            counter,
+        )
+        self.charm.app_peer_data.update({"promoted-cluster-counter": ""})
+        self.charm.update_config()
 
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
@@ -634,6 +781,11 @@ class PostgreSQLAsyncReplication(Object):
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""
+        # A dead-DC teardown whose relation-broken never fired leaves the promoted-
+        # cluster-counter orphaned in peer data; clear it before the guard reads it,
+        # or create-replication reports "There is already a replication set up."
+        # until an update-status cycle happens to reconcile (DPE-10203).
+        self.clear_stale_promotion()
         if self._get_primary_cluster() is not None:
             event.fail("There is already a replication set up.")
             return
@@ -653,6 +805,9 @@ class PostgreSQLAsyncReplication(Object):
 
     def promote_to_primary(self, event: ActionEvent) -> None:
         """Promote this cluster to the primary cluster."""
+        # Same stale-counter exposure as create-replication: a counter orphaned by a
+        # teardown without events would mask the "no primary" condition below.
+        self.clear_stale_promotion()
         if (
             self.charm.app.status.message != READ_ONLY_MODE_BLOCKING_MESSAGE
             and self._get_primary_cluster() is None
@@ -694,7 +849,9 @@ class PostgreSQLAsyncReplication(Object):
             )
             return
 
-        if relation.name == REPLICATION_CONSUMER_RELATION and event.secret.label == SECRET_LABEL:
+        if relation.name == REPLICATION_CONSUMER_RELATION and _same_secret_id(
+            event.secret.id, self._remote_secret_id()
+        ):
             logger.info("Relation secret changed, updating internal secret")
             if not self._update_internal_secret():
                 logger.debug("Secret not found, deferring event")
@@ -750,13 +907,24 @@ class PostgreSQLAsyncReplication(Object):
 
     @property
     def _relation(self) -> Relation | None:
-        """Return the relation object."""
+        """Return the usable async-replication relation, or None.
+
+        A relation whose databags are unreadable is treated as absent — the dying
+        cross-model relation left by a force-removed dead DC reads as "permission
+        denied" on every databag (DPE-10203). A cheap own-unit read probes for that.
+        """
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),
             self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
-            if relation is not None:
-                return relation
+            if relation is None:
+                continue
+            try:
+                relation.data[self.charm.unit].get("unit-address")
+            except ModelError:
+                continue
+            return relation
+        return None
 
     def set_app_status(self) -> None:
         """Set the app status."""
@@ -835,17 +1003,24 @@ class PostgreSQLAsyncReplication(Object):
         if self.is_primary_cluster() and self.charm.unit.is_leader():
             self._update_primary_cluster_data()
 
-    def _update_internal_secret(self) -> bool:
-        # Update the secrets between the clusters.
+    def _remote_secret_id(self) -> str | None:
+        """Return the shared secret id published by the primary cluster, or None."""
         relation = self._relation
-        primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")  # type: ignore
-        secret_id = (
-            None
-            if primary_cluster_info is None
-            else json.loads(primary_cluster_info).get("secret-id")
-        )
+        if relation is None:
+            return None
+        primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")
+        if primary_cluster_info is None:
+            return None
+        return json.loads(primary_cluster_info).get("secret-id")
+
+    def _update_internal_secret(self) -> bool:
+        # Update the secrets between the clusters. Reference the secret purely by the id published
+        # in relation data — never by label — so no consumer-side alias is registered (DPE-10203).
+        secret_id = self._remote_secret_id()
+        if secret_id is None:
+            return False
         try:
-            secret = self.charm.model.get_secret(id=secret_id, label=SECRET_LABEL)
+            secret = self.charm.model.get_secret(id=secret_id)
         except SecretNotFoundError:
             return False
         credentials = secret.peek_content()
