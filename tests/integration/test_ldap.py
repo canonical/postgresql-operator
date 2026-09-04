@@ -141,7 +141,10 @@ def test_glauth_integration(charm) -> None:
         )
 
         password = get_password()
-        address = get_unit_address(juju, f"{DATABASE_APP_NAME}/0")
+        # Do not hardcode /0: re-runs on a reused model keep incrementing the
+        # unit counter after remove-application.
+        unit_name = next(iter(juju.status().get_units(DATABASE_APP_NAME)))
+        address = get_unit_address(juju, unit_name)
 
         # Validate the 'operator' user can still access the instance.
         execute_query_on_unit(address, password, "SELECT VERSION();")
@@ -201,7 +204,7 @@ def test_glauth_integration(charm) -> None:
         # Diagnostic for the CI artifacts (which don't capture the snap service
         # logs): is the ldap-sync sidecar up, and did the role land?
         sync_journal = juju.exec(
-            unit=f"{DATABASE_APP_NAME}/0",
+            unit=unit_name,
             command="sudo journalctl -u snap.charmed-postgresql.ldap-sync.service -n 50 --no-pager",
         )
         logger.info(
