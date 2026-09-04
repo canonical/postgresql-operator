@@ -117,6 +117,10 @@ from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
+from single_kernel_postgresql.events.logical_replication import (
+    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
+    PostgreSQLLogicalReplication,
+)
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
@@ -456,7 +460,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
-        # self.logical_replication = PostgreSQLLogicalReplication(self)
+        self.logical_replication = PostgreSQLLogicalReplication(self, self.state)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -1898,8 +1902,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
-        # if not self.logical_replication.apply_changed_config(event):
-        #     return
+        if not self.logical_replication.apply_changed_config(event):
+            return
 
         if not self.unit.is_leader():
             return
@@ -2398,7 +2402,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.backup.coordinate_stanza_fields()
 
-        # self.logical_replication.retry_validations()
+        self.logical_replication.retry_validations()
 
         self._set_primary_status_message()
 
@@ -2493,8 +2497,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES
-            # and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
+            self.is_blocked
+            and self.unit.status not in S3_BLOCK_MESSAGES
+            and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
@@ -2548,12 +2553,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     BlockedStatus(self.app_peer_data["s3-initialization-block-message"])
                 )
                 return
-            # if self.unit.is_leader() and (
-            #     self.app_peer_data.get("logical-replication-validation") == "error"
-            #     or self.logical_replication.has_remote_publisher_errors()
-            # ):
-            #     self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
-            #     return
+            if self.unit.is_leader() and (
+                self.app_peer_data.get("logical-replication-validation") == "error"
+                or self.logical_replication.has_remote_publisher_errors()
+            ):
+                self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
+                return
             if (
                 self.patroni_manager.get_primary(unit_name_pattern=True) == self.unit.name
                 or self.is_standby_leader
