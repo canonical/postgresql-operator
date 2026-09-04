@@ -114,6 +114,7 @@ from single_kernel_postgresql.config.literals import (
 )
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
+from single_kernel_postgresql.events.async_replication import PostgreSQLAsyncReplication
 from single_kernel_postgresql.events.backup import BackupEventsHandler
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
@@ -123,6 +124,7 @@ from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces i
     DatabaseProvides,
 )
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.s3 import S3Requirer
+from single_kernel_postgresql.managers.async_replication import AsyncReplicationManager
 from single_kernel_postgresql.managers.backup import BackupManager
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
@@ -173,7 +175,6 @@ from constants import (
     UPDATE_CERTS_BIN_PATH,
 )
 from oom import ensure_snap_oom_protection
-from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
@@ -492,8 +493,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # never triggers a reload against files that were never written.
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
-        self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
+        self.async_replication_manager = AsyncReplicationManager(
+            state=self.state,
+            workload=self.workload,
+            patroni_manager=self.patroni_manager,
+            update_config=self.update_config,
+        )
+        self.async_replication = PostgreSQLAsyncReplication(
+            self,
+            self.state,
+            self.async_replication_manager,
+            self.patroni_manager,
+            self.workload,
+            watcher=self.watcher_offer,
+        )
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -675,6 +689,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set unit status without overriding higher priority refresh status."""
         if refresh is None:
             refresh = self.refresh
+
         if refresh is not None and refresh.unit_status_higher_priority:
             return
         if (
@@ -688,6 +703,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
         self.unit.status = status
+
+    def set_app_status(self, status: ops.StatusBase) -> None:
+        """Set the application status without overriding a higher-priority refresh status.
+
+        Bridge for the single-kernel async-replication handler, which writes the app
+        status through the charm instead of touching ``self.app.status`` directly.
+        """
+        if self.refresh is not None and self.refresh.app_status_higher_priority:
+            self.app.status = self.refresh.app_status_higher_priority
+            return
+        self.app.status = status
+
+    def set_primary_status_message(self) -> None:
+        """Recompute the unit's primary/standby status message.
+
+        Bridge for the single-kernel async-replication handler (DPE-10203).
+        """
+        self._set_primary_status_message()
 
     def _restore_unit_status(self, status: ops.StatusBase) -> None:
         """Restore a previously cached unit status.
