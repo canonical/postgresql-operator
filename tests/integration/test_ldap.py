@@ -15,8 +15,8 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 import uuid
+from pathlib import Path
 
 import jubilant
 import pytest
@@ -184,11 +184,16 @@ def test_glauth_integration(charm) -> None:
             f"uid: {LDAP_USER}\n"
             f"userPassword: {password_hash}\n"
         )
-        with tempfile.NamedTemporaryFile("w", suffix=".ldif", delete=False) as ldif_file:
-            ldif_file.write(ldif)
-        juju_k8s.scp(ldif_file.name, f"{GLAUTH_UTILS_APP_NAME}/0:/var/tmp/ldap-test.ldif")
+        # The juju snap cannot read /tmp or /var/tmp (private namespace), and
+        # a transfer sourced from there cannot see the local file. $HOME is
+        # visible to the snap; the unique name avoids colliding with a stale
+        # root-owned copy left by a previous run (juju scp cannot overwrite
+        # it as the charm user).
+        ldif_path = Path.home() / f"ldap-test-{uuid.uuid4().hex[:8]}.ldif"
+        ldif_path.write_text(ldif)
+        juju_k8s.scp(str(ldif_path), f"{GLAUTH_UTILS_APP_NAME}/0:/var/tmp/{ldif_path.name}")
         juju_k8s.run(
-            f"{GLAUTH_UTILS_APP_NAME}/0", "apply-ldif", {"path": "/var/tmp/ldap-test.ldif"}
+            f"{GLAUTH_UTILS_APP_NAME}/0", "apply-ldif", {"path": f"/var/tmp/{ldif_path.name}"}
         ).raise_on_failure()
 
         # The ldap-sync sidecar runs every 30s; poll until the role materialises,
