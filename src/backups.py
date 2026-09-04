@@ -33,6 +33,8 @@ from single_kernel_postgresql.config.literals import (
     BACKUP_ID_FORMAT,
     BACKUP_TYPE_OVERRIDES,
     BACKUP_USER,
+    LOGICAL_REPLICATION_OFFER_RELATION,
+    LOGICAL_REPLICATION_RELATION,
     PGBACKREST_ARCHIVE_TIMEOUT_ERROR_CODE,
     PGBACKREST_BACKUP_ID_FORMAT,
     PGBACKREST_LOG_LEVEL_STDERR,
@@ -1322,27 +1324,20 @@ Stderr:
             return False
 
         logger.info("Checking that cluster does not have an active async replication relation")
-        for relation in [
-            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
-            self.model.get_relation(REPLICATION_OFFER_RELATION),
-        ]:
-            if not relation:
-                continue
+        if self._has_active_async_replication_relation():
             error_message = "Unit cannot restore backup with an active async replication relation"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
 
         logger.info("Checking that cluster does not have an active logical replication relation")
-        # if self.model.get_relation(LOGICAL_REPLICATION_RELATION) or len(
-        #     self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
-        # ):
-        #     error_message = (
-        #         "Unit cannot restore backup with an active logical replication connection"
-        #     )
-        #     logger.error(f"Restore failed: {error_message}")
-        #     event.fail(error_message)
-        #     return False
+        if self._has_active_logical_replication_relation():
+            error_message = (
+                "Unit cannot restore backup with an active logical replication connection"
+            )
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
 
         logger.info("Checking that this unit was already elected the leader unit")
         if not self.charm.unit.is_leader():
@@ -1353,6 +1348,23 @@ Stderr:
 
         return True
 
+    def _has_active_async_replication_relation(self) -> bool:
+        """Check that the cluster does not have an active async replication relation."""
+        return any(
+            relation
+            for relation in [
+                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+                self.model.get_relation(REPLICATION_OFFER_RELATION),
+            ]
+            if relation
+        )
+
+    def _has_active_logical_replication_relation(self) -> bool:
+        """Check that the cluster does not have an active logical replication relation."""
+        return bool(self.model.get_relation(LOGICAL_REPLICATION_RELATION)) or bool(
+            self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
+        )
+
     def _render_pgbackrest_conf_file(self) -> bool:
         # Open the template pgbackrest.conf file.
         s3_parameters, missing_parameters = self._retrieve_s3_parameters()
@@ -1361,7 +1373,6 @@ Stderr:
                 f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
             )
             return False
-
         if self._tls_ca_chain_filename != "":
             render_file(
                 Substrates.VM,
