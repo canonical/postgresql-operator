@@ -197,39 +197,24 @@ def test_glauth_integration(charm) -> None:
         # logs): is the ldap-sync sidecar up, and did the role land?
         sync_journal = juju.exec(
             unit=f"{DATABASE_APP_NAME}/0",
-            command=(
-                "sudo journalctl -u snap.charmed-postgresql.ldap-sync.service -n 50 --no-pager"
-            ),
+            command="sudo journalctl -u snap.charmed-postgresql.ldap-sync.service -n 50 --no-pager",
         )
         logger.info(
             "ldap-sync service journal:\n%s", (sync_journal.stdout or sync_journal.stderr).strip()
         )
-        roles = juju.exec(
-            unit=f"{DATABASE_APP_NAME}/0",
-            command=(
-                'charmed-postgresql.psql -d postgres -tAc "SELECT rolname FROM pg_roles" && '
-                'charmed-postgresql.psql -d postgres -tAc "SELECT r.rolname FROM '
-                "pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid "
-                "WHERE g.rolname = 'identity_access'\""
-            ),
+        roles = execute_query_on_unit(
+            address, password, "SELECT rolname FROM pg_roles WHERE rolname = 'jdoe'"
         )
-        logger.info(
-            "pg_roles and identity_access members: %s",
-            (roles.stdout or roles.stderr).strip(),
+        members = execute_query_on_unit(
+            address,
+            password,
+            "SELECT r.rolname FROM pg_auth_members m "
+            "JOIN pg_roles g ON g.oid = m.roleid "
+            "JOIN pg_roles r ON r.oid = m.member "
+            "WHERE g.rolname = 'identity_access'",
         )
-        roles = juju.exec(
-            unit=f"{DATABASE_APP_NAME}/0",
-            command=(
-                'charmed-postgresql.psql -d postgres -tAc "SELECT rolname FROM pg_roles" && '
-                'charmed-postgresql.psql -d postgres -tAc "SELECT r.rolname FROM '
-                "pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid "
-                "WHERE g.rolname = 'identity_access'\""
-            ),
-        )
-        logger.info(
-            "pg_roles and identity_access members: %s",
-            (roles.stdout or roles.stderr).strip(),
-        )
+        logger.info("jdoe role: %s; identity_access members: %s", roles, members)
+        logger.info("Waiting for the LDAP user to sync into PostgreSQL and authenticating")
         logger.info("Waiting for the LDAP user to sync into PostgreSQL and authenticating")
         for attempt in Retrying(stop=stop_after_attempt(12), wait=wait_fixed(30), reraise=True):
             with attempt:
