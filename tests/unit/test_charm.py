@@ -38,7 +38,11 @@ from single_kernel_postgresql.config.exceptions import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
+from single_kernel_postgresql.config.literals import (
+    JUJU_EXECUTABLE,
+    PEER_RELATION,
+    SECRET_INTERNAL_LABEL,
+)
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -1916,7 +1920,9 @@ def test_juju_run_exec(harness):
         # Juju 3
         harness = Harness(PostgresqlOperatorCharm)
         harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
+        _topology_observer.assert_called_once_with(
+            harness.charm, harness.charm.state, JUJU_EXECUTABLE
+        )
 
 
 def test_client_relations(harness):
