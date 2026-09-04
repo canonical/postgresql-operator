@@ -151,10 +151,11 @@ def test_glauth_integration(charm) -> None:
         # creates the mapped users and grants them identity_access so they match
         # the hba 'ldap' line), create the mapped role the group grants into, and
         # create the user in glauth through the glauth-utils charm.
-        logger.info("Configuring the LDAP group mapping and creating the PostgreSQL group")
-        juju.config(DATABASE_APP_NAME, {"ldap-map": f"{LDAP_GROUP}={LDAP_GROUP}"})
-        # DDL returns no rows; append a SELECT so the helper's fetchall succeeds.
+        logger.info("Creating the mapped PostgreSQL group and setting the LDAP group mapping")
+        # The mapped role must exist BEFORE ldap-map is set: the charm validates the
+        # map's psql groups against pg_roles on config-changed and blocks otherwise.
         execute_query_on_unit(address, password, f'CREATE ROLE "{LDAP_GROUP}" NOLOGIN; SELECT 1;')
+        juju.config(DATABASE_APP_NAME, {"ldap-map": f"{LDAP_GROUP}={LDAP_GROUP}"})
 
         logger.info("Deploying the glauth-utils charm and creating the LDAP user")
         juju_k8s.deploy(GLAUTH_UTILS_APP_NAME, channel="edge", trust=True, constraints=constraints)
