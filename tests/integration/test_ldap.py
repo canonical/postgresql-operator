@@ -215,10 +215,9 @@ def test_glauth_integration(charm) -> None:
         )
         logger.info("jdoe role: %s; identity_access members: %s", roles, members)
         logger.info("Waiting for the LDAP user to sync into PostgreSQL and authenticating")
-        logger.info("Waiting for the LDAP user to sync into PostgreSQL and authenticating")
         for attempt in Retrying(stop=stop_after_attempt(12), wait=wait_fixed(30), reraise=True):
             with attempt:
-                execute_query_on_unit(address, LDAP_USER, LDAP_USER_PASSWORD, "SELECT 1;")
+                execute_query_on_unit(address, LDAP_USER_PASSWORD, "SELECT 1;", username=LDAP_USER)
     finally:
         juju_cleanup = jubilant.Juju()
         juju_cleanup.destroy_model(
