@@ -4,7 +4,6 @@
 
 """Charmed Machine Operator for the PostgreSQL database."""
 
-import dataclasses
 import json
 import logging
 import os
@@ -48,8 +47,6 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, ProtocolNotFoundError
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from cryptography.x509 import load_pem_x509_certificate
-from cryptography.x509.oid import NameOID
 from ops import (
     ActionEvent,
     ActiveStatus,
@@ -125,6 +122,7 @@ from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
+from single_kernel_postgresql.managers.refresh import RefreshManager
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
 from single_kernel_postgresql.utils.postgresql import (
@@ -160,7 +158,6 @@ from constants import (
     RAFT_PARTNER_PREFIX,
     RAFT_PORT,
     TEMP_DATA_DIR,
-    TEMP_STORAGE_PATH,
     UPDATE_CERTS_BIN_PATH,
 )
 from ldap import PostgreSQLLDAP
@@ -189,121 +186,6 @@ class CannotConnectError(Exception):
 
 class StorageUnavailableError(Exception):
     """Cannot find storage mountpoint."""
-
-
-@dataclasses.dataclass(eq=False)
-class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
-    _charm: "PostgresqlOperatorCharm"
-
-    def _check_temp_tablespace_objects(self) -> None:
-        try:
-            connection = self._charm.postgresql._connect_to_database()
-            connection.autocommit = True
-            cursor = connection.cursor()
-            cursor.execute(
-                "SELECT count(*) FROM pg_class WHERE reltablespace = "
-                "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp');"
-            )
-            count = cursor.fetchone()[0]
-            cursor.close()
-            connection.close()
-            if count > 0:
-                raise charm_refresh.PrecheckFailed(
-                    f"Temp tablespace has {count} active object(s). "
-                    "Please ensure no sessions are using temp tables before refreshing."
-                )
-        except charm_refresh.PrecheckFailed:
-            raise
-        except Exception:
-            logger.debug("Unable to check temp tablespace objects", exc_info=True)
-
-    def run_pre_refresh_checks_after_1_unit_refreshed(self) -> None:
-        self._check_temp_tablespace_objects()
-
-    def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
-        for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
-            with attempt:
-                if not self._charm.patroni_manager.are_all_members_ready():
-                    raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
-        if self._charm.patroni_manager.is_creating_backup:
-            raise charm_refresh.PrecheckFailed("Backup in progress")
-        self._check_temp_tablespace_objects()
-
-        # Switch primary to last unit to refresh
-
-        if self._charm._peers is None:
-            # This should not happen since `charm_refresh.PeerRelationNotReady` should've been
-            # raised, so this code would not run
-            raise ValueError
-        all_units = (unit.name for unit in (*self._charm._peers.units, self._charm.unit))
-
-        def unit_number(unit_name: str):
-            _, number = unit_name.split("/")
-            return int(number)
-
-        # Lowest unit number is last to refresh
-        last_unit_to_refresh = sorted(all_units, key=unit_number)[0].replace("/", "-")
-        if self._charm.patroni_manager.get_primary() == last_unit_to_refresh:
-            logger.info(
-                f"Unit {last_unit_to_refresh} was already primary during pre-refresh check"
-            )
-        else:
-            try:
-                self._charm.patroni_manager.switchover(
-                    candidate=last_unit_to_refresh,
-                    async_cluster=bool(
-                        self._charm.async_replication.get_primary_cluster_endpoint()
-                    ),
-                )
-                self._charm._update_relation_endpoints()
-            except SwitchoverFailedError as e:
-                logger.warning(f"switchover failed with reason: {e}")
-                raise charm_refresh.PrecheckFailed("Unable to switch primary")
-            else:
-                logger.info(
-                    f"Switched primary to unit {last_unit_to_refresh} during pre-refresh check"
-                )
-
-    @classmethod
-    def is_compatible(
-        cls,
-        *,
-        old_charm_version: charm_refresh.CharmVersion,
-        new_charm_version: charm_refresh.CharmVersion,
-        old_workload_version: str,
-        new_workload_version: str,
-    ) -> bool:
-        # Check charm version compatibility
-        if not super().is_compatible(
-            old_charm_version=old_charm_version,
-            new_charm_version=new_charm_version,
-            old_workload_version=old_workload_version,
-            new_workload_version=new_workload_version,
-        ):
-            return False
-
-        # Check workload version compatibility
-        old_major, old_minor = (int(component) for component in old_workload_version.split("."))
-        new_major, new_minor = (int(component) for component in new_workload_version.split("."))
-        if old_major != new_major:
-            return False
-        return new_minor >= old_minor
-
-    def refresh_snap(
-        self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
-    ) -> None:
-        # Update the configuration.
-        self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
-        self._charm.update_config(refresh=refresh)
-
-        # TODO add graceful shutdown before refreshing snap?
-        # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
-        # graceful shutdown, restart workload
-
-        self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
-        self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
-
-        self._charm._post_snap_refresh(refresh)
 
 
 def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
@@ -404,10 +286,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
-        # Do not use collect status events elsewhere—otherwise ops will prioritize statuses
-        # incorrectly
-        # https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/#implementation
-        self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
         for storage_name in self.meta.storages:
             self.framework.observe(
                 self.on[storage_name].storage_detaching, self._on_storage_detaching
@@ -459,17 +337,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
-
-        self.refresh: charm_refresh.Machines | None
-        try:
-            self.refresh = charm_refresh.Machines(
-                _PostgreSQLRefresh(
-                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
-                )
-            )
-        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
-            self.refresh = None
-        self._reconcile_refresh_status()
+        self.refresh_manager = RefreshManager(
+            state=self.state,
+            workload=self.workload,
+            charm=self,
+            set_default_status=self._set_primary_status_message,
+        )
+        # Do not use collect status events elsewhere—otherwise ops will prioritize statuses
+        # incorrectly
+        # https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/status/#implementation
+        self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
 
         # Support for disabling the operator.
         disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
@@ -481,12 +358,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus("Disabled")
             sys.exit(0)
 
-        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
-            if self.refresh.in_progress:
-                self._post_snap_refresh(self.refresh)
-            else:
-                self._migrate_temp_tablespace_location()
-                self.refresh.next_unit_allowed_to_refresh = True
+        self.refresh_manager.on_init()
 
         self._observer.start_observer()
         self._rotate_logs.start_log_rotation()
@@ -558,97 +430,62 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if reload:
             self.update_config()
 
-    def _check_and_update_internal_cert(self) -> None:
-        """Check if the internal cert CN matches the unit IP and regenerate if needed."""
-        try:
-            if (
-                (raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"))
-                and (cert := load_pem_x509_certificate(raw_cert.encode()))
-                and (
-                    cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-                    != self.state.unit_ip
-                )
-            ):
-                self._regenerate_internal_cert()
-        except Exception:
-            logger.exception("Unable to check or update internal cert")
-
-    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
-        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
-
-        Called after snap refresh
-        """
-        self._check_and_update_internal_cert()
-
-        if not self.patroni_manager.start_patroni():
-            self.set_unit_status(BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
-            return
-
-        self._setup_exporter()
-        self.backup.start_stop_pgbackrest_service()
-        self._setup_pgbackrest_exporter()
-        self.watcher_offer.update_unit_address()
-
-        # Wait until the database initialise.
-        self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(10)):
-                with attempt:
-                    # Check if the member hasn't started or hasn't joined the cluster yet.
-                    if (
-                        not self.patroni_manager.member_started
-                        or self.unit.name.replace("/", "-")
-                        not in self.patroni_manager.cluster_members
-                        or not self.patroni_manager.is_replication_healthy()
-                    ):
-                        logger.debug(
-                            "Instance not yet back in the cluster."
-                            f" Retry {attempt.retry_state.attempt_number}/6"
-                        )
-                        raise Exception()
-        except RetryError:
-            logger.debug(
-                "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
-            )
-        else:
-            try:
-                self.patroni_manager.set_max_timelines_history()
-            except Exception:
-                logger.warning("Unable to patch in max_timelines_history")
-            peer_relation = self.model.get_relation("database-peers")
-            all_units = sorted(
-                [self.unit, *(peer_relation.units if peer_relation else [])],
-                key=lambda u: int(u.name.split("/")[1]),
-            )
-            if self.unit == all_units[0]:
-                for attempt in Retrying(
-                    stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True
-                ):
-                    with attempt:
-                        if not self._migrate_temp_tablespace_location(required=True):
-                            raise Exception("Temp tablespace migration not yet complete")
-            refresh.next_unit_allowed_to_refresh = True
-            self.set_unit_status(ActiveStatus(), refresh=refresh)
-
     def set_unit_status(
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
     ):
         """Set unit status without overriding higher priority refresh status."""
-        if refresh is None:
-            refresh = self.refresh
-        if refresh is not None and refresh.unit_status_higher_priority:
-            return
-        if (
-            isinstance(status, ops.ActiveStatus)
-            and refresh is not None
-            and (refresh_status := refresh.unit_status_lower_priority())
-        ):
-            self.unit.status = refresh_status
-            pathlib.Path(".last_refresh_unit_status.json").write_text(
-                json.dumps(refresh_status.message)
-            )
-            return
-        self.unit.status = status
+        self.refresh_manager.set_unit_status(status, refresh=refresh)
+
+    def _reconcile_refresh_status(self, _=None) -> None:
+        """Reconcile the unit status with the refresh status on collect-unit-status."""
+        self.refresh_manager.reconcile_refresh_status(_)
+
+    @property
+    def refresh(self) -> charm_refresh.Machines | None:
+        """The charm_refresh object owned by the refresh manager.
+
+        Returns None while the refresh manager is still constructing itself, since
+        status reconciliation runs inside its __init__ before the attribute exists.
+        """
+        if (refresh_manager := getattr(self, "refresh_manager", None)) is None:
+            return None
+        return refresh_manager.refresh
+
+    def set_default_unit_status(self) -> None:
+        """Set the unit status that applies when no refresh status is active."""
+        self._set_primary_status_message()
+
+    def set_app_status(self) -> None:
+        """Set the application status from the async-replication state.
+
+        Owned by the async-replication module until that phase migrates; the refresh
+        manager calls this during status reconciliation.
+        """
+        self.async_replication.set_app_status()
+
+    def get_async_primary_cluster_endpoint(self) -> str | None:
+        """Endpoint of the primary cluster of the async replication partner, if any."""
+        return self.async_replication.get_primary_cluster_endpoint()
+
+    def has_async_replication_relation(self) -> bool:
+        """Whether this unit is related to an async replication partner."""
+        return self.async_replication._relation is not None
+
+    def update_relation_endpoints(self) -> None:
+        """Refresh the client and async relation endpoints after a switchover."""
+        self._update_relation_endpoints()
+
+    def post_refresh_side_effects(self) -> None:
+        """Run the post-snap-refresh side effects owned by not-yet-migrated modules.
+
+        The exporter and pgBackRest exporter setup, the pgBackRest service
+        start/stop, and the watcher unit address update are owned by modules that
+        have not yet migrated to the single kernel library.
+        """
+        self._setup_exporter()
+        self.backup.start_stop_pgbackrest_service()
+        self._setup_pgbackrest_exporter()
+        self.watcher_offer.update_unit_address()
 
     def _restore_unit_status(self, status: ops.StatusBase) -> None:
         """Restore a previously cached unit status.
@@ -660,39 +497,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if isinstance(status, ActiveStatus | BlockedStatus | MaintenanceStatus | WaitingStatus):
             self.set_unit_status(status)
-
-    def _reconcile_refresh_status(self, _=None):
-        if self.unit.is_leader():
-            self.async_replication.set_app_status()
-
-        # Workaround for other unit statuses being set in a stateful way (i.e. unable to recompute
-        # status on every event)
-        path = pathlib.Path(".last_refresh_unit_status.json")
-        try:
-            last_refresh_unit_status = json.loads(path.read_text())
-        except FileNotFoundError:
-            last_refresh_unit_status = None
-        new_refresh_unit_status = None
-        if self.refresh is not None and self.refresh.unit_status_higher_priority:
-            self.unit.status = self.refresh.unit_status_higher_priority
-            new_refresh_unit_status = self.refresh.unit_status_higher_priority.message
-        elif self.unit.status.message == last_refresh_unit_status:
-            if self.refresh is not None and (
-                refresh_status := self.refresh.unit_status_lower_priority()
-            ):
-                self.unit.status = refresh_status
-                new_refresh_unit_status = refresh_status.message
-            else:
-                # Clear refresh status from unit status
-                self._set_primary_status_message()
-        elif (
-            isinstance(self.unit.status, ops.ActiveStatus)
-            and self.refresh is not None
-            and (refresh_status := self.refresh.unit_status_lower_priority())
-        ):
-            self.unit.status = refresh_status
-            new_refresh_unit_status = refresh_status.message
-        path.write_text(json.dumps(new_refresh_unit_status))
 
     def _on_databases_change(self, _):
         """Handle databases change event."""
@@ -856,141 +660,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         data_parent = Path(POSTGRESQL_DATA_DIR).parent
         if data_parent.exists():
             shutil.chown(data_parent, user=SNAP_USER, group=SNAP_USER)
-
-    def _resolve_primary_host(self) -> str | None:
-        """Wait for Patroni to settle and return the primary host.
-
-        After a snap refresh, Patroni may briefly report this unit as the
-        primary before discovering the real cluster topology.  Query the
-        Patroni API directly (bypassing primary_endpoint, which can return
-        stale data from the peer databag) and retry until the primary
-        points to a different host or this unit truly is the primary.
-        """
-        try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    primary = self.patroni_manager.get_primary()
-                    if not primary:
-                        raise Exception("No primary found yet")
-                    target_host = self.patroni_manager.get_member_ip(primary)
-                    if not target_host:
-                        raise Exception("Primary IP not available yet")
-                    if target_host != self.state.unit_ip or self.is_primary:
-                        return target_host
-                    raise Exception("Patroni not settled yet")
-        except RetryError:
-            logger.warning("Patroni did not settle within 60s")
-            return None
-        return None
-
-    def _migrate_temp_tablespace_location(self, *, required: bool = False) -> bool:
-        """One-shot migration of the temp tablespace to the versioned directory.
-
-        During a snap upgrade, the post-refresh hook migrates temp data from the
-        old non-versioned storage root (TEMP_STORAGE_PATH) to the versioned
-        subdirectory (TEMP_DATA_DIR).  This method updates the PostgreSQL catalog
-        entry to match.
-
-        During a snap downgrade (rollback), the pre-refresh hook handles both
-        file migration and catalog migration (DROP/CREATE TABLESPACE) back to
-        the non-versioned root.  This method only handles the forward case.
-
-        DROP TABLESPACE and CREATE TABLESPACE cannot run inside a transaction
-        block, so this method avoids using the connection as a context manager
-        (which would create one in psycopg2).  Instead it uses plain assignments
-        and explicit close(), mirroring the pattern in the single_kernel_postgresql
-        set_up_database helper.
-
-        Args:
-            required: If True (used during upgrade), return False when the
-                primary is unavailable so the caller can retry.  If False
-                (default, used during install), return True to skip gracefully
-                when no cluster exists yet.
-        """
-        if not self.primary_endpoint:
-            return not required
-
-        if self.async_replication._relation is not None:
-            return True
-
-        target_host = self._resolve_primary_host()
-        if target_host is None:
-            return False
-
-        return self._execute_temp_tablespace_migration(target_host)
-
-    def _execute_temp_tablespace_migration(self, target_host: str) -> bool:
-        """Execute the temp tablespace DDL migration on the given host."""
-        connection = None
-        cursor = None
-        try:
-            connection = self.postgresql._connect_to_database(database_host=target_host)
-            connection.autocommit = True
-            cursor = connection.cursor()
-
-            cursor.execute(
-                "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return True
-
-            current_location = row[0]
-            if current_location == TEMP_DATA_DIR:
-                return True
-
-            if current_location != TEMP_STORAGE_PATH:
-                logger.warning(
-                    "Skipping temp tablespace migration: unexpected location %s "
-                    "(expected %s or %s)",
-                    current_location,
-                    TEMP_STORAGE_PATH,
-                    TEMP_DATA_DIR,
-                )
-                return True
-
-            logger.info(
-                "Migrating temp tablespace location from %s to %s",
-                TEMP_STORAGE_PATH,
-                TEMP_DATA_DIR,
-            )
-            cursor.execute("DROP TABLESPACE temp;")
-            cursor.execute(f"CREATE TABLESPACE temp LOCATION '{TEMP_DATA_DIR}';")
-            cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
-            # Flush WAL past the CREATE TABLESPACE record so replicas won't
-            # need to replay it during a future rollback (the versioned
-            # directory may not exist after the snap's pre-refresh hook).
-            cursor.execute("CHECKPOINT;")
-        except psycopg2.Error:
-            logger.exception("Failed to migrate temp tablespace location")
-            try:
-                check_conn = self.postgresql._connect_to_database(database_host=target_host)
-                check_conn.autocommit = True
-                check_cur = check_conn.cursor()
-                check_cur.execute(
-                    "SELECT count(*) FROM pg_class WHERE reltablespace = "
-                    "(SELECT oid FROM pg_tablespace WHERE spcname = 'temp')"
-                )
-                obj_count = check_cur.fetchone()[0]
-                check_cur.close()
-                check_conn.close()
-                if obj_count > 0:
-                    logger.error(
-                        "Temp tablespace has %d object(s). "
-                        "Please move or drop all objects from the temp tablespace, "
-                        "then run 'juju resolved postgresql/<unit-number>' to retry.",
-                        obj_count,
-                    )
-            except Exception:
-                logger.debug("Could not query temp tablespace for blocking objects")
-            return False
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()
-
-        return True
 
     @cached_property
     def postgresql(self) -> PostgreSQL:
