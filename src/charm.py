@@ -87,6 +87,7 @@ from single_kernel_postgresql.config.literals import (
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    JUJU_EXECUTABLE,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_USER,
@@ -126,6 +127,11 @@ from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.tls import TLSManager
+from single_kernel_postgresql.observers.cluster_topology import (
+    ClusterTopologyChangeCharmEvents,
+    ClusterTopologyObserver,
+    start_raft_observer,
+)
 from single_kernel_postgresql.utils import label2name, new_password
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
@@ -148,11 +154,6 @@ from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay,
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import Patroni
-from cluster_topology_observer import (
-    ClusterTopologyChangeCharmEvents,
-    ClusterTopologyObserver,
-    start_raft_observer,
-)
 from constants import (
     MONITORING_SNAP_SERVICE,
     PGBACKREST_MONITORING_SNAP_SERVICE,
@@ -382,7 +383,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
 
-        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
+        self._observer = ClusterTopologyObserver(self, self.state, JUJU_EXECUTABLE)
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
