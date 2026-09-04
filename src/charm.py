@@ -10,11 +10,9 @@ import logging
 import os
 import pathlib
 import platform
-import re
 import shutil
 import subprocess
 import sys
-import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
@@ -115,18 +113,27 @@ from single_kernel_postgresql.config.literals import (
 )
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
+from single_kernel_postgresql.events.backup import BackupEventsHandler
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
+from single_kernel_postgresql.managers.backup import BackupManager
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
+from single_kernel_postgresql.managers.restore import RestoreManager
+from single_kernel_postgresql.managers.s3_client import S3Client
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
+from single_kernel_postgresql.utils.backup import (
+    CANNOT_RESTORE_PITR,
+    S3_BLOCK_MESSAGES,
+    parse_backup_id,
+)
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -146,7 +153,6 @@ from single_kernel_postgresql.utils.postgresql import (
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
@@ -166,7 +172,6 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
-from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -321,13 +326,33 @@ def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
         return
 
     endpoint = f"{endpoint}/v1/traces"
-
     if endpoint.startswith("https://"):
         # if endpoint is https BUT we don't have a server_cert yet:
         # disable charm tracing until we do to prevent tls errors
         logger.warning("Cannot send traces to an https endpoint without a certificate.")
         return
     set_destination(endpoint, None)
+
+
+class PostgreSQLS3Client(S3Client):
+    """S3 client whose TLS verification follows the s3 relation's tls-ca-chain option.
+
+    The library client takes the CA-chain path statically at construction; the
+    charm instead switches verification on every request depending on whether
+    the relation configuration provides tls-ca-chain.
+    """
+
+    def __init__(self, workload: VMWorkload):
+        self.workload = workload
+        super().__init__()
+
+    def _get_s3_session_resource(self, s3_parameters: dict):
+        self._tls_ca_chain_filename = (
+            self.workload.backup_config.tls_ca_chain_path
+            if s3_parameters.get("tls-ca-chain") is not None
+            else None
+        )
+        return super()._get_s3_session_resource(s3_parameters)
 
 
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
@@ -383,7 +408,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
-        self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.databases_change, self._on_databases_change)
@@ -417,9 +441,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["data"].location
 
-        self.backup = PostgreSQLBackups(self, "s3-parameters")
+        self.s3_client = PostgreSQLS3Client(self.workload)
+        self.backup = BackupManager(
+            state=self.state,
+            workload=self.workload,
+            s3_client=self.s3_client,
+            patroni_manager=self.patroni_manager,
+            update_config=self.update_config,
+            resource_provider=self.workload,
+            is_standby_cluster=lambda: self.is_standby_cluster,
+            set_unit_status=self.set_unit_status,
+        )
+        self.restore_manager = RestoreManager(
+            state=self.state,
+            workload=self.workload,
+            patroni_manager=self.patroni_manager,
+            update_config=self.update_config,
+            backup_manager=self.backup,
+            is_standby_cluster=lambda: self.is_standby_cluster,
+        )
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        # TLS events handler owns the two cert requirers; build it before the TLS
+        self.backup_events = BackupEventsHandler(
+            self,  # ty: ignore[invalid-argument-type]
+            self.state,
+            self.backup,
+            self.restore_manager,
+        )
         # manager so the manager can constructor-inject them for its live-fetch getters.
         self.tls = TLS(self, self.state)
         self.tls_manager = TLSManager(
@@ -489,7 +536,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
-        self._rotate_logs.start_log_rotation()
+        self.backup.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
@@ -1381,7 +1428,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "s3-initialization-start" in self.app_peer_data
             and "s3-initialization-done" not in self.unit_peer_data
             and self.is_primary
-            and not self.backup._on_s3_credential_changed_primary(event)
+            and not self.backup.initialise_s3_repository()
         ):
             return False
 
@@ -2392,12 +2439,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
-        if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
+        if self.is_cluster_restoring_to_time and all(self.restore_manager.is_pitr_failed()):
             logger.error(
                 "Restore failed: database service failed to reach point-in-time-recovery target. "
                 "You can launch another restore with different parameters"
             )
-            self.log_pitr_last_transaction_time()
+            self.restore_manager.log_pitr_last_transaction_time()
             self.set_unit_status(BlockedStatus(CANNOT_RESTORE_PITR))
             return False
 
@@ -2435,13 +2482,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "restore-timeline": "",
         })
         self.update_config()
-        self.restore_patroni_restart_condition()
+        self.restore_manager.restore_patroni_restart_condition()
 
         logger.info(
             "Restored"
             f"{f' to {restore_to_time}' if restore_to_time else ''}"
             f"{f' from timeline {restore_timeline}' if restore_timeline and not restoring_backup else ''}"
-            f"{f' from backup {self.backup._parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
+            f"{f' from backup {parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
             f". Currently tracking the newly created timeline {current_timeline}."
         )
 
@@ -2632,7 +2679,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.app.planned_units() > 0:
             return
         self._observer.stop_observer()
-        self._rotate_logs.stop_log_rotation()
+        self.backup.stop_log_rotation()
         try:
             # Disable too, so a mid-teardown restart of the unit can't re-enable the
             # services and re-grab the storage mounts before Juju finishes unmounting.
@@ -2906,119 +2953,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _collect_user_relations(self) -> dict[str, str]:
         return self.database_manager.collect_user_relations()
-
-    def override_patroni_restart_condition(
-        self, new_condition: str, repeat_cause: str | None
-    ) -> bool:
-        """Temporary override Patroni systemd service restart condition.
-
-        Executes only on current unit.
-
-        Args:
-            new_condition: new Patroni systemd service restart condition.
-            repeat_cause: whether this field is equal to the last success override operation repeat cause, Patroni
-                restart condition will be overridden (keeping the original restart condition reference untouched) and
-                success code will be returned. But if this field is distinct from previous repeat cause or None,
-                repeated operation will cause failure code will be returned.
-        """
-        current_condition = self.patroni_manager.get_patroni_restart_condition()
-        if "overridden-patroni-restart-condition" in self.unit_peer_data:
-            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
-            if repeat_cause is None:
-                logger.error(
-                    f"failure trying to override patroni restart condition to {new_condition}"
-                    f"as it already overridden from {original_condition} to {current_condition}"
-                )
-                return False
-            previous_repeat_cause = self.unit_peer_data.get(
-                "overridden-patroni-restart-condition-repeat-cause", None
-            )
-            if previous_repeat_cause != repeat_cause:
-                logger.error(
-                    f"failure trying to override patroni restart condition to {new_condition}"
-                    f"as it already overridden from {original_condition} to {current_condition}"
-                    f"and repeat cause is not equal: {previous_repeat_cause} != {repeat_cause}"
-                )
-                return False
-            # There repeat cause is equal
-            self.patroni_manager.update_patroni_restart_condition(new_condition)
-            logger.debug(
-                f"Patroni restart condition re-overridden to {new_condition} within repeat cause {repeat_cause}"
-                f"(original restart condition reference is untouched and is {original_condition})"
-            )
-            return True
-        self.patroni_manager.update_patroni_restart_condition(new_condition)
-        self.unit_peer_data["overridden-patroni-restart-condition"] = current_condition
-        if repeat_cause is not None:
-            self.unit_peer_data["overridden-patroni-restart-condition-repeat-cause"] = repeat_cause
-        logger.debug(
-            f"Patroni restart condition overridden from {current_condition} to {new_condition}"
-            f"{' with repeat cause ' + repeat_cause if repeat_cause is not None else ''}"
-        )
-        return True
-
-    def restore_patroni_restart_condition(self) -> None:
-        """Restore Patroni systemd service restart condition that was before overriding.
-
-        Will do nothing if not overridden. Executes only on current unit.
-        """
-        if "overridden-patroni-restart-condition" in self.unit_peer_data:
-            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
-            self.patroni_manager.update_patroni_restart_condition(original_condition)
-            self.unit_peer_data.update({
-                "overridden-patroni-restart-condition": "",
-                "overridden-patroni-restart-condition-repeat-cause": "",
-            })
-            logger.debug(f"restored Patroni restart condition to {original_condition}")
-        else:
-            logger.warning("not restoring patroni restart condition as it's not overridden")
-
-    def is_pitr_failed(self) -> tuple[bool, bool]:
-        """Check if Patroni service failed to bootstrap cluster during point-in-time-recovery.
-
-        Typically, this means that database service failed to reach point-in-time-recovery target or has been
-        supplied with bad PITR parameter. Also, remembers last state and can provide info is it new event, or
-        it belongs to previous action. Executes only on current unit.
-
-        Returns:
-            Tuple[bool, bool]:
-                - Is patroni service failed to bootstrap cluster.
-                - Is it new fail, that wasn't observed previously.
-        """
-        patroni_exceptions = []
-        count = 0
-        while len(patroni_exceptions) == 0 and count < 10:
-            if count > 0:
-                time.sleep(3)
-            patroni_logs = self.patroni_manager.patroni_logs(num_lines="all")
-            patroni_exceptions = re.findall(
-                r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
-                patroni_logs,
-                re.MULTILINE,
-            )
-            count += 1
-
-        if len(patroni_exceptions) > 0:
-            logger.debug("Failures to bootstrap cluster detected on Patroni service logs")
-            old_pitr_fail_id = self.unit_peer_data.get("last_pitr_fail_id", None)
-            self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
-            return True, patroni_exceptions[-1] != old_pitr_fail_id
-
-        logger.debug("No failures detected on Patroni service logs")
-        return False, False
-
-    def log_pitr_last_transaction_time(self) -> None:
-        """Log to user last completed transaction time acquired from postgresql logs."""
-        postgresql_logs = self.patroni_manager.last_postgresql_logs()
-        log_time = re.findall(
-            r"last completed transaction was at log time (.*)$",
-            postgresql_logs,
-            re.MULTILINE,
-        )
-        if len(log_time) > 0:
-            logger.info(f"Last completed transaction was at {log_time[-1]}")
-        else:
-            logger.error("Can't tell last completed transaction time")
 
     def get_plugins(self) -> list[str]:
         """Return a list of installed plugins."""
