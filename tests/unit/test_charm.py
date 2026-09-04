@@ -841,43 +841,24 @@ def test_ensure_storage_layout(harness, tmp_path):
     assert not (tmp_path / "logs").exists()
 
 
-def test_migrate_temp_tablespace_location_skips_when_not_primary(harness):
-    """If the unit is not primary, the migration is skipped."""
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=False,
-        ),
-    ):
-        result = harness.charm._migrate_temp_tablespace_location()
-
-    assert result is True
-
-
 def test_migrate_temp_tablespace_location_skips_when_no_endpoint(harness):
     """If primary_endpoint is not yet set, the migration is skipped."""
     with (
-        patch(
-            "charm.PostgresqlOperatorCharm.is_primary",
-            new_callable=PropertyMock,
-            return_value=True,
-        ),
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value=None,
         ),
     ):
-        result = harness.charm._migrate_temp_tablespace_location()
+        result = harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
     assert result is True
 
 
 def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_path):
-    """When temp tablespace is at old TEMP_STORAGE_PATH, it is migrated to TEMP_DATA_DIR."""
-    temp_data_dir = tmp_path / "temp" / "16" / "main"
-    temp_storage_path = str(tmp_path / "temp")
+    """When temp tablespace is at the old storage root, it is migrated to the versioned dir."""
+    temp_data_dir = tmp_path / "16" / "main"
+    temp_storage_path = str(temp_data_dir.parent)
     temp_data_dir.mkdir(parents=True)
 
     connection = MagicMock()
@@ -886,6 +867,8 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
+    workload = MagicMock()
+    workload.paths.temp = temp_data_dir
 
     with (
         patch(
@@ -893,16 +876,21 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch.object(
+            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
-        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
+        patch(
+            "charm.PostgresqlOperatorCharm.workload",
+            new_callable=PropertyMock,
+            return_value=workload,
+        ),
     ):
-        assert harness.charm._migrate_temp_tablespace_location()
+        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
     cursor.execute.assert_has_calls([
         call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
@@ -913,8 +901,8 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
 
 
 def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(harness, tmp_path):
-    """When temp tablespace is already at TEMP_DATA_DIR, no migration is performed."""
-    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    """When temp tablespace is already at the versioned path, no migration is performed."""
+    temp_data_dir = tmp_path / "16" / "main"
     temp_data_dir.mkdir(parents=True)
 
     connection = MagicMock()
@@ -923,6 +911,8 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
+    workload = MagicMock()
+    workload.paths.temp = temp_data_dir
 
     with (
         patch(
@@ -930,15 +920,21 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch.object(
+            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch(
+            "charm.PostgresqlOperatorCharm.workload",
+            new_callable=PropertyMock,
+            return_value=workload,
+        ),
     ):
-        assert harness.charm._migrate_temp_tablespace_location()
+        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
     # Only the SELECT should have been executed — no DROP/CREATE
     cursor.execute.assert_called_once_with(
@@ -954,6 +950,8 @@ def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness,
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
+    workload = MagicMock()
+    workload.paths.temp = tmp_path / "16" / "main"
 
     with (
         patch(
@@ -961,14 +959,21 @@ def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness,
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch.object(
+            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
+        patch(
+            "charm.PostgresqlOperatorCharm.workload",
+            new_callable=PropertyMock,
+            return_value=workload,
+        ),
     ):
-        assert harness.charm._migrate_temp_tablespace_location()
+        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
     # Only the SELECT should have been executed
     cursor.execute.assert_called_once_with(
@@ -984,6 +989,8 @@ def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
+    workload = MagicMock()
+    workload.paths.temp = tmp_path / "16" / "main"
 
     with (
         patch(
@@ -991,15 +998,22 @@ def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch.object(
+            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch("charm.logger") as logger,
+        patch(
+            "charm.PostgresqlOperatorCharm.workload",
+            new_callable=PropertyMock,
+            return_value=workload,
+        ),
+        patch("single_kernel_postgresql.managers.refresh.logger") as logger,
     ):
-        assert harness.charm._migrate_temp_tablespace_location()
+        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
     cursor.execute.assert_called_once_with(
         "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
@@ -1018,14 +1032,16 @@ def test_migrate_temp_tablespace_location_returns_false_on_db_error(harness):
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
+        patch.object(
+            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
     ):
-        assert not harness.charm._migrate_temp_tablespace_location()
+        assert not harness.charm.refresh_manager.migrate_temp_tablespace_location()
 
 
 def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
