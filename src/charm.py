@@ -7,9 +7,13 @@
 import json
 import logging
 import os
+import pathlib
+import platform
+import re
 import shutil
 import subprocess
 import sys
+import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
@@ -37,6 +41,7 @@ except ModuleNotFoundError:
 
 import charm_refresh
 import ops.log
+import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
@@ -93,7 +98,6 @@ from single_kernel_postgresql.config.literals import (
     REPLICATION_USER,
     REWIND_PASSWORD_KEY,
     REWIND_USER,
-    S3_RELATION_NAME,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
@@ -108,32 +112,25 @@ from single_kernel_postgresql.config.literals import (
 )
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
-from single_kernel_postgresql.events.async_replication import PostgreSQLAsyncReplication
-from single_kernel_postgresql.events.backup import BackupEventsHandler
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
+from single_kernel_postgresql.events.logical_replication import (
+    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
+    PostgreSQLLogicalReplication,
+)
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
-from single_kernel_postgresql.events.watcher import WatcherEventsHandler
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.s3 import S3Requirer
-from single_kernel_postgresql.managers.async_replication import AsyncReplicationManager
-from single_kernel_postgresql.managers.backup import BackupManager
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.refresh import RefreshManager
-from single_kernel_postgresql.managers.restore import RestoreManager
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
-from single_kernel_postgresql.utils.backup import (
-    CANNOT_RESTORE_PITR,
-    S3_BLOCK_MESSAGES,
-    parse_backup_id,
-)
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -150,13 +147,13 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
-from single_kernel_postgresql.utils.s3 import S3Client
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
 if TYPE_CHECKING:
     from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
 
+from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
@@ -172,6 +169,9 @@ from constants import (
     TEMP_DATA_DIR,
     UPDATE_CERTS_BIN_PATH,
 )
+from oom import ensure_snap_oom_protection
+from relations.async_replication import PostgreSQLAsyncReplication
+from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
@@ -212,6 +212,7 @@ def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
         return
 
     endpoint = f"{endpoint}/v1/traces"
+
     if endpoint.startswith("https://"):
         # if endpoint is https BUT we don't have a server_cert yet:
         # disable charm tracing until we do to prevent tls errors
@@ -266,9 +267,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # TODO switch to the abstract class base
         # State
-        # ops permits only one S3Requirer object per charm for the s3-parameters relation;
-        # build it here (before CharmState) and hand the same instance to the backups manager.
-        self.s3_requirer = S3Requirer(self, S3_RELATION_NAME)
+        self.s3_requirer = S3Requirer(self, "s3-parameters")
         self.state = CharmState(
             charm=self,
             substrate=self.substrate,
@@ -310,33 +309,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["data"].location
 
-        self.s3_client = S3Client(self.workload)
-        self.backup = BackupManager(
-            state=self.state,
-            workload=self.workload,
-            s3_client=self.s3_client,
-            patroni_manager=self.patroni_manager,
-            update_config=self.update_config,
-            resource_provider=self.workload,
-            is_standby_cluster=lambda: self.is_standby_cluster,
-            set_unit_status=self.set_unit_status,
-            refresh_primary_status=self._set_primary_status_message,
-        )
-        self.restore_manager = RestoreManager(
-            state=self.state,
-            workload=self.workload,
-            patroni_manager=self.patroni_manager,
-            update_config=self.update_config,
-            backup_manager=self.backup,
-            is_standby_cluster=lambda: self.is_standby_cluster,
-        )
+        self.backup = PostgreSQLBackups(self, "s3-parameters", s3_requirer=self.s3_requirer)
         self.ldap = LDAP(self, self.state)
-        self.backup_events = BackupEventsHandler(
-            self,  # ty: ignore[invalid-argument-type]
-            self.state,
-            self.backup,
-            self.restore_manager,
-        )
         # TLS events handler owns the two cert requirers; build it before the TLS
         # manager so the manager can constructor-inject them for its live-fetch getters.
         self.tls = TLS(self, self.state)
@@ -372,33 +346,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # never triggers a reload against files that were never written.
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
-        self.watcher_handler = WatcherEventsHandler(self, self.workload, self.state)
-        self.async_replication_manager = AsyncReplicationManager(
-            state=self.state,
-            workload=self.workload,
-            patroni_manager=self.patroni_manager,
-            update_config=self.update_config,
-            set_unit_status=self.set_unit_status,
-            set_primary_status_message=self.set_primary_status_message,
-            set_app_status=lambda: self.async_replication.set_app_status(),
-            # K8s-only bridges: on VM the pgdata re-initialisation goes through
-            # _reinitialise_pgdata (workload seam) and there is no leader annotation.
-            create_pgdata=lambda: None,
-            fix_leader_annotation=lambda: True,
-            re_emit_relation_changed=lambda: (
-                self.async_replication._re_emit_async_relation_changed_event()
-            ),
-            watcher=self.watcher_handler,
-        )
-        self.async_replication = PostgreSQLAsyncReplication(
-            self,
-            self.state,
-            self.async_replication_manager,
-            self.patroni_manager,
-            self.workload,
-            watcher=self.watcher_handler,
-        )
-        # self.logical_replication = PostgreSQLLogicalReplication(self)
+        self.async_replication = PostgreSQLAsyncReplication(self)
+        self.watcher_offer = PostgreSQLWatcherRelation(self)
+        self.logical_replication = PostgreSQLLogicalReplication(self, self.state)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -501,15 +451,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
     ):
         """Set unit status without overriding higher priority refresh status."""
-        # RefreshManager invokes the charm-injected set_default_status callable during
-        # its construction (reconcile_refresh_status), before this attribute is
-        # assigned; set the ops status directly in that window, mirroring the direct
-        # sets the library itself performs while reconciling.
-        refresh_manager = getattr(self, "refresh_manager", None)
-        if refresh_manager is None:
-            self.unit.status = status
-            return
-        refresh_manager.set_unit_status(status, refresh=refresh)
+        self.refresh_manager.set_unit_status(status, refresh=refresh)
 
     def _reconcile_refresh_status(self, _=None) -> None:
         """Reconcile the unit status with the refresh status on collect-unit-status."""
@@ -530,7 +472,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set the unit status that applies when no refresh status is active."""
         self._set_primary_status_message()
 
-    def _recompute_async_app_status(self) -> None:
+    def set_app_status(self) -> None:
         """Set the application status from the async-replication state.
 
         Owned by the async-replication module until that phase migrates; the refresh
@@ -566,25 +508,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
         self._setup_pgbackrest_exporter()
-        self.watcher_handler.update_unit_address()
-
-    def set_app_status(self, status: ops.StatusBase) -> None:
-        """Set the application status without overriding a higher-priority refresh status.
-
-        Bridge for the single-kernel async-replication handler, which writes the app
-        status through the charm instead of touching ``self.app.status`` directly.
-        """
-        if self.refresh is not None and self.refresh.app_status_higher_priority:
-            self.app.status = self.refresh.app_status_higher_priority
-            return
-        self.app.status = status
-
-    def set_primary_status_message(self) -> None:
-        """Recompute the unit's primary/standby status message.
-
-        Bridge for the single-kernel async-replication handler (DPE-10203).
-        """
-        self._set_primary_status_message()
+        self.watcher_offer.update_unit_address()
 
     def _restore_unit_status(self, status: ops.StatusBase) -> None:
         """Restore a previously cached unit status.
@@ -1008,8 +932,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
-                self.watcher_handler.disable_watcher()
-                if self.watcher_handler.is_active:
+                self.watcher_offer.disable_watcher()
+                if self.watcher_offer.is_active:
                     logger.info("waiting for RAFT watcher to disconnect.")
                     return
 
@@ -1115,7 +1039,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
         # A new member may be running but not registered if it was added to Raft after starting.
         if (
-            self.watcher_handler.is_watcher_connected
+            self.watcher_offer.is_watcher_connected
             and not self.patroni_manager.is_member_registered_in_cluster()
         ):
             logger.info("Member running but not registered in Raft cluster - restarting Patroni")
@@ -1131,7 +1055,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update watcher relation with fresh peer IPs when peer data changes
         # This ensures pg-endpoints stay current when unit IPs change
         if self.unit.is_leader():
-            self.watcher_handler.update_endpoints()
+            self.watcher_offer.update_endpoints()
             self.async_replication.update_async_replication_data()
 
         self._update_new_unit_status()
@@ -1149,7 +1073,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "s3-initialization-start" in self.app_peer_data
             and "s3-initialization-done" not in self.unit_peer_data
             and self.is_primary
-            and not self.backup.initialise_s3_repository()
+            and not self.backup._on_s3_credential_changed_primary(event)
         ):
             return False
 
@@ -1201,7 +1125,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
             # Update watcher relation with current cluster endpoints
-            self.watcher_handler.update_endpoints()
+            self.watcher_offer.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
@@ -1245,9 +1169,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.patroni_manager.stop_patroni()
             self._update_certificate()
             # Update watcher relation - unit address for all units, endpoints only for leader
-            self.watcher_handler.update_unit_address()
+            self.watcher_offer.update_unit_address()
             if self.unit.is_leader():
-                self.watcher_handler.update_endpoints()
+                self.watcher_offer.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -1265,10 +1189,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
-            if (
-                self.patroni_manager.cluster_members == self._hosts
-                and self._units_ips <= self.members_ips
-            ):
+            if self.patroni_manager.cluster_members == self._hosts:
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
 
@@ -1277,13 +1198,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for member in self._hosts - self.patroni_manager.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
-
-            if missing_ips := self._units_ips - self.members_ips:
-                for ip in missing_ips:
-                    logger.info("Adding new IP %s to the members list", ip)
-                    self._add_to_members_ips(ip)
-                self.update_config()
-
             self.patroni_manager.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
@@ -1486,7 +1400,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if val:
                 updates[key] = val
         self.unit_peer_data.update(updates)
-        self.watcher_handler.update_endpoints()
+        self.watcher_offer.update_endpoints()
 
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
@@ -1505,7 +1419,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             or not self.is_cluster_initialised
             or self.state.unit_ip not in self.members_ips
             or self.has_raft_keys()
-            or (not self.members_ips and not self.watcher_handler.watcher_raft_address)
+            or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
         ):
             return
 
@@ -1521,8 +1435,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         local_addr = f"{self.state.unit_ip}:{RAFT_PORT}"
         remote_addr = (
             watcher_addr
-            if (watcher_addr := self.watcher_handler.watcher_raft_address)
-            and self.watcher_handler.is_active
+            if (watcher_addr := self.watcher_offer.watcher_raft_address)
+            and self.watcher_offer.is_active
             else f"{next(member for member in self.members_ips if member != self.state.unit_ip)}:{RAFT_PORT}"
         )
         try:
@@ -1546,7 +1460,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
         # Install the charmed PostgreSQL snap.
-        self.workload.install_snap_package(revision=None)
+        self._install_snap_package(revision=None)
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -1675,8 +1589,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
-        # if not self.logical_replication.apply_changed_config(event):
-        #     return
+        if not self.logical_replication.apply_changed_config(event):
+            return
 
         if not self.unit.is_leader():
             return
@@ -1801,8 +1715,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
             self._regenerate_internal_cert(reload=False)
 
-        self._update_member_ip()
-
+        self.unit_peer_data.update({"ip": self.state.unit_ip})
         self._ensure_storage_layout()
 
         # Open port
@@ -2176,7 +2089,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.backup.coordinate_stanza_fields()
 
-        # self.logical_replication.retry_validations()
+        self.logical_replication.retry_validations()
 
         self._set_primary_status_message()
 
@@ -2184,19 +2097,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.start_observer()
 
         # Keep this unit data current for watcher AZ/IP checks.
-        self.watcher_handler.update_unit_address()
+        self.watcher_offer.update_unit_address()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()
             self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
-        if self.is_cluster_restoring_to_time and all(self.restore_manager.is_pitr_failed()):
+        if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
             logger.error(
                 "Restore failed: database service failed to reach point-in-time-recovery target. "
                 "You can launch another restore with different parameters"
             )
-            self.restore_manager.log_pitr_last_transaction_time()
+            self.log_pitr_last_transaction_time()
             self.set_unit_status(BlockedStatus(CANNOT_RESTORE_PITR))
             return False
 
@@ -2234,13 +2147,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "restore-timeline": "",
         })
         self.update_config()
-        self.restore_manager.restore_patroni_restart_condition()
+        self.restore_patroni_restart_condition()
 
         logger.info(
             "Restored"
             f"{f' to {restore_to_time}' if restore_to_time else ''}"
             f"{f' from timeline {restore_timeline}' if restore_timeline and not restoring_backup else ''}"
-            f"{f' from backup {parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
+            f"{f' from backup {self.backup._parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
             f". Currently tracking the newly created timeline {current_timeline}."
         )
 
@@ -2271,8 +2184,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES
-            # and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
+            self.is_blocked
+            and self.unit.status not in S3_BLOCK_MESSAGES
+            and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
@@ -2326,12 +2240,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     BlockedStatus(self.app_peer_data["s3-initialization-block-message"])
                 )
                 return
-            # if self.unit.is_leader() and (
-            #     self.app_peer_data.get("logical-replication-validation") == "error"
-            #     or self.logical_replication.has_remote_publisher_errors()
-            # ):
-            #     self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
-            #     return
+            if self.unit.is_leader() and (
+                self.app_peer_data.get("logical-replication-validation") == "error"
+                or self.logical_replication.has_remote_publisher_errors()
+            ):
+                self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
+                return
             if (
                 self.patroni_manager.get_primary(unit_name_pattern=True) == self.unit.name
                 or self.is_standby_leader
@@ -2383,6 +2297,44 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             password has not yet been set by the leader.
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
+
+    def _install_snap_package(
+        self, *, revision: str | None, refresh: charm_refresh.Machines | None = None
+    ) -> None:
+        """Installs PostgreSQL snap.
+
+        Args:
+            revision: snap revision to install.
+            refresh: refresh class; will refresh installed snap if not `None`
+        """
+        if revision is None:
+            if refresh is not None:
+                raise ValueError
+            # TODO: consider using `self.refresh.pinned_snap_revision` instead (requires waiting
+            # for refresh peer relation to be ready before installing snap)
+            with pathlib.Path("refresh_versions.toml").open("rb") as file:
+                revisions = tomli.load(file)["snap"]["revisions"]
+            try:
+                revision = revisions[platform.machine()]
+            except KeyError:
+                logger.error("Unavailable snap architecture %s", platform.machine())
+                raise
+        try:
+            ensure_snap_oom_protection(charm_refresh.snap_name())
+            snap_cache = snap.SnapCache()
+            snap_package = snap_cache[charm_refresh.snap_name()]
+            if not snap_package.present or refresh is not None:
+                snap_package.ensure(snap.SnapState.Present, revision=revision)
+                if refresh is not None:
+                    refresh.update_snap_revision()
+                snap_package.hold()
+        except (snap.SnapError, snap.SnapNotFoundError) as e:
+            logger.error(
+                "An exception occurred when installing %s. Reason: %s",
+                charm_refresh.snap_name(),
+                str(e),
+            )
+            raise
 
     def _on_storage_detaching(self, _) -> None:
         """Stop the workload so Juju can unmount the storage on app teardown."""
@@ -2538,8 +2490,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             async_primary_cluster_endpoint=primary_cluster_endpoint,
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
-            watcher_raft_address=self.watcher_handler.watcher_raft_address
-            if self.watcher_handler.is_active
+            watcher_raft_address=self.watcher_offer.watcher_raft_address
+            if self.watcher_offer.is_active
             else None,
             no_peers=no_peers,
             refresh=refresh,
@@ -2680,6 +2632,119 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _collect_user_relations(self) -> dict[str, str]:
         return self.database_manager.collect_user_relations()
+
+    def override_patroni_restart_condition(
+        self, new_condition: str, repeat_cause: str | None
+    ) -> bool:
+        """Temporary override Patroni systemd service restart condition.
+
+        Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+            repeat_cause: whether this field is equal to the last success override operation repeat cause, Patroni
+                restart condition will be overridden (keeping the original restart condition reference untouched) and
+                success code will be returned. But if this field is distinct from previous repeat cause or None,
+                repeated operation will cause failure code will be returned.
+        """
+        current_condition = self.patroni_manager.get_patroni_restart_condition()
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
+            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
+            if repeat_cause is None:
+                logger.error(
+                    f"failure trying to override patroni restart condition to {new_condition}"
+                    f"as it already overridden from {original_condition} to {current_condition}"
+                )
+                return False
+            previous_repeat_cause = self.unit_peer_data.get(
+                "overridden-patroni-restart-condition-repeat-cause", None
+            )
+            if previous_repeat_cause != repeat_cause:
+                logger.error(
+                    f"failure trying to override patroni restart condition to {new_condition}"
+                    f"as it already overridden from {original_condition} to {current_condition}"
+                    f"and repeat cause is not equal: {previous_repeat_cause} != {repeat_cause}"
+                )
+                return False
+            # There repeat cause is equal
+            self.patroni_manager.update_patroni_restart_condition(new_condition)
+            logger.debug(
+                f"Patroni restart condition re-overridden to {new_condition} within repeat cause {repeat_cause}"
+                f"(original restart condition reference is untouched and is {original_condition})"
+            )
+            return True
+        self.patroni_manager.update_patroni_restart_condition(new_condition)
+        self.unit_peer_data["overridden-patroni-restart-condition"] = current_condition
+        if repeat_cause is not None:
+            self.unit_peer_data["overridden-patroni-restart-condition-repeat-cause"] = repeat_cause
+        logger.debug(
+            f"Patroni restart condition overridden from {current_condition} to {new_condition}"
+            f"{' with repeat cause ' + repeat_cause if repeat_cause is not None else ''}"
+        )
+        return True
+
+    def restore_patroni_restart_condition(self) -> None:
+        """Restore Patroni systemd service restart condition that was before overriding.
+
+        Will do nothing if not overridden. Executes only on current unit.
+        """
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
+            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
+            self.patroni_manager.update_patroni_restart_condition(original_condition)
+            self.unit_peer_data.update({
+                "overridden-patroni-restart-condition": "",
+                "overridden-patroni-restart-condition-repeat-cause": "",
+            })
+            logger.debug(f"restored Patroni restart condition to {original_condition}")
+        else:
+            logger.warning("not restoring patroni restart condition as it's not overridden")
+
+    def is_pitr_failed(self) -> tuple[bool, bool]:
+        """Check if Patroni service failed to bootstrap cluster during point-in-time-recovery.
+
+        Typically, this means that database service failed to reach point-in-time-recovery target or has been
+        supplied with bad PITR parameter. Also, remembers last state and can provide info is it new event, or
+        it belongs to previous action. Executes only on current unit.
+
+        Returns:
+            Tuple[bool, bool]:
+                - Is patroni service failed to bootstrap cluster.
+                - Is it new fail, that wasn't observed previously.
+        """
+        patroni_exceptions = []
+        count = 0
+        while len(patroni_exceptions) == 0 and count < 10:
+            if count > 0:
+                time.sleep(3)
+            patroni_logs = self.patroni_manager.patroni_logs(num_lines="all")
+            patroni_exceptions = re.findall(
+                r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
+                patroni_logs,
+                re.MULTILINE,
+            )
+            count += 1
+
+        if len(patroni_exceptions) > 0:
+            logger.debug("Failures to bootstrap cluster detected on Patroni service logs")
+            old_pitr_fail_id = self.unit_peer_data.get("last_pitr_fail_id", None)
+            self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
+            return True, patroni_exceptions[-1] != old_pitr_fail_id
+
+        logger.debug("No failures detected on Patroni service logs")
+        return False, False
+
+    def log_pitr_last_transaction_time(self) -> None:
+        """Log to user last completed transaction time acquired from postgresql logs."""
+        postgresql_logs = self.patroni_manager.last_postgresql_logs()
+        log_time = re.findall(
+            r"last completed transaction was at log time (.*)$",
+            postgresql_logs,
+            re.MULTILINE,
+        )
+        if len(log_time) > 0:
+            logger.info(f"Last completed transaction was at {log_time[-1]}")
+        else:
+            logger.error("Can't tell last completed transaction time")
 
     def get_plugins(self) -> list[str]:
         """Return a list of installed plugins."""
