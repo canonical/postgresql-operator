@@ -39,13 +39,13 @@ from single_kernel_postgresql.config.exceptions import (
     SwitchoverNotSyncError,
 )
 from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
+from single_kernel_postgresql.utils.backup import CANNOT_RESTORE_PITR
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
 )
 from tenacity import RetryError, wait_fixed
 
-from backups import CANNOT_RESTORE_PITR
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
     PRIMARY_NOT_REACHABLE_MESSAGE,
@@ -1068,10 +1068,10 @@ def test_on_update_status(harness):
         patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
         patch("charm.PatroniManager.get_member_status") as _get_member_status,
         patch(
-            "charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)
+            "charm.BackupManager.can_use_s3_repository", return_value=(True, None)
         ) as _can_use_s3_repository,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
+        patch("charm.RestoreManager.log_pitr_last_transaction_time"),
         patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
     ):
         rel_id = harness.model.get_relation(PEER_RELATION).id
@@ -1152,7 +1152,7 @@ def test_on_update_status_after_restore_operation(harness):
         patch(
             "charm.PostgresqlOperatorCharm._handle_processes_failures"
         ) as _handle_processes_failures,
-        patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
+        patch("charm.BackupManager.can_use_s3_repository") as _can_use_s3_repository,
         patch(
             "single_kernel_postgresql.utils.postgresql.PostgreSQL.get_current_timeline"
         ) as _get_current_timeline,
@@ -1653,9 +1653,9 @@ def test_on_peer_relation_changed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
-        patch("backups.PostgreSQLBackups.coordinate_stanza_fields") as _coordinate_stanza_fields,
+        patch("charm.BackupManager.coordinate_stanza_fields") as _coordinate_stanza_fields,
         patch(
-            "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
+            "charm.BackupManager.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
         patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
@@ -2537,82 +2537,10 @@ def test_set_primary_status_message(harness, is_leader):
                 assert isinstance(harness.charm.unit.status, MaintenanceStatus)
 
 
-def test_override_patroni_restart_condition(harness):
-    with (
-        patch(
-            "charm.PatroniManager.update_patroni_restart_condition"
-        ) as _update_restart_condition,
-        patch("charm.PatroniManager.get_patroni_restart_condition") as _get_restart_condition,
-        patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
-    ):
-        _get_restart_condition.return_value = "always"
-
-        # Do override without repeat_cause
-        assert harness.charm.override_patroni_restart_condition("no", None) is True
-        _get_restart_condition.assert_called_once()
-        _update_restart_condition.assert_called_once_with("no")
-        _get_restart_condition.reset_mock()
-        _update_restart_condition.reset_mock()
-
-        _get_restart_condition.return_value = "no"
-
-        # Must not be overridden twice without repeat_cause
-        assert harness.charm.override_patroni_restart_condition("on-failure", None) is False
-        _get_restart_condition.assert_called_once()
-        _update_restart_condition.assert_not_called()
-        _get_restart_condition.reset_mock()
-        _update_restart_condition.reset_mock()
-
-        # Reset override
-        harness.charm.restore_patroni_restart_condition()
-        _update_restart_condition.assert_called_once_with("always")
-        _update_restart_condition.reset_mock()
-
-        # Must not be reset twice
-        harness.charm.restore_patroni_restart_condition()
-        _update_restart_condition.assert_not_called()
-        _update_restart_condition.reset_mock()
-
-        _get_restart_condition.return_value = "always"
-
-        # Do override with repeat_cause
-        assert harness.charm.override_patroni_restart_condition("no", "test_charm") is True
-        _get_restart_condition.assert_called_once()
-        _update_restart_condition.assert_called_once_with("no")
-        _get_restart_condition.reset_mock()
-        _update_restart_condition.reset_mock()
-
-        _get_restart_condition.return_value = "no"
-
-        # Do re-override with repeat_cause
-        assert harness.charm.override_patroni_restart_condition("on-success", "test_charm") is True
-        _get_restart_condition.assert_called_once()
-        _update_restart_condition.assert_called_once_with("on-success")
-        _get_restart_condition.reset_mock()
-        _update_restart_condition.reset_mock()
-
-        _get_restart_condition.return_value = "on-success"
-
-        # Must not be re-overridden with different repeat_cause
-        assert (
-            harness.charm.override_patroni_restart_condition("on-failure", "test_not_charm")
-            is False
-        )
-        _get_restart_condition.assert_called_once()
-        _update_restart_condition.assert_not_called()
-        _get_restart_condition.reset_mock()
-        _update_restart_condition.reset_mock()
-
-        # Reset override
-        harness.charm.restore_patroni_restart_condition()
-        _update_restart_condition.assert_called_once_with("always")
-        _update_restart_condition.reset_mock()
-
-
 def test_restart_services_after_reboot(harness):
     with (
         patch(
-            "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
+            "charm.BackupManager.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
         patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch(
