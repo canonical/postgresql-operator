@@ -172,7 +172,6 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
-from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -409,7 +408,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
-        self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.databases_change, self._on_databases_change)
@@ -452,6 +450,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             update_config=self.update_config,
             resource_provider=self.workload,
             is_standby_cluster=lambda: self.is_standby_cluster,
+            set_unit_status=self.set_unit_status,
         )
         self.restore_manager = RestoreManager(
             state=self.state,
@@ -537,7 +536,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.refresh.next_unit_allowed_to_refresh = True
 
         self._observer.start_observer()
-        self._rotate_logs.start_log_rotation()
+        self.backup.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
@@ -2680,7 +2679,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.app.planned_units() > 0:
             return
         self._observer.stop_observer()
-        self._rotate_logs.stop_log_rotation()
+        self.backup.stop_log_rotation()
         try:
             # Disable too, so a mid-teardown restart of the unit can't re-enable the
             # services and re-grab the storage mounts before Juju finishes unmounting.

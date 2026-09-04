@@ -128,7 +128,7 @@ def test_on_storage_detaching(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
-        patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+        patch("charm.BackupManager.stop_log_rotation") as _stop_log_rotation,
         patch.object(harness.charm.app, "planned_units") as _planned_units,
     ):
         _selected_snap = _snap_cache.return_value.__getitem__.return_value
