@@ -115,12 +115,14 @@ from single_kernel_postgresql.config.literals import (
 )
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
+from single_kernel_postgresql.events.async_replication import PostgreSQLAsyncReplication
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
+from single_kernel_postgresql.managers.async_replication import AsyncReplicationManager
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
@@ -164,7 +166,6 @@ from constants import (
     UPDATE_CERTS_BIN_PATH,
 )
 from ldap import PostgreSQLLDAP
-from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
@@ -453,8 +454,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # never triggers a reload against files that were never written.
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
-        self.async_replication = PostgreSQLAsyncReplication(self)
         self.watcher_offer = PostgreSQLWatcherRelation(self)
+        self.async_replication_manager = AsyncReplicationManager(
+            state=self.state,
+            workload=self.workload,
+            patroni_manager=self.patroni_manager,
+            update_config=self.update_config,
+        )
+        self.async_replication = PostgreSQLAsyncReplication(
+            self,
+            self.state,
+            self.async_replication_manager,
+            self.patroni_manager,
+            self.workload,
+            watcher=self.watcher_offer,
+        )
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -636,6 +650,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set unit status without overriding higher priority refresh status."""
         if refresh is None:
             refresh = self.refresh
+
         if refresh is not None and refresh.unit_status_higher_priority:
             return
         if (
@@ -649,6 +664,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
         self.unit.status = status
+
+    def set_app_status(self, status: ops.StatusBase) -> None:
+        """Set the application status without overriding a higher-priority refresh status.
+
+        Bridge for the single-kernel async-replication handler, which writes the app
+        status through the charm instead of touching ``self.app.status`` directly.
+        """
+        if self.refresh is not None and self.refresh.app_status_higher_priority:
+            self.app.status = self.refresh.app_status_higher_priority
+            return
+        self.app.status = status
+
+    def set_primary_status_message(self) -> None:
+        """Recompute the unit's primary/standby status message.
+
+        Bridge for the single-kernel async-replication handler (DPE-10203).
+        """
+        self._set_primary_status_message()
 
     def _restore_unit_status(self, status: ops.StatusBase) -> None:
         """Restore a previously cached unit status.
@@ -1565,6 +1598,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
+    @property
+    def _planned_units(self) -> int:
+        """Number of planned units, resilient to a transient goal-state failure.
+
+        ops implements ``Application.planned_units()`` via ``goal-state``, which fails
+        ("saas application ... not found") while a cross-model SAAS force-removed during a
+        dead-DC teardown still lingers in goal-state. Fall back to the count of currently known
+        units so the hook reconciles instead of crashing the ``_patroni`` property and every
+        hook that touches it (DPE-10203).
+        """
+        try:
+            return self.app.planned_units()
+        except ModelError:
+            return len(self._hosts)
+
     @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
@@ -2375,6 +2423,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
+        # Clear a promoted-cluster-counter orphaned by a dead-DC teardown whose relation-broken
+        # never fired (Juju CMR limitation); otherwise a newly-formed async relation re-counts it
+        # and create-replication wrongly reports "There is already a replication set up.".
+        self.async_replication.clear_stale_promotion()
+
         self.backup.coordinate_stanza_fields()
 
         # self.logical_replication.retry_validations()
@@ -2540,10 +2593,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 danger_state = ""
                 if not self._patroni.has_raft_quorum():
                     danger_state = " (read-only)"
-                elif (
-                    len(self.patroni_manager.get_running_cluster_members())
-                    < self.app.planned_units()
-                ):
+                elif len(self.patroni_manager.get_running_cluster_members()) < self._planned_units:
                     danger_state = " (degraded)"
                 unit_status = "Standby" if self.is_standby_leader else "Primary"
                 self.set_unit_status(ActiveStatus(f"{unit_status}{danger_state}"))
@@ -2771,12 +2821,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Updates Patroni config file based on the existence of the TLS files."""
         if refresh is None:
             refresh = self.refresh
-        return self.config_manager.update_config(
+        primary_cluster_endpoint = self.async_replication.get_primary_cluster_endpoint()
+        result = self.config_manager.update_config(
             self.postgresql,
             is_creating_backup=is_creating_backup,
             relations_user_databases_map=self.relations_user_databases_map,
             ldap_parameters=self.get_ldap_parameters(),
-            async_primary_cluster_endpoint=self.async_replication.get_primary_cluster_endpoint(),
+            async_primary_cluster_endpoint=primary_cluster_endpoint,
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
             watcher_raft_address=self.watcher_offer.watcher_raft_address
@@ -2785,6 +2836,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             no_peers=no_peers,
             refresh=refresh,
         )
+        # The lib's apply_api_config only SETS the DCS standby_cluster (when another
+        # cluster is primary) and never CLEARS it. A force-promote bumps the
+        # promoted-cluster-counter but — while the dead-DC relation still lingers — does
+        # not call promote_standby_cluster(), so without this the reconciler never clears
+        # the stale standby and the cluster stays a read-only standby leader (DPE-10203).
+        if (
+            result
+            and not no_peers
+            and self.patroni_manager.member_started
+            and primary_cluster_endpoint is None
+        ):
+            self.patroni_manager.bulk_update_parameters_controller_by_patroni(
+                {}, {"standby_cluster": None}
+            )
+        return result
 
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
