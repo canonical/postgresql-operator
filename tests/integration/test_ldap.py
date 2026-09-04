@@ -212,7 +212,7 @@ def test_glauth_integration(charm) -> None:
                 'charmed-postgresql.psql -d postgres -tAc "SELECT rolname FROM pg_roles" && '
                 'charmed-postgresql.psql -d postgres -tAc "SELECT r.rolname FROM '
                 "pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid "
-                "WHERE g.rolname = 'identity_access'"
+                "WHERE g.rolname = 'identity_access'\""
             ),
         )
         logger.info(
@@ -225,7 +225,7 @@ def test_glauth_integration(charm) -> None:
                 'charmed-postgresql.psql -d postgres -tAc "SELECT rolname FROM pg_roles" && '
                 'charmed-postgresql.psql -d postgres -tAc "SELECT r.rolname FROM '
                 "pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid "
-                "WHERE g.rolname = 'identity_access'"
+                "WHERE g.rolname = 'identity_access'\""
             ),
         )
         logger.info(
