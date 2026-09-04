@@ -165,7 +165,7 @@ from constants import (
 )
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
-from relations.watcher import PostgreSQLWatcherRelation
+from single_kernel_postgresql.events.watcher import WatcherEventsHandler
 from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
@@ -454,7 +454,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.watcher_offer = PostgreSQLWatcherRelation(self)
+        self.watcher_offer = WatcherEventsHandler(
+            self,
+            state=self.state,
+            workload=self.workload,
+            tls_manager=self.tls_manager,
+        )
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -2754,6 +2759,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit_peer_data.pop("postgresql_restarted", None)
         self.on[str(self.restart_manager.name)].acquire_lock.emit()
 
+    def cleanup_raft_cluster(self) -> bool:
+        """Remove stale RAFT members not belonging to the cluster or the watcher. Bridge for the lib watcher handler."""
+        return self._patroni.cleanup_raft_cluster()
+
+    def remove_raft_member(self, address: str) -> None:
+        """Remove a RAFT member. Bridge for the lib watcher handler."""
+        self._patroni.remove_raft_member(address)
+
+    def is_primary_cluster(self) -> bool:
+        """Whether this cluster is the async-replication primary. Bridge for the lib watcher handler."""
+        return self.async_replication.is_primary_cluster()
+
     def restart_services(self) -> None:
         """Restart the monitoring and LDAP sync snap services if needed. Bridge for ConfigManager."""
         cache = snap.SnapCache()
@@ -2779,9 +2796,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             async_primary_cluster_endpoint=self.async_replication.get_primary_cluster_endpoint(),
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
-            watcher_raft_address=self.watcher_offer.watcher_raft_address
-            if self.watcher_offer.is_active
-            else None,
             no_peers=no_peers,
             refresh=refresh,
         )
