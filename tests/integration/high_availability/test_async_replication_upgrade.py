@@ -2,7 +2,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
 import time
 from collections.abc import Generator
@@ -12,11 +11,11 @@ import pytest
 from jubilant import Juju
 from tenacity import Retrying, stop_after_attempt
 
-from .. import architecture
 from .high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
+    get_published_secret_id,
     wait_for_apps_status,
 )
 
@@ -185,7 +184,7 @@ def test_upgrade_from_edge(
     # The offer side publishes primary-cluster-data (with the secret id) into the
     # replication relation; the consumer unit's view of that relation is where the
     # published id is observable from the outside.
-    secret_id_before = _published_secret_id(model_2, f"{DB_APP_2}/0")
+    secret_id_before = get_published_secret_id(model_2, f"{DB_APP_2}/0")
 
     run_pre_refresh_checks(model_1, DB_APP_1)
     run_upgrade_from_edge(model_1, DB_APP_1, charm)
@@ -196,7 +195,7 @@ def test_upgrade_from_edge(
     # The adoption path in _get_secret must reuse the pre-upgrade secret: an id
     # switch would wedge any consumer still running label-attaching code during the
     # cross-version window.
-    assert _published_secret_id(model_2, f"{DB_APP_2}/0") == secret_id_before, (
+    assert get_published_secret_id(model_2, f"{DB_APP_2}/0") == secret_id_before, (
         "the shared secret id changed during the upgrade"
     )
 
@@ -238,18 +237,6 @@ def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
         results.append(unit_max_value)
 
     return results
-
-
-def _published_secret_id(juju: Juju, unit_name: str) -> str | None:
-    """Return the secret id the offer side publishes in primary-cluster-data."""
-    data = json.loads(juju.cli("show-unit", unit_name, "--format", "json"))
-    unit = next(iter(data.values()))
-    for relation in unit.get("relation-info", []):
-        if relation.get("endpoint") == "replication":
-            return json.loads(
-                relation.get("application-data", {}).get("primary-cluster-data", "{}")
-            ).get("secret-id")
-    return None
 
 
 def run_pre_refresh_checks(juju: Juju, app_name: str) -> None:

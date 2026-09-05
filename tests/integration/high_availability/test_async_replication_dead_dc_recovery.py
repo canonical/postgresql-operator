@@ -28,21 +28,19 @@ from collections.abc import Generator
 import jubilant
 import pytest
 from jubilant import Juju
-from tenacity import (
-    Retrying,
-    retry_if_exception_type,
-    stop_after_attempt,
-    stop_after_delay,
-    wait_fixed,
-)
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .. import architecture
 from .high_availability_helpers_new import (
+    consumer_alias_exists,
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
     get_db_standby_leader_unit,
+    get_async_secret_labels,
+    start_continuous_writes,
     wait_for_apps_status,
+    wait_resilient,
 )
 
 DB_APP_1 = "db1"  # original primary DC (killed mid-test)
@@ -112,58 +110,6 @@ def third_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
     yield from _extra_model(juju, request, "third")
 
 
-def _async_secret_labels(juju: Juju, app: str) -> set[str]:
-    """Return the async-replication secret labels owned by *app*'s leader unit."""
-    leader = get_app_leader(juju, app)
-    labels: set[str] = set()
-    for secret_id in juju.cli("exec", "--unit", leader, "--", "secret-ids").split():
-        info = juju.cli("exec", "--unit", leader, "--", "secret-info-get", secret_id)
-        for line in info.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("label:"):
-                label = stripped.split(":", 1)[1].strip()
-                if "async-replication" in label:
-                    labels.add(label)
-    return labels
-
-
-def _consumer_alias_exists(juju: Juju, app: str, label: str) -> bool:
-    """Whether *app*'s leader holds a consumer-side alias for *label*.
-
-    A consumed-secret alias is not listed by ``secret-ids`` (which returns only
-    owned secrets), so ``_async_secret_labels`` can't see it. Probe it directly:
-    ``secret-get --label`` returns content when the alias exists and errors with
-    ``consumer label "<label>" not found`` when it was never registered.
-    """
-    leader = get_app_leader(juju, app)
-    try:
-        juju.cli("exec", "--unit", leader, "--", "secret-get", f"--label={label}")
-        return True
-    except jubilant.CLIError as error:
-        haystack = f"{error} {getattr(error, 'stderr', '')} {getattr(error, 'stdout', '')}".lower()
-        if "not found" in haystack:
-            return False
-        raise
-
-
-def _wait_resilient(juju: Juju, **kwargs) -> None:
-    """Run ``juju.wait`` but retry through transient controller CLIErrors.
-
-    Force-stopping the primary DC's machines momentarily stresses the single,
-    LXD-hosted juju controller — ``juju status`` can transiently fail mid-teardown
-    with "no controller API addresses; is bootstrap still in progress?". Retry
-    across those blips; a real readiness timeout (``WaitError``) still propagates.
-    """
-    for attempt in Retrying(
-        stop=stop_after_delay(8 * MINUTE_SECS),
-        wait=wait_fixed(15),
-        retry=retry_if_exception_type(jubilant.CLIError),
-        reraise=True,
-    ):
-        with attempt:
-            juju.wait(**kwargs)
-
-
 def test_deploy(first_model: str, second_model: str, third_model: str, charm: str) -> None:
     """Deploy three 2-unit PostgreSQL clusters, each with its own watcher and test app."""
     configuration = {"profile": "testing"}
@@ -212,15 +158,6 @@ def test_deploy(first_model: str, second_model: str, third_model: str, charm: st
         )
 
 
-def _start_continuous_writes(model: Juju, test_app: str) -> None:
-    """Start continuous writes through the test application (retry through transient errors)."""
-    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
-        with attempt:
-            model.run(
-                unit=get_app_leader(model, test_app), action="start-continuous-writes"
-            ).raise_on_failure()
-
-
 def test_relate_and_replicate(first_model: str, second_model: str) -> None:
     """Make db2 a standby cluster of db1 via async replication."""
     model_1 = Juju(model=first_model)
@@ -252,16 +189,16 @@ def test_relate_and_replicate(first_model: str, second_model: str) -> None:
 
     # db1 owns the shared secret with NO label (the fix), and db2 is now the
     # read-only standby cluster.
-    assert _async_secret_labels(model_1, DB_APP_1) == set()
+    assert get_async_secret_labels(model_1, DB_APP_1) == set()
     assert get_db_standby_leader_unit(model_2, DB_APP_2)
 
     # Start client writes on the primary: the data they produce must survive the
     # dead-DC teardown and re-appear on the fresh re-replication target.
-    _start_continuous_writes(model_1, DB_TEST_APP_1)
+    start_continuous_writes(model_1, DB_TEST_APP_1)
 
     # Consumer side of the fix: the standby reached standby state by reading the
     # offer secret purely by id, so it registered NO consumer alias under any label.
-    assert not _consumer_alias_exists(model_2, DB_APP_2, FORBIDDEN_LABEL), (
+    assert not consumer_alias_exists(model_2, DB_APP_2, FORBIDDEN_LABEL), (
         "db2 registered a stale-prone consumer-side label alias"
     )
 
@@ -316,7 +253,7 @@ def test_dead_dc_failover_and_recreate_replication(
         params={"scope": "cluster", "force": True},
         wait=5 * MINUTE_SECS,
     ).raise_on_failure()
-    _wait_resilient(
+    wait_resilient(
         model_2,
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
         timeout=20 * MINUTE_SECS,
@@ -331,7 +268,7 @@ def test_dead_dc_failover_and_recreate_replication(
     #    --force, for which Juju delivers no events. While that limitation stands the
     #    offer survives it, so the ticket's workaround — remove-saas --force — runs
     #    next; if Juju ever honors the removal, the offer is already gone and the
-    #    workaround's "not found" is tolerated (the _consumer_alias_exists idiom).
+    #    workaround's "not found" is tolerated (the consumer_alias_exists idiom).
     #    Either way no relation-broken reaches the charm, which is what leaves the
     #    stale consumer label + promotion counter.
     logging.info("Attempting remove-relation --force on the dead relation (ticket Issue 1)")
@@ -346,7 +283,7 @@ def test_dead_dc_failover_and_recreate_replication(
         if "not found" not in haystack:
             raise
         logging.info("Offer already gone; remove-relation --force had cleared it")
-    _wait_resilient(
+    wait_resilient(
         model_2,
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
         timeout=20 * MINUTE_SECS,
@@ -356,12 +293,12 @@ def test_dead_dc_failover_and_recreate_replication(
     model_2.offer(f"{second_model}.{DB_APP_2}", endpoint="replication-offer")
     model_3.consume(f"{second_model}.{DB_APP_2}")
     model_3.integrate(DB_APP_2, f"{DB_APP_3}:replication")
-    _wait_resilient(
+    wait_resilient(
         model_2,
         ready=wait_for_apps_status(jubilant.any_active, DB_APP_2),
         timeout=10 * MINUTE_SECS,
     )
-    _wait_resilient(
+    wait_resilient(
         model_3,
         ready=wait_for_apps_status(jubilant.any_active, DB_APP_3),
         timeout=10 * MINUTE_SECS,
@@ -377,12 +314,12 @@ def test_dead_dc_failover_and_recreate_replication(
         wait=5 * MINUTE_SECS,
     ).raise_on_failure()
 
-    _wait_resilient(
+    wait_resilient(
         model_2,
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
         timeout=20 * MINUTE_SECS,
     )
-    _wait_resilient(
+    wait_resilient(
         model_3,
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_3),
         timeout=20 * MINUTE_SECS,
@@ -390,11 +327,11 @@ def test_dead_dc_failover_and_recreate_replication(
 
     # The promoted db2 owns the shared secret with NO label — proof the
     # owner-create did not collide with any stale consumer alias (DPE-10203).
-    assert _async_secret_labels(model_2, DB_APP_2) == set(), (
+    assert get_async_secret_labels(model_2, DB_APP_2) == set(), (
         "db2 owns the async-replication secret under a label"
     )
     # db3 is the standby of the recovered primary.
-    assert not _consumer_alias_exists(model_3, DB_APP_3, FORBIDDEN_LABEL), (
+    assert not consumer_alias_exists(model_3, DB_APP_3, FORBIDDEN_LABEL), (
         "db3 registered a stale-prone consumer-side label alias"
     )
     # The fresh re-replication target carries the pre-death data — the whole point

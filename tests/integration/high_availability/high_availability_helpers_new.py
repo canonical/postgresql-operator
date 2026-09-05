@@ -11,7 +11,13 @@ import requests
 from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
 from single_kernel_postgresql.config.literals import PEER_RELATION
-from tenacity import Retrying, stop_after_delay, wait_fixed
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
 from ..helpers import execute_queries_on_unit
 
@@ -264,3 +270,76 @@ def count_switchovers(juju: Juju, app_name: str) -> int:
     unit_address = get_unit_ip(juju, app_name, app_primary)
     switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
     return len(switchover_history_info.json())
+
+
+def get_async_secret_labels(juju: Juju, app: str) -> set[str]:
+    """Return the async-replication secret labels owned by *app*'s leader unit."""
+    leader = get_app_leader(juju, app)
+    labels: set[str] = set()
+    for secret_id in juju.cli("exec", "--unit", leader, "--", "secret-ids").split():
+        info = juju.cli("exec", "--unit", leader, "--", "secret-info-get", secret_id)
+        for line in info.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("label:"):
+                label = stripped.split(":", 1)[1].strip()
+                if "async-replication" in label:
+                    labels.add(label)
+    return labels
+
+
+def consumer_alias_exists(juju: Juju, app: str, label: str) -> bool:
+    """Whether *app*'s leader holds a consumer-side alias for *label*.
+
+    A consumed-secret alias is not listed by ``secret-ids`` (which returns only
+    owned secrets), so ``get_async_secret_labels`` can't see it. Probe it directly:
+    ``secret-get --label`` returns content when the alias exists and errors with
+    ``consumer label "<label>" not found`` when it was never registered.
+    """
+    leader = get_app_leader(juju, app)
+    try:
+        juju.cli("exec", "--unit", leader, "--", "secret-get", f"--label={label}")
+        return True
+    except jubilant.CLIError as error:
+        haystack = f"{error} {getattr(error, 'stderr', '')} {getattr(error, 'stdout', '')}".lower()
+        if "not found" in haystack:
+            return False
+        raise
+
+
+def wait_resilient(juju: Juju, **kwargs) -> None:
+    """Run ``juju.wait`` but retry through transient controller CLIErrors.
+
+    Force-stopping a whole datacenter's machines can momentarily stress a single
+    LXD-hosted juju controller — ``juju status`` can transiently fail mid-teardown
+    with "no controller API addresses; is bootstrap still in progress?". Retry
+    across those blips; a real readiness timeout (``WaitError``) still propagates.
+    """
+    for attempt in Retrying(
+        stop=stop_after_delay(8 * MINUTE_SECS),
+        wait=wait_fixed(15),
+        retry=retry_if_exception_type(jubilant.CLIError),
+        reraise=True,
+    ):
+        with attempt:
+            juju.wait(**kwargs)
+
+
+def start_continuous_writes(model: Juju, test_app: str) -> None:
+    """Start continuous writes through the test application (retry through transient errors)."""
+    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
+        with attempt:
+            model.run(
+                unit=get_app_leader(model, test_app), action="start-continuous-writes"
+            ).raise_on_failure()
+
+
+def get_published_secret_id(juju: Juju, unit_name: str) -> str | None:
+    """Return the secret id the offer side publishes in primary-cluster-data."""
+    data = json.loads(juju.cli("show-unit", unit_name, "--format", "json"))
+    unit = next(iter(data.values()))
+    for relation in unit.get("relation-info", []):
+        if relation.get("endpoint") == "replication":
+            return json.loads(
+                relation.get("application-data", {}).get("primary-cluster-data", "{}")
+            ).get("secret-id")
+    return None
