@@ -165,10 +165,7 @@ def test_glauth_integration(charm) -> None:
         # hba 'ldap' line into a database if the group has CONNECT. Pending the
         # charm-side grant, do it here so the auth poll can complete.
         execute_query_on_unit(
-            address,
-            password,
-            f'CREATE ROLE "{LDAP_GROUP}" NOLOGIN; '
-            'GRANT CONNECT ON DATABASE postgres TO "identity_access"; SELECT 1;',
+            address, password, 'GRANT CONNECT ON DATABASE postgres TO "identity_access"; SELECT 1;'
         )
         juju_k8s.deploy(GLAUTH_UTILS_APP_NAME, channel="edge", trust=True, constraints=constraints)
         juju_k8s.integrate(GLAUTH_UTILS_APP_NAME, GLAUTH_APP_NAME)
