@@ -1,0 +1,158 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the second database
+  postgresql-test-app/1 [idle] active: received database credentials of the second database
+  database/2 [executing] active: Primary
+  database/3 [executing] active: 
+  another-database/0 [idle] active: Primary
+  another-database/1 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/jammy/data-integrator-472
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  another-data-integrator/0 [executing] maintenance: installing charm software
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [idle] blocked: Please relate the data-integrator with the desired product
+  another-data-integrator/0 [idle] blocked: Please specify either topic, index, database name, keyspace name, or prefix
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: Primary
+  database/3 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: Primary
+  database/3 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: Primary
+  database/3 [idle] blocked: invalid role(s) for extra user roles
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/2 [idle] active: Primary
+  database/3 [idle] blocked: invalid role(s) for extra user roles
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  00:42:01Z
+
+App                      Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+another-application               active       1  postgresql-test-app  latest/edge  587  no       received database credentials of the first database
+another-data-integrator           blocked      1  data-integrator      latest/edge  472  no       Please relate the data-integrator with the desired product
+another-database         14.24    active       2  postgresql                          1  no       
+data-integrator                   blocked      1  data-integrator      latest/edge  472  no       Please relate the data-integrator with the desired product
+database                 14.24    active       2  postgresql                          0  no       
+postgresql-test-app               active       2  postgresql-test-app  latest/edge  587  no       received database credentials of the second database
+
+Unit                        Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*      active    idle   6        10.27.12.38               received database credentials of the first database
+another-data-integrator/0*  blocked   idle   10       10.27.12.33               Please relate the data-integrator with the desired product
+another-database/0*         active    idle   3        10.27.12.139    5432/tcp  Primary
+another-database/1          active    idle   4        10.27.12.232    5432/tcp  
+data-integrator/0*          blocked   idle   9        10.27.12.201              Please relate the data-integrator with the desired product
+database/2                  active    idle   7        10.27.12.132    5432/tcp  Primary
+database/3*                 active    idle   8        10.27.12.131    5432/tcp  
+postgresql-test-app/0*      active    idle   0        10.27.12.159              received database credentials of the second database
+postgresql-test-app/1       active    idle   1        10.27.12.156              received database credentials of the second database
+
+Machine  State    Address       Inst id         Base          AZ             Message
+0        started  10.27.12.159  juju-550494-0   ubuntu@22.04  runnervm9xg2d  Running
+1        started  10.27.12.156  juju-550494-1   ubuntu@22.04  runnervm9xg2d  Running
+3        started  10.27.12.139  juju-550494-3   ubuntu@22.04  runnervm9xg2d  Running
+4        started  10.27.12.232  juju-550494-4   ubuntu@22.04  runnervm9xg2d  Running
+6        started  10.27.12.38   juju-550494-6   ubuntu@22.04  runnervm9xg2d  Running
+7        started  10.27.12.132  juju-550494-7   ubuntu@22.04  runnervm9xg2d  Running
+8        started  10.27.12.131  juju-550494-8   ubuntu@22.04  runnervm9xg2d  Running
+9        started  10.27.12.201  juju-550494-9   ubuntu@22.04  runnervm9xg2d  Running
+10       started  10.27.12.33   juju-550494-10  ubuntu@22.04  runnervm9xg2d  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:07:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:07:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:09:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:09:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:09:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:09:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 00:09:35 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f959d53b3a0 state=finished raised Exception>]
+unit-another-database-0: 00:09:37 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f10a7233d60 state=finished raised Exception>]
+unit-another-database-0: 00:09:39 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa5fe86bcd0 state=finished raised Exception>]
+unit-another-database-0: 00:09:40 ERROR unit.another-database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-another-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9630523d00 state=finished raised Exception>]
+unit-another-database-0: 00:09:48 ERROR unit.another-database/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-database-0: 00:10:15 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fce71715a80 state=finished raised Exception>]
+unit-database-0: 00:10:16 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f6a7dbfff70 state=finished raised Exception>]
+unit-database-0: 00:10:18 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4d224f7f70 state=finished raised Exception>]
+unit-database-0: 00:10:20 ERROR unit.database/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-database-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0c5e0f7f70 state=finished raised Exception>]
+unit-database-0: 00:10:27 ERROR unit.database/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-5: 00:14:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:14:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:20:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:20:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:26:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 00:26:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:26:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 00:26:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:30:57 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 00:30:57 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 00:30:57 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 00:30:57 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 00:36:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 00:36:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 00:39:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 00:39:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
