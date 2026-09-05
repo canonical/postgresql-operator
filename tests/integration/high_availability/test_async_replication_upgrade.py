@@ -11,6 +11,7 @@ import pytest
 from jubilant import Juju
 from tenacity import Retrying, stop_after_attempt
 
+from .. import architecture
 from .high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
