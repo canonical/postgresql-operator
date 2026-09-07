@@ -1,0 +1,33 @@
+# Full concierge config for the LDAP spread test only: it adds the Canonical
+# K8s controller (needed by the glauth-k8s stack) on top of the LXD one that
+# the suite-level prepare already bootstraps from the repo's concierge.yaml.
+# Reference copy kept in sync with the inline heredoc in task.yaml (the
+# authoritative source). Not consumed at runtime since the config moved
+# inline; retained for a future attempt at the non-inline --config form.
+juju:
+  # The default 20-minute bootstrap timeout is too short for the k8s controller
+  # pod to expose its API on slow CI runners (from the concierge k8s preset).
+  extra-bootstrap-args: --config bootstrap-timeout=1800
+  model-defaults:
+    logging-config: <root>=INFO; unit=DEBUG
+providers:
+  lxd:
+    enable: true
+    bootstrap: true
+  k8s:
+    enable: true
+    bootstrap: true
+    bootstrap-constraints:
+      root-disk: "2G"
+    features:
+      load-balancer:
+        l2-mode: "true"
+        cidrs: "10.43.45.0/28"
+      local-storage: {}
+      network: {}
+host:
+  snaps:
+    jhack:
+      channel: latest/edge
+      connections:
+        - jhack:dot-local-share-juju snapd

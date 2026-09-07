@@ -1,0 +1,47 @@
+summary: test_ldap.py
+environment:
+  TEST_MODULE: test_ldap.py
+execute: |
+  # The glauth-k8s stack needs a Kubernetes controller; bootstrap it here so
+  # no other integration job pays for it. Idempotent: concierge skips
+  # providers that are already installed and bootstrapped. The config is
+  # inlined because the task's working directory is not guaranteed to be the
+  # repository root, so a relative --config path is not reliably readable.
+  # Note: a hard-killed task (kill-timeout) leaves its glauth-<uuid> model on
+  # the k8s controller; CI runners are throwaway, so the leak is accepted.
+  sudo tee /tmp/concierge-k8s.yaml > /dev/null <<'EOF'
+  juju:
+    # The default 20-minute bootstrap timeout is too short for the k8s controller
+    # pod to expose its API on slow CI runners (from the concierge k8s preset).
+    extra-bootstrap-args: --config bootstrap-timeout=1800
+    model-defaults:
+      logging-config: <root>=INFO; unit=DEBUG
+  providers:
+    lxd:
+      enable: true
+      bootstrap: true
+    k8s:
+      enable: true
+      bootstrap: true
+      bootstrap-constraints:
+        root-disk: "2G"
+      features:
+        load-balancer:
+          l2-mode: "true"
+          cidrs: "10.43.45.0/28"
+        local-storage: {}
+        network: {}
+  host:
+    snaps:
+      jhack:
+        channel: latest/edge
+        connections:
+          - jhack:dot-local-share-juju snapd
+  EOF
+  sudo concierge prepare --config /tmp/concierge-k8s.yaml --trace
+  # Pin the ambient juju context: the dual prepare leaves the current model on
+  # concierge-k8s, and bare jubilant.Juju() must hit the LXD testing model.
+  export JUJU_MODEL=concierge-lxd:testing
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results

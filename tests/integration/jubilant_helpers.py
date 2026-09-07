@@ -932,15 +932,17 @@ def execute_query_on_unit(
     password: str,
     query: str,
     database: str = DATABASE_DEFAULT_NAME,
+    username: str = "operator",
     sslmode: str | None = None,
 ):
     """Execute given PostgreSQL query on a unit.
 
     Args:
         unit_address: The public IP address of the unit to execute the query on.
-        password: The PostgreSQL superuser password.
+        password: The password for the connecting user.
         query: Query to execute.
         database: Optional database to connect to (defaults to postgres database).
+        username: The PostgreSQL user to connect as (defaults to operator).
         sslmode: Optional ssl mode to use (defaults to None).
 
     Returns:
@@ -949,7 +951,7 @@ def execute_query_on_unit(
     extra_connection_parameters = f"sslmode={sslmode}" if sslmode else ""
     with (
         psycopg2.connect(
-            f"dbname='{database}' user='operator' host='{unit_address}'"
+            f"dbname='{database}' user='{username}' host='{unit_address}'"
             f"password='{password}' connect_timeout=10 {extra_connection_parameters}"
         ) as connection,
         connection.cursor() as cursor,
