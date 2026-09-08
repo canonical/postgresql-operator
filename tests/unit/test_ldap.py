@@ -4,9 +4,9 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from charms.glauth_k8s.v0.ldap import LdapProviderData
 from ops.testing import Harness
 from single_kernel_postgresql.config.literals import PEER_RELATION
+from single_kernel_postgresql.lib.charms.glauth_k8s.v0.ldap import LdapProviderData
 
 from charm import PostgresqlOperatorCharm
 
