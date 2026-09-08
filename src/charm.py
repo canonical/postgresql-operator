@@ -116,6 +116,7 @@ from single_kernel_postgresql.config.literals import (
 from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
+from single_kernel_postgresql.events.ldap import LDAP
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
@@ -163,7 +164,6 @@ from constants import (
     TEMP_STORAGE_PATH,
     UPDATE_CERTS_BIN_PATH,
 )
-from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
@@ -418,7 +418,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._storage_path = self.meta.storages["data"].location
 
         self.backup = PostgreSQLBackups(self, "s3-parameters")
-        self.ldap = PostgreSQLLDAP(self, "ldap")
+        self.ldap = LDAP(self, self.state)
         # TLS events handler owns the two cert requirers; build it before the TLS
         # manager so the manager can constructor-inject them for its live-fetch getters.
         self.tls = TLS(self, self.state)
@@ -443,6 +443,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             tls_manager=self.tls_manager,
             patroni_manager=self.patroni_manager,
             database_manager=self.database_manager,
+            ldap_handler=self.ldap,
             resource_provider=self.get_resource_provider,
             request_restart=self.request_restart,
             restart_services=self.restart_services,
@@ -2103,7 +2104,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             cache = snap.SnapCache()
             postgres_snap = cache[charm_refresh.snap_name()]
 
-        ldap_params = self.get_ldap_parameters()
+        ldap_params = self.ldap.get_ldap_parameters()
         ldap_url = urlparse(ldap_params["ldapurl"])
         ldap_host = ldap_url.hostname
         ldap_port = ldap_url.port
@@ -2775,7 +2776,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.postgresql,
             is_creating_backup=is_creating_backup,
             relations_user_databases_map=self.relations_user_databases_map,
-            ldap_parameters=self.get_ldap_parameters(),
             async_primary_cluster_endpoint=self.async_replication.get_primary_cluster_endpoint(),
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
@@ -3033,32 +3033,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for ext in SPI_MODULE:
                 plugins.append(ext)
         return plugins
-
-    def get_ldap_parameters(self) -> dict:
-        """Returns the LDAP configuration to use."""
-        if not self.is_cluster_initialised:
-            return {}
-        if not self.is_ldap_charm_related:
-            logger.debug("LDAP is not enabled")
-            return {}
-
-        data = self.ldap.get_relation_data()
-        if data is None:
-            return {}
-
-        params = {
-            "ldapbasedn": data.base_dn,
-            "ldapbinddn": data.bind_dn,
-            "ldapbindpasswd": data.bind_password,
-            "ldaptls": data.starttls,
-            "ldapurl": data.urls[0],
-            # LDAP authentication parameters that are exclusive to
-            # one of the two supported modes (simple bind or search+bind)
-            # must be put at the very end of the parameters string
-            "ldapsearchfilter": self.config.ldap_search_filter,
-        }
-
-        return params
 
 
 if __name__ == "__main__":
