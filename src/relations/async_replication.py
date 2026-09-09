@@ -79,8 +79,11 @@ ASYNC_SHARED_SECRET_ID_KEY = "async-replication-secret-id"  # noqa: S105 — a d
 def _same_secret_id(a: str | None, b: str | None) -> bool:
     """Whether two Juju secret ids refer to the same secret.
 
-    Juju/ops may render an id as ``secret:<key>`` or ``secret://<uuid>/<key>``; compare on the
-    trailing key so a format difference doesn't mask a real match.
+    Charm revisions before DPE-10203 publish mangled ids
+    (``secret://<model-uuid>//<model-uuid>/<key>``: their id-rebuild workaround
+    re-prefixed an id that ops >= 2.17 already renders in full). Compare on the
+    trailing key — the local secret id, identical in every rendering — so the
+    format difference doesn't mask a real match.
     """
     if not a or not b:
         return False
