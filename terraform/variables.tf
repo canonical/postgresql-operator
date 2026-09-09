@@ -1,5 +1,5 @@
 variable "juju_model" {
-  description = "Juju model uuid"
+  description = "Juju model UUID to deploy into"
   type        = string
   default     = null
 }
