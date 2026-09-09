@@ -157,16 +157,19 @@ def test_glauth_integration(charm) -> None:
         logger.info("Creating the mapped PostgreSQL group and setting the LDAP group mapping")
         # The mapped role must exist BEFORE ldap-map is set: the charm validates the
         # map's psql groups against pg_roles on config-changed and blocks otherwise.
-        execute_query_on_unit(address, password, f'CREATE ROLE "{LDAP_GROUP}" NOLOGIN; SELECT 1;')
+        execute_query_on_unit(
+            address,
+            password,
+            f'CREATE ROLE "{LDAP_GROUP}" NOLOGIN; '
+            f'GRANT CONNECT ON DATABASE postgres TO "{LDAP_GROUP}"; SELECT 1;',
+        )
         juju.config(DATABASE_APP_NAME, {"ldap-map": f"{LDAP_GROUP}={LDAP_GROUP}"})
 
-        # The charm creates identity_access (NOLOGIN) but does not grant it
-        # CONNECT on the postgres database yet; LDAP users can only pass the
-        # hba 'ldap' line into a database if the group has CONNECT. Pending the
-        # charm-side grant, do it here so the auth poll can complete.
-        execute_query_on_unit(
-            address, password, 'GRANT CONNECT ON DATABASE postgres TO "identity_access"; SELECT 1;'
-        )
+        # Per the DA148 spec, the charm grants no database privileges to LDAP
+        # users: authorization is managed through other means (e.g. the
+        # data-integrator flow). The CONNECT grant above simulates the operator
+        # authorizing the mapped group after the ldap-map; identity_access
+        # stays a pure authentication marker (least privilege).
         juju_k8s.deploy(GLAUTH_UTILS_APP_NAME, channel="edge", trust=True, constraints=constraints)
         juju_k8s.integrate(GLAUTH_UTILS_APP_NAME, GLAUTH_APP_NAME)
         juju_k8s.wait(
