@@ -50,7 +50,21 @@ juju add-machine
 
 terraform apply -var='juju_model_name=welcome' -var='machine=19'
 ```
-Note: the module variables `units` and `machine` are self-exclusive.
+
+Example of deploying multiple units to specific Juju machines (e.g. for HA):
+```
+juju add-machine
+> created machine 19
+juju add-machine
+> created machine 20
+juju add-machine
+> created machine 21
+
+terraform apply -var='juju_model_name=welcome' -var='machines=["19","20","21"]' -auto-approve
+```
+The number of machines in the set determines the number of units deployed.
+
+Note: the module variables `units`, `machine` and `machines` are self-exclusive: `machines` takes precedence over `machine`, and either overrides `units`.
 
 Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs/h-deploy-terraform) for more examples.
 
@@ -65,6 +79,7 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 | revision | Revision number to deploy charm | `number` | n/a | no |
 | base | Application base | `string` | `ubuntu@24.04` | no |
 | machine | Target Juju machine to deploy on | `string` | n/a | no |
+| machines | Target Juju machines to deploy on | `set(string)` | n/a | no |
 | units | Number of units to deploy | `number` | `1` | no |
 | constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
 | storage | Storage directive | `map(string)` | `{}` | no |
