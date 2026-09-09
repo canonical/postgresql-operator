@@ -24,6 +24,7 @@ from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from . import architecture
 from .jubilant_helpers import (
+    DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
     execute_query_on_unit,
     get_password,
@@ -40,6 +41,7 @@ K8S_CONTROLLER = os.environ.get("K8S_CONTROLLER_NAME", "concierge-k8s")
 LDAP_GROUP = "superheros"
 LDAP_USER = "jdoe"
 LDAP_USER_PASSWORD = "ldap-sync-test"
+LDAP_DATABASE_NAME = "ldap_test"
 
 WAIT_TIMEOUT = 1800
 
@@ -157,19 +159,44 @@ def test_glauth_integration(charm) -> None:
         logger.info("Creating the mapped PostgreSQL group and setting the LDAP group mapping")
         # The mapped role must exist BEFORE ldap-map is set: the charm validates the
         # map's psql groups against pg_roles on config-changed and blocks otherwise.
+        # Deploy data-integrator and relate it: per the DA148 spec, LDAP
+        # (identity) users get their authorization through the regular relation
+        # flow — the relation creates the database and the operator grants
+        # privileges to the mapped group on it.
+        logger.info("Deploying data-integrator and relating it to the database")
+        juju_k8s.deploy(
+            DATA_INTEGRATOR_APP_NAME,
+            config={"database-name": LDAP_DATABASE_NAME},
+            constraints=constraints,
+        )
+        juju_k8s.integrate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
+        juju_k8s.wait(
+            lambda status: jubilant.all_active(status, DATA_INTEGRATOR_APP_NAME),
+            delay=10,
+            timeout=WAIT_TIMEOUT,
+        )
+        action = juju_k8s.run(DATA_INTEGRATOR_APP_NAME, "get-credentials")
+        relation_user = action.results["postgresql"]["username"]
+        relation_password = action.results["postgresql"]["password"]
+        # The regular scram relation flow must keep working alongside LDAP.
+        execute_query_on_unit(
+            address,
+            relation_password,
+            "SELECT 1;",
+            database=LDAP_DATABASE_NAME,
+            username=relation_user,
+        )
+        # Simulate the operator's post-mapping grant (see the limitation note in
+        # the PR description): accepting GROUP entity requests from
+        # data-integrator is tracked upstream at
+        # canonical/postgresql-single-kernel-library#297.
         execute_query_on_unit(
             address,
             password,
-            f'CREATE ROLE "{LDAP_GROUP}" NOLOGIN; '
-            f'GRANT CONNECT ON DATABASE postgres TO "{LDAP_GROUP}"; SELECT 1;',
+            f'GRANT CONNECT ON DATABASE "{LDAP_DATABASE_NAME}" TO "{LDAP_GROUP}"; SELECT 1;',
         )
         juju.config(DATABASE_APP_NAME, {"ldap-map": f"{LDAP_GROUP}={LDAP_GROUP}"})
 
-        # Per the DA148 spec, the charm grants no database privileges to LDAP
-        # users: authorization is managed through other means (e.g. the
-        # data-integrator flow). The CONNECT grant above simulates the operator
-        # authorizing the mapped group after the ldap-map; identity_access
-        # stays a pure authentication marker (least privilege).
         juju_k8s.deploy(GLAUTH_UTILS_APP_NAME, channel="edge", trust=True, constraints=constraints)
         juju_k8s.integrate(GLAUTH_UTILS_APP_NAME, GLAUTH_APP_NAME)
         juju_k8s.wait(
