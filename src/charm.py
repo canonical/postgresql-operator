@@ -1570,16 +1570,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _planned_units(self) -> int:
         """Number of planned units, resilient to a transient goal-state failure.
 
-        ops implements ``Application.planned_units()`` via ``goal-state``, which fails
-        ("saas application ... not found") while a cross-model SAAS force-removed during a
-        dead-DC teardown still lingers in goal-state. Fall back to the count of currently known
-        units so the hook reconciles instead of crashing the ``_patroni`` property and every
-        hook that touches it (DPE-10203).
+        Delegates to the lib's cached-and-guarded accessor (DPE-10203): one
+        ``goal-state`` read per hook, shared by the render's synchronous block,
+        the membership checks, and the degraded-status computation; a failing
+        read falls back to the count of currently known units instead of
+        crashing.
         """
-        try:
-            return self.app.planned_units()
-        except ModelError:
-            return len(self._hosts)
+        return self.state.application.planned_units
 
     @cached_property
     def _patroni(self) -> Patroni:
