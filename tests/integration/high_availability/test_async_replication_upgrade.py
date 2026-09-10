@@ -16,6 +16,7 @@ from .high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
+    get_published_secret_id,
     wait_for_apps_status,
 )
 
@@ -177,15 +178,27 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 def test_upgrade_from_edge(
     first_model: str, second_model: str, charm: str, first_model_continuous_writes
 ) -> None:
-    """Upgrade the two PostgreSQL clusters."""
+    """Upgrade the two PostgreSQL clusters and assert the shared secret id is stable."""
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
+
+    # The offer side publishes primary-cluster-data (with the secret id) into the
+    # replication relation; the consumer unit's view of that relation is where the
+    # published id is observable from the outside.
+    secret_id_before = get_published_secret_id(model_2, f"{DB_APP_2}/0")
 
     run_pre_refresh_checks(model_1, DB_APP_1)
     run_upgrade_from_edge(model_1, DB_APP_1, charm)
 
     run_pre_refresh_checks(model_2, DB_APP_2)
     run_upgrade_from_edge(model_2, DB_APP_2, charm)
+
+    # The adoption path in _get_secret must reuse the pre-upgrade secret: an id
+    # switch would wedge any consumer still running label-attaching code during the
+    # cross-version window.
+    assert get_published_secret_id(model_2, f"{DB_APP_2}/0") == secret_id_before, (
+        "the shared secret id changed during the upgrade"
+    )
 
 
 def test_data_replication(
