@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 from ops import Application, ModelError
 from single_kernel_postgresql.config.literals import (
+    APP_SCOPE,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
 )
@@ -1133,3 +1134,149 @@ def test_remote_unit_addresses_skips_unreadable_dead_peer_units():
         PostgreSQLAsyncReplication, "model", new_callable=PropertyMock, return_value=mock_model
     ):
         assert relation._remote_unit_addresses() == ["10.0.0.1"]
+
+
+def test_on_secret_changed_early_exits_for_non_leader():
+    # Every unit of the cluster receives secret-changed events for the shared secrets,
+    # but both handler branches write application-scope data (offer: the shared secret
+    # content; consumer: the internal app secret), which only the leader can write.
+    # Non-leader units must exit early instead of crashing the hook (DPE-11134).
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = False
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    offer_event = MagicMock()
+    offer_event.secret.label = f"database-peers.{mock_charm.model.app.name}.app"
+    consumer_event = MagicMock()
+    consumer_event.secret.id = "secret://uuid/abc123"
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=_consumer_relation("secret://uuid/abc123"),
+        ),
+        patch.object(PostgreSQLAsyncReplication, "_get_secret") as mock_get_secret,
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update_internal,
+    ):
+        relation._on_secret_changed(offer_event)
+        relation._on_secret_changed(consumer_event)
+
+    mock_get_secret.assert_not_called()
+    mock_update_internal.assert_not_called()
+    offer_event.defer.assert_not_called()
+    consumer_event.defer.assert_not_called()
+
+
+def test_on_secret_changed_still_processes_for_leader():
+    # The leader guard must not break the existing leader-side behaviour.
+    mock_charm = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    consumer_event = MagicMock()
+    consumer_event.secret.id = "secret://uuid/abc123"
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=_consumer_relation("secret:abc123"),
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update_internal,
+    ):
+        relation._on_secret_changed(consumer_event)
+
+    mock_update_internal.assert_called_once()
+
+
+def test_update_async_replication_data_pulls_shared_secret_on_standby():
+    # Juju does not notify the consumer side when the primary cluster rotates the
+    # shared secret across the cross-model relation, so the standby leader must pull
+    # the shared secret content on every reconciliation (DPE-11134).
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    standby_relation = MagicMock()
+    standby_relation.name = REPLICATION_CONSUMER_RELATION
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=standby_relation,
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_get_primary_cluster",
+            return_value=MagicMock(),
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update_internal,
+    ):
+        relation.update_async_replication_data()
+
+    mock_update_internal.assert_called_once()
+
+
+def test_update_async_replication_data_pushes_on_primary():
+    # The primary cluster keeps pushing its own secret content to the shared secret.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    offer_relation = MagicMock()
+    offer_relation.name = REPLICATION_OFFER_RELATION
+
+    with (
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_relation",
+            new_callable=PropertyMock,
+            return_value=offer_relation,
+        ),
+        patch.object(
+            PostgreSQLAsyncReplication,
+            "_get_primary_cluster",
+            return_value=mock_charm.app,
+        ),
+        patch.object(PostgreSQLAsyncReplication, "_update_primary_cluster_data") as mock_push,
+        patch.object(
+            PostgreSQLAsyncReplication, "_update_internal_secret", return_value=True
+        ) as mock_update_internal,
+    ):
+        relation.update_async_replication_data()
+
+    mock_push.assert_called_once()
+    mock_update_internal.assert_not_called()
+
+
+def test_update_internal_secret_skips_unchanged_passwords():
+    # Every rewrite of the app secret creates a new Juju revision; passwords that
+    # already match the shared secret must not be rewritten.
+    mock_charm = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    secret = MagicMock()
+    secret.peek_content.return_value = {
+        "operator-password": "changed-password",
+        "replication-password": "unchanged-password",
+    }
+    mock_charm.model.get_secret.return_value = secret
+    mock_charm.get_secret.return_value = "unchanged-password"
+
+    with patch.object(
+        PostgreSQLAsyncReplication, "_remote_secret_id", return_value="secret://uuid/abc123"
+    ):
+        assert relation._update_internal_secret() is True
+
+    mock_charm.set_secret.assert_called_once_with(
+        APP_SCOPE, "operator-password", "changed-password"
+    )

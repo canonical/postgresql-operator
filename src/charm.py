@@ -2330,6 +2330,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.set_unit_status(BlockedStatus("Password update for system users failed."))
             return
 
+        # Refresh the shared async-replication secret content. The standby cluster only
+        # learns about password rotations when the primary cluster updates that secret,
+        # otherwise its own Juju app secret keeps the old password (DPE-11134).
+        self.async_replication.update_async_replication_data()
+
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
