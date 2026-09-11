@@ -38,7 +38,11 @@ from single_kernel_postgresql.config.exceptions import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from single_kernel_postgresql.config.literals import PEER_RELATION, SECRET_INTERNAL_LABEL
+from single_kernel_postgresql.config.literals import (
+    APP_SCOPE,
+    PEER_RELATION,
+    SECRET_INTERNAL_LABEL,
+)
 from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -2966,3 +2970,66 @@ def test_planned_units_survives_goal_state_failure(harness):
         side_effect=ModelError('ERROR saas application "db1" not found'),
     ):
         assert charm._planned_units == len(charm._hosts)
+
+
+def test_on_secret_changed_refreshes_async_replication_data(harness):
+    """Rotating system-user passwords must refresh the shared async-replication secret.
+
+    Regression for DPE-11134: the standby cluster only learns about password rotations
+    when the primary cluster updates the shared secret content; without the refresh the
+    standby's own Juju app secret keeps the old password.
+    """
+    harness.update_config({"system-users": "secret:fake-user-secret-id"})
+    with harness.hooks_disabled():
+        harness.set_leader()
+
+    with (
+        patch.object(harness.charm, "_on_peer_relation_changed"),
+        patch("charm.PatroniManager.are_all_members_ready", return_value=True),
+        patch.object(harness.charm, "postgresql") as postgresql_mock,
+        patch.object(
+            harness.charm, "get_secret_from_id", return_value={"operator": "new-password"}
+        ),
+        patch.object(
+            harness.charm,
+            "get_secret",
+            side_effect=lambda scope, key: "old-password" if key == "operator-password" else None,
+        ),
+        patch.object(harness.charm, "set_secret") as set_secret_mock,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(
+            harness.charm.async_replication, "update_async_replication_data"
+        ) as update_async_data_mock,
+    ):
+        harness.charm.on.secret_changed.emit("secret:fake-user-secret-id", None)
+
+    postgresql_mock.update_user_password.assert_called_once_with(
+        "operator", "new-password", database_host=None
+    )
+    set_secret_mock.assert_called_once_with(APP_SCOPE, "operator-password", "new-password")
+    update_async_data_mock.assert_called_once()
+
+
+def test_update_admin_password_refreshes_async_replication_data(harness):
+    """Password rotation driven by config-changed must also refresh the shared secret.
+
+    On config-changed the async-replication data is refreshed BEFORE the password
+    rotation happens, so `_update_admin_password` itself must trigger the refresh
+    afterwards (DPE-11134).
+    """
+    with (
+        patch("charm.PatroniManager.are_all_members_ready", return_value=True),
+        patch.object(harness.charm, "postgresql"),
+        patch.object(
+            harness.charm, "get_secret_from_id", return_value={"operator": "new-password"}
+        ),
+        patch.object(harness.charm, "get_secret", return_value="old-password"),
+        patch.object(harness.charm, "set_secret"),
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(
+            harness.charm.async_replication, "update_async_replication_data"
+        ) as update_async_data_mock,
+    ):
+        harness.charm._update_admin_password("secret:fake-user-secret-id")
+
+    update_async_data_mock.assert_called_once()

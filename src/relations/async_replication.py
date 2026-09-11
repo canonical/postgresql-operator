@@ -828,6 +828,14 @@ class PostgreSQLAsyncReplication(Object):
 
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         """Update the internal secret when the relation secret changes."""
+        if not self.charm.unit.is_leader():
+            # Both branches update application-scope data (the shared secret content on
+            # the offer side, the internal app secret on the consumer side), which only
+            # the leader can write. Every unit receives the same secret-changed event;
+            # the leader reconciles for the whole cluster.
+            logger.debug("Early exit on_secret_changed: Unit is not the leader.")
+            return
+
         relation = self._relation
         if relation is None:
             logger.debug("Early exit on_secret_changed: No relation found.")
@@ -1003,8 +1011,15 @@ class PostgreSQLAsyncReplication(Object):
         if relation is None:
             return
         relation.data[self.charm.unit].update({"unit-address": self._unit_ip})
-        if self.is_primary_cluster() and self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and self.is_primary_cluster():
             self._update_primary_cluster_data()
+        elif self.charm.unit.is_leader() and relation.name == REPLICATION_CONSUMER_RELATION:
+            # Juju does not deliver secret-changed events to the charm units when
+            # the primary cluster adds a revision to the shared secret across the
+            # cross-model relation, so the standby cluster must pull the shared
+            # secret content on its own reconciliations instead (DPE-11134).
+            # A missing shared secret is retried on the next reconciliation.
+            self._update_internal_secret()
 
     def _remote_secret_id(self) -> str | None:
         """Return the shared secret id published by the primary cluster, or None."""
@@ -1029,6 +1044,10 @@ class PostgreSQLAsyncReplication(Object):
         credentials = secret.peek_content()
         for key, password in credentials.items():
             user = key.split("-password")[0]
+            if password == self.charm.get_secret(APP_SCOPE, key):
+                # Already synced: every rewrite is a new Juju secret revision, so skip
+                # unchanged passwords instead of churning revisions on each hook.
+                continue
             self.charm.set_secret(APP_SCOPE, key, password)
             logger.debug("Synced %s password", user)
         return True
