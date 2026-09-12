@@ -335,27 +335,6 @@ def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
     set_destination(endpoint, None)
 
 
-class PostgreSQLS3Client(S3Client):
-    """S3 client whose TLS verification follows the s3 relation's tls-ca-chain option.
-
-    The library client takes the CA-chain path statically at construction; the
-    charm instead switches verification on every request depending on whether
-    the relation configuration provides tls-ca-chain.
-    """
-
-    def __init__(self, workload: VMWorkload):
-        self.workload = workload
-        super().__init__()
-
-    def _get_s3_session_resource(self, s3_parameters: dict):
-        self._tls_ca_chain_filename = (
-            self.workload.backup_config.tls_ca_chain_path
-            if s3_parameters.get("tls-ca-chain") is not None
-            else None
-        )
-        return super()._get_s3_session_resource(s3_parameters)
-
-
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -443,7 +422,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["data"].location
 
-        self.s3_client = PostgreSQLS3Client(self.workload)
+        self.s3_client = S3Client(self.workload)
         self.backup = BackupManager(
             state=self.state,
             workload=self.workload,
