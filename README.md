@@ -162,3 +162,4 @@ For more information, see the [Security policy](SECURITY.md).
 The Charmed PostgreSQL Operator is distributed under the [Apache Software License, version 2.0](https://github.com/canonical/postgresql-operator/blob/main/LICENSE). It installs, operates and depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which is licensed under the [PostgreSQL License](https://www.postgresql.org/about/licence/), a liberal Open Source license similar to the BSD or MIT licenses.
 
 PostgreSQL is a trademark or registered trademark of PostgreSQL Global Development Group. Other trademarks are property of their respective owners.
+
