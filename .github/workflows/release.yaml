@@ -17,11 +17,12 @@ on:
 jobs:
   tag:
     name: Create charm refresh compatibility version git tag
-    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v52.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v53.0.0
     with:
       track: '16'
     permissions:
       contents: write  # Needed to create git tag
+    cache-mode: none
 
   ci-tests:
     name: Tests
@@ -38,13 +39,14 @@ jobs:
       LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
       contents: write  # Needed for Allure Report
+    cache-mode: none
 
   release:
     name: Release charm
     needs:
       - tag
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v52.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v53.0.0
     with:
       track: 16
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
@@ -52,3 +54,4 @@ jobs:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN_EDGE }}
     permissions:
       contents: write  # Needed to create git tags
+    cache-mode: none
