@@ -70,3 +70,12 @@ variable "machine" {
   type        = string
   default     = null
 }
+
+variable "endpoint_bindings" {
+  description = "Bindings of the application endpoints to network spaces. A binding without an endpoint sets the default space for the application"
+  type = set(object({
+    endpoint = optional(string)
+    space    = string
+  }))
+  default = null
+}

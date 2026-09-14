@@ -43,6 +43,13 @@ terraform apply -var='juju_model_name=welcome' -auto-approve \
   -var='constraints=arch=amd64 cores=4 mem=4096M virt-type=virtual-machine'
 ```
 
+The juju endpoint bindings example (binds application endpoints to network spaces):
+```
+terraform apply -var='juju_model=<model uuid>' -auto-approve \
+  -var='endpoint_bindings=[{space="db-space"},{endpoint="cos-agent",space="oam-space"}]'
+```
+A binding without an `endpoint` sets the default space for the application.
+
 Example of deploying to the specific Juju machine:
 ```
 juju add-machine
@@ -65,6 +72,7 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 | revision | Revision number to deploy charm | `number` | n/a | no |
 | base | Application base | `string` | `ubuntu@24.04` | no |
 | machine | Target Juju machine to deploy on | `string` | n/a | no |
+| endpoint_bindings | Bindings of the application endpoints to network spaces; a binding without an `endpoint` sets the default space | `set(object({endpoint = optional(string), space = string}))` | n/a | no |
 | units | Number of units to deploy | `number` | `1` | no |
 | constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
 | storage | Storage directive | `map(string)` | `{}` | no |
