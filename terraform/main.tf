@@ -8,8 +8,8 @@ resource "juju_application" "machine_postgresql" {
     base     = var.base
   }
 
-  machines           = var.machine != null ? [var.machine] : null
-  units              = var.machine == null ? var.units : null
+  machines           = var.machines != null ? var.machines : (var.machine != null ? [var.machine] : null)
+  units              = (var.machines == null && var.machine == null) ? var.units : null
   config             = var.config
   constraints        = var.constraints
   storage_directives = var.storage
