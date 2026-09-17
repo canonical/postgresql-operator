@@ -3,10 +3,12 @@
 # See LICENSE file for licensing details.
 import logging
 import re
+from pathlib import Path
 from time import sleep
 
 import psycopg2
 import pytest
+import tomli
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (
@@ -150,6 +152,10 @@ def test_pg_hba(juju: JujuFixture, charm):
                     # Get the version of the database and compare with the information that
                     # was retrieved directly from the database.
                     assert credentials["postgresql"]["version"] == data
+
+                    with Path("refresh_versions.toml").open("rb") as file:
+                        versions = tomli.load(file)
+                    assert versions["workload"] == data
 
                 logger.info(
                     f"Checking that the user {SECOND_RELATION_USER} cannot connect to the database {FIRST_DATABASE} on {unit.name}"
