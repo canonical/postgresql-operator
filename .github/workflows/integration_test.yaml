@@ -97,6 +97,7 @@ jobs:
     outputs:
       jobs: ${{ steps.collect-jobs.outputs.jobs }}
     permissions: {}
+    cache-mode: none
 
   integration-test:
     strategy:
@@ -211,6 +212,7 @@ jobs:
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: df --human-readable
     permissions: {}
+    cache-mode: none
 
   allure-report:
     name: Publish Allure report
@@ -419,3 +421,4 @@ jobs:
           VAR_RUN_NUMBER: ${{ github.run_number }}
     permissions:
       contents: write  # Needed for Allure Report
+    cache-mode: none
