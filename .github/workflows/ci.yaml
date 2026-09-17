@@ -41,9 +41,10 @@ on:
 jobs:
   lint-workflows:
     name: Lint .github/workflows/
-    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v52.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v53.0.0
     permissions:
       contents: read
+    cache-mode: none
 
   lint:
     name: Lint
@@ -61,6 +62,7 @@ jobs:
       - name: tox run -e lint
         run: tox run -e lint
     permissions: {}
+    cache-mode: none
 
   unit-test:
     name: Unit test charm
@@ -78,6 +80,7 @@ jobs:
       - name: Run tests
         run: tox run -e unit
     permissions: {}
+    cache-mode: none
 
   alert-test:
     name: Test Prometheus Alert Rules
@@ -95,12 +98,14 @@ jobs:
       - name: Run unit tests for prometheus alert rules
         run: promtool test rules tests/alerts/*.yaml
     permissions: {}
+    cache-mode: none
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v52.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v53.0.0
     permissions:
       contents: read
+    cache-mode: none
 
   integration-test:
     name: Integration test charm
@@ -122,3 +127,4 @@ jobs:
       LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
     permissions:
       contents: write  # Needed for Allure Report
+    cache-mode: none
