@@ -13,6 +13,7 @@ resource "juju_application" "machine_postgresql" {
   config             = var.config
   constraints        = var.constraints
   storage_directives = var.storage
+  endpoint_bindings  = var.endpoint_bindings
   model_uuid         = var.juju_model
 
   dynamic "expose" {
