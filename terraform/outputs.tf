@@ -1,7 +1,10 @@
+output "application" {
+  value = juju_application.machine_postgresql
+}
+
 output "application_name" {
   value = juju_application.machine_postgresql.name
 }
-
 
 output "provides" {
   value = {
