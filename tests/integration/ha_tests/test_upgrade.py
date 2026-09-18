@@ -103,7 +103,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     current_primary_name = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     database_version = (
         await execute_query_on_unit(
-            await get_unit_address(ops_test, current_primary_name),
+            get_unit_address(ops_test, current_primary_name),
             await get_password(ops_test, current_primary_name),
             "SELECT version();",
         )
