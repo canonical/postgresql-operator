@@ -38,16 +38,18 @@ REQUEST_CONFIG = {TESTING_DATABASE: ["public.asd"]}
 
 async def _run_query(ops_test: OpsTest, data_integrator: str, query: str) -> list[tuple]:
     """Run a query against the data integrator database and return all rows."""
-    connection_string = await build_connection_string(
-        ops_test,
-        data_integrator,
-        DATA_INTEGRATOR_RELATION,
-        database=TESTING_DATABASE,
-    )
     connection = None
     try:
-        for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(3), reraise=True):
+        # The data-integrator relation can take several minutes to complete on a
+        # cold environment; retry the credential read together with the connect.
+        for attempt in Retrying(stop=stop_after_delay(600), wait=wait_fixed(15), reraise=True):
             with attempt:
+                connection_string = await build_connection_string(
+                    ops_test,
+                    data_integrator,
+                    DATA_INTEGRATOR_RELATION,
+                    database=TESTING_DATABASE,
+                )
                 connection = psycopg2.connect(connection_string)
         connection.autocommit = True
         with connection.cursor() as cursor:
