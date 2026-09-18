@@ -432,6 +432,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             resource_provider=self.workload,
             is_standby_cluster=lambda: self.is_standby_cluster,
             set_unit_status=self.set_unit_status,
+            refresh_primary_status=self._set_primary_status_message,
         )
         self.restore_manager = RestoreManager(
             state=self.state,
