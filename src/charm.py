@@ -2557,7 +2557,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.app_peer_data.get("logical-replication-validation") == "error"
                 or self.logical_replication.has_remote_publisher_errors()
             ):
-                self.unit.status = BlockedStatus(LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS)
+                self.unit.status = BlockedStatus(
+                    self.app_peer_data.get("logical-replication-validation-status-message")
+                    or LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
+                )
                 return
             if (
                 self.patroni_manager.get_primary(unit_name_pattern=True) == self.unit.name
