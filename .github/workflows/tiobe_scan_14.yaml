@@ -1,7 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-name: Weekly TICS scan
+name: Weekly TICS scan (14/edge)
 
 on:
   schedule:
@@ -16,6 +16,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: main
 
       - name: Create and activate virtual environment
         run: |
@@ -38,7 +39,7 @@ jobs:
         uses: tiobe/tics-github-action@v4
         with:
           mode: qserver
-          project: postgresql-operator
+          project: postgresql-operator-14
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
           branchdir: ${{ env.GITHUB_WORKSPACE }}
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}  # zizmor: ignore[secrets-outside-env] Organization secret (does not support environments: https://github.com/orgs/community/discussions/15379)
