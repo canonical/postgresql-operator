@@ -1,13 +1,19 @@
-variable "model_uuid" {
-  description = "UUID of the Juju model to deploy to"
+variable "app_name" {
+  description = "Name of the application in the Juju model."
   type        = string
-  default     = null
+  default     = "postgresql"
 }
 
-variable "juju_model" {
-  description = "Deprecated: UUID of the Juju model. Use model_uuid instead"
+variable "base" {
+  description = "Application base"
   type        = string
-  default     = null
+  default     = "ubuntu@24.04"
+}
+
+variable "channel" {
+  description = "Charm channel to use when deploying"
+  type        = string
+  default     = "16/stable"
 }
 
 variable "charm_name" {
@@ -17,34 +23,10 @@ variable "charm_name" {
   nullable    = false
 }
 
-variable "app_name" {
-  description = "Name of the application in the Juju model."
-  type        = string
-  default     = "postgresql"
-}
-
-variable "channel" {
-  description = "Charm channel to use when deploying"
-  type        = string
-  default     = "16/stable"
-}
-
-variable "revision" {
-  description = "Revision number to deploy charm"
-  type        = number
-  default     = null
-}
-
-variable "base" {
-  description = "Application base"
-  type        = string
-  default     = "ubuntu@24.04"
-}
-
-variable "units" {
-  description = "Number of units to deploy"
-  type        = number
-  default     = 1
+variable "config" {
+  description = "Application configuration. Details at https://charmhub.io/postgresql/configurations"
+  type        = map(string)
+  default     = {}
 }
 
 variable "constraints" {
@@ -53,26 +35,44 @@ variable "constraints" {
   default     = "arch=amd64"
 }
 
-variable "storage" {
-  description = "Storage directive"
-  type        = map(string)
-  default     = {}
-}
-
-variable "config" {
-  description = "Application configuration. Details at https://charmhub.io/postgresql/configurations"
-  type        = map(string)
-  default     = {}
-}
-
 variable "enable_expose" {
   description = "Whether to expose the application"
   type        = bool
   default     = true
 }
 
+variable "juju_model" {
+  description = "Deprecated: UUID of the Juju model. Use model_uuid instead"
+  type        = string
+  default     = null
+}
+
 variable "machine" {
   description = "Target Juju machine to deploy on"
   type        = string
   default     = null
+}
+
+variable "model_uuid" {
+  description = "UUID of the Juju model to deploy to"
+  type        = string
+  default     = null
+}
+
+variable "revision" {
+  description = "Revision number to deploy charm"
+  type        = number
+  default     = null
+}
+
+variable "storage" {
+  description = "Storage directive"
+  type        = map(string)
+  default     = {}
+}
+
+variable "units" {
+  description = "Number of units to deploy"
+  type        = number
+  default     = 1
 }

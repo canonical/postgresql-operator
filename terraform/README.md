@@ -62,24 +62,25 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| model_uuid | UUID of the Juju model to deploy to | `string` | n/a | yes |
-| juju_model | Deprecated: UUID of the Juju model. Use model_uuid instead | `string` | n/a | no |
-| charm_name | Name of the charm on charmhub.io to deploy | `string` | `postgresql` | no |
 | app_name | Name of the deployed application in the Juju model | `string` | `postgresql` | no |
-| channel | Charm channel to use when deploying | `string` | `16/stable` | no |
-| revision | Revision number to deploy charm | `number` | n/a | no |
 | base | Application base | `string` | `ubuntu@24.04` | no |
-| machine | Target Juju machine to deploy on | `string` | n/a | no |
-| units | Number of units to deploy | `number` | `1` | no |
-| constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
-| storage | Storage directive | `map(string)` | `{}` | no |
+| channel | Charm channel to use when deploying | `string` | `16/stable` | no |
+| charm_name | Name of the charm on charmhub.io to deploy | `string` | `postgresql` | no |
 | config | Application configuration. Details at https://charmhub.io/postgresql/configurations | `map(string)` | n/a | no |
+| constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
 | enable_expose | Whether to expose the application | `bool` | `true` | no |
+| juju_model | Deprecated: UUID of the Juju model. Use model_uuid instead | `string` | n/a | no |
+| machine | Target Juju machine to deploy on | `string` | n/a | no |
+| model_uuid | UUID of the Juju model to deploy to | `string` | n/a | yes |
+| revision | Revision number to deploy charm | `number` | n/a | no |
+| storage | Storage directive | `map(string)` | `{}` | no |
+| units | Number of units to deploy | `number` | `1` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
+| application | The deployed application resource |
 | application_name | Application name which make up this product module |
 | provides | Endpoints charm provides |
 | requires | Endpoints charm requires |
