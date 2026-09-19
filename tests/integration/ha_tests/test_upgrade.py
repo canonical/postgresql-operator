@@ -14,8 +14,11 @@ from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
     count_switchovers,
+    execute_query_on_unit,
     get_leader_unit,
+    get_password,
     get_primary,
+    get_unit_address,
 )
 from ..new_relations.helpers import get_application_relation_data
 from .helpers import (
@@ -91,6 +94,23 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", idle_period=30, timeout=TIMEOUT
         )
+
+    dependencies = await get_application_relation_data(
+        ops_test, DATABASE_APP_NAME, "upgrade", "dependencies"
+    )
+    assert dependencies is not None, "Upgrade relation dependencies data is missing"
+    expected_version = json.loads(dependencies)["snap"]["version"]
+    current_primary_name = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    database_version = (
+        await execute_query_on_unit(
+            get_unit_address(ops_test, current_primary_name),
+            await get_password(ops_test, current_primary_name),
+            "SELECT version();",
+        )
+    )[0].split(" ")[1]
+    assert expected_version == database_version, (
+        f"PostgreSQL version mismatch: expected {expected_version}, got {database_version}"
+    )
 
     # Check whether writes are increasing.
     logger.info("checking whether writes are increasing")
