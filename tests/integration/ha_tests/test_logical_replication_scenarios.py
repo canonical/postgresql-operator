@@ -64,7 +64,7 @@ async def _run_query(ops_test: OpsTest, data_integrator: str, query: str) -> lis
 
 async def _subscription_count(ops_test: OpsTest) -> int:
     """Number of logical replication subscriptions in the subscriber database."""
-    rows = await _run_query(ops_test, APP_NAME_B, "SELECT count(*) FROM pg_subscription;")
+    rows = await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT count(*) FROM pg_subscription;")
     return rows[0][0]
 
 
@@ -72,7 +72,7 @@ async def _wait_for_row_count(ops_test: OpsTest, expected: int, timeout: int = 1
     """Wait until the subscriber table reaches the expected row count."""
     for attempt in Retrying(stop=stop_after_delay(timeout), wait=wait_fixed(5), reraise=True):
         with attempt:
-            rows = await _run_query(ops_test, APP_NAME_B, "SELECT count(*) FROM asd;")
+            rows = await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT count(*) FROM asd;")
             assert rows[0][0] == expected, f"subscriber rows: {rows[0][0]} != {expected}"
     return rows[0][0]
 
@@ -128,9 +128,9 @@ async def test_deploy_clusters(ops_test: OpsTest, charm):
 async def test_basic_one_way_replication(ops_test: OpsTest):
     """The PR body scenario: initial copy on subscribe and ongoing push."""
     # Publisher table with data, subscriber table empty.
-    await _run_query(ops_test, APP_NAME_A, "CREATE TABLE asd (message text);")
-    await _run_query(ops_test, APP_NAME_A, "INSERT INTO asd VALUES ('hello');")
-    await _run_query(ops_test, APP_NAME_B, "CREATE TABLE asd (message text);")
+    await _run_query(ops_test, DATA_INTEGRATOR_A, "CREATE TABLE asd (message text);")
+    await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('hello');")
+    await _run_query(ops_test, DATA_INTEGRATOR_B, "CREATE TABLE asd (message text);")
 
     # Establish the one-way relation, then configure the subscriber.
     async with ops_test.fast_forward():
@@ -148,7 +148,7 @@ async def test_basic_one_way_replication(ops_test: OpsTest):
     assert await _wait_for_row_count(ops_test, 1) == 1
 
     # Ongoing push.
-    await _run_query(ops_test, APP_NAME_A, "INSERT INTO asd VALUES ('a2'), ('a3');")
+    await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('a2'), ('a3');")
     assert await _wait_for_row_count(ops_test, 3) == 3
 
 
@@ -160,9 +160,9 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
     (6 rows became 12 after remove + re-integrate).
     """
     # Grow the replicated table to six rows.
-    await _run_query(ops_test, APP_NAME_A, "INSERT INTO asd VALUES ('d4'), ('d5'), ('d6');")
+    await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('d4'), ('d5'), ('d6');")
     assert await _wait_for_row_count(ops_test, 6) == 6
-    before = dict(await _run_query(ops_test, APP_NAME_B, "SELECT message, md5(message) FROM asd;"))
+    before = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
     assert len(before) == 6
 
     # Remove the relation: the subscription is dropped, the data stays.
@@ -174,7 +174,7 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
         )
     assert await _subscription_count(ops_test) == 0
     rows_after_break = dict(
-        await _run_query(ops_test, APP_NAME_B, "SELECT message, md5(message) FROM asd;")
+        await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
     )
     assert rows_after_break == before
 
@@ -188,7 +188,7 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(status="active", timeout=500)
 
     assert await _subscription_count(ops_test) == 0
-    rows = dict(await _run_query(ops_test, APP_NAME_B, "SELECT message, md5(message) FROM asd;"))
+    rows = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
     assert rows == before, "subscriber rows changed on re-integration"
 
 
@@ -210,14 +210,14 @@ async def test_config_cycle_no_duplication(ops_test: OpsTest):
 
     # The guard blocks the subscribe: no subscription, rows unchanged.
     assert await _subscription_count(ops_test) == 0
-    rows = dict(await _run_query(ops_test, APP_NAME_B, "SELECT message, md5(message) FROM asd;"))
+    rows = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
     assert len(rows) == 6
 
 
 @pytest.mark.abort_on_fail
 async def test_truncate_resubscribe_recovery(ops_test: OpsTest):
     """After truncating the subscriber table, a clean re-subscribe works."""
-    await _run_query(ops_test, APP_NAME_B, "TRUNCATE asd;")
+    await _run_query(ops_test, DATA_INTEGRATOR_B, "TRUNCATE asd;")
 
     config_b = APP_CONFIG.copy()
     config_b["logical-replication-subscription-request"] = "{}"
@@ -232,10 +232,10 @@ async def test_truncate_resubscribe_recovery(ops_test: OpsTest):
     for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True):
         with attempt:
             rows = await _run_query(
-                ops_test, APP_NAME_B, "SELECT count(*), count(DISTINCT message) FROM asd;"
+                ops_test, DATA_INTEGRATOR_B, "SELECT count(*), count(DISTINCT message) FROM asd;"
             )
             assert rows[0] == (6, 6), f"subscriber rows: {rows[0]}"
 
     # The re-created subscription is live.
-    await _run_query(ops_test, APP_NAME_A, "INSERT INTO asd VALUES ('e7');")
+    await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('e7');")
     assert await _wait_for_row_count(ops_test, 7) == 7
