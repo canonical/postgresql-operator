@@ -1,0 +1,195 @@
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:68 removing sync_standbys, sync_standbys
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-4', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.150.116.108:8008/patroni', 'host': '10.150.116.108', 'port': 5432, 'timeline': 5}, {'name': 'postgresql-5', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.150.116.45:8008/patroni', 'host': '10.150.116.45', 'port': 5432, 'timeline': 5, 'lag': 0}, {'name': 'postgresql-6', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.150.116.186:8008/patroni', 'host': '10.150.116.186', 'port': 5432, 'timeline': 5, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:78 Stopping unit postgresql/5
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:78 Stopping unit postgresql/6
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:82 Deleting unit postgresql/5
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:82 Deleting unit postgresql/6
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [executing] blocked: Raft majority loss, run: promote-to-primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [idle] blocked: Raft majority loss, run: promote-to-primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [idle] blocked: Raft majority loss, run: promote-to-primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [executing] active: received database credentials of the first database
+  postgresql/4 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [idle] active: Primary
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:117 Scaling back up
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [idle] active: Primary
+  postgresql/7 [allocating] waiting: waiting for machine
+  postgresql/8 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/7 [allocating] waiting: waiting for machine
+  postgresql/8 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/7 [allocating] waiting: agent initialising
+  postgresql/8 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/7 [executing] maintenance: installing PostgreSQL
+  postgresql/8 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [executing] waiting: waiting for peer IP
+  postgresql/7 [executing] waiting: waiting to start PostgreSQL
+  postgresql/8 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [executing] waiting: waiting for peer IP
+  postgresql/7 [executing] waiting: awaiting for member to start
+  postgresql/8 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [executing] active: Primary (degraded)
+  postgresql/7 [executing] active: 
+  postgresql/8 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/4 [executing] active: Primary
+  postgresql/7 [idle] active: 
+  postgresql/8 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [idle] active: Primary
+  postgresql/7 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-4': 574, 'testing.postgresql-7': 575, 'testing.postgresql-8': 575}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-4': 576, 'testing.postgresql-7': 576, 'testing.postgresql-8': 576}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-4', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.150.116.108:8008/patroni', 'host': '10.150.116.108', 'port': 5432, 'timeline': 7}, {'name': 'postgresql-7', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.150.116.247:8008/patroni', 'host': '10.150.116.247', 'port': 5432, 'timeline': 7, 'lag': 0}, {'name': 'postgresql-8', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.150.116.221:8008/patroni', 'host': '10.150.116.221', 'port': 5432, 'timeline': 7, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-4, count: 577, max_number_written: 577, total_expected_writes: 577
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-7, count: 577, max_number_written: 577, total_expected_writes: 577
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-8, count: 577, max_number_written: 577, total_expected_writes: 577
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  09:05:32Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.15    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  590  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   0        10.150.116.101            received database credentials of the first database
+postgresql/4*           active    idle   5        10.150.116.108  5432/tcp  Primary
+postgresql/7            active    idle   8        10.150.116.247  5432/tcp  
+postgresql/8            active    idle   9        10.150.116.221  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.150.116.101  juju-47be52-0  ubuntu@24.04  runnervmlun5p  Running
+5        started  10.150.116.108  juju-47be52-5  ubuntu@24.04  runnervmlun5p  Running
+8        started  10.150.116.247  juju-47be52-8  ubuntu@24.04  runnervmlun5p  Running
+9        started  10.150.116.221  juju-47be52-9  ubuntu@24.04  runnervmlun5p  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 08:32:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 08:32:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 08:33:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 08:33:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 08:33:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 08:33:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 08:33:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 08:33:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 08:34:25 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7c5a057650 state=finished raised Exception>]
+unit-postgresql-1: 08:34:43 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fee3cda3b00 state=finished raised Exception>]
+unit-postgresql-1: 08:34:47 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0ef1cafad0 state=finished raised Exception>]
+unit-postgresql-2: 08:37:46 ERROR unit.postgresql/2.juju-log database-peers:1: single_kernel_postgresql.workload.vm:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'start', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 151, in start_patroni
+    selected_snap.start(services=["patroni"])
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 415, in start
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'start', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "start" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Sep 20 08:34:05 juju-47be52-3 systemd[1]: Starting snapd.service - Snap Daemon...
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: seclog.go:174: security logger enabled
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: overlord.go:313: Acquiring state lock file
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: overlord.go:318: Acquired state lock file
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: daemon.go:277: started snapd/2.76.3+ubuntu24.04 (series 16; classic) ubuntu/24.04 (amd64) linux/6.17.0-1022-azure.
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: daemon.go:371: adjusting startup timeout by 35s (pessimistic estimate of 30s plus 5s per snap)
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: backends.go:70: AppArmor status: apparmor is enabled and all features are available
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: backend.go:145: reloading profiles for snap-confine
+Sep 20 08:34:05 juju-47be52-3 snapd[2740]: standby.go:95: will consider standby after: 5s
+Sep 20 08:34:05 juju-47be52-3 systemd[1]: Started snapd.service - Snap Daemon.
+Sep 20 08:34:07 juju-47be52-3 snapd[2740]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Sep 20 08:34:07 juju-47be52-3 snapd[2740]: cache.go:320: removed 0 entries/    0 from downloads cache
+Sep 20 08:34:07 juju-47be52-3 snapd[2740]: devicemgr.go:1343: skipping boot ok check since it already ran for boot-id "7c9c49da-3153-4557-8c14-63d80416d86b"
+Sep 20 08:34:07 juju-47be52-3 snapd[2740]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Sep 20 08:34:11 juju-47be52-3 snapd[2740]: cache.go:320: removed 0 entries/    0 from downloads cache
+Sep 20 08:34:18 juju-47be52-3 snapd[2740]: cache.go:320: removed 0 entries/    0 from downloads cache
+Sep 20 08:34:21 juju-47be52-3 snapd[2740]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Sep 20 08:37:46 juju-47be52-3 snapd[2740]: taskrunner.go:304: Change 10 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Sep 20 08:37:46 juju-47be52-3 snapd[2740]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Sep 20 08:37:46 juju-47be52-3 snapd[2740]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+controller-0: 08:39:18 ERROR juju.worker.provisioner failed to remove dead machine "2"
+machine-4: 08:41:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 08:41:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 08:42:36 ERROR unit.postgresql/3.juju-log refresh-v-three:3: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+controller-0: 08:44:29 ERROR juju.worker.provisioner failed to remove dead machine "3"
+machine-5: 08:46:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 08:46:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-4: 08:47:49 ERROR unit.postgresql/4.juju-log database-peers:1: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+controller-0: 08:49:34 ERROR juju.worker.provisioner failed to remove dead machine "1"
+machine-6: 08:53:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 08:53:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 08:53:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 08:53:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-6: 08:55:25 ERROR unit.postgresql/6.juju-log restart:2: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+controller-0: 08:57:28 ERROR juju.worker.provisioner failed to remove dead machine "6"
+controller-0: 08:57:28 ERROR juju.worker.provisioner failed to remove dead machine "7"
+machine-8: 09:02:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 09:02:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 09:02:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 09:02:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
