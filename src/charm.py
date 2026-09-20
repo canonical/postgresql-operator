@@ -906,7 +906,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
-            if self._patroni.cluster_members == self._hosts:
+            if self._patroni.cluster_members == self._hosts and self._units_ips <= self.members_ips:
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
 
@@ -915,6 +915,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
+
+            if missing_ips := self._units_ips - self.members_ips:
+                for ip in missing_ips:
+                    logger.info("Adding new IP %s to the members list", ip)
+                    self._add_to_members_ips(ip)
+                self.update_config()
             self._patroni.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
@@ -1368,7 +1374,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        self._update_member_ip()
         # Update the async replication data with the current unit IP.
         self.async_replication.update_async_replication_data()
 
