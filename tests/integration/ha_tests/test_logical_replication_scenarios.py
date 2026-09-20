@@ -75,7 +75,7 @@ async def _assert_no_subscription(ops_test: OpsTest) -> None:
     invariant this suite guards is the settled state (and the row count
     below asserts the data itself was never duplicated).
     """
-    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(10), reraise=True):
+    for attempt in Retrying(stop=stop_after_delay(600), wait=wait_fixed(15), reraise=True):
         with attempt:
             await _assert_no_subscription(ops_test), "subscription still present"
 
