@@ -162,7 +162,9 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
     # Grow the replicated table to six rows.
     await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('d4'), ('d5'), ('d6');")
     assert await _wait_for_row_count(ops_test, 6) == 6
-    before = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
+    before = dict(
+        await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
+    )
     assert len(before) == 6
 
     # Remove the relation: the subscription is dropped, the data stays.
@@ -188,7 +190,9 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(status="active", timeout=500)
 
     assert await _subscription_count(ops_test) == 0
-    rows = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
+    rows = dict(
+        await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
+    )
     assert rows == before, "subscriber rows changed on re-integration"
 
 
@@ -210,7 +214,9 @@ async def test_config_cycle_no_duplication(ops_test: OpsTest):
 
     # The guard blocks the subscribe: no subscription, rows unchanged.
     assert await _subscription_count(ops_test) == 0
-    rows = dict(await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;"))
+    rows = dict(
+        await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
+    )
     assert len(rows) == 6
 
 
