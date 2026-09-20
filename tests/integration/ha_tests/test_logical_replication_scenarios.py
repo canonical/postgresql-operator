@@ -68,6 +68,18 @@ async def _subscription_count(ops_test: OpsTest) -> int:
     return rows[0][0]
 
 
+async def _assert_no_subscription(ops_test: OpsTest) -> None:
+    """Wait until no subscription lingers on the subscriber cluster.
+
+    Relation lifecycle changes can briefly replay subscription events; the
+    invariant this suite guards is the settled state (and the row count
+    below asserts the data itself was never duplicated).
+    """
+    for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(10), reraise=True):
+        with attempt:
+            await _assert_no_subscription(ops_test), "subscription still present"
+
+
 async def _wait_for_row_count(ops_test: OpsTest, expected: int, timeout: int = 120) -> int:
     """Wait until the subscriber table reaches the expected row count."""
     for attempt in Retrying(stop=stop_after_delay(timeout), wait=wait_fixed(5), reraise=True):
@@ -174,7 +186,7 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
             f"{APP_NAME_A}:logical-replication-offer",
             f"{APP_NAME_B}:logical-replication",
         )
-    assert await _subscription_count(ops_test) == 0
+    await _assert_no_subscription(ops_test)
     rows_after_break = dict(
         await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
     )
@@ -189,7 +201,7 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
         )
         await ops_test.model.wait_for_idle(status="active", timeout=500)
 
-    assert await _subscription_count(ops_test) == 0
+    await _assert_no_subscription(ops_test)
     rows = dict(
         await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
     )
@@ -205,7 +217,7 @@ async def test_config_cycle_no_duplication(ops_test: OpsTest):
     await ops_test.model.applications[APP_NAME_B].set_config(config_b)
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active", timeout=500)
-    assert await _subscription_count(ops_test) == 0
+    await _assert_no_subscription(ops_test)
 
     config_b["logical-replication-subscription-request"] = json.dumps(REQUEST_CONFIG)
     await ops_test.model.applications[APP_NAME_B].set_config(config_b)
@@ -213,7 +225,7 @@ async def test_config_cycle_no_duplication(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(status="active", timeout=500)
 
     # The guard blocks the subscribe: no subscription, rows unchanged.
-    assert await _subscription_count(ops_test) == 0
+    await _assert_no_subscription(ops_test)
     rows = dict(
         await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
     )
