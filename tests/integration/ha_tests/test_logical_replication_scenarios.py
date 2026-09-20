@@ -77,7 +77,7 @@ async def _assert_no_subscription(ops_test: OpsTest) -> None:
     """
     for attempt in Retrying(stop=stop_after_delay(600), wait=wait_fixed(15), reraise=True):
         with attempt:
-            await _assert_no_subscription(ops_test), "subscription still present"
+            assert await _subscription_count(ops_test) == 0, "subscription still present"
 
 
 async def _wait_for_row_count(ops_test: OpsTest, expected: int, timeout: int = 120) -> int:
