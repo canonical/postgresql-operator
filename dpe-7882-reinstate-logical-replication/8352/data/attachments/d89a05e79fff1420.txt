@@ -1,0 +1,55 @@
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json test-app1/0 stop-continuous-writes --wait 120s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing secret:03vojta2f7m2mb1e81c0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other secret:m5nm4h80vmipjk8p5qr0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other secret:m5nm4h80vmipjk8p5qr0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:243 Killing the primary DC by force-stopping machines: ['juju-be4c66-0', 'juju-be4c66-1', 'juju-be4c66-2']
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:249 Force-promoting the standby cluster to primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing-other --format json db2/0 promote-to-primary --wait 300s --params /root/snap/juju/common/tmpgapz5cfx
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other secret:m5nm4h80vmipjk8p5qr0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other secret:m5nm4h80vmipjk8p5qr0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:274 Attempting remove-relation --force on the dead relation (ticket Issue 1)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing-other db1:replication-offer db2:replication --force
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:278 Clearing the dead offer with remove-saas --force
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-saas --model testing-other db1 --force
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju offer testing-other.db2:replication-offer
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju consume --model testing-other-third testing-other.db2
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing-other-third db2 db3:replication
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing-other --format json db2/0 create-replication --wait 300s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-ids
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get f4papnkqta7umefrn61g
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get n4uiqvn0gtagrj2g0o7g
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get rn9eb74teq56okd7000g
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get 4mrpvsm37btpj52mull0
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get 600qoro0m51vqojsnrug
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/0 -- secret-info-get m5nm4h80vmipjk8p5qr0
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other-third --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other-third --unit db3/0 -- secret-get --label=async-replication-secret
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other-third --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other-third --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other-third secret:ia16m5h7b8alnp2jidb0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other-third --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing-other-third --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing-other-third secret:ia16m5h7b8alnp2jidb0 --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other-third --format json
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:94 Destroying model: testing-other-third
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju destroy-model testing-other-third --no-prompt --destroy-storage --force
+[32mINFO    [0m root:test_async_replication_dead_dc_recovery.py:94 Destroying model: testing-other
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju destroy-model testing-other --no-prompt --destroy-storage --force
