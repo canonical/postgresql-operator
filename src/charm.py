@@ -15,14 +15,15 @@ import shutil
 import subprocess
 import sys
 import time
-import httpcore
-import httpx
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, get_args
 from urllib.parse import urlparse
+
+import httpcore
+import httpx
 
 # First platform-specific import, will fail on wrong architecture
 try:
