@@ -57,3 +57,14 @@ variable "enable_expose" {
   default     = true
   description = "Whether to expose the application"
 }
+
+variable "machines" {
+  description = "Target Juju machines to deploy on"
+  type        = set(string)
+  default     = null
+
+  validation {
+    condition     = var.machines == null ? true : length(var.machines) > 0
+    error_message = "machines must contain at least one machine id, or be left unset."
+  }
+}

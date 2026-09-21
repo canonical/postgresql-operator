@@ -13,7 +13,8 @@ resource "juju_application" "machine_postgresql" {
     pgdata = var.storage_size
   }
 
-  units       = var.units
+  machines    = var.machines
+  units       = var.machines == null ? var.units : null
   constraints = var.constraints
   config      = var.config
 
