@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import sys
 import time
+import httpcore
+import httpx
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
@@ -468,6 +470,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.refresh: charm_refresh.Machines | None
         try:
+            self.refresh = charm_refresh.Machines(
+                _PostgreSQLRefresh(
+                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
+                )
+            )
+        except (httpcore.ReadTimeout, httpx.ReadTimeout):
+            # The snapd revision probe in charm_refresh uses httpx's default 5s
+            # timeout with no retry; a transient snapd stall must not crash the
+            # charm at boot. Retry once after a short pause.
+            time.sleep(10)
+            self.refresh = charm_refresh.Machines(
+                _PostgreSQLRefresh(
+                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
+                )
+            )
+        except (httpcore.ReadTimeout, httpx.ReadTimeout):
+            time.sleep(10)
             self.refresh = charm_refresh.Machines(
                 _PostgreSQLRefresh(
                     workload_name="PostgreSQL", charm_name="postgresql", _charm=self
