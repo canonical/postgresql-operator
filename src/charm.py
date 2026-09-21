@@ -486,13 +486,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     workload_name="PostgreSQL", charm_name="postgresql", _charm=self
                 )
             )
-        except (httpcore.ReadTimeout, httpx.ReadTimeout):
-            time.sleep(10)
-            self.refresh = charm_refresh.Machines(
-                _PostgreSQLRefresh(
-                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
-                )
-            )
         except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
             self.refresh = None
         self._reconcile_refresh_status()
