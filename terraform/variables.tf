@@ -1,5 +1,5 @@
 variable "juju_model" {
-  description = "Juju model uuid"
+  description = "Juju model UUID to deploy into"
   type        = string
   default     = null
 }
@@ -69,4 +69,15 @@ variable "machine" {
   description = "Target Juju machine to deploy on"
   type        = string
   default     = null
+}
+
+variable "machines" {
+  description = "Target Juju machines to deploy on"
+  type        = set(string)
+  default     = null
+
+  validation {
+    condition     = var.machines == null ? true : length(var.machines) > 0
+    error_message = "machines must contain at least one machine id, or be left unset."
+  }
 }
