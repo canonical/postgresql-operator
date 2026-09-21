@@ -906,7 +906,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
-            if (self._patroni.cluster_members == self._hosts 
+            if (self._patroni.cluster_members == self._hosts
                 and self._units_ips <= self.members_ips):
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
