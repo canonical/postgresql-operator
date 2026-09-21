@@ -2034,7 +2034,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
             self._regenerate_internal_cert(reload=False)
 
-        # self.unit_peer_data.update({"ip": self.state.unit_ip})
         self._update_member_ip()
 
         self._ensure_storage_layout()
