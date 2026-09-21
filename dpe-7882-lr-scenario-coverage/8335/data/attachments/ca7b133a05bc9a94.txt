@@ -1,0 +1,175 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/postgresql-test-app-590
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-0
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-1
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [allocating] waiting: waiting for machine
+  another-database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [allocating] waiting: waiting for machine
+  another-database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [allocating] waiting: waiting for machine
+  another-database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [allocating] waiting: waiting for machine
+  another-database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [executing] waiting: agent initialising
+  another-database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [allocating] waiting: waiting for machine
+  another-database/0 [executing] maintenance: installing PostgreSQL
+  another-database/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [executing] maintenance: installing PostgreSQL
+  another-database/0 [executing] waiting: waiting for peer IP
+  another-database/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  08:18:15Z
+
+App                  Version  Status       Scale  Charm                Channel      Rev  Exposed  Message
+another-database     16.15    active           2  postgresql                          0  no       
+database             16.15    maintenance      1  postgresql                          1  no       installing PostgreSQL
+postgresql-test-app           blocked          2  postgresql-test-app  latest/edge  590  no       No database integration available
+
+Unit                    Workload     Agent      Machine  Public address  Ports  Message
+another-database/0*     waiting      executing  3        10.150.56.52           (config-changed) waiting for peer IP
+another-database/1      error        idle       4        10.150.56.39           hook failed: "refresh-v-three-relation-joined"
+database/0*             maintenance  executing  2        10.150.56.232          (install) installing PostgreSQL
+postgresql-test-app/0*  blocked      idle       0        10.150.56.7            No database integration available
+postgresql-test-app/1   blocked      idle       1        10.150.56.104          No database integration available
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.150.56.7    juju-fec148-0  ubuntu@24.04  runnervmlun5p  Running
+1        started  10.150.56.104  juju-fec148-1  ubuntu@24.04  runnervmlun5p  Running
+2        started  10.150.56.232  juju-fec148-2  ubuntu@24.04  runnervmlun5p  Running
+3        started  10.150.56.52   juju-fec148-3  ubuntu@24.04  runnervmlun5p  Running
+4        started  10.150.56.39   juju-fec148-4  ubuntu@24.04  runnervmlun5p  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 08:16:18 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 08:16:18 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 08:16:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 08:16:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 08:17:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 08:17:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 08:17:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 08:17:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 08:17:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 08:17:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 08:18:13 ERROR unit.another-database/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3117efbbc0 state=finished raised Exception>]
+unit-another-database-1: 08:18:14 ERROR unit.another-database/1.juju-log refresh-v-three:2: root:Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/model.py", line 3591, in _wrap_hookcmd
+    yield
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/model.py", line 3982, in secret_get
+    return hookcmds.secret_get(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/hookcmds/_secret.py", line 153, in secret_get
+    stdout = run('secret-get', '--format=json', *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/hookcmds/_utils.py", line 53, in run
+    raise Error(returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr) from None
+ops.hookcmds._utils.Error: command ('secret-get', '--format=json', '--label', 'database-peers.another-database.app') exited with status 1
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/charm.py", line 3095, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/__init__.py", line 360, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 520, in main
+    manager = _Manager(charm_class, use_juju_for_storage=use_juju_for_storage)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 320, in __init__
+    self.charm = self._charm_class(self.framework)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/charm.py", line 507, in __init__
+    self._migrate_temp_tablespace_location()
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/charm.py", line 929, in _migrate_temp_tablespace_location
+    if not self.primary_endpoint:
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/functools.py", line 995, in __get__
+    val = self.func(instance)
+          ^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/src/charm.py", line 1036, in primary_endpoint
+    self.patroni_manager.get_primary() or self.patroni_manager.get_standby_leader()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 279, in get_primary
+    cluster_status = self.cluster_status(alternative_endpoints)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 196, in cluster_status
+    if not self._patroni_async_auth:
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/functools.py", line 995, in __get__
+    val = self.func(instance)
+          ^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 155, in _patroni_async_auth
+    if self.state.application.patroni_password:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/core/peer_relation.py", line 359, in patroni_password
+    return self.get_secret(PATRONI_PASSWORD_KEY)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/core/peer_relation.py", line 481, in get_secret
+    return self.data_interface.get_secret(self.relation.id, key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 641, in wrapper
+    return f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2527, in get_secret
+    and full_field not in self.current_secret_fields
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2484, in current_secret_fields
+    if content := self._get_group_secret_contents(relation, group):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2825, in _get_group_secret_contents
+    result = super()._get_group_secret_contents(relation, group, secret_fields)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1490, in _get_group_secret_contents
+    if (secret := self._get_relation_secret(relation.id, group)) and (
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 628, in wrapper
+    return f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2812, in _get_relation_secret
+    return self.secrets.get(
+           ^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 972, in get
+    if secret.meta:
+       ^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/lib/charms/data_platform_libs/v0/data_interfaces.py", line 796, in meta
+    self._secret_meta = self._model.get_secret(label=self.label)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/model.py", line 309, in get_secret
+    content = self._backend.secret_get(id=id, label=label)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/model.py", line 3981, in secret_get
+    with self._wrap_hookcmd('secret-get', id=id, label=label, refresh=refresh, peek=peek):
+  File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/var/lib/juju/agents/unit-another-database-1/charm/venv/lib/python3.12/site-packages/ops/model.py", line 3601, in _wrap_hookcmd
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR permission denied
+
+unit-another-database-1: 08:18:14 ERROR juju.worker.uniter.operation hook "refresh-v-three-relation-joined" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
