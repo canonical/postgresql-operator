@@ -1498,7 +1498,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
-            if self.patroni_manager.cluster_members == self._hosts:
+            if (
+                self.patroni_manager.cluster_members == self._hosts
+                and self._units_ips <= self.members_ips
+            ):
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
 
@@ -1507,6 +1510,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for member in self._hosts - self.patroni_manager.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
+
+            if missing_ips := self._units_ips - self.members_ips:
+                for ip in missing_ips:
+                    logger.info("Adding new IP %s to the members list", ip)
+                    self._add_to_members_ips(ip)
+                self.update_config()
+
             self.patroni_manager.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
@@ -2024,7 +2034,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
             self._regenerate_internal_cert(reload=False)
 
-        self.unit_peer_data.update({"ip": self.state.unit_ip})
+        # self.unit_peer_data.update({"ip": self.state.unit_ip})
+        self._update_member_ip()
+
         self._ensure_storage_layout()
 
         # Open port
