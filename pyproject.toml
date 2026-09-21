@@ -21,7 +21,12 @@ charm-refresh = "^3.1.0.2"
 charmlibs-snap = "^1.0.1"
 charmlibs-systemd = "^1.0.0.post0"
 charmlibs-interfaces-tls-certificates = "^1.10.1"
-postgresql-charms-single-kernel = {extras = ["postgresql", "vm"], version = "16.3.8"}
+# Pinned to the commit carrying the logical-replication migration PRs
+# (canonical/postgresql-single-kernel-library#266..#270) until they are released.
+postgresql-charms-single-kernel = { url = "https://github.com/canonical/postgresql-single-kernel-library/archive/2d7f0bb0589e4e674ee691b15dbb007be675d15e.tar.gz", extras = [
+    "postgresql",
+    "vm",
+] }
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
