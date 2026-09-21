@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import sys
 import time
+import httpcore
+import httpx
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
