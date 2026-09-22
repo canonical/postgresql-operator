@@ -164,6 +164,7 @@ from constants import (
     TEMP_STORAGE_PATH,
     UPDATE_CERTS_BIN_PATH,
 )
+from oom import ensure_snap_oom_protection
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
@@ -2628,6 +2629,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.error("Unavailable snap architecture %s", platform.machine())
                 raise
         try:
+            ensure_snap_oom_protection(charm_refresh.snap_name())
             snap_cache = snap.SnapCache()
             snap_package = snap_cache[charm_refresh.snap_name()]
             if not snap_package.present or refresh is not None:
