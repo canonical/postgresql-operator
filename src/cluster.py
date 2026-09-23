@@ -260,7 +260,7 @@ class Patroni:
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
             if snp["name"] == POSTGRESQL_SNAP_NAME:
-                return snp["version"]
+                return str(snp["version"])
         raise Exception("Cannot get version found.")
 
     def get_member_ip(self, member_name: str) -> str | None:
