@@ -11,7 +11,7 @@ and [deployment tutorial](https://charmhub.io/postgresql/docs/h-deploy-terraform
 | Name | Version |
 |------|---------|
 | terraform | >= 1.6.6 |
-| juju provider | >= 0.14.0 |
+| juju provider | ~> 1.0 (>= 1.0.0, < 2.0.0) |
 
 ## Usage
 

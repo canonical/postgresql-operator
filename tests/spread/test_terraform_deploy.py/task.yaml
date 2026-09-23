@@ -1,0 +1,10 @@
+summary: terraform/test_terraform_deploy.py
+environment:
+  TEST_MODULE: terraform/test_terraform_deploy.py
+execute: |
+  # The terraform binary is not part of the concierge substrate; install it for this task only.
+  sudo snap install terraform --classic
+
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results

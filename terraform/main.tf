@@ -11,7 +11,6 @@ check "juju_model_deprecated" {
   }
 }
 
-
 resource "juju_application" "machine_postgresql" {
   name = var.app_name
 
