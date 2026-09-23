@@ -11,7 +11,7 @@ and [deployment tutorial](https://charmhub.io/postgresql/docs/h-deploy-terraform
 | Name | Version |
 |------|---------|
 | terraform | >= 1.6.6 |
-| juju provider | ~> 1.0 (>= 1.0.0, < 2.0.0) |
+| juju provider | ~> 1.0 |
 
 ## Usage
 
@@ -19,6 +19,11 @@ Users should ensure that Juju model has been created to deploy into, and take no
 ```
 juju add-model welcome
 juju show-model welcome --format=json | jq -r '.welcome."model-uuid"'
+```
+
+The module takes the model UUID rather than the model name. Export it once and reuse it in the examples below:
+```
+export JUJU_MODEL_UUID=$(juju show-model welcome --format json | jq -r '.welcome.model-uuid')
 ```
 
 To deploy Charmed PostgreSQL into the model `welcome`, run:
@@ -51,7 +56,9 @@ juju add-machine
 
 terraform apply -var='model_uuid=<model-uuid>' -var='machine=19'
 ```
-Note: the module variables `units` and `machine` are self-exclusive.
+The number of machines in the set determines the number of units deployed.
+
+Note: the module variables `units`, `machine` and `machines` are self-exclusive: `machines` takes precedence over `machine`, and either overrides `units`.
 
 Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs/h-deploy-terraform) for more examples.
 
@@ -67,6 +74,7 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 | revision | Revision number to deploy charm | `number` | n/a | no |
 | base | Application base | `string` | `ubuntu@24.04` | no |
 | machine | Target Juju machine to deploy on | `string` | n/a | no |
+| machines | Target Juju machines to deploy on | `set(string)` | n/a | no |
 | units | Number of units to deploy | `number` | `1` | no |
 | constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
 | storage | Storage directive | `map(string)` | `{}` | no |
