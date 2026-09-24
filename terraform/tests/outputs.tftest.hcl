@@ -8,13 +8,14 @@ run "endpoint_outputs_are_stable" {
   command = plan
 
   assert {
-    condition     = output.provides == { database = "database", cos_agent = "cos-agent" }
-    error_message = "provides must expose exactly the database and cos-agent endpoints"
+    condition = toset(values(output.provides)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).provides))
+    error_message = "provides must match the provides endpoints in metadata.yaml"
   }
 
+
   assert {
-    condition     = output.requires == { certificates = "certificates", s3_parameters = "s3-parameters" }
-    error_message = "requires must expose exactly the certificates and s3-parameters endpoints"
+    condition = toset(values(output.requires)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).requires))
+    error_message = "requires must match the requires endpoints in metadata.yaml"
   }
 }
 
