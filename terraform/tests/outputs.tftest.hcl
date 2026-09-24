@@ -8,13 +8,13 @@ run "endpoint_outputs_are_stable" {
   command = plan
 
   assert {
-    condition = toset(values(output.provides)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).provides))
+    condition     = toset(values(output.provides)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).provides))
     error_message = "provides must match the provides endpoints in metadata.yaml"
   }
 
 
   assert {
-    condition = toset(values(output.requires)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).requires))
+    condition     = toset(values(output.requires)) == toset(keys(yamldecode(file("${path.module}/../metadata.yaml")).requires))
     error_message = "requires must match the requires endpoints in metadata.yaml"
   }
 }
