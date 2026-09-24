@@ -1,0 +1,11 @@
+summary: OOM protection on VM workload units
+systems:
+  - ubuntu-24.04
+environment:
+  TEST_MODULE: test_oom.py
+  DISK: 40
+execute: |
+  test -c /dev/kvm
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results
