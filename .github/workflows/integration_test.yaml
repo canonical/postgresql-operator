@@ -64,6 +64,10 @@ jobs:
               _, runner, task, variant = job.split(":")
               # Example: "test_charm.py"
               task = task.removeprefix("tests/spread/")
+              # Deploys the terraform module from Charmhub, not the packed charm; it runs in
+              # .github/workflows/terraform.yaml on changes to the module instead.
+              if task == "test_terraform_deploy.py":
+                  continue
               if runner.endswith("-arm"):
                   architecture = "arm64"
               else:
@@ -84,7 +88,7 @@ jobs:
               file.write(output)
       - name: Generate Allure default test results
         if: ${{ github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
-        run: tox run -e integration -- tests/integration --allure-default-dir=allure-default-results
+        run: tox run -e integration -- tests/integration --ignore=tests/integration/terraform --allure-default-dir=allure-default-results
       - name: Upload Allure default results
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
