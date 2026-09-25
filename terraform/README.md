@@ -15,37 +15,45 @@ and [deployment tutorial](https://charmhub.io/postgresql/docs/h-deploy-terraform
 
 ## Usage
 
-Users should ensure that Juju model has been created to deploy into:
+Users should ensure that Juju model has been created to deploy into, and take note of its UUID:
 ```
 juju add-model welcome
 ```
 
-The module takes the model UUID rather than the model name. Export it once and reuse it in the examples below:
+The module takes the model UUID (`model_uuid` input) rather than the model name. The former `juju_model` input is deprecated and will be removed in a future release. Export the UUID once and reuse it in the examples below:
 ```
 export JUJU_MODEL_UUID=$(juju show-model welcome --format json | jq -r '.welcome.model-uuid')
 ```
 
 To deploy Charmed PostgreSQL into the model `welcome`, run:
 ```
-terraform apply -var="juju_model=$JUJU_MODEL_UUID" -auto-approve
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -auto-approve
 ```
 
 By default, this Terraform module will deploy PostgreSQL with `1` unit only.
 To configure the module to deploy `3` units, run:
 ```
-terraform apply -var="juju_model=$JUJU_MODEL_UUID" -var='units=3' -auto-approve
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -var='units=3' -auto-approve
 ```
 
-The juju storage directive config example:
+The juju storage directives config example:
 ```
-terraform apply -var="juju_model=$JUJU_MODEL_UUID" -auto-approve \
-  -var='storage_size=20G'
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -auto-approve \
+  -var='storage={pgdata="20G,lxd"}'
 ```
 
 The juju constraints example:
 ```
-terraform apply -var="juju_model=$JUJU_MODEL_UUID" -auto-approve \
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -auto-approve \
   -var='constraints=arch=amd64 cores=4 mem=4096M virt-type=virtual-machine'
+```
+
+Example of deploying to the specific Juju machine:
+```
+juju add-machine
+> created machine 19
+
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -var='machine=19'
 ```
 
 Example of deploying multiple units to specific Juju machines (e.g. for HA):
@@ -57,11 +65,11 @@ juju add-machine
 juju add-machine
 > created machine 21
 
-terraform apply -var="juju_model=$JUJU_MODEL_UUID" -var='machines=["19","20","21"]' -auto-approve
+terraform apply -var="model_uuid=$JUJU_MODEL_UUID" -var='machines=["19","20","21"]' -auto-approve
 ```
 The number of machines in the set determines the number of units deployed.
 
-Note: the module variables `units` and `machines` are self-exclusive.
+Note: the module variables `units`, `machine` and `machines` are self-exclusive: `machines` takes precedence over `machine`, and either overrides `units`.
 
 Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs/h-deploy-terraform) for more examples.
 
@@ -69,15 +77,19 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| juju_model | Juju model UUID to deploy into | `string` | n/a | yes |
-| app_name | Name of the application in the Juju model. | `string` | `postgresql` | no |
+| model_uuid | Juju model UUID to deploy into | `string` | n/a | yes |
+| juju_model | **Deprecated**, use `model_uuid` instead. Juju model UUID, only used when `model_uuid` is unset | `string` | n/a | no |
+| charm_name | Name of the charm on charmhub.io to deploy | `string` | `postgresql` | no |
+| app_name | Name of the deployed application in the Juju model | `string` | `postgresql` | no |
 | channel | Charm channel to use when deploying | `string` | `14/stable` | no |
 | revision | Revision number to deploy charm | `number` | n/a | no |
 | base | Application base | `string` | `ubuntu@22.04` | no |
+| machine | Target Juju machine to deploy on | `string` | n/a | no |
 | machines | Target Juju machines to deploy on | `set(string)` | n/a | no |
 | units | Number of units to deploy | `number` | `1` | no |
-| constraints | Juju constraints to apply for this application. | `string` | `arch=amd64` | no |
-| storage_size | Storage size | `string` | `10G` | no |
+| constraints | Juju constraints to apply for this application | `string` | `arch=amd64` | no |
+| storage | Storage directive | `map(string)` | `{ pgdata = "10G" }` | no |
+| storage_size | **Deprecated**, use `storage` instead. Size of the `pgdata` storage, overrides `storage["pgdata"]` when set | `string` | n/a | no |
 | config | Application configuration. Details at https://charmhub.io/postgresql/configurations | `map(string)` | `{}` | no |
 | enable_expose | Whether to expose the application | `bool` | `true` | no |
 
@@ -85,6 +97,8 @@ Check [Charmed PostgreSQL Deployment How-to](https://charmhub.io/postgresql/docs
 
 | Name | Description |
 |------|-------------|
-| application_name | Application name |
+| application | The full `juju_application` resource which makes up this product module |
+| application_name | Application name which make up this product module |
 | provides | Endpoints charm provides |
 | requires | Endpoints charm requires |
+
