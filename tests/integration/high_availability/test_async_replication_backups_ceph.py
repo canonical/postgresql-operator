@@ -4,6 +4,7 @@
 
 import logging
 from collections.abc import Generator
+from pathlib import Path
 
 import jubilant
 import pytest
@@ -33,6 +34,34 @@ logger = logging.getLogger(__name__)
 logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 
 
+def _dump_model_debug_log(model: Juju, model_name: str) -> None:
+    """Persist this model's full debug-log before teardown.
+
+    The shared pytest-operator fixture only captures logs for the model it
+    manages. Secondary models — like the async-replication standby cluster in
+    ``testing-other`` — would otherwise lose all charm logs on teardown,
+    leaving hook hangs in them undiagnosable.
+    """
+    try:
+        dump = model.cli(
+            "debug-log", "--replay", "--no-tail", "--level", "DEBUG", "--lines", "20000"
+        )
+    except (CLIError, TaskError) as e:
+        logger.warning("Failed to dump debug-log for model %s: %s", model_name, e)
+        return
+    target_dir = Path.home() / "logs"
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / f"debug-log-{model_name}.txt"
+        target.write_text(dump)
+        logger.info("Dumped debug-log for model %s to %s", model_name, target)
+    except OSError:
+        # Local runs without a writable logs dir: keep the tail in the pytest log.
+        logger.info(
+            "Debug-log tail for model %s:\n%s", model_name, "\n".join(dump.splitlines()[-500:])
+        )
+
+
 @pytest.fixture(scope="module")
 def first_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
     """Return the first model."""
@@ -53,6 +82,7 @@ def second_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
     if request.config.getoption("--keep-models"):
         return
 
+    _dump_model_debug_log(model_2, model_name)
     logger.info("Destroying model: %s", model_name)
     juju.destroy_model(model_name, destroy_storage=True, force=True)
 
