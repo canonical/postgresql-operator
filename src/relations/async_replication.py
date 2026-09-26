@@ -603,7 +603,6 @@ class PostgreSQLAsyncReplication(Object):
             return False
 
         # Increment the current cluster counter in this application side based on the highest counter value.
-        promoted_cluster_counter = int(self._get_highest_promoted_cluster_counter_value())
         promoted_cluster_counter = int(datetime.now(UTC).timestamp())
         logger.debug("Promoted cluster counter: %s", promoted_cluster_counter)
 

@@ -544,7 +544,7 @@ def test_handle_replication_change():
     assert result is True
     relation._can_promote_cluster.assert_called_once_with(mock_event)
     relation.get_system_identifier.assert_called_once()
-    relation._get_highest_promoted_cluster_counter_value.assert_called_once()
+    assert not relation._get_highest_promoted_cluster_counter_value.called
     relation._update_primary_cluster_data.assert_called_once_with(int(_now.timestamp()), 12345)
     mock_event.fail.assert_not_called()
 
