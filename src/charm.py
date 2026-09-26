@@ -99,6 +99,7 @@ from single_kernel_postgresql.config.literals import (
     REPLICATION_USER,
     REWIND_PASSWORD_KEY,
     REWIND_USER,
+    S3_RELATION_NAME,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
@@ -121,13 +122,13 @@ from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
+from single_kernel_postgresql.lib.charms.data_platform_libs.v0.s3 import S3Requirer
 from single_kernel_postgresql.managers.backup import BackupManager
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.restore import RestoreManager
-from single_kernel_postgresql.managers.s3_client import S3Client
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
 from single_kernel_postgresql.utils.backup import (
@@ -151,6 +152,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLUndefinedHostError,
     PostgreSQLUpdateUserPasswordError,
 )
+from single_kernel_postgresql.utils.s3 import S3Client
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
@@ -381,7 +383,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # TODO switch to the abstract class base
         # State
-        self.state = CharmState(charm=self, substrate=self.substrate)
+        self.s3_requirer = S3Requirer(self, S3_RELATION_NAME)
+        self.state = CharmState(
+            charm=self,
+            substrate=self.substrate,
+            s3_requirer=self.s3_requirer,
+        )
 
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
