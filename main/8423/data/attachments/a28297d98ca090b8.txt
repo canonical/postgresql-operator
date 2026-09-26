@@ -1,0 +1,165 @@
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-1
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] maintenance: installing PostgreSQL
+  second-postgresql/1 [executing] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] waiting: waiting to start PostgreSQL
+  second-postgresql/1 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] active: Primary (degraded)
+  second-postgresql/1 [executing] waiting: awaiting for cluster to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary (degraded)
+  second-postgresql/1 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary
+  second-postgresql/1 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 6}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 8}
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  00:17:21Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.24    active      2  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  599  no       received database credentials of the first database
+second-postgresql    14.24    active      2  postgresql                          1  no       
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.223.57.4               received database credentials of the first database
+postgresql/0*           active    idle   0        10.223.57.170   5432/tcp  
+postgresql/2            active    idle   2        10.223.57.22    5432/tcp  Primary
+second-postgresql/0*    active    idle   4        10.223.57.248   5432/tcp  Primary
+second-postgresql/1     active    idle   5        10.223.57.221   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.223.57.170  juju-af12b9-0  ubuntu@22.04  runnervm3p1d5  Running
+2        started  10.223.57.22   juju-af12b9-2  ubuntu@22.04  runnervm3p1d5  Running
+3        started  10.223.57.4    juju-af12b9-3  ubuntu@22.04  runnervm3p1d5  Running
+4        started  10.223.57.248  juju-af12b9-4  ubuntu@22.04  runnervm3p1d5  Running
+5        started  10.223.57.221  juju-af12b9-5  ubuntu@22.04  runnervm3p1d5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:05:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:05:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:06:38 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1e97791a80 state=finished raised Exception>]
+unit-postgresql-1: 00:06:42 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbb26614340 state=finished raised Exception>]
+unit-postgresql-1: 00:06:46 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb772564340 state=finished raised Exception>]
+unit-postgresql-1: 00:06:49 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f13a5728340 state=finished raised Exception>]
+unit-postgresql-1: 00:06:53 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7eff73160370 state=finished raised Exception>]
+unit-postgresql-1: 00:07:26 ERROR unit.postgresql/1.juju-log database-peers:0: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 00:07:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:07:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:08:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-1: 00:11:01 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql-0: 00:11:18 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-4: 00:14:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:14:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:14:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:14:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-postgresql-0: 00:15:08 ERROR unit.second-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9980525cf0 state=finished raised Exception>]
+unit-second-postgresql-0: 00:15:10 ERROR unit.second-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbbe7ab4550 state=finished raised Exception>]
+unit-second-postgresql-0: 00:15:12 ERROR unit.second-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5a926105b0 state=finished raised Exception>]
+unit-second-postgresql-0: 00:15:15 ERROR unit.second-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1315708550 state=finished raised Exception>]
+unit-second-postgresql-0: 00:15:17 ERROR unit.second-postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f542fee8550 state=finished raised Exception>]
+unit-second-postgresql-0: 00:15:25 ERROR unit.second-postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
