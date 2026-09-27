@@ -1,0 +1,88 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  00:26:30Z
+
+App                   Version  Status   Scale  Charm                Channel        Rev  Exposed  Message
+mailman3-core                  active       1  mailman3-core        latest/stable   18  no       Ready (source version/commit e1d5a03)
+postgresql            14.24    active       2  postgresql                            0  no       
+postgresql-test-app            blocked      1  postgresql-test-app  latest/edge    599  no       No database integration available
+postgresql-test-app2           blocked      1  postgresql-test-app  latest/edge    599  no       No database integration available
+
+Unit                     Workload  Agent  Machine  Public address  Ports     Message
+mailman3-core/0*         active    idle   2        10.250.49.78    25/tcp    Ready (source version/commit e1d5a03)
+postgresql-test-app2/0*  blocked   idle   6        10.250.49.42              No database integration available
+postgresql-test-app/0*   blocked   idle   5        10.250.49.94              No database integration available
+postgresql/2*            active    idle   3        10.250.49.14    5432/tcp  
+postgresql/3             active    idle   4        10.250.49.73    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+2        started  10.250.49.78  juju-bd6c1c-2  ubuntu@20.04  runnervm3p1d5  Running
+3        started  10.250.49.14  juju-bd6c1c-3  ubuntu@22.04  runnervm3p1d5  Running
+4        started  10.250.49.73  juju-bd6c1c-4  ubuntu@22.04  runnervm3p1d5  Running
+5        started  10.250.49.94  juju-bd6c1c-5  ubuntu@22.04  runnervm3p1d5  Running
+6        started  10.250.49.42  juju-bd6c1c-6  ubuntu@22.04  runnervm3p1d5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:05:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:05:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 00:06:35 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7efe043b1d20 state=finished raised Exception>]
+unit-postgresql-1: 00:06:37 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f69daf8c5e0 state=finished raised Exception>]
+unit-postgresql-1: 00:06:38 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0d5eda4610 state=finished raised Exception>]
+unit-postgresql-1: 00:06:40 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4527014550 state=finished raised Exception>]
+unit-postgresql-1: 00:06:42 ERROR unit.postgresql/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f105a5345b0 state=finished raised Exception>]
+unit-postgresql-1: 00:06:50 ERROR unit.postgresql/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 00:07:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:07:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:10:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:10:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:16:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:16:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:16:33 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 00:16:33 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:18:00 ERROR unit.postgresql/2.juju-log upgrade:0: Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: FATAL:  the database system is starting up
+
+machine-1: 00:21:23 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql-2: 00:21:33 ERROR unit.postgresql/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-5: 00:24:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 00:24:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:25:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 00:25:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:25:32 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "90bd2d1c-1c0c-44aa-86d4-94796abd6c1c:r#6#postgresql-test-app": settings 90bd2d1c-1c0c-44aa-86d4-94796abd6c1c:r#6#postgresql-test-app not found (not found)
+unit-postgresql-2: 00:26:09 ERROR unit.postgresql/2.juju-log db:8: ERROR - `extensions` (pg_trgm, unaccent) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+unit-postgresql-2: 00:26:12 ERROR unit.postgresql/2.juju-log db:8: ERROR - `extensions` (pg_trgm, unaccent) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
