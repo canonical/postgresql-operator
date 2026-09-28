@@ -87,6 +87,7 @@ from single_kernel_postgresql.config.literals import (
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_USER,
@@ -101,6 +102,7 @@ from single_kernel_postgresql.config.literals import (
     REPLICATION_USER,
     REWIND_PASSWORD_KEY,
     REWIND_USER,
+    S3_RELATION_NAME,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
@@ -117,10 +119,7 @@ from single_kernel_postgresql.core.config import CharmConfig
 from single_kernel_postgresql.core.state import CharmState
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
-from single_kernel_postgresql.events.logical_replication import (
-    LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
-    PostgreSQLLogicalReplication,
-)
+from single_kernel_postgresql.events.logical_replication import PostgreSQLLogicalReplication
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
@@ -130,6 +129,7 @@ from single_kernel_postgresql.lib.charms.data_platform_libs.v0.s3 import S3Requi
 from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
+from single_kernel_postgresql.managers.logical_replication import LogicalReplicationManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.refresh import RefreshManager
 from single_kernel_postgresql.managers.tls import TLSManager
@@ -332,7 +332,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.database = DatabaseEventsHandler(
             self, self.state, self.database_manager, self.patroni_manager, self.tls_manager
         )
-        self.logical_replication = PostgreSQLLogicalReplication(self, self.state)
+        self.logical_replication_manager = LogicalReplicationManager(
+            state=self.state,
+            workload=self.workload,
+            # Per-call bridges: the client and the primary lookup are freshly
+            # constructed per access (Patroni primary lookup + app secret).
+            postgresql=lambda: self.postgresql,
+            primary_endpoint=lambda: self.primary_endpoint,
+            update_config=self.update_config,
+            set_unit_status=self.set_unit_status,
+        )
+        self.logical_replication = PostgreSQLLogicalReplication(
+            self, self.state, self.logical_replication_manager
+        )
         self.config_manager = ConfigManager(
             state=self.state,
             workload=self.workload,
@@ -2252,7 +2264,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.unit.status = BlockedStatus(
                     self.app_peer_data.get("logical-replication-validation-status-message")
-                    or self.logical_replication.remote_publisher_error_message()
+                    or self.logical_replication_manager.remote_publisher_error_message()
                     or LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
                 )
                 return
