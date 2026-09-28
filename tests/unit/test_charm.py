@@ -1254,7 +1254,10 @@ def test_on_update_status_after_restore_operation(harness):
 
 
 def test_install_snap_package(harness):
-    with patch("charm.snap.SnapCache") as _snap_cache:
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.ensure_snap_oom_protection"),
+    ):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
         _snap_package.ensure.side_effect = snap.SnapError
         _snap_package.present = False
@@ -1333,6 +1336,42 @@ def test_install_snap_package(harness):
                 harness.charm._install_snap_package(revision=None)
         assert not _snap_package.ensure.called
         assert not _snap_package.hold.called
+
+
+@pytest.mark.parametrize("present,refreshing", [(False, False), (True, False), (True, True)])
+def test_install_snap_package_configures_oom_before_install(harness, present, refreshing):
+    with (
+        patch("charm.snap.SnapCache") as cache,
+        patch("charm.ensure_snap_oom_protection", return_value=-898) as protect,
+    ):
+        calls = Mock()
+        calls.attach_mock(protect, "protect")
+        calls.attach_mock(cache, "cache")
+        package = cache.return_value.__getitem__.return_value
+        package.present = present
+        refresh = Mock() if refreshing else None
+
+        harness.charm._install_snap_package(revision="416", refresh=refresh)
+
+        assert calls.mock_calls[:2] == [call.protect("charmed-postgresql"), call.cache()]
+        if not present or refreshing:
+            package.ensure.assert_called_once_with(snap.SnapState.Present, revision="416")
+        else:
+            package.ensure.assert_not_called()
+        package.start.assert_not_called()
+        package.restart.assert_not_called()
+        package.stop.assert_not_called()
+
+
+def test_install_snap_package_stops_on_oom_failure(harness):
+    with (
+        patch("charm.snap.SnapCache") as cache,
+        patch("charm.ensure_snap_oom_protection", side_effect=snap.SnapError("cannot protect")),
+    ):
+        with pytest.raises(snap.SnapError, match="cannot protect"):
+            harness.charm._install_snap_package(revision="416")
+
+        cache.assert_not_called()
 
 
 def test_is_storage_attached(harness):
