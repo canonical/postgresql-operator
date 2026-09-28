@@ -23,7 +23,6 @@ from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidatio
 from botocore.loaders import create_loader
 from botocore.regions import EndpointResolver
 from charmlibs import snap
-from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
@@ -42,6 +41,10 @@ from single_kernel_postgresql.config.literals import (
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     UNIT_SCOPE,
+)
+from single_kernel_postgresql.lib.charms.data_platform_libs.v0.s3 import (
+    CredentialsChangedEvent,
+    S3Requirer,
 )
 from single_kernel_postgresql.utils import render_file
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -96,14 +99,17 @@ class ListBackupsError(Exception):
 class PostgreSQLBackups(Object):
     """In this class, we manage PostgreSQL backups."""
 
-    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str):
+    def __init__(
+        self, charm: "PostgresqlOperatorCharm", relation_name: str, s3_requirer: S3Requirer
+    ):
         """Manager of PostgreSQL backups."""
         super().__init__(charm, "backup")
         self.charm = charm
         self.relation_name = relation_name
 
-        # s3 relation handles the config options for s3 backups
-        self.s3_client = S3Requirer(self.charm, self.relation_name)
+        # s3 relation handles the config options for s3 backups; the requirer is
+        # constructed once (charm-level, for CharmState) and injected here.
+        self.s3_client = s3_requirer
         self.framework.observe(
             self.s3_client.on.credentials_changed, self._on_s3_credential_changed
         )
