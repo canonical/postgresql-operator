@@ -16,7 +16,7 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 from urllib.parse import urlparse
 
 # First platform-specific import, will fail on wrong architecture
@@ -156,6 +156,9 @@ from single_kernel_postgresql.utils.postgresql import (
 from single_kernel_postgresql.utils.s3 import S3Client
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
+
+if TYPE_CHECKING:
+    from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
 
 from cluster import Patroni
 from cluster_topology_observer import (
@@ -406,7 +409,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.refresh_manager = RefreshManager(
             state=self.state,
             workload=self.workload,
-            charm=self,
+            # The charm implements the abstract charm's dispatch surface
+            # duck-typed; the lib managers type it as AbstractPostgreSQLCharm.
+            charm=cast("AbstractPostgreSQLCharm", self),
             set_default_status=self._set_primary_status_message,
         )
         # Do not use collect status events elsewhere—otherwise ops will prioritize statuses

@@ -104,9 +104,7 @@ def test_internal_cert_path_pushes_and_reloads(harness):
             "charm.CharmState.get_secret",
             return_value="-----BEGIN CERTIFICATE-----",
         ),
-        patch(
-            "single_kernel_postgresql.managers.refresh.load_pem_x509_certificate"
-        ) as _load_cert,
+        patch("single_kernel_postgresql.managers.refresh.load_pem_x509_certificate") as _load_cert,
         patch("charm.TLSManager.generate_internal_peer_cert") as _generate,
         patch("charm.TLSManager.push_tls_files") as _push,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
