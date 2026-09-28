@@ -2519,9 +2519,7 @@ def test_on_peer_relation_departed(harness):
 
 def test_update_new_unit_status(harness):
     with (
-        patch(
-            "charm.PostgreSQLAsyncReplication.handle_read_only_mode"
-        ) as handle_read_only_mode,
+        patch("charm.PostgreSQLAsyncReplication.handle_read_only_mode") as handle_read_only_mode,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,

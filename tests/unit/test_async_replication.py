@@ -13,11 +13,13 @@ from single_kernel_postgresql.config.literals import (
 from single_kernel_postgresql.events.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
     PostgreSQLAsyncReplication,
+    _same_secret_id,
 )
-from single_kernel_postgresql.events.async_replication import _same_secret_id
-from single_kernel_postgresql.managers.async_replication import AsyncReplicationManager, _safe_databag_get
+from single_kernel_postgresql.managers.async_replication import (
+    AsyncReplicationManager,
+    _safe_databag_get,
+)
 from tenacity import RetryError
-
 
 
 def make_relation(charm=None) -> PostgreSQLAsyncReplication:
@@ -42,6 +44,12 @@ def make_real_manager(state: MagicMock) -> AsyncReplicationManager:
         workload=MagicMock(),
         patroni_manager=MagicMock(),
         update_config=MagicMock(),
+        set_unit_status=MagicMock(),
+        set_primary_status_message=MagicMock(),
+        set_app_status=MagicMock(),
+        create_pgdata=MagicMock(),
+        fix_leader_annotation=MagicMock(return_value=True),
+        re_emit_relation_changed=MagicMock(),
     )
 
 
@@ -64,7 +72,7 @@ def test_on_secret_changed():
     mock_event = MagicMock()
 
     relation = make_relation(mock_charm)
-    relation.manager._relation = None
+    relation.manager.async_relation = None
 
     with patch("logging.Logger.debug") as mock_debug:
         relation._on_secret_changed(mock_event)
@@ -74,13 +82,14 @@ def test_on_secret_changed():
 
 
 def test__configure_primary_cluster():
-    # 1.
+    # 1. Not this cluster's promotion: no-op.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
 
-    result = relation._configure_primary_cluster(None, mock_event)
+    result = relation.manager._configure_primary_cluster(None, mock_event)
     assert result is False
 
     # 2. Another cluster is primary but this unit is not the leader: only the config
@@ -88,17 +97,19 @@ def test__configure_primary_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_app = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
-    relation.state.model.app = mock_app
-    relation.state.model.unit.is_leader.return_value = False
+    relation = make_relation_with_real_manager(mock_charm, state)
+    state.model.app = mock_app
+    state.model.unit.is_leader.return_value = False
     relation.manager.is_primary_cluster = MagicMock(return_value=True)
+    relation.manager.get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
     relation.patroni_manager.get_standby_leader.return_value = None
 
-    result = relation._configure_primary_cluster(mock_app, mock_event)
+    result = relation.manager._configure_primary_cluster(mock_app, mock_event)
 
-    mock_charm.update_config.assert_called_once()
-    relation.state.peer.data.update.assert_called_once()
+    relation.manager.update_config.assert_called_once()
+    state.peer.data.update.assert_called_once()
     assert result is True
 
     # 3. This cluster is the primary, the unit is the leader and the cluster is a
@@ -106,20 +117,22 @@ def test__configure_primary_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_app = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
-    relation.state.model.app = mock_app
-    relation.state.model.unit.name = "unit-0"
-    relation.state.model.unit.is_leader.return_value = True
+    relation = make_relation_with_real_manager(mock_charm, state)
+    state.model.app = mock_app
+    state.model.unit.name = "unit-0"
+    state.model.unit.is_leader.return_value = True
     relation.manager.is_primary_cluster = MagicMock(return_value=True)
-    relation.manager._update_primary_cluster_data = MagicMock()
+    relation.manager.get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
+    relation.manager.update_primary_cluster_data = MagicMock()
     relation.patroni_manager.get_standby_leader.return_value = True
     relation.patroni_manager.get_primary.return_value = "unit-0"
 
-    result = relation._configure_primary_cluster(mock_app, mock_event)
+    result = relation.manager._configure_primary_cluster(mock_app, mock_event)
 
-    mock_charm.update_config.assert_called_once()
-    relation.manager._update_primary_cluster_data.assert_called_once()
+    relation.manager.update_config.assert_called_once()
+    relation.manager.update_primary_cluster_data.assert_called_once()
     relation.patroni_manager.promote_standby_cluster.assert_called_once()
     assert result is True
 
@@ -127,18 +140,20 @@ def test__configure_primary_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_app = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
-    relation.state.model.app = mock_app
-    relation.state.model.unit.is_leader.return_value = True
+    relation = make_relation_with_real_manager(mock_charm, state)
+    state.model.app = mock_app
+    state.model.unit.is_leader.return_value = True
     relation.manager.is_primary_cluster = MagicMock(return_value=True)
-    relation.manager._update_primary_cluster_data = MagicMock()
+    relation.manager.get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
+    relation.manager.update_primary_cluster_data = MagicMock()
     relation.patroni_manager.get_standby_leader.return_value = None
 
-    result = relation._configure_primary_cluster(mock_app, mock_event)
+    result = relation.manager._configure_primary_cluster(mock_app, mock_event)
 
-    mock_charm.update_config.assert_called_once()
-    relation.manager._update_primary_cluster_data.assert_called_once()
+    relation.manager.update_config.assert_called_once()
+    relation.manager.update_primary_cluster_data.assert_called_once()
     assert result is True
 
 
@@ -196,7 +211,7 @@ def test_on_create_replication():
 
     mock_relation = MagicMock()
     mock_relation.name = REPLICATION_CONSUMER_RELATION
-    relation.manager._relation = mock_relation
+    relation.manager.async_relation = mock_relation
 
     result = relation._on_create_replication(mock_event)
 
@@ -211,11 +226,11 @@ def test_on_create_replication():
     relation = make_relation(mock_charm)
 
     relation.manager.get_primary_cluster = MagicMock(return_value=None)
-    relation._handle_replication_change = MagicMock(return_value=True)
+    relation.manager._handle_replication_change = MagicMock(return_value=True)
 
     mock_relation = MagicMock()
     mock_relation.name = "Something"
-    relation.manager._relation = mock_relation
+    relation.manager.async_relation = mock_relation
 
     result = relation._on_create_replication(mock_event)
 
@@ -228,11 +243,11 @@ def test_on_create_replication():
     relation = make_relation(mock_charm)
 
     relation.manager.get_primary_cluster = MagicMock(return_value=None)
-    relation._handle_replication_change = MagicMock(return_value=False)
+    relation.manager._handle_replication_change = MagicMock(return_value=False)
 
     mock_relation = MagicMock()
     mock_relation.name = "Something"
-    relation.manager._relation = mock_relation
+    relation.manager.async_relation = mock_relation
 
     result = relation._on_create_replication(mock_event)
 
@@ -253,14 +268,14 @@ def test_on_create_replication():
     stale_relation.data = {state.model.unit: {}, state.model.app: {}}
     state.model.get_relation.return_value = stale_relation
     relation = make_relation_with_real_manager(mock_charm, state)
-    relation._handle_replication_change = MagicMock(return_value=True)
+    relation.manager._handle_replication_change = MagicMock(return_value=True)
     relation.manager.get_primary_cluster = MagicMock(return_value=None)
 
     result = relation._on_create_replication(mock_event)
 
     assert result is None
     assert app_data.get("promoted-cluster-counter") == ""
-    relation._handle_replication_change.assert_called_once()
+    relation.manager._handle_replication_change.assert_called_once()
 
     # 6. A counter mirrored on a live relation (an actual replication) survives the
     # pre-guard clearing: the action still refuses with "already a replication set up."
@@ -272,10 +287,13 @@ def test_on_create_replication():
     app_data = {"promoted-cluster-counter": "2"}
     state.application.data = app_data
     mirror_relation = MagicMock()
-    mirror_relation.data = {state.model.unit: {}, state.model.app: {"promoted-cluster-counter": "2"}}
+    mirror_relation.data = {
+        state.model.unit: {},
+        state.model.app: {"promoted-cluster-counter": "2"},
+    }
     state.model.get_relation.return_value = mirror_relation
     relation = make_relation_with_real_manager(mock_charm, state)
-    relation._handle_replication_change = MagicMock(return_value=True)
+    relation.manager._handle_replication_change = MagicMock(return_value=True)
     relation.manager.get_primary_cluster = MagicMock(return_value=mock_charm.app)
 
     result = relation._on_create_replication(mock_event)
@@ -290,11 +308,11 @@ def test_promote_to_primary():
     mock_charm = MagicMock()
     mock_event = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
     relation.state.model.app.status.message = "Something"
     relation.manager.get_primary_cluster = MagicMock(return_value=None)
 
-    result = relation.promote_to_primary(mock_event)
+    result = relation.manager.promote_to_primary(mock_event)
     assert result is None
 
     mock_event.fail.assert_called_once_with(
@@ -304,13 +322,14 @@ def test_promote_to_primary():
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
-    relation.state.model.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
+    relation = make_relation_with_real_manager(mock_charm, state)
+    state.model.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
     relation.manager.get_primary_cluster = MagicMock(return_value=None)
-    relation._handle_replication_change = MagicMock(return_value=False)
+    relation.manager._handle_replication_change = MagicMock(return_value=False)
 
-    result = relation.promote_to_primary(mock_event)
+    result = relation.manager.promote_to_primary(mock_event)
 
     assert result is None
 
@@ -319,13 +338,18 @@ def test__configure_standby_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
     mock_relation = MagicMock()
     mock_relation.name = REPLICATION_CONSUMER_RELATION
-    relation.manager._relation = mock_relation
     relation.manager._update_internal_secret = MagicMock(return_value=False)
 
-    result = relation._configure_standby_cluster(mock_event)
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._configure_standby_cluster(mock_event)
 
     assert result is False
     mock_event.defer.assert_called_once()
@@ -333,37 +357,52 @@ def test__configure_standby_cluster():
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
     mock_relation = MagicMock()
     mock_relation.name = "something_else"
-    relation.manager._relation = mock_relation
     relation.manager._update_internal_secret = MagicMock(return_value=True)
-    relation.workload.get_system_identifier = MagicMock(return_value=(None, 2))
+    relation.manager.workload.get_system_identifier = MagicMock(return_value=(None, 2))
 
-    with pytest.raises(Exception) as exc_info:
-        relation._configure_standby_cluster(mock_event)
+    with (
+        patch.object(
+            AsyncReplicationManager,
+            "async_relation",
+            new_callable=PropertyMock,
+            return_value=mock_relation,
+        ),
+        pytest.raises(Exception) as exc_info,
+    ):
+        relation.manager._configure_standby_cluster(mock_event)
 
     assert str(exc_info.value) == "2"
 
     # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
     mock_relation = MagicMock()
     mock_relation.name = "some_relation"
     mock_relation.app = "remote-app"
-    relation.workload.create_data_backup_tarball = MagicMock(return_value="backup.tar.gz")
+    relation.manager.workload.create_data_backup_tarball = MagicMock(return_value="backup.tar.gz")
     app_data = {}
-    relation.state.application.data = app_data
+    state.application.data = app_data
 
-    relation.workload.get_system_identifier = MagicMock(return_value=("456", None))
+    relation.manager.workload.get_system_identifier = MagicMock(return_value=("456", None))
 
-    result = relation._configure_standby_cluster(mock_event)
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._configure_standby_cluster(mock_event)
 
     assert result is True
-    relation.workload.create_data_backup_tarball.assert_called_once()
+    relation.manager.workload.create_data_backup_tarball.assert_called_once()
     assert app_data == {"suppress-oversee-users": "true"}
 
 
@@ -371,14 +410,15 @@ def test_wait_for_standby_leader():
     # 1.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
 
     relation.patroni_manager.get_standby_leader.return_value = None
-    relation.state.model.unit.is_leader.return_value = False
+    state.model.unit.is_leader.return_value = False
     relation.patroni_manager.is_member_isolated = True
 
-    result = relation._wait_for_standby_leader(mock_event)
+    result = relation.manager._wait_for_standby_leader(mock_event)
     assert result is True
     relation.patroni_manager.restart_patroni.assert_called_once()
     mock_event.defer.assert_called_once()
@@ -386,26 +426,28 @@ def test_wait_for_standby_leader():
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
 
     relation.patroni_manager.get_standby_leader.return_value = None
-    relation.state.model.unit.is_leader.return_value = False
+    state.model.unit.is_leader.return_value = False
     relation.patroni_manager.is_member_isolated = False
 
-    result = relation._wait_for_standby_leader(mock_event)
+    result = relation.manager._wait_for_standby_leader(mock_event)
     assert result is True
     mock_event.defer.assert_called_once()
 
     # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
+    state = MagicMock()
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, state)
     relation.patroni_manager.get_standby_leader.return_value = None
-    relation.state.model.unit.is_leader.return_value = True
+    state.model.unit.is_leader.return_value = True
 
-    result = relation._wait_for_standby_leader(mock_event)
+    result = relation.manager._wait_for_standby_leader(mock_event)
     assert result is False
 
 
@@ -426,9 +468,9 @@ def test_handle_replication_change():
     # 1.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    relation = make_relation(mock_charm)
-    relation._can_promote_cluster = MagicMock(return_value=False)
-    result = relation._handle_replication_change(mock_event)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
+    relation.manager._can_promote_cluster = MagicMock(return_value=False)
+    result = relation.manager._handle_replication_change(mock_event)
     assert result is False
 
     # 2.
@@ -437,14 +479,19 @@ def test_handle_replication_change():
     mock_relation = MagicMock()
     mock_relation.units = []
 
-    relation = make_relation(mock_charm)
-    relation._can_promote_cluster = MagicMock(return_value=True)
-    relation.manager._relation = mock_relation
-    relation.workload.get_system_identifier = MagicMock()
-    result = relation._handle_replication_change(mock_event)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
+    relation.manager._can_promote_cluster = MagicMock(return_value=True)
+    relation.manager.workload.get_system_identifier = MagicMock()
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._handle_replication_change(mock_event)
 
     assert result is False
-    relation.workload.get_system_identifier.assert_not_called()
+    relation.manager.workload.get_system_identifier.assert_not_called()
     mock_event.fail.assert_called_once_with(
         "All units from the other cluster must publish their unit addresses in the relation data."
     )
@@ -458,11 +505,16 @@ def test_handle_replication_change():
     mock_relation.units = [mock_unit]
     mock_relation.data = {mock_unit: {"unit-address": "10.0.0.1"}}
 
-    relation = make_relation(mock_charm)
-    relation._can_promote_cluster = MagicMock(return_value=True)
-    relation.manager._relation = mock_relation
-    relation.workload.get_system_identifier = MagicMock(return_value=(12345, "some error"))
-    result = relation._handle_replication_change(mock_event)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
+    relation.manager._can_promote_cluster = MagicMock(return_value=True)
+    relation.manager.workload.get_system_identifier = MagicMock(return_value=(12345, "some error"))
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._handle_replication_change(mock_event)
 
     assert result is False
     mock_event.fail.assert_called_once_with("Failed to get system identifier")
@@ -482,20 +534,25 @@ def test_handle_replication_change():
         mock_unit2: {"unit-address": "10.0.0.2"},
     }
 
-    relation = make_relation(mock_charm)
-    relation._can_promote_cluster = MagicMock(return_value=True)
-    relation.manager._relation = mock_relation
-    relation.workload.get_system_identifier = MagicMock(return_value=(12345, None))
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
+    relation.manager._can_promote_cluster = MagicMock(return_value=True)
+    relation.manager.workload.get_system_identifier = MagicMock(return_value=(12345, None))
     relation.manager.get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
-    relation.manager._update_primary_cluster_data = MagicMock()
+    relation.manager.update_primary_cluster_data = MagicMock()
 
-    result = relation._handle_replication_change(mock_event)
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._handle_replication_change(mock_event)
 
     assert result is True
-    relation._can_promote_cluster.assert_called_once_with(mock_event)
-    relation.workload.get_system_identifier.assert_called_once()
+    relation.manager._can_promote_cluster.assert_called_once_with(mock_event)
+    relation.manager.workload.get_system_identifier.assert_called_once()
     relation.manager.get_highest_promoted_cluster_counter_value.assert_called_once()
-    relation.manager._update_primary_cluster_data.assert_called_once_with(2, 12345)
+    relation.manager.update_primary_cluster_data.assert_called_once_with(2, 12345)
     mock_event.fail.assert_not_called()
 
 
@@ -506,7 +563,7 @@ def test_re_emit_async_relation_changed_event():
     mock_relation.name = "replication-offer"
     mock_relation.app = MagicMock()
     mock_relation.units = []
-    relation.manager._relation = mock_relation
+    relation.manager.async_relation = mock_relation
 
     relation._re_emit_async_relation_changed_event()
 
@@ -530,8 +587,8 @@ def test_handle_forceful_promotion():
     mock_event = MagicMock()
 
     mock_event.params.get.return_value = True
-    relation = make_relation(mock_charm)
-    result = relation._handle_forceful_promotion(mock_event)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
+    result = relation.manager._handle_forceful_promotion(mock_event)
 
     assert result is True
     # 2.
@@ -540,17 +597,22 @@ def test_handle_forceful_promotion():
 
     mock_event.params.get.return_value = False
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
 
     mock_relation = MagicMock()
     mock_relation.app.name = "test-app"
-    relation.manager._relation = mock_relation
 
     relation.manager.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
     relation.patroni_manager.get_primary.side_effect = RetryError("timeout")
 
-    result = relation._handle_forceful_promotion(mock_event)
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._handle_forceful_promotion(mock_event)
 
     mock_event.fail.assert_called_once_with(
         "test-app isn't reachable. Pass `force=true` to promote anyway."
@@ -562,17 +624,22 @@ def test_handle_forceful_promotion():
 
     mock_event.params.get.return_value = False
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
 
     mock_relation = MagicMock()
     mock_relation.app.name = "test-app"
-    relation.manager._relation = mock_relation
 
     relation.manager.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
 
     relation.patroni_manager.get_primary.side_effect = None
 
-    result = relation._handle_forceful_promotion(mock_event)
+    with patch.object(
+        AsyncReplicationManager,
+        "async_relation",
+        new_callable=PropertyMock,
+        return_value=mock_relation,
+    ):
+        result = relation.manager._handle_forceful_promotion(mock_event)
 
     assert result is True
     # 4.
@@ -581,11 +648,11 @@ def test_handle_forceful_promotion():
 
     mock_event.params.get.return_value = False
 
-    relation = make_relation(mock_charm)
+    relation = make_relation_with_real_manager(mock_charm, MagicMock())
 
     relation.manager.get_all_primary_cluster_endpoints = MagicMock(return_value=[])
 
-    result = relation._handle_forceful_promotion(mock_event)
+    result = relation.manager._handle_forceful_promotion(mock_event)
 
     assert result is True
 
@@ -725,7 +792,7 @@ def test_get_secret_creates_labelless_owned_secret_and_persists_id():
     created.id = "secret://uuid/new"
     state.model.app.add_secret.return_value = created
 
-    result = manager._get_secret()
+    result = manager.get_shared_secret()
 
     # Created with NO label; only password fields are shared between clusters.
     state.model.app.add_secret.assert_called_once()
@@ -759,11 +826,13 @@ def test_get_secret_adopts_secret_from_own_relation_data_on_migration():
     offer_relation = MagicMock()
     offer_relation.name = REPLICATION_OFFER_RELATION
     offer_relation.data = {
-        state.model.app: {"primary-cluster-data": json.dumps({"secret-id": "secret://uuid/legacy"})}
+        state.model.app: {
+            "primary-cluster-data": json.dumps({"secret-id": "secret://uuid/legacy"})
+        }
     }
     state.model.get_relation.return_value = offer_relation
 
-    result = manager._get_secret()
+    result = manager.get_shared_secret()
 
     state.model.app.add_secret.assert_not_called()
     assert result is existing
@@ -787,7 +856,7 @@ def test_get_secret_reuses_secret_by_persisted_id():
     state.model.get_secret.side_effect = [app_secret, existing]
     state.application.data = {"async-replication-secret-id": "secret://uuid/abc"}
 
-    result = manager._get_secret()
+    result = manager.get_shared_secret()
 
     state.model.app.add_secret.assert_not_called()
     existing.set_content.assert_not_called()
@@ -816,10 +885,8 @@ def test__get_primary_cluster_skips_unreadable_dead_peer_databag():
     offer_relation.app = remote_app
     offer_relation.data = {remote_app: dead_databag}
 
-    local_databag = MagicMock()
-    local_databag.get.return_value = "1"
-    state.peer_relation = MagicMock()
-    state.peer_relation.data = {local_app: local_databag}
+    # The local counter lives in the application databag and is readable.
+    state.application.data = {"promoted-cluster-counter": "1"}
 
     state.model.get_relation.side_effect = [offer_relation, None]
 
@@ -894,7 +961,7 @@ def test_update_internal_secret_reads_by_id_without_label():
 
     with patch.object(
         AsyncReplicationManager,
-        "_relation",
+        "async_relation",
         new_callable=PropertyMock,
         return_value=_consumer_relation("secret://uuid/abc123"),
     ):
@@ -910,7 +977,7 @@ def test_update_internal_secret_returns_false_without_secret_id():
 
     with patch.object(
         AsyncReplicationManager,
-        "_relation",
+        "async_relation",
         new_callable=PropertyMock,
         return_value=_consumer_relation(None),
     ):
@@ -927,8 +994,8 @@ def test_on_secret_changed_consumer_matches_by_id_not_label():
     mock_event.secret.id = "secret://uuid/abc123"  # same key, different URI format
     mock_event.secret.label = None  # no alias any more
 
-    relation.manager._relation = _consumer_relation("secret:abc123")
-    relation.manager._remote_secret_id = MagicMock(return_value="secret:abc123")
+    relation.manager.async_relation = _consumer_relation("secret:abc123")
+    relation.manager.remote_secret_id = MagicMock(return_value="secret:abc123")
     relation.manager._update_internal_secret = MagicMock(return_value=True)
 
     relation._on_secret_changed(mock_event)
@@ -945,8 +1012,8 @@ def test_on_secret_changed_consumer_ignores_unrelated_secret():
     mock_event.secret.id = "secret://uuid/DIFFERENT"
     mock_event.secret.label = "async-replication-secret"  # legacy label must NOT trigger the sync
 
-    relation.manager._relation = _consumer_relation("secret:abc123")
-    relation.manager._remote_secret_id = MagicMock(return_value="secret:abc123")
+    relation.manager.async_relation = _consumer_relation("secret:abc123")
+    relation.manager.remote_secret_id = MagicMock(return_value="secret:abc123")
     relation.manager._update_internal_secret = MagicMock(return_value=True)
 
     relation._on_secret_changed(mock_event)
@@ -963,8 +1030,8 @@ def test_on_secret_changed_consumer_defers_when_secret_not_ready():
     mock_event.secret.id = "secret://uuid/abc123"
     mock_event.secret.label = None
 
-    relation.manager._relation = _consumer_relation("secret:abc123")
-    relation.manager._remote_secret_id = MagicMock(return_value="secret:abc123")
+    relation.manager.async_relation = _consumer_relation("secret:abc123")
+    relation.manager.remote_secret_id = MagicMock(return_value="secret:abc123")
     relation.manager._update_internal_secret = MagicMock(return_value=False)
 
     relation._on_secret_changed(mock_event)
