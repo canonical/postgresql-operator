@@ -385,6 +385,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # TODO switch to the abstract class base
         # State
+        # ops permits only one S3Requirer object per charm for the s3-parameters relation;
+        # build it here (before CharmState) and hand the same instance to the backups manager.
         self.s3_requirer = S3Requirer(self, S3_RELATION_NAME)
         self.state = CharmState(
             charm=self,
@@ -499,6 +501,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             workload=self.workload,
             patroni_manager=self.patroni_manager,
             update_config=self.update_config,
+            set_unit_status=self.set_unit_status,
+            set_primary_status_message=self.set_primary_status_message,
+            set_app_status=lambda: self.async_replication.set_app_status(),
+            # K8s-only bridges: on VM the pgdata re-initialisation goes through
+            # _reinitialise_pgdata (workload seam) and there is no leader annotation.
+            create_pgdata=lambda: None,
+            fix_leader_annotation=lambda: True,
+            re_emit_relation_changed=lambda: (
+                self.async_replication._re_emit_async_relation_changed_event()
+            ),
+            watcher=self.watcher_offer,
         )
         self.async_replication = PostgreSQLAsyncReplication(
             self,
