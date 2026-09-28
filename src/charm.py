@@ -519,6 +519,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Refresh the client and async relation endpoints after a switchover."""
         self._update_relation_endpoints()
 
+    def update_pebble_layers(self) -> None:
+        """Reconcile the workload's Pebble layers (K8s only)."""
+
+    def ensure_pgdata_dirs_and_symlinks(self) -> None:
+        """Create the storage directories and symlinks for the PostgreSQL data paths (K8s only)."""
+
     def post_refresh_side_effects(self) -> None:
         """Run the post-snap-refresh side effects owned by not-yet-migrated modules.
 
