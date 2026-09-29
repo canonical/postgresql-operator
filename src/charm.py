@@ -2494,7 +2494,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES
+            self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES
             # and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
