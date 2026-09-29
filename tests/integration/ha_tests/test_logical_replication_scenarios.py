@@ -251,8 +251,11 @@ async def test_truncate_resubscribe_recovery(ops_test: OpsTest):
     config_b["logical-replication-subscription-request"] = json.dumps(REQUEST_CONFIG)
     await ops_test.model.applications[APP_NAME_B].set_config(config_b)
 
-    # Single copy of the publisher rows, no duplication.
-    for attempt in Retrying(stop=stop_after_delay(180), wait=wait_fixed(5), reraise=True):
+    # Single copy of the publisher rows, no duplication. The window covers
+    # the first push after a fresh subscription: the initial copy can lag
+    # the subscribe, and a 120s window flaked once in the Multipass VM
+    # validation ("subscriber rows: 6 != 7").
+    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
         with attempt:
             rows = await _run_query(
                 ops_test, DATA_INTEGRATOR_B, "SELECT count(*), count(DISTINCT message) FROM asd;"
@@ -261,4 +264,4 @@ async def test_truncate_resubscribe_recovery(ops_test: OpsTest):
 
     # The re-created subscription is live.
     await _run_query(ops_test, DATA_INTEGRATOR_A, "INSERT INTO asd VALUES ('e7');")
-    assert await _wait_for_row_count(ops_test, 7) == 7
+    assert await _wait_for_row_count(ops_test, 7, timeout=300) == 7
