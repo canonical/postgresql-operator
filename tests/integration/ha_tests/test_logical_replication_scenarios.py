@@ -186,17 +186,6 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
             f"{APP_NAME_A}:logical-replication-offer",
             f"{APP_NAME_B}:logical-replication",
         )
-    # Juju removes relations asynchronously; re-integrating while the old
-    # relation is still dying races its teardown ("relation is dying, but
-    # not yet removed"). Wait for the removal to complete first.
-    for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            assert ops_test.model.get_relation("logical-replication") is None, (
-                "subscription relation still being removed"
-            )
-            assert ops_test.model.get_relation("logical-replication-offer") is None, (
-                "offer relation still being removed"
-            )
     await _assert_no_subscription(ops_test)
     rows_after_break = dict(
         await _run_query(ops_test, DATA_INTEGRATOR_B, "SELECT message, md5(message) FROM asd;")
@@ -204,12 +193,17 @@ async def test_rerelation_no_duplication(ops_test: OpsTest):
     assert rows_after_break == before
 
     # Re-integrate with NO config change: the guard must block the subscribe
-    # because the subscriber table is not empty.
+    # because the subscriber table is not empty. Juju removes relations
+    # asynchronously; a slow teardown races the re-integration ("relation is
+    # dying, but not yet removed", observed once in the charm Multipass VM
+    # validation), so the integrate is retried on transient juju errors.
     async with ops_test.fast_forward():
-        await ops_test.model.integrate(
-            f"{APP_NAME_A}:logical-replication-offer",
-            f"{APP_NAME_B}:logical-replication",
-        )
+        for attempt in Retrying(stop=stop_after_delay(300), wait=wait_fixed(15), reraise=True):
+            with attempt:
+                await ops_test.model.integrate(
+                    f"{APP_NAME_A}:logical-replication-offer",
+                    f"{APP_NAME_B}:logical-replication",
+                )
         await ops_test.model.wait_for_idle(status="active", timeout=500)
 
     await _assert_no_subscription(ops_test)
