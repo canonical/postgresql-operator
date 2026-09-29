@@ -1,0 +1,93 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: Primary
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-0': 175, 'testing.postgresql-1': 175, 'testing.postgresql-2': 175}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-0': 176, 'testing.postgresql-1': 176, 'testing.postgresql-2': 176}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-0, count: 181, max_number_written: 181, total_expected_writes: 181
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-1, count: 181, max_number_written: 181, total_expected_writes: 181
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 181, max_number_written: 181, total_expected_writes: 181
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.28   unsupported  02:01:00Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.15    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  598  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.207.184.14             received database credentials of the first database
+postgresql/0*           active    idle   0        10.207.184.76   5432/tcp  
+postgresql/1            active    idle   1        10.207.184.236  5432/tcp  
+postgresql/2            active    idle   2        10.207.184.16   5432/tcp  Primary
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.207.184.76   juju-779c35-0  ubuntu@24.04  runnervmtr4k5  Running
+1        started  10.207.184.236  juju-779c35-1  ubuntu@24.04  runnervmtr4k5  Running
+2        started  10.207.184.16   juju-779c35-2  ubuntu@24.04  runnervmtr4k5  Running
+3        started  10.207.184.14   juju-779c35-3  ubuntu@24.04  runnervmtr4k5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:44:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:44:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:44:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:44:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:44:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:44:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:44:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:44:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:45:40 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fedaa623e30 state=finished raised Exception>]
+unit-postgresql-0: 01:45:58 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe96455bad0 state=finished raised Exception>]
+unit-postgresql-0: 01:46:02 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3a78217c50 state=finished raised Exception>]
+unit-postgresql-2: 01:56:05 ERROR unit.postgresql/2.juju-log __main__:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 239, in remove_raft_member
+    result = syncobj_util.executeCommand(raft_host, ["remove", member_address])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/pysyncobj/utility.py", line 81, in executeCommand
+    raise UtilityException(self.__error)
+pysyncobj.utility.UtilityException: connection lost
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 1753, in _on_raft_reconnect
+    self._patroni.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 242, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from e
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-2: 01:56:22 ERROR unit.postgresql/2.juju-log __main__:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 1753, in _on_raft_reconnect
+    self._patroni.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 246, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
