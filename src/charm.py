@@ -506,7 +506,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
     ):
         """Set unit status without overriding higher priority refresh status."""
-        self.refresh_manager.set_unit_status(status, refresh=refresh)
+        # RefreshManager invokes the charm-injected set_default_status callable during
+        # its construction (reconcile_refresh_status), before this attribute is
+        # assigned; set the ops status directly in that window, mirroring the direct
+        # sets the library itself performs while reconciling.
+        refresh_manager = getattr(self, "refresh_manager", None)
+        if refresh_manager is None:
+            self.unit.status = status
+            return
+        refresh_manager.set_unit_status(status, refresh=refresh)
 
     def _reconcile_refresh_status(self, _=None) -> None:
         """Reconcile the unit status with the refresh status on collect-unit-status."""
