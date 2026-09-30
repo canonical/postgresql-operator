@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import json
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -540,19 +541,26 @@ def test_handle_replication_change():
     relation.manager.get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
     relation.manager.update_primary_cluster_data = MagicMock()
 
-    with patch.object(
-        AsyncReplicationManager,
-        "async_relation",
-        new_callable=PropertyMock,
-        return_value=mock_relation,
+    _now = datetime.now(UTC)
+    with (
+        patch("single_kernel_postgresql.managers.async_replication.datetime") as _datetime,
+        patch.object(
+            AsyncReplicationManager,
+            "async_relation",
+            new_callable=PropertyMock,
+            return_value=mock_relation,
+        ),
     ):
+        _datetime.now.return_value = _now
         result = relation.manager._handle_replication_change(mock_event)
 
     assert result is True
     relation.manager._can_promote_cluster.assert_called_once_with(mock_event)
     relation.manager.workload.get_system_identifier.assert_called_once()
-    relation.manager.get_highest_promoted_cluster_counter_value.assert_called_once()
-    relation.manager.update_primary_cluster_data.assert_called_once_with(2, 12345)
+    assert not relation.manager.get_highest_promoted_cluster_counter_value.called
+    relation.manager.update_primary_cluster_data.assert_called_once_with(
+        int(_now.timestamp()), 12345
+    )
     mock_event.fail.assert_not_called()
 
 
