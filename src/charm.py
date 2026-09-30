@@ -1994,7 +1994,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
-        if self.is_blocked:
+        if self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES:
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
