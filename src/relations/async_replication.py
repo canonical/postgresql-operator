@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import typing
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from subprocess import run
 
@@ -603,8 +603,7 @@ class PostgreSQLAsyncReplication(Object):
             return False
 
         # Increment the current cluster counter in this application side based on the highest counter value.
-        promoted_cluster_counter = int(self._get_highest_promoted_cluster_counter_value())
-        promoted_cluster_counter += 1
+        promoted_cluster_counter = int(datetime.now(UTC).timestamp())
         logger.debug("Promoted cluster counter: %s", promoted_cluster_counter)
 
         self._update_primary_cluster_data(promoted_cluster_counter, system_identifier)
