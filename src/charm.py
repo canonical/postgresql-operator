@@ -220,6 +220,31 @@ def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
     set_destination(endpoint, None)
 
 
+class OOMProtectedVMWorkload(VMWorkload):
+    """VM workload that keeps OOM protection on every snap-install path.
+
+    The library's refresh-resume path and the cluster manager install the snap
+    through ``workload.install_snap_package``; the OOM-protection module has not
+    migrated to the library yet, so the vitality-hint append runs here — before
+    snapd (re)starts any service with the new revision.
+    """
+
+    def install_snap_package(
+        self, *, revision: str | None, refresh: charm_refresh.Machines | None = None
+    ) -> None:
+        """Configure OOM protection, then install or refresh the PostgreSQL snap."""
+        try:
+            ensure_snap_oom_protection(charm_refresh.snap_name())
+        except (snap.SnapError, snap.SnapNotFoundError) as e:
+            logger.error(
+                "An exception occurred when installing %s. Reason: %s",
+                charm_refresh.snap_name(),
+                str(e),
+            )
+            raise
+        super().install_snap_package(revision=revision, refresh=refresh)
+
+
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -465,7 +490,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             BaseWorkload: The VMWorkload instance for this charm
         """
-        return VMWorkload(charm_dir=self.charm_dir)
+        return OOMProtectedVMWorkload(charm_dir=self.charm_dir)
 
     @property
     def substrate(self) -> Substrates:
