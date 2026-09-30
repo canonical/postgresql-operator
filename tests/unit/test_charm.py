@@ -103,7 +103,7 @@ def test_config_fallback(harness):
 def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
+        patch("charm.OOMProtectedVMWorkload.install_snap_package") as _install_snap_package,
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -1271,7 +1271,7 @@ def test_on_update_status_after_restore_operation(harness):
 
 def test_install_snap_package(harness):
     with (
-        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("single_kernel_postgresql.workload.vm.snap.SnapCache") as _snap_cache,
         patch("charm.ensure_snap_oom_protection"),
     ):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
@@ -1283,7 +1283,7 @@ def test_install_snap_package(harness):
 
         # Test for problem with snap update.
         with pytest.raises(snap.SnapError):
-            harness.charm._install_snap_package(revision=None)
+            harness.charm.workload.install_snap_package(revision=None)
         _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
@@ -1293,7 +1293,7 @@ def test_install_snap_package(harness):
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = snap.SnapNotFoundError
         with pytest.raises(snap.SnapNotFoundError):
-            harness.charm._install_snap_package(revision=None)
+            harness.charm.workload.install_snap_package(revision=None)
         _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
@@ -1302,7 +1302,7 @@ def test_install_snap_package(harness):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        harness.charm._install_snap_package(revision=None)
+        harness.charm.workload.install_snap_package(revision=None)
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
@@ -1312,7 +1312,7 @@ def test_install_snap_package(harness):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        harness.charm._install_snap_package(revision="42")
+        harness.charm.workload.install_snap_package(revision="42")
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision="42")
@@ -1323,7 +1323,7 @@ def test_install_snap_package(harness):
         _snap_package.reset_mock()
         _snap_package.present = True
         _refresh = Mock()
-        harness.charm._install_snap_package(
+        harness.charm.workload.install_snap_package(
             revision="42",
             refresh=_refresh,
         )
@@ -1336,7 +1336,7 @@ def test_install_snap_package(harness):
         # Test without refresh
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
-        harness.charm._install_snap_package(revision="42")
+        harness.charm.workload.install_snap_package(revision="42")
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
         _snap_package.ensure.assert_not_called()
@@ -1349,7 +1349,7 @@ def test_install_snap_package(harness):
         with patch("platform.machine") as _machine:
             _machine.return_value = "missingarch"
             with pytest.raises(KeyError):
-                harness.charm._install_snap_package(revision=None)
+                harness.charm.workload.install_snap_package(revision=None)
         assert not _snap_package.ensure.called
         assert not _snap_package.hold.called
 
@@ -1357,7 +1357,7 @@ def test_install_snap_package(harness):
 @pytest.mark.parametrize("present,refreshing", [(False, False), (True, False), (True, True)])
 def test_install_snap_package_configures_oom_before_install(harness, present, refreshing):
     with (
-        patch("charm.snap.SnapCache") as cache,
+        patch("single_kernel_postgresql.workload.vm.snap.SnapCache") as cache,
         patch("charm.ensure_snap_oom_protection", return_value=-898) as protect,
     ):
         calls = Mock()
@@ -1367,7 +1367,7 @@ def test_install_snap_package_configures_oom_before_install(harness, present, re
         package.present = present
         refresh = Mock() if refreshing else None
 
-        harness.charm._install_snap_package(revision="416", refresh=refresh)
+        harness.charm.workload.install_snap_package(revision="416", refresh=refresh)
 
         assert calls.mock_calls[:2] == [call.protect("charmed-postgresql"), call.cache()]
         if not present or refreshing:
@@ -1381,11 +1381,11 @@ def test_install_snap_package_configures_oom_before_install(harness, present, re
 
 def test_install_snap_package_stops_on_oom_failure(harness):
     with (
-        patch("charm.snap.SnapCache") as cache,
+        patch("single_kernel_postgresql.workload.vm.snap.SnapCache") as cache,
         patch("charm.ensure_snap_oom_protection", side_effect=snap.SnapError("cannot protect")),
     ):
         with pytest.raises(snap.SnapError, match="cannot protect"):
-            harness.charm._install_snap_package(revision="416")
+            harness.charm.workload.install_snap_package(revision="416")
 
         cache.assert_not_called()
 
