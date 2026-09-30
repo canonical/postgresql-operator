@@ -7,8 +7,6 @@
 import json
 import logging
 import os
-import pathlib
-import platform
 import shutil
 import subprocess
 import sys
@@ -39,7 +37,6 @@ except ModuleNotFoundError:
 
 import charm_refresh
 import ops.log
-import tomli
 from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
@@ -222,6 +219,31 @@ def charm_tracing_config(endpoint_requirer: COSAgentProvider) -> None:
         logger.warning("Cannot send traces to an https endpoint without a certificate.")
         return
     set_destination(endpoint, None)
+
+
+class OOMProtectedVMWorkload(VMWorkload):
+    """VM workload that keeps OOM protection on every snap-install path.
+
+    The library's refresh-resume path and the cluster manager install the snap
+    through ``workload.install_snap_package``; the OOM-protection module has not
+    migrated to the library yet, so the vitality-hint append runs here — before
+    snapd (re)starts any service with the new revision.
+    """
+
+    def install_snap_package(
+        self, *, revision: str | None, refresh: charm_refresh.Machines | None = None
+    ) -> None:
+        """Configure OOM protection, then install or refresh the PostgreSQL snap."""
+        try:
+            ensure_snap_oom_protection(charm_refresh.snap_name())
+        except (snap.SnapError, snap.SnapNotFoundError) as e:
+            logger.error(
+                "An exception occurred when installing %s. Reason: %s",
+                charm_refresh.snap_name(),
+                str(e),
+            )
+            raise
+        super().install_snap_package(revision=revision, refresh=refresh)
 
 
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
@@ -461,7 +483,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Returns:
             BaseWorkload: The VMWorkload instance for this charm
         """
-        return VMWorkload(charm_dir=self.charm_dir)
+        return OOMProtectedVMWorkload(charm_dir=self.charm_dir)
 
     @property
     def substrate(self) -> Substrates:
@@ -1552,7 +1574,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
         # Install the charmed PostgreSQL snap.
-        self._install_snap_package(revision=None)
+        self.workload.install_snap_package(revision=None)
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2389,44 +2411,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             password has not yet been set by the leader.
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
-
-    def _install_snap_package(
-        self, *, revision: str | None, refresh: charm_refresh.Machines | None = None
-    ) -> None:
-        """Installs PostgreSQL snap.
-
-        Args:
-            revision: snap revision to install.
-            refresh: refresh class; will refresh installed snap if not `None`
-        """
-        if revision is None:
-            if refresh is not None:
-                raise ValueError
-            # TODO: consider using `self.refresh.pinned_snap_revision` instead (requires waiting
-            # for refresh peer relation to be ready before installing snap)
-            with pathlib.Path("refresh_versions.toml").open("rb") as file:
-                revisions = tomli.load(file)["snap"]["revisions"]
-            try:
-                revision = revisions[platform.machine()]
-            except KeyError:
-                logger.error("Unavailable snap architecture %s", platform.machine())
-                raise
-        try:
-            ensure_snap_oom_protection(charm_refresh.snap_name())
-            snap_cache = snap.SnapCache()
-            snap_package = snap_cache[charm_refresh.snap_name()]
-            if not snap_package.present or refresh is not None:
-                snap_package.ensure(snap.SnapState.Present, revision=revision)
-                if refresh is not None:
-                    refresh.update_snap_revision()
-                snap_package.hold()
-        except (snap.SnapError, snap.SnapNotFoundError) as e:
-            logger.error(
-                "An exception occurred when installing %s. Reason: %s",
-                charm_refresh.snap_name(),
-                str(e),
-            )
-            raise
 
     def _on_storage_detaching(self, _) -> None:
         """Stop the workload so Juju can unmount the storage on app teardown."""
