@@ -1,0 +1,97 @@
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju add-machine --model testing --base ubuntu@24.04 --constraints virt-type=virtual-machine --constraints cores=2 --constraints mem=2G --constraints root-disk=16G
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --format json --machine 0 -- 'systemd-detect-virt --vm'
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --format json --machine 0 -- 'sudo -n python3 -c '"'"'from pathlib import Path; Path('"'"'"'"'"'"'"'"'/proc/self/oom_score_adj'"'"'"'"'"'"'"'"').write_text('"'"'"'"'"'"'"'"'-898'"'"'"'"'"'"'"'"')'"'"''
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --format json --machine 0 -- 'sudo -n /usr/bin/snap get system -d'
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --format json --machine 0 -- 'sudo -n /usr/bin/snap set system resilience.vitality-hint=oom-test-placeholder'
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing /root/snap/juju/common/tmpaxl_65qk/_temp.charm postgresql-oom-fresh --config profile=testing --to 0
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-oom-fresh] status: waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-oom-fresh/0] status: waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: waiting (installing agent) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: maintenance (installing charm software) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: maintenance (installing charm software) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: maintenance (installing PostgreSQL) -> waiting (waiting to start PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: maintenance (installing PostgreSQL) -> waiting (waiting to start PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: waiting (waiting to start PostgreSQL) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: waiting (waiting to start PostgreSQL) -> waiting (waiting for peer IP)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: waiting (waiting for peer IP) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: maintenance (reconfiguring cluster) -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: waiting (awaiting for member to start) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: active (Primary) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: maintenance (Executing restart operation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-oom-fresh/0] status changed: active () -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --format json --unit postgresql-oom-fresh/0 -- 'python3 -c '"'"'# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Read live workload state on a unit using only the Python standard library."""
+
+import json
+import subprocess
+from pathlib import Path
+
+
+def snapshot() -> dict:
+    """Include reparented PostgreSQL processes by inspecting the service cgroup."""
+    properties = subprocess.check_output(
+        [
+            "systemctl",
+            "show",
+            "snap.charmed-postgresql.patroni.service",
+            "--property=MainPID,ControlGroup,OOMScoreAdjust,ActiveState",
+        ],
+        text=True,
+    )
+    service = dict(line.split("=", 1) for line in properties.splitlines())
+    group = service["ControlGroup"]
+    assert group and service["ActiveState"] == "active", service
+    processes = []
+    for directory in Path("/proc").iterdir():
+        if not directory.name.isdigit():
+            continue
+        try:
+            groups = [
+                line.split(":", 2)[2] for line in (directory / "cgroup").read_text().splitlines()
+            ]
+            if not any(path == group or path.startswith(f"{group}/") for path in groups):
+                continue
+            stat = (directory / "stat").read_text().rsplit(")", 1)[1].split()
+            argv = (directory / "cmdline").read_bytes().decode().split("\0")
+            processes.append({
+                "pid": int(directory.name),
+                "ppid": int(stat[1]),
+                "start_ticks": int(stat[19]),
+                "name": (directory / "comm").read_text().strip(),
+                "postmaster": argv[0].endswith("/postgres"),
+                "patroni": any(Path(arg).name == "patroni" for arg in argv),
+                "oom_score_adj": int((directory / "oom_score_adj").read_text()),
+            })
+        except (FileNotFoundError, ProcessLookupError):
+            # Short-lived backends may exit while /proc is being read.
+            continue
+    config = json.loads(
+        subprocess.check_output(["/usr/bin/snap", "get", "system", "-d"], text=True)
+    )
+    return {
+        "hint": config.get("resilience", {}).get("vitality-hint", ""),
+        "revision": Path("/snap/charmed-postgresql/current").resolve().name,
+        "service": service,
+        "processes": processes,
+    }
+
+
+if __name__ == "__main__":
+    print(json.dumps(snapshot()))
+'"'"''
+[32mINFO    [0m integration.test_oom:test_oom.py:131 OOM snapshot for postgresql-oom-fresh/0: {"hint": "oom-test-placeholder,charmed-postgresql", "processes": [{"name": "start-patroni.s", "oom_score_adj": -898, "patroni": false, "pid": 11107, "postmaster": false, "ppid": 1, "start_ticks": 18873}, {"name": "python3", "oom_score_adj": -898, "patroni": true, "pid": 11125, "postmaster": false, "ppid": 11107, "start_ticks": 18884}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13704, "postmaster": true, "ppid": 1, "start_ticks": 20530}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13706, "postmaster": false, "ppid": 13704, "start_ticks": 20536}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13707, "postmaster": false, "ppid": 13704, "start_ticks": 20537}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13708, "postmaster": false, "ppid": 13704, "start_ticks": 20537}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13710, "postmaster": false, "ppid": 13704, "start_ticks": 20539}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13711, "postmaster": false, "ppid": 13704, "start_ticks": 20539}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13712, "postmaster": false, "ppid": 13704, "start_ticks": 20539}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13713, "postmaster": false, "ppid": 13704, "start_ticks": 20539}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13714, "postmaster": false, "ppid": 13704, "start_ticks": 20539}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 13716, "postmaster": false, "ppid": 13704, "start_ticks": 20563}, {"name": "postgres", "oom_score_adj": -898, "patroni": false, "pid": 15699, "postmaster": false, "ppid": 13704, "start_ticks": 21871}], "revision": "416", "service": {"ActiveState": "active", "ControlGroup": "/system.slice/snap.charmed-postgresql.patroni.service", "MainPID": "11107", "OOMScoreAdjust": "-898"}}
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing secret:nn3g52q5jgs49rsco7ag --format json --reveal
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju secrets --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju show-secret --model testing secret:nn3g52q5jgs49rsco7ag --format json --reveal
