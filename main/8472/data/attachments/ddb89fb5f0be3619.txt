@@ -1,0 +1,99 @@
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:134 starting continuous writes to the database
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:138 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 6, 'testing.postgresql-1': 6, 'testing.postgresql-2': 6}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 10, 'testing.postgresql-1': 10, 'testing.postgresql-2': 10}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:141 Get leader unit
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:145 Run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:153 Inject dependency fault
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:158 Refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:161 Wait for upgrade to fail
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:168 Ensure continuous_writes while in failure state on remaining units
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 61, 'testing.postgresql-1': 61, 'testing.postgresql-2': 61}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 66, 'testing.postgresql-1': 66, 'testing.postgresql-2': 66}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:171 Re-run pre-upgrade-check action
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:175 Re-refresh the charm
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:178 Wait for upgrade to start
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:184 Wait for application to recover
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] blocked: ready to rollback application
+  postgresql/1 [idle] waiting: other units upgrading first...
+  postgresql/2 [idle] waiting: other units upgrading first...
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] maintenance: updating configuration
+  postgresql/1 [idle] maintenance: upgrade completed
+  postgresql/2 [idle] maintenance: upgrade completed
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:190 Ensure continuous_writes after rollback procedure
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 203, 'testing.postgresql-1': 203, 'testing.postgresql-2': 203}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 207, 'testing.postgresql-1': 207, 'testing.postgresql-2': 207}
+[32mINFO    [0m integration.ha_tests.test_upgrade:test_upgrade.py:195 Checking whether no writes were lost
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  00:15:43Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.24    active      3  postgresql                          2  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  604  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.33.243.96              received database credentials of the first database
+postgresql/0*           active    idle   0        10.33.243.84    5432/tcp  
+postgresql/1            active    idle   1        10.33.243.78    5432/tcp  
+postgresql/2            active    idle   2        10.33.243.25    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.33.243.84  juju-f317e1-0  ubuntu@22.04  runnervm3p1d5  Running
+1        started  10.33.243.78  juju-f317e1-1  ubuntu@22.04  runnervm3p1d5  Running
+2        started  10.33.243.25  juju-f317e1-2  ubuntu@22.04  runnervm3p1d5  Running
+3        started  10.33.243.96  juju-f317e1-3  ubuntu@22.04  runnervm3p1d5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:06:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:08:03 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff71fd9eef0 state=finished raised Exception>]
+unit-postgresql-0: 00:08:09 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f27f0db0a90 state=finished raised Exception>]
+unit-postgresql-0: 00:08:14 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f35a1e44a30 state=finished raised Exception>]
+unit-postgresql-0: 00:08:19 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f73a47c0a90 state=finished raised Exception>]
+unit-postgresql-0: 00:08:23 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc3ba86c040 state=finished raised Exception>]
+unit-postgresql-0: 00:08:31 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-3: 00:08:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:08:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:08:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:08:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:09:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:14:10 ERROR unit.postgresql/0.juju-log charms.data_platform_libs.v0.upgrade.VersionError - {'message': 'Versions incompatible, snap 14.24 can not be upgraded to 15.0', 'cause': 'Upgrades only supported for specific versions, snap versions satisfying requirement ^15', 'resolution': ''}
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
