@@ -1992,11 +1992,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Doesn't try to bootstrap the cluster if it's in a blocked state
-        # caused, for example, because a failed installation of packages.
-        # REMOVE THIS LATER
-        if self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES:
-            logger.debug("Early exit on_start: Unit blocked")
+        if "raft_stopped" in self.unit_peer_data or "raft_stuck" in self.unit_peer_data:
             return False
 
         return True
