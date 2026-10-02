@@ -263,9 +263,11 @@ class PostgreSQLAsyncReplication(Object):
         if system_identifier != _safe_databag_get(relation.data[relation.app], "system-id"):
             # Store current data in a tar.gz file.
             logger.info("Creating backup of data folder")
-            filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
+            filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.xz"
             # Input is hardcoded
-            subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_DIR}".split())  # noqa: S603
+            subprocess.check_call(
+                f"nice -n 9 ionice -c 3 tar -Jcf {filename} {POSTGRESQL_DATA_DIR}".split()
+            )  # noqa: S603
             logger.warning("Please review the backup file %s and handle its removal", filename)
         self.charm.app_peer_data["suppress-oversee-users"] = "true"
         return True
