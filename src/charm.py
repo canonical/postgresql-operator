@@ -497,7 +497,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if reload:
             self.update_config()
 
-
     def set_unit_status(
         self, status: ops.StatusBase, /, *, refresh: charm_refresh.Machines | None = None
     ):
