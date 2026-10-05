@@ -119,7 +119,7 @@ from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
-from single_kernel_postgresql.events.watcher import PostgreSQLWatcherEventsHandler
+from single_kernel_postgresql.events.watcher import WatcherEventsHandler
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
@@ -493,7 +493,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.watcher_offer = PostgreSQLWatcherEventsHandler(self, self.state, self.workload)
+        self.watcher_offer = WatcherEventsHandler(self, self.workload, self.state)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
