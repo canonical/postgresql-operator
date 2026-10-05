@@ -1,25 +1,7 @@
-variable "juju_model" {
-  description = "Juju model UUID to deploy into"
-  type        = string
-  default     = null
-}
-
 variable "app_name" {
   description = "Name of the application in the Juju model."
   type        = string
   default     = "postgresql"
-}
-
-variable "channel" {
-  description = "Charm channel to use when deploying"
-  type        = string
-  default     = "14/stable"
-}
-
-variable "revision" {
-  description = "Revision number to deploy charm"
-  type        = number
-  default     = null
 }
 
 variable "base" {
@@ -28,22 +10,17 @@ variable "base" {
   default     = "ubuntu@22.04"
 }
 
-variable "units" {
-  description = "Number of units to deploy"
-  type        = number
-  default     = 1
+variable "channel" {
+  description = "Charm channel to use when deploying"
+  type        = string
+  default     = "14/stable"
 }
 
-variable "constraints" {
-  description = "Juju constraints to apply for this application."
+variable "charm_name" {
+  description = "Name of the charm on https://charmhub.io"
   type        = string
-  default     = "arch=amd64"
-}
-
-variable "storage_size" {
-  description = "Storage size"
-  type        = string
-  default     = "10G"
+  default     = "postgresql"
+  nullable    = false
 }
 
 variable "config" {
@@ -52,10 +29,28 @@ variable "config" {
   default     = {}
 }
 
+variable "constraints" {
+  description = "Juju constraints to apply for this application."
+  type        = string
+  default     = "arch=amd64"
+}
+
 variable "enable_expose" {
+  description = "Whether to expose the application"
   type        = bool
   default     = true
-  description = "Whether to expose the application"
+}
+
+variable "juju_model" {
+  description = "Deprecated: UUID of the Juju model. Use model_uuid instead"
+  type        = string
+  default     = null
+}
+
+variable "machine" {
+  description = "Target Juju machine to deploy on"
+  type        = string
+  default     = null
 }
 
 variable "machines" {
@@ -67,4 +62,34 @@ variable "machines" {
     condition     = var.machines == null ? true : length(var.machines) > 0
     error_message = "machines must contain at least one machine id, or be left unset."
   }
+}
+
+variable "model_uuid" {
+  description = "Juju model uuid"
+  type        = string
+  default     = null
+}
+
+variable "revision" {
+  description = "Revision number to deploy charm"
+  type        = number
+  default     = null
+}
+
+variable "storage" {
+  description = "Storage directive"
+  type        = map(string)
+  default     = { pgdata = "10G" }
+}
+
+variable "storage_size" {
+  description = "Deprecated: size of the pgdata storage. Use storage instead"
+  type        = string
+  default     = null
+}
+
+variable "units" {
+  description = "Number of units to deploy"
+  type        = number
+  default     = 1
 }

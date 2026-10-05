@@ -1,0 +1,106 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Terraform
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - "tests/terraform/**"
+      - "tests/integration/terraform/**"
+      - "tests/spread/test_terraform_deploy.py/**"
+      - "tox.ini"
+      - ".github/workflows/terraform.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Static checks + module & constraint composition tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Terraform
+        run: sudo snap install terraform --classic
+
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
+
+      - name: Terraform lint (fmt/init/validate)
+        run: tox run -e lint-terraform
+
+      - name: Module & constraint-composition tests
+        run: tox run -e terraform
+    permissions:
+      contents: read
+    cache-mode: none
+
+  deploy:
+    name: Deploy test | ${{ matrix.runner }}
+    needs:
+      - static
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-22.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 69  # Sum of steps `timeout-minutes` + 5
+    steps:
+      - name: Checkout
+        timeout-minutes: 3
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up environment
+        timeout-minutes: 5
+        run: |
+          sudo snap install go --classic
+          go install github.com/canonical/spread/cmd/spread@latest
+      - name: Run spread job
+        timeout-minutes: 45
+        id: spread
+        run: ~/go/bin/spread -vv -artifacts=artifacts "github-ci:${VAR_RUNNER}:tests/spread/test_terraform_deploy.py:juju36"
+        env:
+          VAR_RUNNER: ${{ matrix.runner }}
+      - name: Select model
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: |
+          # sudo needed since spread runs scripts as root
+          # "testing" is default model created by concierge
+          sudo juju switch testing
+          mkdir ~/logs/
+      - name: juju status
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: sudo juju status --color --relations --storage | tee ~/logs/juju-status.txt
+      - name: juju debug-log
+        timeout-minutes: 3
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: sudo juju debug-log --color --replay --no-tail | tee ~/logs/juju-debug-log.txt
+      - name: Upload logs
+        timeout-minutes: 5
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-terraform-deploy-${{ matrix.runner }}
+          path: ~/logs/
+          if-no-files-found: error
+      - name: Disk usage
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: df --human-readable
+    permissions: {}
+    cache-mode: none
