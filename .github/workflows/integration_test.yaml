@@ -64,10 +64,6 @@ jobs:
               _, runner, task, variant = job.split(":")
               # Example: "test_charm.py"
               task = task.removeprefix("tests/spread/")
-              # Deploys the terraform module from Charmhub, not the packed charm; it runs in
-              # .github/workflows/terraform.yaml on changes to the module instead.
-              if task == "test_terraform_deploy.py":
-                  continue
               if runner.endswith("-arm"):
                   architecture = "arm64"
               else:
@@ -76,6 +72,18 @@ jobs:
               name = f"{task}:{variant} | {architecture}"
               # ":" character not valid in GitHub Actions artifact
               name_in_artifact = f"{task}-{variant}-{architecture}"
+              if task == "test_terraform_deploy.py":
+                  # The juju terraform provider can only deploy from Charmhub, so the module is
+                  # tested twice: against the Charmhub charm, and refreshed to the packed charm.
+                  for charm_source in ("charmhub", "local"):
+                      jobs.append({
+                          "spread_job": job,
+                          "name": f"{name} | {charm_source} charm",
+                          "name_in_artifact": f"{name_in_artifact}-{charm_source}",
+                          "runner": runner,
+                          "terraform_charm_source": charm_source,
+                      })
+                  continue
               jobs.append({
                   "spread_job": job,
                   "name": name,
@@ -88,7 +96,7 @@ jobs:
               file.write(output)
       - name: Generate Allure default test results
         if: ${{ github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
-        run: tox run -e integration -- tests/integration --ignore=tests/integration/terraform --allure-default-dir=allure-default-results
+        run: tox run -e integration -- tests/integration --allure-default-dir=allure-default-results
       - name: Upload Allure default results
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
@@ -152,9 +160,13 @@ jobs:
           LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
           LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
           VAR_SPREAD_JOB: ${{ matrix.job.spread_job }}
+          # Only set for test_terraform_deploy.py
+          TERRAFORM_CHARM_SOURCE: ${{ matrix.job.terraform_charm_source }}
       - name: Check spread name for Allure collection
         id: check-spread-name
-        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
+        # `terraform_charm_source != 'charmhub'`: the "local" terraform job runs a superset of the
+        # "charmhub" one, with overlapping pytest test IDs
+        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && matrix.job.terraform_charm_source != 'charmhub' && github.event_name == 'workflow_dispatch' && github.run_attempt == '1' }}
         run: |
           if [[ '${{ matrix.job.spread_job }}' =~ ^github-ci:ubuntu-[0-9][0-9].04:[a-z_\/\.0-9]+:juju36$ ]]; then
               echo "match=true" >> "$GITHUB_OUTPUT"
