@@ -2,16 +2,9 @@
 # See LICENSE file for licensing details.
 name: Terraform
 
+# Superseded: the terraform tests now run in ci.yaml & integration_test.yaml. Delete this file.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "terraform/**"
-      - "tests/terraform/**"
-      - "tests/integration/terraform/**"
-      - "tests/spread/test_terraform_deploy.py/**"
-      - "tox.ini"
-      - ".github/workflows/terraform.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

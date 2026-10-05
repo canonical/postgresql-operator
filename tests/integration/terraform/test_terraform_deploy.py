@@ -7,6 +7,9 @@
 Applies the module into the pre-created ``testing`` model and waits for
 active/idle. The module pins the juju provider to the v1 line, so there is a
 single deploy leg; the resolved provider major is asserted before applying.
+
+CI runs this module twice: once against the charm from Charmhub, and once
+(``TERRAFORM_CHARM_SOURCE=local``) also refreshing to the locally packed charm.
 """
 
 import json
@@ -32,6 +35,9 @@ TIMEOUT = 20 * 60
 # `terraform apply` blocks until the charm's units are created, so give it the deploy budget.
 TF_TIMEOUT = 15 * 60
 TF_BINARY = os.getenv("TF_BINARY") or "terraform"
+# `charmhub`: test the module against the charm it deploys from Charmhub.
+# `local`: additionally refresh the deployed application to the locally packed charm.
+CHARM_SOURCE = os.getenv("TERRAFORM_CHARM_SOURCE") or "charmhub"
 # Storage directives for the postgresql charm: archive, data, logs, temp — drives the `storage`
 # variable (the machine module's name for `storage_directives`).
 STORAGE = '{"data"="2G","archive"="1G","logs"="1G","temp"="1G"}'
@@ -100,3 +106,43 @@ def test_terraform_apply_deploys_postgresql(juju: jubilant.Juju) -> None:
         TERRAFORM_MODULE, TF_TIMEOUT, "output", "-raw", "application_name", capture=True
     )
     assert output.stdout.strip() == APP, f"application_name output: {output.stdout!r}"
+
+
+@pytest.mark.skipif(CHARM_SOURCE != "local", reason="TERRAFORM_CHARM_SOURCE != local")
+def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
+    """The application deployed by the module must refresh to the locally packed charm."""
+    # The juju provider cannot deploy a local charm, so refresh the terraform-deployed
+    # application (from Charmhub) to the charm packed from this branch.
+    unit = next(iter(juju.status().apps[APP].units))
+    juju.run(unit=unit, action="pre-refresh-check")
+    juju.wait(lambda status: jubilant.all_agents_idle(status, APP), timeout=TIMEOUT)
+    juju.refresh(app=APP, path=charm)
+
+    # Check the charm origin so the wait cannot succeed before the refresh has started.
+    juju.wait(
+        lambda status: (
+            status.apps[APP].charm.startswith("local:")
+            and jubilant.all_agents_idle(status, APP)
+            and (status.apps[APP].is_active or status.apps[APP].is_blocked)
+        ),
+        error=lambda status: jubilant.any_error(status, APP),
+        timeout=TIMEOUT,
+    )
+    app_status = juju.status().apps[APP]
+    if app_status.is_blocked:
+        # A single unit never pauses for `resume-refresh`; it only blocks on incompatibility.
+        assert "Refresh incompatible" in app_status.app_status.message, (
+            f"unexpected blocked status: {app_status.app_status.message!r}"
+        )
+        juju.run(
+            unit=unit,
+            action="force-refresh-start",
+            params={"check-compatibility": False},
+            wait=TIMEOUT,
+        )
+
+    juju.wait(
+        lambda status: jubilant.all_active(status, APP) and jubilant.all_agents_idle(status, APP),
+        error=lambda status: jubilant.any_error(status, APP),
+        timeout=TIMEOUT,
+    )
