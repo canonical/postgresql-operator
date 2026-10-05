@@ -2,9 +2,12 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+import time
+from contextlib import closing
 
 import psycopg2 as psycopg2
 import pytest as pytest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (
@@ -90,6 +93,7 @@ TIMESCALEDB_EXTENSION_STATEMENT = "CREATE TABLE test_timescaledb (time TIMESTAMP
 PG_STAT_STATEMENTS_STATEMENT = (
     "SELECT query, calls, total_exec_time, rows FROM pg_stat_statements LIMIT 5;"
 )
+PG_CRON_EXTENSION_STATEMENT = "SELECT * FROM cron.job;"
 
 
 @pytest.mark.abort_on_fail
@@ -162,6 +166,7 @@ def test_plugins(juju: JujuFixture, charm) -> None:
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
         "plugin-pg-stat-statements-enable": PG_STAT_STATEMENTS_STATEMENT,
+        "plugin-pg-cron-enable": PG_CRON_EXTENSION_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
@@ -254,3 +259,37 @@ def test_plugin_objects(juju: JujuFixture) -> None:
     logger.info("Waiting for status to resolve again")
     with juju.ext.fast_forward(fast_interval="60s"):
         juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+
+def test_pg_cron(juju: JujuFixture) -> None:
+    """Check that pg_cron runs a job and stops it when disabled."""
+    juju.ext.model.applications[DATABASE_APP_NAME].set_config({"plugin-pg-cron-enable": "True"})
+    juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    password = get_password()
+    address = get_unit_address(juju, primary)
+
+    with closing(db_connect(host=address, password=password)) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE public.pg_cron_test (run_at timestamptz DEFAULT now())")
+            cursor.execute(
+                "SELECT cron.schedule('pg-cron-test', '2 seconds', 'INSERT INTO public.pg_cron_test DEFAULT VALUES')"
+            )
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(2), reraise=True):
+                with attempt:
+                    cursor.execute("SELECT count(*) FROM public.pg_cron_test")
+                    assert cursor.fetchone()[0] >= 2
+
+            juju.ext.model.applications[DATABASE_APP_NAME].set_config({
+                "plugin-pg-cron-enable": "False"
+            })
+            juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+            cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'")
+            assert cursor.fetchone() is None
+            cursor.execute("SELECT count(*) FROM public.pg_cron_test")
+            previous = cursor.fetchone()[0]
+            time.sleep(6)
+            cursor.execute("SELECT count(*) FROM public.pg_cron_test")
+            assert cursor.fetchone()[0] == previous
+            cursor.execute("DROP TABLE public.pg_cron_test")
