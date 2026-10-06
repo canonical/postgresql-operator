@@ -176,7 +176,6 @@ from constants import (
     UPDATE_CERTS_BIN_PATH,
 )
 from oom import ensure_snap_oom_protection
-
 from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
@@ -512,7 +511,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             re_emit_relation_changed=lambda: (
                 self.async_replication._re_emit_async_relation_changed_event()
             ),
-            watcher=self.watcher_offer,
+            watcher=self.watcher_handler,
         )
         self.async_replication = PostgreSQLAsyncReplication(
             self,
