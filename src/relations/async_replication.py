@@ -266,7 +266,7 @@ class PostgreSQLAsyncReplication(Object):
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.xz"
             # Input is hardcoded
             subprocess.check_call(  # noqa: S603
-                f"nice -n 9 ionice -c 3 tar -Jcf {filename} {POSTGRESQL_DATA_DIR}".split()
+                f"{'nice -n 9 ionice -c 3' if self.charm.config.profile != 'testing' else ''}tar -Jcf {filename} {POSTGRESQL_DATA_DIR}".split()
             )
             logger.warning("Please review the backup file %s and handle its removal", filename)
         self.charm.app_peer_data["suppress-oversee-users"] = "true"
