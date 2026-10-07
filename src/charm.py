@@ -119,6 +119,7 @@ from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
+from single_kernel_postgresql.events.watcher import WatcherEventsHandler
 from single_kernel_postgresql.lib.charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
 )
@@ -174,7 +175,6 @@ from constants import (
 )
 from oom import ensure_snap_oom_protection
 from relations.async_replication import PostgreSQLAsyncReplication
-from relations.watcher import PostgreSQLWatcherRelation
 from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
@@ -493,7 +493,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         self.async_replication = PostgreSQLAsyncReplication(self)
-        self.watcher_offer = PostgreSQLWatcherRelation(self)
+        self.watcher_handler = WatcherEventsHandler(self, self.workload, self.state)
         # self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -626,7 +626,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
         self._setup_pgbackrest_exporter()
-        self.watcher_offer.update_unit_address()
+        self.watcher_handler.update_unit_address()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
@@ -1279,8 +1279,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._patroni.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
-                self.watcher_offer.disable_watcher()
-                if self.watcher_offer.is_active:
+                self.watcher_handler.disable_watcher()
+                if self.watcher_handler.is_active:
                     logger.info("waiting for RAFT watcher to disconnect.")
                     return
 
@@ -1386,7 +1386,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # In Raft mode with a watcher, ensure this member is properly registered in the DCS.
         # A new member may be running but not registered if it was added to Raft after starting.
         if (
-            self.watcher_offer.is_watcher_connected
+            self.watcher_handler.is_watcher_connected
             and not self.patroni_manager.is_member_registered_in_cluster()
         ):
             logger.info("Member running but not registered in Raft cluster - restarting Patroni")
@@ -1402,7 +1402,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update watcher relation with fresh peer IPs when peer data changes
         # This ensures pg-endpoints stay current when unit IPs change
         if self.unit.is_leader():
-            self.watcher_offer.update_endpoints()
+            self.watcher_handler.update_endpoints()
             self.async_replication.update_async_replication_data()
 
         self._update_new_unit_status()
@@ -1472,7 +1472,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._update_relation_endpoints()
             self.async_replication.handle_read_only_mode()
             # Update watcher relation with current cluster endpoints
-            self.watcher_offer.update_endpoints()
+            self.watcher_handler.update_endpoints()
         else:
             self.set_unit_status(WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE))
 
@@ -1516,9 +1516,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.patroni_manager.stop_patroni()
             self._update_certificate()
             # Update watcher relation - unit address for all units, endpoints only for leader
-            self.watcher_offer.update_unit_address()
+            self.watcher_handler.update_unit_address()
             if self.unit.is_leader():
-                self.watcher_offer.update_endpoints()
+                self.watcher_handler.update_endpoints()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -1757,7 +1757,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if val:
                 updates[key] = val
         self.unit_peer_data.update(updates)
-        self.watcher_offer.update_endpoints()
+        self.watcher_handler.update_endpoints()
 
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
@@ -1776,7 +1776,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             or not self.is_cluster_initialised
             or self.state.unit_ip not in self.members_ips
             or self.has_raft_keys()
-            or (not self.members_ips and not self.watcher_offer.watcher_raft_address)
+            or (not self.members_ips and not self.watcher_handler.watcher_raft_address)
         ):
             return
 
@@ -1792,8 +1792,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         local_addr = f"{self.state.unit_ip}:{RAFT_PORT}"
         remote_addr = (
             watcher_addr
-            if (watcher_addr := self.watcher_offer.watcher_raft_address)
-            and self.watcher_offer.is_active
+            if (watcher_addr := self.watcher_handler.watcher_raft_address)
+            and self.watcher_handler.is_active
             else f"{next(member for member in self.members_ips if member != self.state.unit_ip)}:{RAFT_PORT}"
         )
         try:
@@ -2455,7 +2455,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.start_observer()
 
         # Keep this unit data current for watcher AZ/IP checks.
-        self.watcher_offer.update_unit_address()
+        self.watcher_handler.update_unit_address()
 
         if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
             self.postgresql.drop_hba_triggers()
@@ -2847,8 +2847,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             async_primary_cluster_endpoint=primary_cluster_endpoint,
             async_partner_addresses=self.async_replication.get_partner_addresses(),
             async_standby_endpoints=self.async_replication.get_standby_endpoints(),
-            watcher_raft_address=self.watcher_offer.watcher_raft_address
-            if self.watcher_offer.is_active
+            watcher_raft_address=self.watcher_handler.watcher_raft_address
+            if self.watcher_handler.is_active
             else None,
             no_peers=no_peers,
             refresh=refresh,

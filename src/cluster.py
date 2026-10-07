@@ -153,7 +153,7 @@ class Patroni:
                         # Check if this is a stale watcher (not a PostgreSQL node and not current watcher)
                         if (
                             member_ip not in self.charm._units_ips
-                            and member_addr != self.charm.watcher_offer.watcher_raft_address
+                            and member_addr != self.charm.watcher_handler.watcher_raft_address
                         ):
                             logger.info(f"Removing stale Raft member: {member_addr}")
                             self.remove_raft_member(member_addr)
