@@ -1934,10 +1934,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_remove(self, _) -> None:
         """Remove the charmed-postgresql snap on app teardown, before the machine goes away."""
-        # On scale-down the snap is left in place; only remove it when the whole app
-        # is going away.
-        if self.app.planned_units() > 0:
-            return
         try:
             postgres_snap = snap.SnapCache()[POSTGRESQL_SNAP_NAME]
             if not postgres_snap.present:

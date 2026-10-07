@@ -1037,13 +1037,6 @@ def test_on_remove(harness):
         # Report every storage as mounted.
         _run.return_value.returncode = 0
 
-        # Scale-down (units remain): the snap is left in place.
-        _planned_units.return_value = 2
-        harness.charm.on.remove.emit()
-        _run.assert_not_called()
-        _selected_snap.stop.assert_not_called()
-        _selected_snap.ensure.assert_not_called()
-
         # Full teardown (no units remain): stop the services, unmount the storages
         # and remove the snap.
         _planned_units.return_value = 0
