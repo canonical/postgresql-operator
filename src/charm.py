@@ -2711,10 +2711,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_remove(self, _) -> None:
         """Remove the charmed-postgresql snap on app teardown, before the machine goes away."""
-        # On scale-down the snap is left in place; only remove it when the whole app
-        # is going away.
-        if self.app.planned_units() > 0:
-            return
         # Juju only unmounts the storages after this hook, and snapd refuses to remove the
         # snap while anything is mounted under its data directories, so unmount them here.
         # The services were already stopped on storage-detaching, and unmounting leaves
