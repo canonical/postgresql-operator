@@ -225,6 +225,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.secret_remove, self._on_secret_remove)
+        self.framework.observe(self.on.remove, self._on_remove)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
 
@@ -1930,6 +1931,51 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
                 )
                 raise
+
+    def _on_remove(self, _) -> None:
+        """Remove the charmed-postgresql snap on app teardown, before the machine goes away."""
+        # On scale-down the snap is left in place; only remove it when the whole app
+        # is going away.
+        if self.app.planned_units() > 0:
+            return
+        try:
+            postgres_snap = snap.SnapCache()[POSTGRESQL_SNAP_NAME]
+            if not postgres_snap.present:
+                return
+            # Stop the services so nothing keeps the storages busy while unmounting them.
+            postgres_snap.stop(disable=True)
+        except (snap.SnapError, snap.SnapNotFoundError):
+            logger.exception("Failed to stop charmed-postgresql snap services")
+            return
+        # Juju only unmounts the storages after this hook, and snapd refuses to remove the
+        # snap while anything is mounted under its data directories, so unmount them here.
+        # Unmounting leaves the storage contents untouched.
+        for name, storage in self.meta.storages.items():
+            if not storage.location:
+                continue
+            # `mountpoint` also detects bind mounts (unlike `os.path.ismount`), which is
+            # how Juju attaches rootfs storage.
+            if subprocess.run(["/usr/bin/mountpoint", "-q", storage.location]).returncode != 0:  # noqa: S603
+                continue
+            try:
+                subprocess.run(  # noqa: S603
+                    ["/usr/bin/umount", storage.location],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(
+                    "Skipping charmed-postgresql snap removal: failed to unmount %s storage: %s",
+                    name,
+                    e.stderr,
+                )
+                return
+        try:
+            postgres_snap.ensure(snap.SnapState.Absent)
+        except snap.SnapError:
+            # Don't fail the hook: an error here would block the removal of the unit.
+            logger.exception("Failed to remove charmed-postgresql snap")
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
