@@ -1139,6 +1139,8 @@ def test_on_update_status(harness):
             )
         harness.charm.unit.status = ActiveStatus()
         harness.charm.on.update_status.emit()
+        # A stale promoted-cluster-counter from a dead-DC teardown is reconciled here too.
+        _clear_stale_promotion.assert_called_once_with()
         _set_primary_status_message.assert_called_once()
         # A stale promoted-cluster-counter from a dead-DC teardown is reconciled here too.
         _clear_stale_promotion.assert_called_once_with()
@@ -2540,9 +2542,7 @@ def test_on_peer_relation_departed(harness):
 
 def test_update_new_unit_status(harness):
     with (
-        patch(
-            "relations.async_replication.PostgreSQLAsyncReplication.handle_read_only_mode"
-        ) as handle_read_only_mode,
+        patch("charm.PostgreSQLAsyncReplication.handle_read_only_mode") as handle_read_only_mode,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
