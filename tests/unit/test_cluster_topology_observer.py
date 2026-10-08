@@ -36,7 +36,7 @@ def test_start_raft_observer(harness):
             template = Template(contents)
         expected_service = template.render(
             envvars={"ENV": "var"},
-            script="python3 -m single_kernel_postgresql.scripts.raft_observer",
+            script="-m single_kernel_postgresql.scripts.raft_observer",
         )
         with open("templates/raft-observer.timer.j2") as file:
             contents = file.read()

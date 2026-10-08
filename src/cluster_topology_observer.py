@@ -51,7 +51,7 @@ def start_raft_observer() -> None:
 
     rendered = template.render(
         envvars=copy_environment(),
-        script="python3 -m single_kernel_postgresql.scripts.raft_observer",
+        script="-m single_kernel_postgresql.scripts.raft_observer",
     )
     render_file(Substrates.VM, oneshot_service_file, rendered, 0o644, change_owner=False)
 
