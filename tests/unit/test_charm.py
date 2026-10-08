@@ -625,24 +625,31 @@ def test_on_start_no_patroni_member(harness):
         assert harness.model.unit.status.message == "awaiting for member to start"
 
 
-def test_on_start_after_blocked_state(harness):
+@pytest.mark.parametrize("raft_flag", ["raft_stuck", "raft_stopped"])
+def test_on_start_after_blocked_state(harness, raft_flag):
     with (
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
+        patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("upgrade.PostgreSQLUpgrade.idle", return_value=True) as _idle,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
     ):
-        # Set an initial blocked status (like after the install hook was triggered).
-        initial_status = BlockedStatus("fake message")
+        # Set an initial blocked status (like after losing raft quorum after reboot).
+        initial_status = BlockedStatus("Raft majority loss, run: promote-to-primary")
         harness.model.unit.status = initial_status
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {raft_flag: "True"})
 
-        # Test for a failed cluster bootstrapping.
+        # Patroni must not be started while the raft recovery is pending.
         harness.charm.on.start.emit()
         _get_password.assert_not_called()
         _replication_password.assert_not_called()
         _bootstrap_cluster.assert_not_called()
+        _start_patroni.assert_not_called()
         # Assert the status didn't change.
         assert harness.model.unit.status == initial_status
 
