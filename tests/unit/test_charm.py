@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, call, patch, sentinel
 import charm_refresh
 import psycopg2
 import pytest
+from charmlibs import snap
 from ops import (
     ActiveStatus,
     BlockedStatus,
