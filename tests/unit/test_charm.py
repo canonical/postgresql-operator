@@ -159,6 +159,29 @@ def test_on_storage_detaching(harness):
             _selected_snap.stop.assert_called_once_with(disable=True)
 
 
+def test_on_remove(harness):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.subprocess.run") as _run,
+        patch.object(harness.charm.app, "planned_units") as _planned_units,
+    ):
+        _selected_snap = _snap_cache.return_value.__getitem__.return_value
+        # Report every storage as mounted.
+        _run.return_value.returncode = 0
+
+        # Full teardown (no units remain): unmount the storages and remove the snap.
+        _planned_units.return_value = 0
+        harness.charm.on.remove.emit()
+        for storage in harness.charm.meta.storages.values():
+            _run.assert_any_call(
+                ["/usr/bin/umount", storage.location],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        _selected_snap.ensure.assert_called_once_with(snap.SnapState.Absent)
+
+
 def test_patroni_scrape_config(harness):
     result = harness.charm.patroni_scrape_config()
 
