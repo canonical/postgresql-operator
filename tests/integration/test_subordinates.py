@@ -60,6 +60,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
             channel="latest/edge",
             num_units=0,
             base=CHARM_BASE,
+            series="jammy",
         ),
     )
 
