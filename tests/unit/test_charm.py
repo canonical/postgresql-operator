@@ -48,7 +48,6 @@ from tenacity import RetryError, wait_fixed
 
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
-    PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
     StorageUnavailableError,
 )
@@ -127,7 +126,7 @@ def test_on_install(harness):
 def test_on_storage_detaching(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
+        patch("charm.ObserverManager.stop_observer") as _stop_observer,
         patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
         patch.object(harness.charm.app, "planned_units") as _planned_units,
     ):
@@ -395,6 +394,21 @@ def test_check_extension_dependencies(harness):
         harness.charm.enable_disable_extensions()
         assert isinstance(harness.model.unit.status, BlockedStatus)
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
+
+
+def test_pg_cron_config(harness):
+    assert harness.charm.config.plugin_pg_cron_enable is False
+    with (
+        harness.hooks_disabled(),
+        patch.object(harness.charm, "patroni_manager"),
+        patch.object(harness.charm, "postgresql") as postgresql,
+    ):
+        for enabled in (True, False):
+            harness.update_config({"plugin-pg-cron-enable": enabled})
+            del harness.charm.config
+            harness.charm.enable_disable_extensions()
+            assert postgresql.enable_disable_extensions.call_args.args[0]["pg_cron"] is enabled
+            assert ("pg_cron" in harness.charm.get_plugins()) is enabled
 
 
 def test_enable_disable_extensions(harness, caplog):
@@ -1064,7 +1078,7 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
 
 def test_on_update_status(harness):
     with (
-        patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
+        patch("charm.ObserverManager.start_observer") as _start_observer,
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
@@ -1162,7 +1176,7 @@ def test_on_update_status(harness):
 
 def test_on_update_status_after_restore_operation(harness):
     with (
-        patch("charm.ClusterTopologyObserver.start_observer"),
+        patch("charm.ObserverManager.start_observer"),
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
@@ -1543,71 +1557,6 @@ def test_update_config_clears_stale_standby_when_primary(harness):
         # standby_cluster must be explicitly cleared (patched to None) so the DCS converges;
         # merely omitting it would leave the stale standby from before the promotion in place.
         assert base_patch["standby_cluster"] is None
-
-
-def test_on_cluster_topology_change(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
-        ) as _primary_endpoint,
-    ):
-        # Mock the property value.
-        _primary_endpoint.side_effect = [None, "1.1.1.1"]
-
-        # Test without an elected primary.
-        harness.charm._on_cluster_topology_change(Mock())
-        _update_relation_endpoints.assert_not_called()
-
-        # Test with an elected primary.
-        harness.charm._on_cluster_topology_change(Mock())
-        _update_relation_endpoints.assert_called_once()
-
-
-def test_on_cluster_topology_change_keep_blocked(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-            return_value=None,
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-    ):
-        harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
-
-        harness.charm._on_cluster_topology_change(Mock())
-
-        _update_relation_endpoints.assert_not_called()
-        _primary_endpoint.assert_called_once_with()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-        assert harness.model.unit.status.message == PRIMARY_NOT_REACHABLE_MESSAGE
-
-
-def test_on_cluster_topology_change_clear_blocked(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-            return_value="fake-unit",
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-        patch(
-            "charm.PostgresqlOperatorCharm._set_primary_status_message"
-        ) as _set_primary_status_message,
-    ):
-        harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
-
-        harness.charm._on_cluster_topology_change(Mock())
-
-        _update_relation_endpoints.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
-        _set_primary_status_message.assert_called_once_with()
 
 
 def test_validate_config_options(harness):
@@ -2001,16 +1950,6 @@ def test_clean_ca_file_from_workload(harness):
         assert harness.charm.clean_ca_file_from_workload("ca-app")
         _unlink.assert_called_once()
         _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
-
-
-def test_juju_run_exec(harness):
-    with (
-        patch("charm.ClusterTopologyObserver") as _topology_observer,
-    ):
-        # Juju 3
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
 
 
 def test_client_relations(harness):
@@ -2846,16 +2785,6 @@ def test_handle_processes_failures(harness):
         assert not _rename.called
         assert not _listdir.called
         _exists.return_value = True
-
-
-def test_on_databases_change(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-    ):
-        harness.charm._on_databases_change(Mock())
-
-        _update_config.assert_called_once_with()
-        assert "timestamp" in harness.charm.unit_peer_data
 
 
 def test_relations_user_databases_map(harness):
