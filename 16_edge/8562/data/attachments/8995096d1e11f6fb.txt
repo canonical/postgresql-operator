@@ -1,0 +1,19 @@
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju offer testing.db1:replication-offer
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju consume --model testing-other testing.db1
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing-other db1 db2:replication
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json db1/0 create-replication --wait 300s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-ids
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get sptilgtkt1d6tru3refg
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get af8q2u5k8ktkasoge280
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get ner92q2m6fsbqml4e1l0
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get 206babogmjl7oia27er0
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get dslah4pt9p6oq83e3jk0
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing --unit db1/0 -- secret-info-get 6crcebgp0uprurpepkrg
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json test-app1/0 start-continuous-writes
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing-other --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju exec --model testing-other --unit db2/1 -- secret-get --label=async-replication-secret
