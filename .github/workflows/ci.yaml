@@ -14,7 +14,6 @@ on:
       - 'LICENSE'
       - '**.md'
       - .github/renovate.json5
-      - 'terraform/**'
   # Triggered on schedule by .github/workflows/scheduled_ci_*.yaml on default branch
   workflow_dispatch:
   # Triggered on push by .github/workflows/release.yaml
@@ -83,6 +82,28 @@ jobs:
     permissions: {}
     cache-mode: none
 
+  terraform-test:
+    name: Lint & unit test terraform module
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Terraform
+        run: sudo snap install terraform --classic
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
+      - name: Terraform lint (fmt/init/validate)
+        run: tox run -e lint-terraform
+      - name: Module & constraint-composition tests
+        run: tox run -e terraform
+    permissions: {}
+    cache-mode: none
+
   alert-test:
     name: Test Prometheus Alert Rules
     runs-on: ubuntu-latest
@@ -114,6 +135,7 @@ jobs:
       - lint-workflows
       - lint
       - unit-test
+      - terraform-test
       - build
     uses: $/.github/workflows/integration_test.yaml
     with:

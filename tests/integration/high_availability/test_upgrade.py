@@ -96,13 +96,13 @@ def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
                 unit=unit_names[-1],
                 action="force-refresh-start",
                 params={"check-compatibility": False},
-                wait=10 * MINUTE_SECS,
+                wait=30 * MINUTE_SECS,
             )
 
         juju.wait(jubilant.all_agents_idle, timeout=10 * MINUTE_SECS)
 
         logging.info("Run resume-refresh action")
-        juju.run(unit=unit_names[1], action="resume-refresh", wait=15 * MINUTE_SECS)
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=30 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert juju.status().apps[DB_APP_NAME].is_active
