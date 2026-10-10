@@ -14,6 +14,7 @@ CI runs this module twice: once against the charm from Charmhub, and once
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -32,6 +33,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TERRAFORM_MODULE = REPO_ROOT / "terraform"
 APP = "postgresql"
 TIMEOUT = 20 * 60
+# The forced refresh fetches the pinned snap (~7.5 min on cold runners) and then settles
+# replication (~10 min) — the deploy budget is not enough for that flow.
+REFRESH_TIMEOUT = 30 * 60
 # `terraform apply` blocks until the charm's units are created, so give it the deploy budget.
 TF_TIMEOUT = 15 * 60
 TF_BINARY = os.getenv("TF_BINARY") or "terraform"
@@ -114,35 +118,48 @@ def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
     # The juju provider cannot deploy a local charm, so refresh the terraform-deployed
     # application (from Charmhub) to the charm packed from this branch.
     unit = next(iter(juju.status().apps[APP].units))
+    pre_revision = int(re.search(r"Snap revision (\d+)", unit.workload_status.message).group(1))
     juju.run(unit=unit, action="pre-refresh-check")
     juju.wait(lambda status: jubilant.all_agents_idle(status, APP), timeout=TIMEOUT)
     juju.refresh(app=APP, path=charm)
 
     # Check the charm origin so the wait cannot succeed before the refresh has started.
+    # CI-packed charms are always unreleased (`…postN.dev0+gSHA`), so charm_refresh
+    # blocks with "Refresh incompatible" once its compatibility check runs — wait for
+    # that block specifically: accepting `is_active` here races the block (the hook
+    # evaluates after this wait exits) and would skip the forced refresh below.
     juju.wait(
         lambda status: (
             status.apps[APP].charm.startswith("local:")
-            and jubilant.all_agents_idle(status, APP)
-            and (status.apps[APP].is_active or status.apps[APP].is_blocked)
+            and status.apps[APP].is_blocked
+            and "Refresh incompatible" in status.apps[APP].app_status.message
         ),
         error=lambda status: jubilant.any_error(status, APP),
         timeout=TIMEOUT,
     )
     app_status = juju.status().apps[APP]
-    if app_status.is_blocked:
-        # A single unit never pauses for `resume-refresh`; it only blocks on incompatibility.
-        assert "Refresh incompatible" in app_status.app_status.message, (
-            f"unexpected blocked status: {app_status.app_status.message!r}"
-        )
-        juju.run(
-            unit=unit,
-            action="force-refresh-start",
-            params={"check-compatibility": False},
-            wait=TIMEOUT,
-        )
+    # A single unit never pauses for `resume-refresh`; it only blocks on incompatibility.
+    assert "Refresh incompatible" in app_status.app_status.message, (
+        f"unexpected blocked status: {app_status.app_status.message!r}"
+    )
+    juju.run(
+        unit=unit,
+        action="force-refresh-start",
+        params={"check-compatibility": False},
+        wait=REFRESH_TIMEOUT,
+    )
 
+    # The forced refresh must fetch the pinned snap (~7.5 min on cold runners) and settle
+    # replication (~10 min) — the deploy budget expires mid-settle.
     juju.wait(
         lambda status: jubilant.all_active(status, APP) and jubilant.all_agents_idle(status, APP),
         error=lambda status: jubilant.any_error(status, APP),
-        timeout=TIMEOUT,
+        timeout=REFRESH_TIMEOUT,
     )
+
+    # The refresh must actually have progressed to the pinned snap, or this test would
+    # pass vacuously (the block can arrive after the origin flip, skipping the forced
+    # refresh entirely — as observed on the base branch).
+    post_message = next(iter(juju.status().apps[APP].units.values())).workload_status.message
+    post_revision = int(re.search(r"Snap revision (\d+)", post_message).group(1))
+    assert post_revision > pre_revision, f"snap did not refresh: {pre_revision} -> {post_revision}"
