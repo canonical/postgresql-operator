@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, call, patch, sentinel
 import charm_refresh
 import psycopg2
 import pytest
+from charmlibs import snap
 from ops import (
     ActiveStatus,
     BlockedStatus,
@@ -156,6 +157,29 @@ def test_on_storage_detaching(harness):
             _stop_observer.assert_called_once_with()
             _stop_log_rotation.assert_called_once_with()
             _selected_snap.stop.assert_called_once_with(disable=True)
+
+
+def test_on_remove(harness):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.subprocess.run") as _run,
+        patch.object(harness.charm.app, "planned_units") as _planned_units,
+    ):
+        _selected_snap = _snap_cache.return_value.__getitem__.return_value
+        # Report every storage as mounted.
+        _run.return_value.returncode = 0
+
+        # Full teardown (no units remain): unmount the storages and remove the snap.
+        _planned_units.return_value = 0
+        harness.charm.on.remove.emit()
+        for storage in harness.charm.meta.storages.values():
+            _run.assert_any_call(
+                ["/usr/bin/umount", storage.location],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        _selected_snap.ensure.assert_called_once_with(snap.SnapState.Absent)
 
 
 def test_patroni_scrape_config(harness):
@@ -371,6 +395,21 @@ def test_check_extension_dependencies(harness):
         harness.charm.enable_disable_extensions()
         assert isinstance(harness.model.unit.status, BlockedStatus)
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
+
+
+def test_pg_cron_config(harness):
+    assert harness.charm.config.plugin_pg_cron_enable is False
+    with (
+        harness.hooks_disabled(),
+        patch.object(harness.charm, "patroni_manager"),
+        patch.object(harness.charm, "postgresql") as postgresql,
+    ):
+        for enabled in (True, False):
+            harness.update_config({"plugin-pg-cron-enable": enabled})
+            del harness.charm.config
+            harness.charm.enable_disable_extensions()
+            assert postgresql.enable_disable_extensions.call_args.args[0]["pg_cron"] is enabled
+            assert ("pg_cron" in harness.charm.get_plugins()) is enabled
 
 
 def test_enable_disable_extensions(harness, caplog):
