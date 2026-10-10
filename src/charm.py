@@ -1352,10 +1352,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Doesn't try to bootstrap the cluster if it's in a blocked state
-        # caused, for example, because a failed installation of packages.
-        if self.is_blocked:
-            logger.debug("Early exit on_start: Unit blocked")
+        if "raft_stopped" in self.unit_peer_data or "raft_stuck" in self.unit_peer_data:
+            logger.debug("Early exit on_start: Raft quorum not available")
             return False
 
         return True
@@ -1811,7 +1809,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES:
+        if self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES:
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
