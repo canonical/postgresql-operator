@@ -102,8 +102,8 @@ async def test_deploy_async_replication_setup(
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
-            first_model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked"),
-            second_model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked"),
+            first_model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked", timeout=TIMEOUT),
+            second_model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked", timeout=TIMEOUT),
         )
         await gather(
             first_model.wait_for_idle(
