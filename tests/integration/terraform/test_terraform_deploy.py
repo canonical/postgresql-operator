@@ -117,8 +117,10 @@ def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
     """The application deployed by the module must refresh to the locally packed charm."""
     # The juju provider cannot deploy a local charm, so refresh the terraform-deployed
     # application (from Charmhub) to the charm packed from this branch.
-    unit = next(iter(juju.status().apps[APP].units))
-    pre_revision = int(re.search(r"Snap revision (\d+)", unit.workload_status.message).group(1))
+    units = juju.status().apps[APP].units
+    unit = next(iter(units))
+    pre_message = next(iter(units.values())).workload_status.message
+    pre_revision = int(re.search(r"Snap revision (\d+)", pre_message).group(1))
     juju.run(unit=unit, action="pre-refresh-check")
     juju.wait(lambda status: jubilant.all_agents_idle(status, APP), timeout=TIMEOUT)
     juju.refresh(app=APP, path=charm)
