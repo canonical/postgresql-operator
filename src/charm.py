@@ -114,6 +114,10 @@ from single_kernel_postgresql.events.backup import BackupEventsHandler
 from single_kernel_postgresql.events.database import DatabaseEventsHandler
 from single_kernel_postgresql.events.ldap import LDAP
 from single_kernel_postgresql.events.logical_replication import PostgreSQLLogicalReplication
+from single_kernel_postgresql.events.observer import (
+    ClusterTopologyChangeCharmEvents,
+    ObserverEventsHandler,
+)
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
 from single_kernel_postgresql.events.watcher import WatcherEventsHandler
@@ -127,6 +131,7 @@ from single_kernel_postgresql.managers.cluster import ClusterManager
 from single_kernel_postgresql.managers.config import ConfigManager
 from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.logical_replication import LogicalReplicationManager
+from single_kernel_postgresql.managers.observer import ObserverManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.refresh import RefreshManager
 from single_kernel_postgresql.managers.restore import RestoreManager
@@ -161,11 +166,7 @@ if TYPE_CHECKING:
     from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
 
 from cluster import Patroni
-from cluster_topology_observer import (
-    ClusterTopologyChangeCharmEvents,
-    ClusterTopologyObserver,
-    start_raft_observer,
-)
+from cluster_topology_observer import start_raft_observer
 from constants import (
     MONITORING_SNAP_SERVICE,
     PGBACKREST_MONITORING_SNAP_SERVICE,
@@ -281,12 +282,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Managers
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
+        self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
 
-        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
-        self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
-        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -445,7 +444,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.refresh_manager.on_init()
 
-        self._observer.start_observer()
+        self.observer_manager.start_observer()
         self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
@@ -1506,14 +1505,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit_peer_data.update(updates)
         self.watcher_handler.update_endpoints()
 
-    def _on_cluster_topology_change(self, _):
-        """Updates endpoints and (optionally) certificates when the cluster topology changes."""
-        logger.info("Cluster topology changed")
-        if self.primary_endpoint:
-            self._update_relation_endpoints()
-            self._set_primary_status_message()
-            self.async_replication.update_async_replication_data()
-
     def _on_raft_reconnect(self, _) -> None:
         raft_status = self._patroni.get_raft_status()
         logger.debug(f"Local raft status: {raft_status}")
@@ -2181,7 +2172,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self.patroni_manager.member_started and self.patroni_manager.is_member_isolated:
             self.patroni_manager.restart_patroni()
-            self._observer.start_observer()
+            self.observer_manager.start_observer()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -2199,7 +2190,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._set_primary_status_message()
 
         # Restart topology observer if it is gone
-        self._observer.start_observer()
+        self.observer_manager.start_observer()
 
         # Keep this unit data current for watcher AZ/IP checks.
         self.watcher_handler.update_unit_address()
@@ -2333,7 +2324,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 logger.info("restarted PostgreSQL because it was not running")
                 self.patroni_manager.restart_patroni()
-                self._observer.start_observer()
+                self.observer_manager.start_observer()
                 return True
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
@@ -2423,7 +2414,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # remove it from raft; only stop when the whole app is going away.
         if self.app.planned_units() > 0:
             return
-        self._observer.stop_observer()
+        self.observer_manager.stop_observer()
         self._rotate_logs.stop_log_rotation()
         try:
             # Disable too, so a mid-teardown restart of the unit can't re-enable the
