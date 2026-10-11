@@ -397,6 +397,21 @@ def test_check_extension_dependencies(harness):
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
 
 
+def test_pg_cron_config(harness):
+    assert harness.charm.config.plugin_pg_cron_enable is False
+    with (
+        harness.hooks_disabled(),
+        patch.object(harness.charm, "patroni_manager"),
+        patch.object(harness.charm, "postgresql") as postgresql,
+    ):
+        for enabled in (True, False):
+            harness.update_config({"plugin-pg-cron-enable": enabled})
+            del harness.charm.config
+            harness.charm.enable_disable_extensions()
+            assert postgresql.enable_disable_extensions.call_args.args[0]["pg_cron"] is enabled
+            assert ("pg_cron" in harness.charm.get_plugins()) is enabled
+
+
 def test_enable_disable_extensions(harness, caplog):
     with (
         patch(
