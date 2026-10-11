@@ -1,0 +1,263 @@
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-1
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [allocating] waiting: waiting for machine
+  second-postgresql/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] maintenance: installing PostgreSQL
+  second-postgresql/1 [allocating] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] waiting: waiting to start PostgreSQL
+  second-postgresql/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] waiting: waiting for peer IP
+  second-postgresql/1 [idle] waiting: awaiting for cluster to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [executing] active: Primary (degraded)
+  second-postgresql/1 [idle] waiting: awaiting for cluster to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary (degraded)
+  second-postgresql/1 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-postgresql/0 [idle] active: Primary
+  second-postgresql/1 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-2': 3}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-2': 5}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-1, count: 5, max_number_written: 5, total_expected_writes: 5
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 5, max_number_written: 5, total_expected_writes: 5
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  01:58:09Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.15    active      2  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  607  no       received database credentials of the first database
+second-postgresql    16.15    active      2  postgresql                          1  no       
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.225.209.164            received database credentials of the first database
+postgresql/1*           active    idle   1        10.225.209.106  5432/tcp  Primary
+postgresql/2            active    idle   2        10.225.209.188  5432/tcp  
+second-postgresql/0*    active    idle   4        10.225.209.77   5432/tcp  Primary
+second-postgresql/1     active    idle   5        10.225.209.167  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+1        started  10.225.209.106  juju-61f8b3-1  ubuntu@24.04  runnervmmprz5  Running
+2        started  10.225.209.188  juju-61f8b3-2  ubuntu@24.04  runnervmmprz5  Running
+3        started  10.225.209.164  juju-61f8b3-3  ubuntu@24.04  runnervmmprz5  Running
+4        started  10.225.209.77   juju-61f8b3-4  ubuntu@24.04  runnervmmprz5  Running
+5        started  10.225.209.167  juju-61f8b3-5  ubuntu@24.04  runnervmmprz5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:46:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:46:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:47:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:47:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:47:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:47:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:47:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:47:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:48:13 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc9307ce810 state=finished raised Exception>]
+unit-postgresql-0: 01:48:31 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7687e59370 state=finished raised Exception>]
+unit-postgresql-0: 01:48:34 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f676912a390 state=finished raised Exception>]
+unit-postgresql-2: 01:51:11 ERROR unit.postgresql/2.juju-log database-peers:1: single_kernel_postgresql.workload.vm:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'start', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 161, in start_patroni
+    selected_snap.start(services=["patroni"])
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 415, in start
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'start', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "start" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: patch.go:64: Patching system state level 6 to sublevel 1...
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: patch.go:64: Patching system state level 6 to sublevel 2...
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: patch.go:64: Patching system state level 6 to sublevel 3...
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: daemon.go:277: started snapd/2.77.1 (series 16; classic) ubuntu/24.04 (amd64) linux/6.17.0-1022-azure.
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: daemon.go:371: adjusting startup timeout by 35s (pessimistic estimate of 30s plus 5s per snap)
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backends.go:70: AppArmor status: apparmor is enabled and all features are available (using snapd provided apparmor_parser)
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:141: delegating reload of snap-confine profiles to system snap security profiles setup
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: standby.go:95: will consider standby after: 5s
+Oct 11 01:47:39 juju-61f8b3-2 systemd[1]: Started snapd.service - Snap Daemon.
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: devicemgr.go:1363: skipping boot ok check since it already ran for boot-id "0210ac4d-f124-442b-812d-f23985e0d226"
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:45 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:51 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:54 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 11 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+unit-postgresql-2: 01:51:13 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.workload.vm:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'start', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 161, in start_patroni
+    selected_snap.start(services=["patroni"])
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 415, in start
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'start', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "start" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: daemon.go:277: started snapd/2.77.1 (series 16; classic) ubuntu/24.04 (amd64) linux/6.17.0-1022-azure.
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: daemon.go:371: adjusting startup timeout by 35s (pessimistic estimate of 30s plus 5s per snap)
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backends.go:70: AppArmor status: apparmor is enabled and all features are available (using snapd provided apparmor_parser)
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:141: delegating reload of snap-confine profiles to system snap security profiles setup
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: standby.go:95: will consider standby after: 5s
+Oct 11 01:47:39 juju-61f8b3-2 systemd[1]: Started snapd.service - Snap Daemon.
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: devicemgr.go:1363: skipping boot ok check since it already ran for boot-id "0210ac4d-f124-442b-812d-f23985e0d226"
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:45 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:51 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:54 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 11 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 12 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+unit-postgresql-2: 01:51:14 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.managers.patroni:Failed to start patroni snap service
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 351, in _snap_daemons
+    return subprocess.run(args, text=True, check=True, capture_output=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['snap', 'restart', 'charmed-postgresql.patroni']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 690, in restart_patroni
+    selected_snap.restart(services=["patroni"])
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 508, in restart
+    self._snap_daemons(args, services)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 354, in _snap_daemons
+    raise SnapError._from_called_process_error(msg=msg, error=e) from e
+charmlibs.snap._snap.SnapError: Snap: 'charmed-postgresql' -- command ['snap', 'restart', 'charmed-postgresql.patroni'] failed!
+Stderr:
+error: cannot perform the following tasks:
+- Run service command "restart" for services ["patroni"] of snap "charmed-postgresql" (systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.)
+
+Latest logs:
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:141: delegating reload of snap-confine profiles to system snap security profiles setup
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:39 juju-61f8b3-2 snapd[2584]: standby.go:95: will consider standby after: 5s
+Oct 11 01:47:39 juju-61f8b3-2 systemd[1]: Started snapd.service - Snap Daemon.
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: snapmgr.go:1675: performing periodic snap downloads cache cleanup
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: devicemgr.go:1363: skipping boot ok check since it already ran for boot-id "0210ac4d-f124-442b-812d-f23985e0d226"
+Oct 11 01:47:42 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:47:45 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:51 juju-61f8b3-2 snapd[2584]: cache.go:320: removed 0 entries/    0 from downloads cache
+Oct 11 01:47:54 juju-61f8b3-2 snapd[2584]: backend.go:285: reloading profiles of snap-confine provided by the system snap
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 11 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:10 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 12 task (Run service command "start" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: taskrunner.go:304: Change 13 task (Run service command "restart" for services ["patroni"] of snap "charmed-postgresql") failed: systemctl command [start snap.charmed-postgresql.patroni.service] failed with exit status 1: stderr:
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: Job for snap.charmed-postgresql.patroni.service failed because the control process exited with error code.
+Oct 11 01:51:13 juju-61f8b3-2 snapd[2584]: See "systemctl status snap.charmed-postgresql.patroni.service" and "journalctl -xeu snap.charmed-postgresql.patroni.service" for details.
+
+unit-postgresql-0: 01:52:38 ERROR unit.postgresql/0.juju-log __main__:Skipping charmed-postgresql snap removal: failed to unmount data storage: umount: /var/snap/charmed-postgresql/common/var/lib/postgresql: target is busy.
+
+machine-4: 01:55:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:55:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:55:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:55:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-postgresql-0: 01:56:06 ERROR unit.second-postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3b648e84d0 state=finished raised Exception>]
+unit-second-postgresql-0: 01:56:23 ERROR unit.second-postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f377cc47830 state=finished raised Exception>]
+unit-second-postgresql-0: 01:56:25 ERROR unit.second-postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-second-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc970d44cb0 state=finished raised Exception>]
+unit-second-postgresql-1: 01:57:15 ERROR unit.second-postgresql/1.juju-log single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
