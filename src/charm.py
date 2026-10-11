@@ -116,7 +116,6 @@ from single_kernel_postgresql.events.ldap import LDAP
 from single_kernel_postgresql.events.logical_replication import PostgreSQLLogicalReplication
 from single_kernel_postgresql.events.observer import (
     ClusterTopologyChangeCharmEvents,
-    ObserverEventsHandler,
 )
 from single_kernel_postgresql.events.tls import TLS
 from single_kernel_postgresql.events.tls_transfer import TLSTransfer
@@ -134,6 +133,7 @@ from single_kernel_postgresql.managers.logical_replication import LogicalReplica
 from single_kernel_postgresql.managers.observer import ObserverManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
 from single_kernel_postgresql.managers.refresh import RefreshManager
+from single_kernel_postgresql.managers.raft import RaftManager
 from single_kernel_postgresql.managers.restore import RestoreManager
 from single_kernel_postgresql.managers.tls import TLSManager
 from single_kernel_postgresql.utils import label2name, new_password
@@ -166,7 +166,11 @@ if TYPE_CHECKING:
     from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
 
 from cluster import Patroni
-from cluster_topology_observer import start_raft_observer
+from cluster_topology_observer import (
+    ClusterTopologyChangeCharmEvents,
+    ClusterTopologyObserver,
+    start_raft_observer,
+)
 from constants import (
     MONITORING_SNAP_SERVICE,
     PGBACKREST_MONITORING_SNAP_SERVICE,
@@ -283,9 +287,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.patroni_manager = PatroniManager(state=self.state, workload=self.workload)
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
+        # Built here so the raft manager can hold it; the async subsystem below
+        # reuses the same instance.
+        self.watcher_handler = WatcherEventsHandler(self, self.workload, self.state)
+        self.raft_manager = RaftManager(
+            state=self.state,
+            workload=self.workload,
+            patroni_manager=self.patroni_manager,
+            watcher_handler=self.watcher_handler,
+            update_config=self.update_config,
+            set_unit_status=self.set_unit_status,
+            peer_relation_changed=self.on[PEER_RELATION].relation_changed,
+            remove_from_members_ips=self._remove_from_members_ips,
+        )
 
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -389,7 +407,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # never triggers a reload against files that were never written.
         self.framework.observe(self.tls.tls_files_pushed, self._reload_tls_after_push)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
-        self.watcher_handler = WatcherEventsHandler(self, self.workload, self.state)
         self.async_replication_manager = AsyncReplicationManager(
             state=self.state,
             workload=self.workload,
@@ -881,7 +898,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # checked for none in the early exit method
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self.patroni_manager.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
+                self.raft_manager.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -1022,7 +1039,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ) and "raft_stopped" not in self.unit_peer_data:
                 self.unit_peer_data.pop("raft_stuck", None)
                 self.unit_peer_data.pop("raft_candidate", None)
-                self._patroni.remove_raft_data()
+                self.raft_manager.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
                 self.watcher_handler.disable_watcher()
@@ -1040,7 +1057,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.set_unit_status(MaintenanceStatus("Reinitialising raft"))
                 logger.info(f"Reinitialising {self.unit.name} as primary")
-                self._patroni.reinitialise_raft_data()
+                self.raft_manager.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
 
             if self.unit.is_leader():
@@ -1229,7 +1246,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             Whether it was possible to reconfigure the cluster.
         """
         # Remove departing units when the leader changes.
-        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
+        if self.is_cluster_initialised and not self.raft_manager.cleanup_raft_cluster():
             logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
             return False
         try:
@@ -1375,11 +1392,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             return len(self._hosts)
 
-    @cached_property
-    def _patroni(self) -> Patroni:
-        """Returns an instance of the Patroni object."""
-        return Patroni(self, self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY))
-
     @property
     def is_connectivity_enabled(self) -> bool:
         """Return whether this unit can be connected externally."""
@@ -1506,7 +1518,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.watcher_handler.update_endpoints()
 
     def _on_raft_reconnect(self, _) -> None:
-        raft_status = self._patroni.get_raft_status()
+        raft_status = self.raft_manager.get_raft_status()
         logger.debug(f"Local raft status: {raft_status}")
         if (
             not raft_status
@@ -1535,14 +1547,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else f"{next(member for member in self.members_ips if member != self.state.unit_ip)}:{RAFT_PORT}"
         )
         try:
-            self._patroni.remove_raft_member(
+            self.raft_manager.remove_raft_member(
                 local_addr, remote_address=remote_addr, set_raft_flags=False
             )
         except Exception:
             logger.exception("Unable to remove Raft member")
             return
         try:
-            self._patroni.add_raft_member(local_addr, remote_address=remote_addr)
+            self.raft_manager.add_raft_member(local_addr, remote_address=remote_addr)
         except Exception:
             logger.exception("Unable to add Raft member")
             return
@@ -2361,7 +2373,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 or self.is_standby_leader
             ):
                 danger_state = ""
-                if not self._patroni.has_raft_quorum():
+                if not self.raft_manager.has_raft_quorum():
                     danger_state = " (read-only)"
                 elif len(self.patroni_manager.get_running_cluster_members()) < self._planned_units:
                     danger_state = " (degraded)"

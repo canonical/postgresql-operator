@@ -1,15 +1,26 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-from unittest.mock import patch
+import signal
+import sys
+from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
 from jinja2 import Template
+from ops.model import ActiveStatus, WaitingStatus
 from ops.testing import Harness
+from pysyncobj.utility import UtilityException
 from single_kernel_postgresql.config.enums import Substrates
 from single_kernel_postgresql.config.literals import PEER_RELATION
 
 from charm import PostgresqlOperatorCharm
 from cluster_topology_observer import start_raft_observer
+from scripts.cluster_topology_observer import (
+    UnreachableUnitsError,
+    check_for_database_changes,
+    dispatch,
+    main,
+)
+from scripts.raft_observer import check_raft_connection
 
 
 @pytest.fixture(autouse=True)
@@ -21,44 +32,40 @@ def harness():
     harness.cleanup()
 
 
-def test_start_raft_observer(harness):
+def test_start_observer(harness):
     with (
-        patch("cluster_topology_observer.daemon_reload") as _daemon_reload,
-        patch("cluster_topology_observer.service_enable") as _service_enable,
-        patch("cluster_topology_observer.render_file") as _render_file,
+        patch("builtins.open") as _open,
+        patch("subprocess.Popen") as _popen,
         patch(
-            "cluster_topology_observer.copy_environment", return_value={"ENV": "var"}
-        ) as _copy_environment,
+            "single_kernel_postgresql.core.state.CharmState.unit_ip", new_callable=PropertyMock
+        ) as _unit_ip,
     ):
-        # Get the expected content from a file.
-        with open("templates/raft-observer.service.j2") as file:
-            contents = file.read()
-            template = Template(contents)
-        expected_service = template.render(
-            envvars={"ENV": "var"},
-            script="-m single_kernel_postgresql.scripts.raft_observer",
-        )
-        with open("templates/raft-observer.timer.j2") as file:
-            contents = file.read()
-            template = Template(contents)
-        expected_timer = template.render()
+        harness.charm.unit.status = ActiveStatus()
+        _unit_ip.return_value = "1.2.3.4"
 
-        start_raft_observer()
+        # Test that nothing is done if the PID is already recorded and alive.
+        with patch("single_kernel_postgresql.managers.observer.os.kill") as _kill:
+            harness.charm.state.peer.observer_pid = 1
+            harness.charm.observer_manager.start_observer()
+            _popen.assert_not_called()
+            _kill.assert_called_once_with(1, 0)
+        harness.charm.state.peer.observer_pid = None
 
-        _daemon_reload.assert_called_once_with()
-        _service_enable.assert_called_once_with("/etc/systemd/system/raft-observer.timer", "--now")
-        assert _render_file.call_count == 2
-        _render_file.assert_any_call(
-            Substrates.VM,
-            "/etc/systemd/system/raft-observer.service",
-            expected_service,
-            0o644,
-            change_owner=False,
-        )
-        _render_file.assert_any_call(
-            Substrates.VM,
-            "/etc/systemd/system/raft-observer.timer",
-            expected_timer,
-            0o644,
-            change_owner=False,
-        )
+        # Test that nothing is done if the charm is not in an active status.
+        harness.charm.unit.status = WaitingStatus()
+        harness.charm.observer_manager.start_observer()
+        _popen.assert_not_called()
+
+        # Test that nothing is done if there is no unit IP yet.
+        harness.charm.unit.status = ActiveStatus()
+        _unit_ip.return_value = None
+        harness.charm.observer_manager.start_observer()
+        _popen.assert_not_called()
+
+        # Happy path: no PID, active, IP set -> the process spawns.
+        _unit_ip.return_value = "1.2.3.4"
+        _popen.return_value = Mock(pid=1)
+        harness.charm.observer_manager.start_observer()
+        _popen.assert_called_once()
+
+
