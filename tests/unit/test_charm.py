@@ -50,24 +50,24 @@ def test_config_fallback(harness):
     harness.disable_hooks()
     charm: PostgresqlOperatorCharm = harness.charm
 
-    assert charm.config.connection_authentication_timeout == 60
+    assert charm.state.config.connection_authentication_timeout == 60
 
     harness.update_config({"connection_authentication_timeout": 50})
-    del harness.charm.config
-    assert charm.config.connection_authentication_timeout == 50
+    del charm.state.config
+    assert charm.state.config.connection_authentication_timeout == 50
 
     harness.update_config({"connection-authentication-timeout": 90})
-    del harness.charm.config
-    assert charm.config.connection_authentication_timeout == 90
+    del charm.state.config
+    assert charm.state.config.connection_authentication_timeout == 90
 
     harness.update_config(unset=["connection-authentication-timeout"])
-    del harness.charm.config
-    assert charm.config.connection_authentication_timeout == 50
+    del charm.state.config
+    assert charm.state.config.connection_authentication_timeout == 50
 
     harness.update_config(unset=["connection_authentication_timeout"])
-    del harness.charm.config
-    assert charm.config.connection_authentication_timeout == 60
+    del charm.state.config
+    assert charm.state.config.connection_authentication_timeout == 60
 
     harness.update_config({"connection-authentication-timeout": 120})
-    del harness.charm.config
-    assert charm.config.connection_authentication_timeout == 120
+    del charm.state.config
+    assert charm.state.config.connection_authentication_timeout == 120
