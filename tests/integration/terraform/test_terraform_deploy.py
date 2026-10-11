@@ -120,7 +120,9 @@ def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
     units = juju.status().apps[APP].units
     unit = next(iter(units))
     pre_message = next(iter(units.values())).workload_status.message
-    pre_revision = int(re.search(r"Snap revision (\d+)", pre_message).group(1))
+    # The deployed charm advertises the snap revision in its workload message only on
+    # some channels (16/edge-era charms); 16/stable reports e.g. just "Primary".
+    pre_match = re.search(r"Snap revision (\d+)", pre_message)
     juju.run(unit=unit, action="pre-refresh-check")
     juju.wait(lambda status: jubilant.all_agents_idle(status, APP), timeout=TIMEOUT)
     juju.refresh(app=APP, path=charm)
@@ -163,5 +165,10 @@ def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
     # pass vacuously (the block can arrive after the origin flip, skipping the forced
     # refresh entirely — as observed on the base branch).
     post_message = next(iter(juju.status().apps[APP].units.values())).workload_status.message
-    post_revision = int(re.search(r"Snap revision (\d+)", post_message).group(1))
-    assert post_revision > pre_revision, f"snap did not refresh: {pre_revision} -> {post_revision}"
+    post_match = re.search(r"Snap revision (\d+)", post_message)
+    assert post_match, f"refreshed unit does not report a snap revision: {post_message!r}"
+    post_revision = int(post_match.group(1))
+    if pre_match:
+        assert post_revision > int(pre_match.group(1)), (
+            f"snap did not refresh: {pre_match.group(1)} -> {post_revision}"
+        )
