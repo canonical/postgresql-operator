@@ -177,7 +177,6 @@ from constants import (
     UPDATE_CERTS_BIN_PATH,
 )
 from oom import ensure_snap_oom_protection
-from rotate_logs import RotateLogs
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -400,7 +399,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
 
-        self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -565,7 +563,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.refresh.next_unit_allowed_to_refresh = True
 
         self.observer_manager.start_observer()
-        self._rotate_logs.start_log_rotation()
+        self.backup.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[
@@ -2740,7 +2738,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.app.planned_units() > 0:
             return
         self.observer_manager.stop_observer()
-        self._rotate_logs.stop_log_rotation()
+        self.backup.stop_log_rotation()
         try:
             # Disable too, so a mid-teardown restart of the unit can't re-enable the
             # services and re-grab the storage mounts before Juju finishes unmounting.
