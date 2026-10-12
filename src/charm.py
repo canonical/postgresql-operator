@@ -6,7 +6,7 @@
 import logging
 
 import charm_refresh
-import ops
+import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops_tracing import Tracing
