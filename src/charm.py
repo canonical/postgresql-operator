@@ -41,12 +41,13 @@ class PostgresqlOperatorCharm(PostgreSQLVMCharm):
             if isinstance(handler, ops.log.JujuLogHandler):
                 handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
-        # The rolling-ops manager is a charm lib; it stays charm-side and its
-        # callback lands in the lib events handler.
+        # The rolling-ops manager is a charm lib; it stays charm-side. It resolves
+        # its callback BY NAME on the charm (getattr(charm, callback.__name__)), so
+        # the charm must carry a named method delegating to the lib handler.
         self.restart_manager = RollingOpsManager(
             charm=self,
             relation="restart",
-            callback=self.postgresql_events_handler._restart,
+            callback=self._restart,
         )
 
         # COS requirers (charm libs stay charm-side).
@@ -68,6 +69,10 @@ class PostgresqlOperatorCharm(PostgreSQLVMCharm):
         self.tracing = Tracing(self, tracing_relation_name=TRACING_RELATION_NAME)
         self.tls_transfer = TLSTransfer(self, PEER_RELATION)
         charm_tracing_config(self._grafana_agent)
+
+    def _restart(self, event) -> None:
+        """Delegate to the lib events handler (rolling-ops resolves the callback by name)."""
+        self.postgresql_events_handler._restart(event)
 
 
 if __name__ == "__main__":
