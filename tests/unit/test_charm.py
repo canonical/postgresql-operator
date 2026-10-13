@@ -625,8 +625,20 @@ def test_on_start_no_patroni_member(harness):
         assert harness.model.unit.status.message == "awaiting for member to start"
 
 
-@pytest.mark.parametrize("raft_flag", ["raft_stuck", "raft_stopped"])
-def test_on_start_after_blocked_state(harness, raft_flag):
+@pytest.mark.parametrize(
+    "scope,raft_flag",
+    [
+        ("unit", "raft_stuck"),
+        ("unit", "raft_candidate"),
+        ("unit", "raft_stopped"),
+        ("unit", "raft_primary"),
+        ("app", "raft_selected_candidate"),
+        ("app", "raft_followers_stopped"),
+        ("app", "raft_reset_primary"),
+        ("app", "raft_rejoin"),
+    ],
+)
+def test_on_start_after_blocked_state(harness, scope, raft_flag):
     with (
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
@@ -641,8 +653,9 @@ def test_on_start_after_blocked_state(harness, raft_flag):
         initial_status = BlockedStatus("Raft majority loss, run: promote-to-primary")
         harness.model.unit.status = initial_status
         rel_id = harness.model.get_relation(PEER).id
+        entity = harness.charm.unit.name if scope == "unit" else harness.charm.app.name
         with harness.hooks_disabled():
-            harness.update_relation_data(rel_id, harness.charm.unit.name, {raft_flag: "True"})
+            harness.update_relation_data(rel_id, entity, {raft_flag: "True"})
 
         # Patroni must not be started while the raft recovery is pending.
         harness.charm.on.start.emit()
