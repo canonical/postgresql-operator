@@ -9,6 +9,9 @@ PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 
 # Snap constants.
+SNAP_VITALITY_HINT = "resilience.vitality-hint"
+SNAP_VITALITY_MAX_SNAPS = 100
+SNAP_OOM_SCORE_ADJUST_MIN = -900
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
