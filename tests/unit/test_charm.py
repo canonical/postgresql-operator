@@ -5,6 +5,8 @@ import itertools
 import json
 import logging
 import os
+import pathlib
+import platform
 import subprocess
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch, sentinel
@@ -13,6 +15,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, call, patch, sentinel
 import charm_refresh
 import psycopg2
 import pytest
+import tomli
 from charmlibs import snap
 from ops import (
     ActiveStatus,
@@ -99,9 +102,7 @@ def test_config_fallback(harness):
 def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch(
-            "single_kernel_postgresql.workload.vm.VMWorkload.install_snap_package"
-        ) as _install_snap_package,
+        patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
         patch("charm.PostgresqlOperatorCharm._check_detached_storage"),
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -126,7 +127,7 @@ def test_on_storage_detaching(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.ObserverManager.stop_observer") as _stop_observer,
-        patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+        patch("charm.BackupManager.stop_log_rotation") as _stop_log_rotation,
         patch.object(harness.charm.app, "planned_units") as _planned_units,
     ):
         _selected_snap = _snap_cache.return_value.__getitem__.return_value
@@ -305,11 +306,10 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
-        patch(
-            "single_kernel_postgresql.events.logical_replication."
-            "PostgreSQLLogicalReplication.apply_changed_config",
-            return_value=True,
-        ),
+        # patch(
+        #     "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
+        #     return_value=True,
+        # ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -468,6 +468,7 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     with (
         patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
+        patch("charm.RaftManager"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
@@ -518,7 +519,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -564,7 +565,7 @@ def test_on_start_create_user_error(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -623,7 +624,7 @@ def test_on_start_success(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -739,7 +740,7 @@ def test_on_start_replica(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLSManager.generate_internal_peer_cert"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -805,7 +806,7 @@ def test_on_start_no_patroni_member(harness):
             "single_kernel_postgresql.managers.database.DatabaseManager.get_databases_prefix_mapping",
             return_value={},
         ),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         # Mock the passwords.
         _get_postgresql_version.return_value = "16.6"
@@ -896,24 +897,43 @@ def test_ensure_storage_layout(harness, tmp_path):
     assert not (tmp_path / "logs").exists()
 
 
+def test_migrate_temp_tablespace_location_skips_when_not_primary(harness):
+    """If the unit is not primary, the migration is skipped."""
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+    ):
+        result = harness.charm._migrate_temp_tablespace_location()
+
+    assert result is True
+
+
 def test_migrate_temp_tablespace_location_skips_when_no_endpoint(harness):
     """If primary_endpoint is not yet set, the migration is skipped."""
     with (
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
             return_value=None,
         ),
     ):
-        result = harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        result = harness.charm._migrate_temp_tablespace_location()
 
     assert result is True
 
 
 def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_path):
-    """When temp tablespace is at the old storage root, it is migrated to the versioned dir."""
-    temp_data_dir = tmp_path / "16" / "main"
-    temp_storage_path = str(temp_data_dir.parent)
+    """When temp tablespace is at old TEMP_STORAGE_PATH, it is migrated to TEMP_DATA_DIR."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
+    temp_storage_path = str(tmp_path / "temp")
     temp_data_dir.mkdir(parents=True)
 
     connection = MagicMock()
@@ -922,8 +942,6 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
-    workload = MagicMock()
-    workload.paths.temp = temp_data_dir
 
     with (
         patch(
@@ -931,21 +949,16 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(
-            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
-        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch(
-            "charm.PostgresqlOperatorCharm.workload",
-            new_callable=PropertyMock,
-            return_value=workload,
-        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
+        patch("charm.TEMP_STORAGE_PATH", temp_storage_path),
     ):
-        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        assert harness.charm._migrate_temp_tablespace_location()
 
     cursor.execute.assert_has_calls([
         call("SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"),
@@ -956,8 +969,8 @@ def test_migrate_temp_tablespace_location_migrates_from_old_path(harness, tmp_pa
 
 
 def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(harness, tmp_path):
-    """When temp tablespace is already at the versioned path, no migration is performed."""
-    temp_data_dir = tmp_path / "16" / "main"
+    """When temp tablespace is already at TEMP_DATA_DIR, no migration is performed."""
+    temp_data_dir = tmp_path / "temp" / "16" / "main"
     temp_data_dir.mkdir(parents=True)
 
     connection = MagicMock()
@@ -966,8 +979,6 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
-    workload = MagicMock()
-    workload.paths.temp = temp_data_dir
 
     with (
         patch(
@@ -975,21 +986,15 @@ def test_migrate_temp_tablespace_location_skips_when_already_at_versioned_path(h
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(
-            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
-        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch(
-            "charm.PostgresqlOperatorCharm.workload",
-            new_callable=PropertyMock,
-            return_value=workload,
-        ),
+        patch("charm.TEMP_DATA_DIR", str(temp_data_dir)),
     ):
-        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        assert harness.charm._migrate_temp_tablespace_location()
 
     # Only the SELECT should have been executed — no DROP/CREATE
     cursor.execute.assert_called_once_with(
@@ -1005,8 +1010,6 @@ def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness,
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
-    workload = MagicMock()
-    workload.paths.temp = tmp_path / "16" / "main"
 
     with (
         patch(
@@ -1014,21 +1017,14 @@ def test_migrate_temp_tablespace_location_skips_when_tablespace_missing(harness,
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(
-            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
-        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch(
-            "charm.PostgresqlOperatorCharm.workload",
-            new_callable=PropertyMock,
-            return_value=workload,
-        ),
     ):
-        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        assert harness.charm._migrate_temp_tablespace_location()
 
     # Only the SELECT should have been executed
     cursor.execute.assert_called_once_with(
@@ -1044,8 +1040,6 @@ def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness
     connection.cursor.return_value = cursor
     postgresql = MagicMock()
     postgresql._connect_to_database.return_value = connection
-    workload = MagicMock()
-    workload.paths.temp = tmp_path / "16" / "main"
 
     with (
         patch(
@@ -1053,22 +1047,15 @@ def test_migrate_temp_tablespace_location_skips_when_unexpected_location(harness
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(
-            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
-        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
-        patch(
-            "charm.PostgresqlOperatorCharm.workload",
-            new_callable=PropertyMock,
-            return_value=workload,
-        ),
-        patch("single_kernel_postgresql.managers.refresh.logger") as logger,
+        patch("charm.logger") as logger,
     ):
-        assert harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        assert harness.charm._migrate_temp_tablespace_location()
 
     cursor.execute.assert_called_once_with(
         "SELECT pg_tablespace_location(oid) FROM pg_tablespace WHERE spcname='temp';"
@@ -1087,16 +1074,14 @@ def test_migrate_temp_tablespace_location_returns_false_on_db_error(harness):
             new_callable=PropertyMock,
             return_value="10.0.0.1",
         ),
-        patch.object(
-            harness.charm.refresh_manager, "_resolve_primary_host", return_value="10.0.0.1"
-        ),
+        patch.object(harness.charm, "_resolve_primary_host", return_value="10.0.0.1"),
         patch(
             "charm.PostgresqlOperatorCharm.postgresql",
             new_callable=PropertyMock,
             return_value=postgresql,
         ),
     ):
-        assert not harness.charm.refresh_manager.migrate_temp_tablespace_location()
+        assert not harness.charm._migrate_temp_tablespace_location()
 
 
 def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
@@ -1324,6 +1309,127 @@ def test_on_update_status_after_restore_operation(harness):
             "refresh_remove_trigger": "True",
         }
         assert not _drop_hba_triggers.called
+
+
+def test_install_snap_package(harness):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.ensure_snap_oom_protection"),
+    ):
+        _snap_package = _snap_cache.return_value.__getitem__.return_value
+        _snap_package.ensure.side_effect = snap.SnapError
+        _snap_package.present = False
+
+        with pathlib.Path("refresh_versions.toml").open("rb") as file:
+            _revision = tomli.load(file)["snap"]["revisions"][platform.machine()]
+
+        # Test for problem with snap update.
+        with pytest.raises(snap.SnapError):
+            harness.charm._install_snap_package(revision=None)
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_cache.assert_called_once_with()
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
+
+        # Test with a not found package.
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = snap.SnapNotFoundError
+        with pytest.raises(snap.SnapNotFoundError):
+            harness.charm._install_snap_package(revision=None)
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_cache.assert_called_once_with()
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
+
+        # Then test a valid one.
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        harness.charm._install_snap_package(revision=None)
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision=_revision)
+        _snap_package.hold.assert_called_once_with()
+
+        # Test revision
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        harness.charm._install_snap_package(revision="42")
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision="42")
+        _snap_package.hold.assert_called_once_with()
+
+        # Test with refresh
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.present = True
+        _refresh = Mock()
+        harness.charm._install_snap_package(
+            revision="42",
+            refresh=_refresh,
+        )
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Present, revision="42")
+        _snap_package.hold.assert_called_once_with()
+        _refresh.update_snap_revision.assert_called_once()
+
+        # Test without refresh
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        harness.charm._install_snap_package(revision="42")
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("charmed-postgresql")
+        _snap_package.ensure.assert_not_called()
+        _snap_package.hold.assert_not_called()
+
+        # test missing architecture
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.present = True
+        with patch("platform.machine") as _machine:
+            _machine.return_value = "missingarch"
+            with pytest.raises(KeyError):
+                harness.charm._install_snap_package(revision=None)
+        assert not _snap_package.ensure.called
+        assert not _snap_package.hold.called
+
+
+@pytest.mark.parametrize("present,refreshing", [(False, False), (True, False), (True, True)])
+def test_install_snap_package_configures_oom_before_install(harness, present, refreshing):
+    with (
+        patch("charm.snap.SnapCache") as cache,
+        patch("charm.ensure_snap_oom_protection", return_value=-898) as protect,
+    ):
+        calls = Mock()
+        calls.attach_mock(protect, "protect")
+        calls.attach_mock(cache, "cache")
+        package = cache.return_value.__getitem__.return_value
+        package.present = present
+        refresh = Mock() if refreshing else None
+
+        harness.charm._install_snap_package(revision="416", refresh=refresh)
+
+        assert calls.mock_calls[:2] == [call.protect("charmed-postgresql"), call.cache()]
+        if not present or refreshing:
+            package.ensure.assert_called_once_with(snap.SnapState.Present, revision="416")
+        else:
+            package.ensure.assert_not_called()
+        package.start.assert_not_called()
+        package.restart.assert_not_called()
+        package.stop.assert_not_called()
+
+
+def test_install_snap_package_stops_on_oom_failure(harness):
+    with (
+        patch("charm.snap.SnapCache") as cache,
+        patch("charm.ensure_snap_oom_protection", side_effect=snap.SnapError("cannot protect")),
+    ):
+        with pytest.raises(snap.SnapError, match="cannot protect"):
+            harness.charm._install_snap_package(revision="416")
+
+        cache.assert_not_called()
 
 
 def test_is_storage_attached(harness):
@@ -1738,8 +1844,7 @@ def test_reconfigure_cluster(harness):
             return_value=False,
         ) as _is_cluster_initialised,
         patch(
-            "charm.RaftManager.cleanup_raft_cluster",
-            return_value=False,
+            "charm.RaftManager.cleanup_raft_cluster", return_value=False
         ) as _cleanup_raft_cluster,
     ):
         # Cluster not initialised
