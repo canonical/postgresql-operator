@@ -165,7 +165,6 @@ from single_kernel_postgresql.utils.s3 import S3Client
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
-from cluster_topology_observer import start_raft_observer
 from constants import (
     MONITORING_SNAP_SERVICE,
     PGBACKREST_MONITORING_SNAP_SERVICE,
@@ -2080,7 +2079,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             logger.exception("failed to open port")
 
-        start_raft_observer()
+        self.observer_manager.start_raft_observer()
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():

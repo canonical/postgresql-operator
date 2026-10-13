@@ -519,7 +519,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -565,7 +565,7 @@ def test_on_start_create_user_error(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -624,7 +624,7 @@ def test_on_start_success(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -740,7 +740,7 @@ def test_on_start_replica(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLSManager.generate_internal_peer_cert"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -806,7 +806,7 @@ def test_on_start_no_patroni_member(harness):
             "single_kernel_postgresql.managers.database.DatabaseManager.get_databases_prefix_mapping",
             return_value={},
         ),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         # Mock the passwords.
         _get_postgresql_version.return_value = "16.6"
