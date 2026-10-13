@@ -5,12 +5,26 @@
 
 import logging
 
+# First platform-specific import; on wrong architectures fall back to a
+# blocked warning charm (the wheel for this arch is unavailable).
+try:
+    from single_kernel_postgresql.charms.vm_charm import PostgreSQLVMCharm
+except ModuleNotFoundError:
+    from ops.main import main
+    from single_kernel_postgresql.utils.arch import (
+        WrongArchitectureWarningCharm,
+        is_wrong_architecture,
+    )
+
+    if is_wrong_architecture() and __name__ == "__main__":
+        main(WrongArchitectureWarningCharm)
+    raise
+
 import charm_refresh
 import ops.log
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops_tracing import Tracing
-from single_kernel_postgresql.charms.vm_charm import PostgreSQLVMCharm
 from single_kernel_postgresql.config.literals import (
     METRICS_PORT,
     PEER_RELATION,
