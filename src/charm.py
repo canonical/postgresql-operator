@@ -1991,9 +1991,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_start: Refresh in progress")
             event.defer()
             return False
-
-        if "raft_stopped" in self.unit_peer_data or "raft_stuck" in self.unit_peer_data:
-            logger.debug("Early exit on_start: Raft quorum not available")
+        
+        if self.has_raft_keys():
+            logger.debug("Early exit on_start: Raft recovery in process")
             return False
 
         return True
