@@ -1263,6 +1263,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         multiple units copying data at the same time, which can cause slow
         transfer rates in these processes and overload the primary instance.
         """
+        # Do not override the blocked PITR status: while a restore-to-time is pending
+        # and Patroni is down after a bootstrap FATAL, the reconfigure cannot succeed
+        # ("not all members are ready") and would mask the blocked status on every
+        # deferred re-emission.
+        if (
+            self.is_cluster_restoring_to_time
+            and isinstance(self.unit.status, BlockedStatus)
+            and self.unit.status.message == CANNOT_RESTORE_PITR
+        ):
+            logger.debug("Early exit add_members: blocked after failed PITR restore")
+            return
+
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
@@ -2182,7 +2194,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
-        if self.is_cluster_restoring_to_time and all(self.restore_manager.is_pitr_failed()):
+        # The PITR blocked status must be re-set on every check while the restore flags
+        # are present, not only when a new bootstrap FATAL is observed: the one-shot
+        # write can otherwise be overwritten by a concurrent handler (e.g. the deferred
+        # cluster reconfigure setting "reconfiguring cluster") and never restored.
+        pitr_failed, _ = self.restore_manager.is_pitr_failed()
+        if self.is_cluster_restoring_to_time and pitr_failed:
             logger.error(
                 "Restore failed: database service failed to reach point-in-time-recovery target. "
                 "You can launch another restore with different parameters"
