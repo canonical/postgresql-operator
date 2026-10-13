@@ -1991,7 +1991,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_start: Refresh in progress")
             event.defer()
             return False
-        
+
         if self.has_raft_keys():
             logger.debug("Early exit on_start: Raft recovery in process")
             return False
