@@ -2976,10 +2976,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         leader (update_endpoints returns early otherwise), so non-leader units fire
         no extra REST calls.
         """
+        online_members = []
+        if self.state.peer.is_app_leader:
+            try:
+                online_members = self.patroni_manager.online_cluster_members()
+            except RetryError:
+                logger.warning("Failed to get online members.")
         return {
-            "online_members": (
-                self.patroni_manager.online_cluster_members() if self.unit.is_leader() else None
-            ),
+            "online_members": online_members,
             "client_tls_files": self.tls_manager.get_client_tls_files(),
         }
 
