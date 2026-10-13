@@ -399,6 +399,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             resource_provider=self.get_resource_provider,
             request_restart=self.request_restart,
             restart_services=self.restart_services,
+            set_unit_status=self.set_unit_status,
             logical_replication_slots=self.logical_replication.replication_slots,
         )
         # Reload PostgreSQL after the lib TLS handler has actually pushed the cert files.
@@ -1789,10 +1790,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Doesn't try to bootstrap the cluster if it's in a blocked state
-        # caused, for example, because a failed installation of packages.
-        if self.is_blocked:
-            logger.debug("Early exit on_start: Unit blocked")
+        if self.has_raft_keys():
+            logger.debug("Early exit on_start: Raft recovery in process")
             return False
 
         return True
@@ -2293,7 +2292,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if (
             self.is_blocked
-            and self.unit.status not in S3_BLOCK_MESSAGES
+            and self.unit.status.message not in S3_BLOCK_MESSAGES
             and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
             and self.unit.status.message
             != self.app_peer_data.get("logical-replication-validation-status-message")
