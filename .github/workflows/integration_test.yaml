@@ -207,10 +207,31 @@ jobs:
         timeout-minutes: 1
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: sudo juju status --color --relations --storage | tee ~/logs/juju-status.txt
+      - name: juju per-model status
+        timeout-minutes: 5
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: |
+          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
+            sudo juju status -m $m --color --relations | tee ~/logs/${m}-juju-status.txt
+          done
       - name: juju debug-log
         timeout-minutes: 3
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: sudo juju debug-log --color --replay --no-tail | tee ~/logs/juju-debug-log.txt
+      - name: juju per-model debug-log
+        timeout-minutes: 5
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: |
+          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
+            sudo juju debug-log -m $m --color --replay --no-tail | tee ~/logs/${m}-juju-debug-log.txt
+          done
+      - name: juju per-model status-log
+        timeout-minutes: 5
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: |
+          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
+            sudo juju show-status-log -m $m | tee ~/logs/${m}-status-log.txt
+          done
       - name: jhack tail
         timeout-minutes: 3
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
