@@ -631,6 +631,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         timestamp = datetime.now()
         self.unit_peer_data.update({"timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
+
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
         return [
