@@ -211,8 +211,10 @@ jobs:
         timeout-minutes: 5
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: |
-          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
-            sudo juju status -m $m --color --relations | tee ~/logs/${m}-juju-status.txt
+          mkdir -p ~/logs/
+          for m in $(sudo juju models --format json | jq -r '.models[].name | select(. != "admin/controller" and . != "controller")'); do
+            f="${m//\//-}"
+            sudo juju status -m "$m" --color --relations | tee ~/logs/"$f"-juju-status.txt || true
           done
       - name: juju debug-log
         timeout-minutes: 3
@@ -222,15 +224,19 @@ jobs:
         timeout-minutes: 5
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: |
-          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
-            sudo juju debug-log -m $m --color --replay --no-tail | tee ~/logs/${m}-juju-debug-log.txt
+          mkdir -p ~/logs/
+          for m in $(sudo juju models --format json | jq -r '.models[].name | select(. != "admin/controller" and . != "controller")'); do
+            f="${m//\//-}"
+            sudo juju debug-log -m "$m" --color --replay --no-tail | tee ~/logs/"$f"-juju-debug-log.txt || true
           done
       - name: juju per-model status-log
         timeout-minutes: 5
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: |
-          for m in $(sudo juju models --format json | jq -r '.models[].name' | grep -v '^controller$'); do
-            sudo juju show-status-log -m $m | tee ~/logs/${m}-status-log.txt
+          mkdir -p ~/logs/
+          for m in $(sudo juju models --format json | jq -r '.models[].name | select(. != "admin/controller" and . != "controller")'); do
+            f="${m//\//-}"
+            sudo juju show-status-log -m "$m" | tee ~/logs/"$f"-status-log.txt || true
           done
       - name: jhack tail
         timeout-minutes: 3
