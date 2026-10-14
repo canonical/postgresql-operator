@@ -1,0 +1,23 @@
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.252.232.238:8008/patroni', 'host': '10.252.232.238', 'port': 5432, 'timeline': 6, 'lag': 0}, {'name': 'postgresql-3', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.252.232.174:8008/patroni', 'host': '10.252.232.174', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:584 Isolating replica network: postgresql/2 on juju-979f1a-6
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-3': 5}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-3': 7}
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:600 Restoring network for juju-979f1a-6
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: 
+  postgresql/3 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: 
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/2 [idle] active: 
+  postgresql/3 [idle] active: Primary
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.252.232.238:8008/patroni', 'host': '10.252.232.238', 'port': 5432, 'timeline': 6, 'lag': 0}, {'name': 'postgresql-3', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.252.232.174:8008/patroni', 'host': '10.252.232.174', 'port': 5432, 'timeline': 6}]
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-2': 118, 'testing.postgresql-3': 118}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-2': 120, 'testing.postgresql-3': 120}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 120, max_number_written: 120, total_expected_writes: 120
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-3, count: 120, max_number_written: 120, total_expected_writes: 120
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:87 Verifying Raft cluster health with 3 expected members
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:121 Raft status on postgresql/2: {'version': '0.3.17', 'revision': 'deprecated', 'self': TCPNode('10.252.232.238:2222'), 'state': 0, 'leader': TCPNode('10.252.232.122:2222'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.252.232.122:2222': 2, 'partner_node_status_server_10.252.232.174:2222': 2, 'readonly_nodes_count': 0, 'log_len': 245, 'last_applied': 930, 'commit_idx': 930, 'raft_term': 33, 'next_node_idx_count': 0, 'match_idx_count': 0, 'leader_commit_idx': 930, 'uptime': 172, 'self_code_version': 0, 'enabled_code_version': 0}
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:121 Raft status on postgresql/3: {'version': '0.3.17', 'revision': 'deprecated', 'self': TCPNode('10.252.232.174:2222'), 'state': 0, 'leader': TCPNode('10.252.232.122:2222'), 'has_quorum': True, 'partner_nodes_count': 2, 'partner_node_status_server_10.252.232.238:2222': 2, 'partner_node_status_server_10.252.232.122:2222': 2, 'readonly_nodes_count': 0, 'log_len': 71, 'last_applied': 930, 'commit_idx': 930, 'raft_term': 33, 'next_node_idx_count': 2, 'next_node_idx_server_10.252.232.122:2222': 874, 'next_node_idx_server_10.252.232.238:2222': 862, 'match_idx_count': 2, 'match_idx_server_10.252.232.122:2222': 873, 'match_idx_server_10.252.232.238:2222': 0, 'leader_commit_idx': 930, 'uptime': 719, 'self_code_version': 0, 'enabled_code_version': 0}
+[32mINFO    [0m integration.ha_tests.test_stereo_mode:test_stereo_mode.py:138 Raft cluster health verified successfully
