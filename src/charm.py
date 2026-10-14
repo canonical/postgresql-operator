@@ -310,6 +310,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
 
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
