@@ -1,0 +1,62 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator-sc2/0 [idle] active: 
+  data-integrator-sc1/0 [idle] active: 
+  postgresql-sc1/0 [idle] active: 
+  postgresql-sc2/0 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-sc1/0 [executing] active: 
+  postgresql-sc2/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  21:40:30Z
+
+App                  Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator-sc1           active      1  data-integrator  latest/stable  418  no       
+data-integrator-sc2           active      1  data-integrator  latest/stable  418  no       
+postgresql-sc1       16.15    active      1  postgresql                        0  no       
+postgresql-sc2       16.15    active      1  postgresql                        1  no       
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+data-integrator-sc1/0*  active    idle       1        10.60.205.77              
+data-integrator-sc2/0*  active    idle       0        10.60.205.211             
+postgresql-sc1/0*       active    executing  2        10.60.205.82    5432/tcp  
+postgresql-sc2/0*       active    executing  3        10.60.205.42    5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.60.205.211  juju-341f13-0  ubuntu@24.04  runnervm8k3b6  Running
+1        started  10.60.205.77   juju-341f13-1  ubuntu@24.04  runnervm8k3b6  Running
+2        started  10.60.205.82   juju-341f13-2  ubuntu@24.04  runnervm8k3b6  Running
+3        started  10.60.205.42   juju-341f13-3  ubuntu@24.04  runnervm8k3b6  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 21:30:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 21:30:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 21:30:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 21:30:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 21:30:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 21:30:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 21:31:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 21:31:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-sc2-0: 21:32:02 ERROR unit.postgresql-sc2/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-sc2-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-sc2-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff419da3b60 state=finished raised Exception>]
+unit-postgresql-sc1-0: 21:32:12 ERROR unit.postgresql-sc1/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-sc1-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-sc1-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f29e079c800 state=finished raised Exception>]
+unit-postgresql-sc2-0: 21:35:51 ERROR unit.postgresql-sc2/0.juju-log logical-replication:13: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.asd in database testdb isn't empty
+unit-postgresql-sc2-0: 21:36:18 ERROR unit.postgresql-sc2/0.juju-log logical-replication:13: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.asd in database testdb isn't empty
+unit-postgresql-sc2-0: 21:38:26 ERROR unit.postgresql-sc2/0.juju-log logical-replication:13: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.asd in database testdb isn't empty
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

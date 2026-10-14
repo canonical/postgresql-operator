@@ -1,0 +1,52 @@
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:69 removing replicas
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.61.129.206:8008/patroni', 'host': '10.61.129.206', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.61.129.170:8008/patroni', 'host': '10.61.129.170', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-4', 'role': 'replica', 'state': 'streaming', 'api_url': 'https://10.61.129.155:8008/patroni', 'host': '10.61.129.155', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:79 Stopping unit postgresql/4
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:83 Deleting unit postgresql/4
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/3 [idle] active: 
+  postgresql/4 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [idle] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:118 Scaling back up
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [idle] active: 
+  postgresql/3 [idle] active: 
+  postgresql/5 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/5 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/5 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/3 [executing] active: 
+  postgresql/5 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/3 [executing] active: 
+  postgresql/5 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/3 [executing] active: 
+  postgresql/5 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/3 [idle] active: 
+  postgresql/5 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/5 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-0': 620, 'testing.postgresql-3': 620}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-0': 622, 'testing.postgresql-3': 622}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:628 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'https://10.61.129.206:8008/patroni', 'host': '10.61.129.206', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'https://10.61.129.170:8008/patroni', 'host': '10.61.129.170', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-5', 'role': 'replica', 'state': 'streaming', 'api_url': 'https://10.61.129.20:8008/patroni', 'host': '10.61.129.20', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-0, count: 623, max_number_written: 623, total_expected_writes: 623
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-3, count: 623, max_number_written: 623, total_expected_writes: 623

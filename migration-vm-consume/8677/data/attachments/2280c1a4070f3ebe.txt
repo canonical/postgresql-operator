@@ -1,0 +1,88 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [idle] active: 
+  data-integrator3/0 [idle] active: 
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+  postgresql3/0 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+  postgresql3/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  22:00:59Z
+
+App               Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator            active      1  data-integrator  latest/stable  418  no       
+data-integrator3           active      1  data-integrator  latest/stable  418  no       
+postgresql        16.15    active      3  postgresql                        0  no       
+postgresql3       16.15    active      1  postgresql                        2  no       
+
+Unit                 Workload  Agent  Machine  Public address  Ports     Message
+data-integrator3/0*  active    idle   1        10.169.217.115            
+data-integrator/0*   active    idle   0        10.169.217.103            
+postgresql3/0*       active    idle   6        10.169.217.190  5432/tcp  
+postgresql/0*        active    idle   3        10.169.217.188  5432/tcp  
+postgresql/1         active    idle   4        10.169.217.83   5432/tcp  
+postgresql/2         active    idle   5        10.169.217.124  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.169.217.103  juju-0a2403-0  ubuntu@24.04  runnervmmprz5  Running
+1        started  10.169.217.115  juju-0a2403-1  ubuntu@24.04  runnervmmprz5  Running
+3        started  10.169.217.188  juju-0a2403-3  ubuntu@24.04  runnervmmprz5  Running
+4        started  10.169.217.83   juju-0a2403-4  ubuntu@24.04  runnervmmprz5  Running
+5        started  10.169.217.124  juju-0a2403-5  ubuntu@24.04  runnervmmprz5  Running
+6        started  10.169.217.190  juju-0a2403-6  ubuntu@24.04  runnervmmprz5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+unit-postgresql-0: 21:48:03 ERROR unit.postgresql/0.juju-log logical-replication-offer:18: single_kernel_postgresql.managers.logical_replication:Cannot create new publication for logical-replication-offer #18: table public.test_table in database testdb doesn't exist
+unit-postgresql2-2: 21:48:15 ERROR unit.postgresql2/2.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 21:48:29 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: database bad_database doesn't exist
+unit-postgresql2-2: 21:49:42 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 21:52:23 ERROR unit.postgresql3/0.juju-log logical-replication:19: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+unit-postgresql2-2: 21:55:21 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table in database testdb isn't empty
+unit-postgresql2-2: 21:56:01 ERROR unit.postgresql2/2.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+machine-2: 21:57:52 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 21:57:52 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 21:57:52 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-7: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-7: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-7: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-7: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:42 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-9: 21:59:44 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-8: 21:59:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-8: 21:59:46 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

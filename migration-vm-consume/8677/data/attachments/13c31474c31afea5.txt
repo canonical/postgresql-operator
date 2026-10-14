@@ -1,0 +1,86 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-a/0 [executing] blocked: Circular replication detected
+  postgresql-c/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-a/0 [executing] blocked: table public.orders in database testdb isn't empty
+  postgresql-c/0 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-a/0 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  21:46:27Z
+
+App                Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator-a           active      1  data-integrator  latest/stable  418  no       
+data-integrator-b           active      1  data-integrator  latest/stable  418  no       
+data-integrator-c           active      1  data-integrator  latest/stable  418  no       
+postgresql-a       16.15    active      1  postgresql                        1  no       
+postgresql-b       16.15    active      1  postgresql                        2  no       
+postgresql-c       16.15    active      1  postgresql                        0  no       
+
+Unit                  Workload  Agent  Machine  Public address  Ports     Message
+data-integrator-a/0*  active    idle   0        10.227.159.154            
+data-integrator-b/0*  active    idle   1        10.227.159.227            
+data-integrator-c/0*  active    idle   2        10.227.159.181            
+postgresql-a/0*       active    idle   3        10.227.159.186  5432/tcp  
+postgresql-b/0*       active    idle   4        10.227.159.251  5432/tcp  
+postgresql-c/0*       active    idle   5        10.227.159.150  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.227.159.154  juju-abb342-0  ubuntu@24.04  runnervm8k3b6  Running
+1        started  10.227.159.227  juju-abb342-1  ubuntu@24.04  runnervm8k3b6  Running
+2        started  10.227.159.181  juju-abb342-2  ubuntu@24.04  runnervm8k3b6  Running
+3        started  10.227.159.186  juju-abb342-3  ubuntu@24.04  runnervm8k3b6  Running
+4        started  10.227.159.251  juju-abb342-4  ubuntu@24.04  runnervm8k3b6  Running
+5        started  10.227.159.150  juju-abb342-5  ubuntu@24.04  runnervm8k3b6  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 21:31:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 21:31:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 21:31:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 21:31:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 21:31:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 21:31:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 21:31:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 21:31:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 21:32:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 21:32:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 21:32:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 21:32:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-c-0: 21:33:28 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-c-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-c-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f00e4b98050 state=finished raised Exception>]
+unit-postgresql-b-0: 21:33:39 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-b-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-b-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1f92658560 state=finished raised Exception>]
+unit-postgresql-a-0: 21:33:45 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-a-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-a-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f017ba6f890 state=finished raised Exception>]
+unit-postgresql-a-0: 21:38:39 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: circular replication detected for table public.users in database testdb
+unit-postgresql-b-0: 21:38:43 ERROR unit.postgresql-b/0.juju-log logical-replication-offer:19: single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #19: circular replication detected for tables public.users in database testdb
+unit-postgresql-b-0: 21:38:50 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #19: circular replication detected for tables public.users in database testdb
+unit-postgresql-b-0: 21:39:01 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #19: circular replication detected for tables public.users in database testdb
+unit-postgresql-a-0: 21:40:17 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "64d776c5-52d5-48d5-8b22-08102aabb342:r#18#postgresql-b": settings 64d776c5-52d5-48d5-8b22-08102aabb342:r#18#postgresql-b not found (not found)
+unit-postgresql-c-0: 21:45:17 ERROR unit.postgresql-c/0.juju-log logical-replication-offer:22: single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #22: circular replication detected for tables public.users in database testdb
+unit-postgresql-a-0: 21:45:20 ERROR unit.postgresql-a/0.juju-log logical-replication:22: single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher rejected subscription: circular replication detected for tables public.users in database testdb
+unit-postgresql-c-0: 21:45:33 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #22: circular replication detected for tables public.users in database testdb
+unit-postgresql-a-0: 21:45:47 ERROR unit.postgresql-a/0.juju-log logical-replication:22: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.orders in database testdb isn't empty
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
