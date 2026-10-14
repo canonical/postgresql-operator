@@ -164,3 +164,9 @@ def test_refresh_to_local_charm(juju: jubilant.Juju, charm: str) -> None:
         error=lambda status: jubilant.any_error(status, APP),
         timeout=REFRESH_TIMEOUT,
     )
+    # Progression is guaranteed without parsing the workload message (its content varies
+    # by charm version — e.g. 16/stable reports "Primary", others report nothing):
+    # wait B can only succeed once charm_refresh blocked as incompatible, and
+    # force-refresh-start only returns after the pinned snap is installed and
+    # replication is healthy; a refresh that never progressed stays blocked and
+    # fails the waits above.
