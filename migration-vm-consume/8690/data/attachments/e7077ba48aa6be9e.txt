@@ -1,0 +1,210 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/0 [idle] active: Primary
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  database/1 [allocating] waiting: agent initialising
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  14:09:06Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+another-database     16.15    active      2  postgresql                          0  no       
+database             16.15    active      2  postgresql                          1  no       
+postgresql-test-app           active      2  postgresql-test-app  latest/edge  615  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+another-database/0*     active    idle   3        10.191.176.217  5432/tcp  Primary
+another-database/1      active    idle   4        10.191.176.146  5432/tcp  
+database/0*             active    idle   2        10.191.176.34   5432/tcp  
+database/1              error     idle   5        10.191.176.178            hook failed: "storage-attached"
+postgresql-test-app/0*  active    idle   0        10.191.176.131            received database credentials of the first database
+postgresql-test-app/1   active    idle   1        10.191.176.183            received database credentials of the first database
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.191.176.131  juju-04fb27-0  ubuntu@24.04  runnervm8k3b6  Running
+1        started  10.191.176.183  juju-04fb27-1  ubuntu@24.04  runnervm8k3b6  Running
+2        started  10.191.176.34   juju-04fb27-2  ubuntu@24.04  runnervm8k3b6  Running
+3        started  10.191.176.217  juju-04fb27-3  ubuntu@24.04  runnervm8k3b6  Running
+4        started  10.191.176.146  juju-04fb27-4  ubuntu@24.04  runnervm8k3b6  Running
+5        started  10.191.176.178  juju-04fb27-5  ubuntu@24.04  runnervm8k3b6  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 14:01:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 14:01:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 14:01:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 14:01:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 14:02:07 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f0d6226e6c0 state=finished raised Exception>]
+unit-another-database-0: 14:02:07 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0d61daf5c0 state=finished raised Exception>]
+unit-another-database-0: 14:02:11 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7fa27c93b920 state=finished raised Exception>]
+unit-another-database-0: 14:02:12 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa27c41b6e0 state=finished raised Exception>]
+unit-another-database-0: 14:02:14 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f8f512b8e60 state=finished raised Exception>]
+unit-another-database-0: 14:02:15 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8f50932030 state=finished raised Exception>]
+unit-another-database-0: 14:02:18 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f2c7344c620 state=finished raised Exception>]
+unit-another-database-0: 14:02:19 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f2c7111f680 state=finished raised Exception>]
+unit-another-database-0: 14:02:22 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f3a53f41790 state=finished raised Exception>]
+machine-2: 14:02:24 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 14:02:24 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 14:02:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 14:02:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 14:02:44 ERROR unit.database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f46f94ecb00 state=finished raised Exception>]
+unit-database-0: 14:02:45 ERROR unit.database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f46f94efbf0 state=finished raised Exception>]
+unit-database-0: 14:02:47 ERROR unit.database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f931edf66f0 state=finished raised Exception>]
+unit-database-0: 14:02:48 ERROR unit.database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f931eb64650 state=finished raised Exception>]
+machine-4: 14:02:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 14:02:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 14:02:51 ERROR unit.database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f97635d1580 state=finished raised Exception>]
+unit-database-0: 14:02:52 ERROR unit.database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f97635d3d10 state=finished raised Exception>]
+unit-database-0: 14:02:54 ERROR unit.database/0.juju-log failed to get primary with error RetryError[<Future at 0x7fb8dd8f0cb0 state=finished raised Exception>]
+unit-database-0: 14:02:55 ERROR unit.database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb8dd5d4680 state=finished raised Exception>]
+unit-database-0: 14:02:57 ERROR unit.database/0.juju-log failed to get primary with error RetryError[<Future at 0x7ff439ae9790 state=finished raised Exception>]
+unit-another-database-1: 14:03:03 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7f4ce092d280 state=finished raised Exception>]
+unit-another-database-1: 14:03:03 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4cdf7da6c0 state=finished raised Exception>]
+unit-another-database-1: 14:03:05 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7fb8f8232a80 state=finished raised Exception>]
+unit-another-database-1: 14:03:05 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb8f7f6aff0 state=finished raised Exception>]
+unit-another-database-0: 14:03:05 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3a53fd3980 state=finished raised Exception>]
+unit-another-database-1: 14:03:07 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7efef35a2a80 state=finished raised Exception>]
+unit-another-database-1: 14:03:07 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efef3177cb0 state=finished raised Exception>]
+unit-another-database-0: 14:03:08 ERROR unit.another-database/0.juju-log status-peers:8: failed to get primary with error RetryError[<Future at 0x7fd6cd9c8da0 state=finished raised Exception>]
+unit-another-database-0: 14:03:08 ERROR unit.another-database/0.juju-log status-peers:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd6cc8a5730 state=finished raised Exception>]
+unit-another-database-1: 14:03:10 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7fb9a34ba6c0 state=finished raised Exception>]
+unit-another-database-1: 14:03:11 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb9a33c76b0 state=finished raised Exception>]
+unit-another-database-0: 14:03:11 ERROR unit.another-database/0.juju-log database-peers:5: failed to get primary with error RetryError[<Future at 0x7ff2a2e1a6f0 state=finished raised Exception>]
+unit-another-database-0: 14:03:11 ERROR unit.another-database/0.juju-log database-peers:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff2a1ccddf0 state=finished raised Exception>]
+unit-another-database-1: 14:03:13 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7f98981eacf0 state=finished raised Exception>]
+unit-another-database-0: 14:03:13 ERROR unit.another-database/0.juju-log refresh-v-three:7: failed to get primary with error RetryError[<Future at 0x7fb200fc5e80 state=finished raised Exception>]
+unit-another-database-0: 14:03:14 ERROR unit.another-database/0.juju-log refresh-v-three:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb2012127b0 state=finished raised Exception>]
+unit-another-database-0: 14:03:16 ERROR unit.another-database/0.juju-log restart:6: failed to get primary with error RetryError[<Future at 0x7f2278cd7dd0 state=finished raised Exception>]
+unit-another-database-0: 14:03:16 ERROR unit.another-database/0.juju-log restart:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f2277bb9580 state=finished raised Exception>]
+unit-another-database-0: 14:03:19 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7fa66c1ea1b0 state=finished raised Exception>]
+unit-database-0: 14:03:33 ERROR unit.database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff439b960f0 state=finished raised Exception>]
+unit-another-database-0: 14:03:35 ERROR unit.another-database/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-another-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-another-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 199, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa66b8d4b60 state=finished raised Exception>]
+unit-another-database-0: 14:03:36 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa66a843680 state=finished raised Exception>]
+unit-another-database-0: 14:03:39 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f6670254710 state=finished raised Exception>]
+unit-another-database-0: 14:03:39 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f66702f6a50 state=finished raised Exception>]
+unit-another-database-0: 14:03:43 ERROR unit.another-database/0.juju-log failed to get primary with error RetryError[<Future at 0x7f234a3593d0 state=finished raised Exception>]
+unit-another-database-0: 14:03:49 ERROR unit.another-database/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f234a3dde80 state=finished raised Exception>]
+unit-another-database-1: 14:03:50 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f98980c3a10 state=finished raised Exception>]
+unit-another-database-0: 14:03:51 ERROR unit.another-database/0.juju-log database-peers:5: failed to get primary with error RetryError[<Future at 0x7ff74c002e10 state=finished raised Exception>]
+unit-another-database-1: 14:03:53 ERROR unit.another-database/1.juju-log refresh-v-three:7: failed to get primary with error RetryError[<Future at 0x7f37876052e0 state=finished raised Exception>]
+unit-another-database-1: 14:03:54 ERROR unit.another-database/1.juju-log refresh-v-three:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f37864414f0 state=finished raised Exception>]
+unit-another-database-1: 14:03:56 ERROR unit.another-database/1.juju-log restart:6: failed to get primary with error RetryError[<Future at 0x7f129783ec00 state=finished raised Exception>]
+unit-another-database-1: 14:03:56 ERROR unit.another-database/1.juju-log restart:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f1297898950 state=finished raised Exception>]
+unit-another-database-1: 14:03:58 ERROR unit.another-database/1.juju-log status-peers:8: failed to get primary with error RetryError[<Future at 0x7fe4d176b080 state=finished raised Exception>]
+unit-another-database-1: 14:03:58 ERROR unit.another-database/1.juju-log status-peers:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe4d0250920 state=finished raised Exception>]
+unit-another-database-1: 14:04:01 ERROR unit.another-database/1.juju-log database-peers:5: failed to get primary with error RetryError[<Future at 0x7fd02c23db20 state=finished raised Exception>]
+unit-another-database-1: 14:04:01 ERROR unit.another-database/1.juju-log database-peers:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd02c23e510 state=finished raised Exception>]
+unit-another-database-1: 14:04:03 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7fc4a93067e0 state=finished raised Exception>]
+unit-another-database-1: 14:04:03 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc4a9360410 state=finished raised Exception>]
+unit-database-0: 14:04:06 ERROR unit.database/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 483, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 223, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff7e0562c90 state=finished raised Exception>]
+unit-another-database-1: 14:04:06 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7f5ff0d4a420 state=finished raised Exception>]
+unit-another-database-1: 14:04:07 ERROR unit.another-database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5ff0da47a0 state=finished raised Exception>]
+unit-another-database-1: 14:04:10 ERROR unit.another-database/1.juju-log failed to get primary with error RetryError[<Future at 0x7fe7919f5a60 state=finished raised Exception>]
+unit-another-database-1: 14:05:06 ERROR unit.another-database/1.juju-log refresh-v-three:7: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-5: 14:08:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 14:08:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-1: 14:09:01 ERROR unit.database/1.juju-log failed to get primary with error RetryError[<Future at 0x7f51ca77d7c0 state=finished raised Exception>]
+unit-database-1: 14:09:01 ERROR unit.database/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f51ca6aab70 state=finished raised Exception>]
+unit-database-1: 14:09:02 ERROR unit.database/1.juju-log root:Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 888, in _request_raw
+    response = self.opener.open(request, timeout=self.timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 965, in __getitem__
+    snap = self._snap_map[snap_name] = self._load_info(snap_name)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 1014, in _load_info
+    info = self._snap_client.get_snap_information(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 914, in get_snap_information
+    return self._request('GET', 'find', {'name': name})[0]  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 840, in _request
+    response = self._request_raw(method, path, query, headers, data)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 900, in _request_raw
+    raise SnapAPIError(body, code, status, message) from e
+charmlibs.snap._snap.SnapAPIError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-1/charm/src/charm.py", line 80, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/main.py", line 39, in main
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 527, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 511, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 449, in _emit
+    _charm._evaluate_status(self.charm)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/charm.py", line 1652, in _evaluate_status
+    charm.on.collect_unit_status.emit()
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 338, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 904, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 1032, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 246, in _on_collect_unit_status
+    self._process_on_scope_statuses(scope="unit", event=event)
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 202, in _process_on_scope_statuses
+    all_statuses = self._get_sorted_statuses(scope)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 163, in _get_sorted_statuses
+    {component.name: component.get_statuses(scope) for component in self.components}
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster.py", line 190, in get_statuses
+    if not self.workload.workload_present:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 613, in workload_present
+    return cache[charm_refresh.snap_name()].present
+           ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-database-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 967, in __getitem__
+    raise SnapNotFoundError(f"Snap '{snap_name}' not found!") from e
+charmlibs.snap._snap.SnapNotFoundError: Snap 'charmed-postgresql' not found!
+unit-database-1: 14:09:03 ERROR juju.worker.uniter.operation hook "temp-storage-attached" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...

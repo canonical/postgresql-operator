@@ -1,0 +1,168 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-0
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/postgresql-test-app-615
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  postgresql/1 [allocating] waiting: waiting for machine
+  postgresql/2 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  postgresql/1 [allocating] waiting: waiting for machine
+  postgresql/2 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  postgresql/1 [allocating] waiting: waiting for machine
+  postgresql/2 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  postgresql/1 [allocating] waiting: waiting for machine
+  postgresql/2 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] maintenance: installing PostgreSQL
+  postgresql/1 [allocating] waiting: waiting for machine
+  postgresql/2 [allocating] waiting: waiting for machine
+  postgresql-test-app/0 [executing] maintenance: installing charm software
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] maintenance: installing PostgreSQL
+  postgresql/1 [executing] waiting: agent initialising
+  postgresql/2 [executing] maintenance: installing PostgreSQL
+  postgresql-test-app/0 [idle] blocked: No database integration available
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  14:00:38Z
+
+App                  Version  Status       Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.15    maintenance      3  postgresql                          0  no       installing PostgreSQL
+postgresql-test-app           blocked          1  postgresql-test-app  latest/edge  615  no       No database integration available
+
+Unit                    Workload     Agent      Machine  Public address  Ports  Message
+postgresql-test-app/0*  blocked      idle       3        10.233.161.81          No database integration available
+postgresql/0*           maintenance  executing  0        10.233.161.8           (install) installing PostgreSQL
+postgresql/1            error        idle       1        10.233.161.239         hook failed: "storage-attached"
+postgresql/2            maintenance  executing  2        10.233.161.92          (install) installing PostgreSQL
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.233.161.8    juju-7b2401-0  ubuntu@24.04  runnervmmprz5  Running
+1        started  10.233.161.239  juju-7b2401-1  ubuntu@24.04  runnervmmprz5  Running
+2        started  10.233.161.92   juju-7b2401-2  ubuntu@24.04  runnervmmprz5  Running
+3        started  10.233.161.81   juju-7b2401-3  ubuntu@24.04  runnervmmprz5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 13:59:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 13:59:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 13:59:52 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f175b6e74d0 state=finished raised Exception>]
+unit-postgresql-0: 13:59:53 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f175b4da450 state=finished raised Exception>]
+machine-3: 13:59:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 13:59:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 13:59:56 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fe31f1ca6f0 state=finished raised Exception>]
+unit-postgresql-0: 13:59:57 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe31edd8ad0 state=finished raised Exception>]
+unit-postgresql-0: 14:00:00 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f144d0728a0 state=finished raised Exception>]
+unit-postgresql-0: 14:00:01 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f144cdd04a0 state=finished raised Exception>]
+unit-postgresql-0: 14:00:04 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fcb63df27e0 state=finished raised Exception>]
+unit-postgresql-0: 14:00:05 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fcb639d03b0 state=finished raised Exception>]
+unit-postgresql-0: 14:00:07 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f942d9027e0 state=finished raised Exception>]
+machine-2: 14:00:10 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 14:00:10 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 14:00:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 14:00:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 14:00:23 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7fb80e208bf0 state=finished raised Exception>]
+unit-postgresql-2: 14:00:23 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb80c1e9400 state=finished raised Exception>]
+unit-postgresql-2: 14:00:26 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7fa4c4f19790 state=finished raised Exception>]
+unit-postgresql-2: 14:00:26 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa4c488f650 state=finished raised Exception>]
+unit-postgresql-2: 14:00:27 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f1d06fa7680 state=finished raised Exception>]
+unit-postgresql-2: 14:00:28 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f1d065c2c60 state=finished raised Exception>]
+unit-postgresql-2: 14:00:30 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f3e72e2d7c0 state=finished raised Exception>]
+unit-postgresql-2: 14:00:30 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3e7298f110 state=finished raised Exception>]
+unit-postgresql-2: 14:00:32 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f077fe22630 state=finished raised Exception>]
+unit-postgresql-1: 14:00:33 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f70e2bc2f30 state=finished raised Exception>]
+unit-postgresql-1: 14:00:33 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f70e28f5580 state=finished raised Exception>]
+unit-postgresql-1: 14:00:34 ERROR unit.postgresql/1.juju-log root:Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 888, in _request_raw
+    response = self.opener.open(request, timeout=self.timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 965, in __getitem__
+    snap = self._snap_map[snap_name] = self._load_info(snap_name)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 1014, in _load_info
+    info = self._snap_client.get_snap_information(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 914, in get_snap_information
+    return self._request('GET', 'find', {'name': name})[0]  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 840, in _request
+    response = self._request_raw(method, path, query, headers, data)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 900, in _request_raw
+    raise SnapAPIError(body, code, status, message) from e
+charmlibs.snap._snap.SnapAPIError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/src/charm.py", line 80, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/main.py", line 39, in main
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 527, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 511, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/_main.py", line 449, in _emit
+    _charm._evaluate_status(self.charm)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/charm.py", line 1652, in _evaluate_status
+    charm.on.collect_unit_status.emit()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 338, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 904, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/ops/framework.py", line 1032, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 246, in _on_collect_unit_status
+    self._process_on_scope_statuses(scope="unit", event=event)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 202, in _process_on_scope_statuses
+    all_statuses = self._get_sorted_statuses(scope)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/data_platform_helpers/advanced_statuses/handler.py", line 163, in _get_sorted_statuses
+    {component.name: component.get_statuses(scope) for component in self.components}
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster.py", line 190, in get_statuses
+    if not self.workload.workload_present:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/workload/vm.py", line 613, in workload_present
+    return cache[charm_refresh.snap_name()].present
+           ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/charmlibs/snap/_snap.py", line 967, in __getitem__
+    raise SnapNotFoundError(f"Snap '{snap_name}' not found!") from e
+charmlibs.snap._snap.SnapNotFoundError: Snap 'charmed-postgresql' not found!
+unit-postgresql-1: 14:00:35 ERROR juju.worker.uniter.operation hook "data-storage-attached" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
