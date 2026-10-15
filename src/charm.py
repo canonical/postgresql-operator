@@ -2280,7 +2280,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if (
             self.is_blocked
-            and self.unit.status not in S3_BLOCK_MESSAGES
+            and self.unit.status.message not in S3_BLOCK_MESSAGES
             and self.unit.status.message != LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS
             and self.unit.status.message
             != self.app_peer_data.get("logical-replication-validation-status-message")
