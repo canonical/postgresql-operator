@@ -1,0 +1,1229 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing s3-integrator --bind ''
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing self-signed-certificates --bind '' --channel 1/stable
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing /root/snap/juju/common/tmp11aox4qu/_temp.charm postgresql-gcp --bind '' --config profile=testing --num-units 2
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-gcp:client-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-gcp:peer-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=60s
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/1] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: maintenance (installing charm software) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: maintenance (installing charm software) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: waiting (waiting for machine) -> waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (waiting for machine) -> waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: waiting (installing agent) -> waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: maintenance (installing charm software) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (installing charm software) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: maintenance (installing charm software) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: maintenance (installing charm software) -> blocked (Missing parameters: ['access-key', 'secret-key'])
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: maintenance (installing charm software) -> blocked (Missing parameters: ['access-key', 'secret-key'])
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: maintenance (installing PostgreSQL) -> waiting (waiting to start PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (installing PostgreSQL) -> waiting (waiting to start PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: maintenance (installing PostgreSQL) -> waiting (waiting to start PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: waiting (waiting to start PostgreSQL) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (waiting to start PostgreSQL) -> waiting (waiting for peer IP)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (waiting to start PostgreSQL) -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (awaiting passwords generation) -> waiting (awaiting for cluster to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (waiting for peer IP) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (reconfiguring cluster) -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (awaiting for member to start) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary (degraded)) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (Executing restart operation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active () -> waiting (Updating extensions)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: waiting (Updating extensions) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active () -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (awaiting for cluster to start) -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (reconfiguring cluster) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: waiting (awaiting for member to start) -> active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:60 configuring S3 integrator for GCP
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing s3-integrator endpoint=https://storage.googleapis.com bucket=data-charms-testing path=/postgresql-k8s/a1c3ab76-c83a-11f1-ad83-000d3a5ce524 region=us-east-1
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json s3-integrator/0 sync-s3-credentials --params /root/snap/juju/common/tmpwrjveyoz
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-gcp s3-integrator
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=60s
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary) -> maintenance (initialising stanza)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (initialising stanza) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary) -> maintenance (initialising stanza)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (initialising stanza) -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-gcp/0 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:309 1: creating table
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:312 1: creating backup b1
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-gcp/1 create-backup --params /root/snap/juju/common/tmpkfkez91e
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:570 listing the available backups
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-gcp/1 list-backups --params /root/snap/juju/common/tmpxd_nvpat
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:320 1: creating test data td1
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:323 1: get timestamp ts1
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:333 1: creating test data td2
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:336 1: switching wal
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:339 1: scaling down to do restore
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-unit --model testing --no-prompt postgresql-gcp/1
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: active (Primary) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/0] status changed: maintenance (reconfiguring cluster) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: active () -> maintenance (stopping charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: maintenance (stopping charm software) -> maintenance (cleaning up prior to charm deletion)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-gcp/1] status changed: maintenance (cleaning up prior to charm deletion) -> terminated ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:347 1: restoring the backup b1 with bad restore-to-time parameter
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-gcp/0 restore --params /root/snap/juju/common/tmpk9nsgst1
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:356 1: restoring the backup b1 with unreachable restore-to-time parameter
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-gcp/0 restore --params /root/snap/juju/common/tmp_1e__wad
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:361 1: waiting for the database charm to become blocked after restore
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-gcp/0] status: maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.conftest:conftest.py:71 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  02:19:33Z
+
+App                       Version  Status  Scale  Charm                     Channel   Rev  Exposed  Message
+postgresql-gcp            16.15    active      1  postgresql                            0  no       
+s3-integrator                      active      1  s3-integrator             1/stable  562  no       
+self-signed-certificates           active      1  self-signed-certificates  1/stable  586  no       
+
+Unit                         Workload     Agent  Machine  Public address  Ports     Message
+postgresql-gcp/0*            maintenance  idle   2        10.215.218.50   5432/tcp  reconfiguring cluster
+s3-integrator/0*             active       idle   0        10.215.218.243            
+self-signed-certificates/0*  active       idle   1        10.215.218.104            
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.215.218.243  juju-a4e3c6-0  ubuntu@22.04  runnervmmprz5  Running
+1        started  10.215.218.104  juju-a4e3c6-1  ubuntu@24.04  runnervmmprz5  Running
+2        started  10.215.218.50   juju-a4e3c6-2  ubuntu@24.04  runnervmmprz5  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 01:50:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:50:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:51:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:51:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:51:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:51:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:51:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:51:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 01:52:50 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f60305d4710 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:52:50 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f602f3ff6b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:52:51 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f60305b9ca0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:53:09 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4548f005c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:53:12 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f57efaa48c0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 02:02:17 ERROR unit.postgresql-gcp/1.juju-log __main__:Skipping charmed-postgresql snap removal: failed to unmount data storage: umount: /var/snap/charmed-postgresql/common/var/lib/postgresql: target is busy.
+
+machine-3: 02:02:17 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:02:17 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql-gcp-0: 02:02:41 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.restore:Restore failed: Bad restore-to-time format
+unit-postgresql-gcp-0: 02:02:45 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7feb0449d550 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:33 ERROR unit.postgresql-gcp/0.juju-log database-peers:1: __main__:Restore failed: database service failed to reach point-in-time-recovery target. You can launch another restore with different parameters
+unit-postgresql-gcp-0: 02:03:34 ERROR unit.postgresql-gcp/0.juju-log database-peers:1: single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f157cd4dfd0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:34 ERROR unit.postgresql-gcp/0.juju-log database-peers:1: single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f157cd4db20 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:36 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe19f6b59a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:36 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe19f6b42f0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:36 ERROR unit.postgresql-gcp/0.juju-log __main__:failed to get primary with error RetryError[<Future at 0x7fe1a07e6540 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:38 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f299d383c50 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:42 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f42f51980b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:03:54 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7942f8c500 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:03 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f926b0d1e80 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:13 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe4d211a2a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:24 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f96a4480a40 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:35 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3c4d147d70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:46 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdebf085ac0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:04:54 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7faf640ad580 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:06 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9f47139f70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:17 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fea456664b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:27 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f93bf51d3a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:35 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff284028aa0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:45 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8f02f7de20 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:05:56 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ffa79abdcd0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:06:08 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9344164530 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:06:19 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f836a985df0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:06:27 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb03db16c30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:06:38 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fec6d384a10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:06:49 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdd81c35df0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:00 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f338f0b9670 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:09 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe2cb68f110 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:19 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f481d79f590 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:27 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f00d0b15640 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:37 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f6b97ca99a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:46 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd79e9aa9c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:07:57 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f158861a510 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:07 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f70e4995130 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:18 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5b76e4d250 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:29 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fddf0822210 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:38 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f6cff8b1c70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:47 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f42e90568a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:08:55 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fefae3f69c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:07 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdc5c68f920 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:16 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd65acb1550 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:27 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f6ffb11a990 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:36 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0862b4b320 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:45 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fae31472630 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:09:56 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc4e4b06060 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:06 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2a34a91a60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:15 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe15a4a5d90 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:26 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff4ac23a480 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:35 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2070591b80 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:45 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f380ac7e330 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:10:55 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f19fb622c60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:06 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe73a176810 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:14 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb0e33a9d00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:23 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f063a9152b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:33 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fca02225910 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:41 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2396a92e10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:51 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fdd69595ac0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:02 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0267b119d0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:14 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0e54d85d30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:24 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa2592661e0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:33 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd6127353d0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:41 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7feb6de5fda0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:52 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9f01158c20 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:02 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8c164b9d60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:13 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f09497a56d0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:21 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fcfca589640 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:32 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd39ce6f9b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:43 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ff76eb5e4e0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:13:55 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f01dd360e00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:06 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5efee41130 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:17 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5bf2897da0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:26 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe68c71a0c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:37 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc8fb227ad0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:47 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0a51a13290 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:14:55 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb567245d90 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:07 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbcd6b3bef0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:16 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb74db59f70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:26 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7efe71a33230 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:36 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc2a6586e10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:47 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f94af61f830 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:15:58 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fef268ad6a0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:08 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2cf4aad8b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:20 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f290559d520 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:31 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0aacf09670 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:40 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fefe98acfe0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:49 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f28d2ee9d00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:16:58 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f00fff80530 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:07 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7ffa62e6fbc0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:16 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb976578e90 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:28 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9b170ada30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:37 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd1c33d7e90 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:48 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f9af01a06b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:17:58 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fafc5607680 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:07 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4578e3da00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:15 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f3f0f8a20c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:25 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f058b644a10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:33 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7a8677a420 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:42 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f35c778db50 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:18:52 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fea55f6b7d0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:19:02 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd0a6f92720 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:19:13 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc144d68fb0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:19:25 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 481, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 221, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8103359be0 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
