@@ -43,16 +43,6 @@ def test_tls_handler_is_lib_backed(harness):
     assert not hasattr(charm, "push_tls_files_to_workload")
 
 
-def test_is_tls_enabled_reflects_tls_manager(harness):
-    """is_tls_enabled is driven by TLSManager.get_client_tls_files(), not the handler."""
-    with patch("charm.TLSManager.get_client_tls_files") as _get_client_tls_files:
-        _get_client_tls_files.return_value = (None, None, None)
-        assert harness.charm.is_tls_enabled is False
-
-        _get_client_tls_files.return_value = ("key", "ca", "cert")
-        assert harness.charm.is_tls_enabled is True
-
-
 def test_reload_bridge_calls_update_config(harness):
     """_reload_tls_after_push delegates to update_config (the event guarantees readiness)."""
     with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
@@ -97,16 +87,20 @@ def test_reload_bridge_observes_tls_files_pushed(harness):
 
 
 def test_internal_cert_path_pushes_and_reloads(harness):
-    """_check_and_update_internal_cert generates, pushes, and reloads on CN mismatch."""
+    """check_and_update_internal_cert generates, pushes, and reloads on CN mismatch."""
     with (
-        patch("charm.CharmState.unit_ip", new_callable=PropertyMock) as _unit_ip,
         patch(
-            "charm.PostgresqlOperatorCharm.get_secret",
+            "single_kernel_postgresql.core.state.CharmState.unit_ip", new_callable=PropertyMock
+        ) as _unit_ip,
+        patch(
+            "single_kernel_postgresql.core.state.CharmState.get_secret",
             return_value="-----BEGIN CERTIFICATE-----",
         ),
-        patch("charm.load_pem_x509_certificate") as _load_cert,
-        patch("charm.TLSManager.generate_internal_peer_cert") as _generate,
-        patch("charm.TLSManager.push_tls_files") as _push,
+        patch("single_kernel_postgresql.managers.refresh.load_pem_x509_certificate") as _load_cert,
+        patch(
+            "single_kernel_postgresql.managers.tls.TLSManager.generate_internal_peer_cert"
+        ) as _generate,
+        patch("single_kernel_postgresql.managers.tls.TLSManager.push_tls_files") as _push,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
     ):
         _unit_ip.return_value = "1.2.3.4"
@@ -115,7 +109,7 @@ def test_internal_cert_path_pushes_and_reloads(harness):
         attr.value = "9.9.9.9"
         _load_cert.return_value.subject.get_attributes_for_oid.return_value = [attr]
 
-        harness.charm._check_and_update_internal_cert()
+        harness.charm.refresh_manager.check_and_update_internal_cert()
 
         _generate.assert_called_once_with()
         _push.assert_called_once_with()
