@@ -144,6 +144,20 @@ jobs:
         with:
           pattern: ${{ inputs.artifact-prefix }}-*
           merge-multiple: true
+      - name: Start per-model log poller
+        timeout-minutes: 1
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') }}
+        run: |
+          setsid nohup bash -c 'while true; do
+            for m in $(sudo juju models --format json | jq -r '"'"'.models[].name | select(. != "admin/controller" and . != "controller")'"'"'); do
+              f="${m//\//-}"
+              mkdir -p ~/logs/
+              sudo juju status -m "$m" --color --relations | tee ~/logs/"$f"-juju-status.txt || true
+              sudo juju debug-log -m "$m" --color --replay --no-tail | tee ~/logs/"$f"-juju-debug-log.txt || true
+              sudo juju show-status-log -m "$m" | tee ~/logs/"$f"-status-log.txt || true
+            done
+            sleep 60
+          done' >/dev/null 2>&1 & echo $! > /tmp/log-poller.pid
       - name: Run spread job
         timeout-minutes: 180
         id: spread
@@ -162,6 +176,10 @@ jobs:
           VAR_SPREAD_JOB: ${{ matrix.job.spread_job }}
           # Only set for test_terraform_deploy.py
           TERRAFORM_CHARM_SOURCE: ${{ matrix.job.terraform_charm_source }}
+      - name: Stop per-model log poller
+        timeout-minutes: 1
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: kill "$(cat /tmp/log-poller.pid 2>/dev/null)" 2>/dev/null || true
       - name: Check spread name for Allure collection
         id: check-spread-name
         # `terraform_charm_source != 'charmhub'`: the "local" terraform job runs a superset of the
@@ -242,6 +260,12 @@ jobs:
         timeout-minutes: 3
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
         run: sudo jhack tail --printer raw --replay --no-watch | tee ~/logs/jhack-tail.txt
+      - name: juju controller diagnostics
+        timeout-minutes: 1
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: |
+          sudo juju models --format json | tee ~/logs/juju-models.json || true
+          sudo juju debug-log -m controller --color --replay --no-tail | tee ~/logs/juju-controller-debug-log.txt || true
       - name: Upload logs
         timeout-minutes: 5
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
