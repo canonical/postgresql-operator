@@ -305,10 +305,11 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
-        # patch(
-        #     "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
-        #     return_value=True,
-        # ),
+        patch(
+            "single_kernel_postgresql.events.logical_replication."
+            "PostgreSQLLogicalReplication.apply_changed_config",
+            return_value=True,
+        ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -467,7 +468,7 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     with (
         patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("charm.RaftManager"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
@@ -518,7 +519,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -564,7 +565,7 @@ def test_on_start_create_user_error(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -623,7 +624,7 @@ def test_on_start_success(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -739,7 +740,7 @@ def test_on_start_replica(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLSManager.generate_internal_peer_cert"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -805,7 +806,7 @@ def test_on_start_no_patroni_member(harness):
             "single_kernel_postgresql.managers.database.DatabaseManager.get_databases_prefix_mapping",
             return_value={},
         ),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         # Mock the passwords.
         _get_postgresql_version.return_value = "16.6"
@@ -1737,7 +1738,9 @@ def test_reconfigure_cluster(harness):
             new_callable=PropertyMock,
             return_value=False,
         ) as _is_cluster_initialised,
-        patch("charm.Patroni.cleanup_raft_cluster", return_value=False) as _cleanup_raft_cluster,
+        patch(
+            "charm.RaftManager.cleanup_raft_cluster", return_value=False
+        ) as _cleanup_raft_cluster,
     ):
         # Cluster not initialised
         mock_event = MagicMock(spec=RelationEvent)
@@ -2021,8 +2024,8 @@ def test_raft_reinitialisation(harness):
         patch(
             "charm.PostgresqlOperatorCharm._stuck_raft_cluster_cleanup"
         ) as _stuck_raft_cluster_cleanup,
-        patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
-        patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
+        patch("charm.RaftManager.remove_raft_data") as _remove_raft_data,
+        patch("charm.RaftManager.reinitialise_raft_data") as _reinitialise_raft_data,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
         patch("charm.PatroniManager.start_patroni"),
@@ -2223,7 +2226,7 @@ def test_on_peer_relation_departed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
-        patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
+        patch("charm.RaftManager.remove_raft_member") as _remove_raft_member,
         patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
         patch("charm.PatroniManager.get_member_ip") as _get_member_ip,
     ):
@@ -2423,7 +2426,7 @@ def test_update_new_unit_status(harness):
 @pytest.mark.parametrize("is_leader", [True, False])
 def test_set_primary_status_message(harness, is_leader):
     with (
-        patch("charm.Patroni.has_raft_quorum", return_value=True),
+        patch("charm.RaftManager.has_raft_quorum", return_value=True),
         patch("charm.PatroniManager.get_running_cluster_members", return_value=["test"]),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
