@@ -284,7 +284,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
 
         self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
-        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -623,14 +622,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if isinstance(status, ActiveStatus | BlockedStatus | MaintenanceStatus | WaitingStatus):
             self.set_unit_status(status)
-
-    def _on_databases_change(self, _):
-        """Handle databases change event."""
-        self.update_config()
-        logger.debug("databases changed")
-        timestamp = datetime.now()
-        self.unit_peer_data.update({"timestamp": str(timestamp)})
-        logger.debug(f"authorisation rules changed at {timestamp}")
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
