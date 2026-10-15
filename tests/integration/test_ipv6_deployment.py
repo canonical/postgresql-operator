@@ -51,7 +51,7 @@ def test_deploy(juju: JujuFixture, charm: str):
             application_name=DATABASE_APP_NAME,
             num_units=1,
             config={"profile": "testing"},
-            #bind={"database-peers": "ipv6"},
+            # bind={"database-peers": "ipv6"},
         )
     else:
         juju.ext.model.deploy(
