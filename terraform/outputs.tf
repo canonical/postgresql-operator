@@ -11,6 +11,7 @@ output "provides" {
     database                  = "database"
     cos_agent                 = "cos-agent"
     replication_offer         = "replication-offer"
+    logical_replication_offer = "logical-replication-offer"
     watcher_offer             = "watcher-offer"
   }
 }
@@ -18,6 +19,7 @@ output "provides" {
 output "requires" {
   value = {
     replication         = "replication"
+    logical_replication = "logical-replication"
     peer_certificates   = "peer-certificates"
     client_certificates = "client-certificates"
     receive_ca_cert     = "receive-ca-cert"

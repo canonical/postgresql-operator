@@ -305,10 +305,11 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
-        # patch(
-        #     "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
-        #     return_value=True,
-        # ),
+        patch(
+            "single_kernel_postgresql.events.logical_replication."
+            "PostgreSQLLogicalReplication.apply_changed_config",
+            return_value=True,
+        ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -2798,3 +2799,115 @@ def test_planned_units_survives_goal_state_failure(harness):
         side_effect=ModelError('ERROR saas application "db1" not found'),
     ):
         assert charm._planned_units == len(charm._hosts)
+
+
+def test_on_update_status_pitr_no_reblock_on_stale_fail_id(harness):
+    """Test that a stale bootstrap FATAL does not block a valid PITR restore."""
+    with (
+        patch("charm.ObserverManager.start_observer"),
+        patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.RestoreManager.log_pitr_last_transaction_time"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # A Patroni bootstrap FATAL already observed by the charm (is_new == False).
+        _patroni_logs.return_value = (
+            "2026-10-11 01:58:00 UTC patroni.exceptions.PatroniFatalException:"
+            " Failed to bootstrap cluster"
+        )
+        _member_started.return_value = False
+        _get_member_status.return_value = ""
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.unit.name,
+                {"last_pitr_fail_id": "2026-10-11"},
+            )
+
+        harness.charm.unit.status = ActiveStatus()
+        harness.charm.on.update_status.emit()
+
+        assert harness.charm.unit.status.message != CANNOT_RESTORE_PITR
+
+
+def test_on_update_status_pitr_blocks_on_new_fail(harness):
+    """Test that a NEW bootstrap FATAL blocks with the PITR message."""
+    with (
+        patch("charm.ObserverManager.start_observer"),
+        patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.RestoreManager.log_pitr_last_transaction_time"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # A Patroni bootstrap FATAL that the charm has not observed yet.
+        _patroni_logs.return_value = (
+            "2026-10-11 01:58:00 UTC patroni.exceptions.PatroniFatalException:"
+            " Failed to bootstrap cluster"
+        )
+        _member_started.return_value = False
+        _get_member_status.return_value = ""
+
+        harness.charm.unit.status = ActiveStatus()
+        harness.charm.on.update_status.emit()
+
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
+
+
+def test_add_members_does_not_override_blocked_pitr_status(harness):
+    """Test that the reconfigure loop does not override the blocked PITR status."""
+    with (
+        patch("charm.snap.SnapCache"),
+        patch(
+            "charm.PatroniManager.cluster_members", new_callable=PropertyMock
+        ) as _cluster_members,
+        patch("charm.PatroniManager.are_all_members_ready", return_value=False),
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # Patroni API is unreachable: cluster_status returns nothing, so the
+        # reconfigure path is exercised.
+        _cluster_members.return_value = set()
+        peers = harness.model.get_relation(PEER_RELATION)
+        peers.data[harness.charm.unit]["database-peers-address"] = "192.0.2.1"
+
+        harness.charm.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+        mock_event = Mock()
+
+        harness.charm._add_members(mock_event)
+
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
