@@ -1280,6 +1280,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         multiple units copying data at the same time, which can cause slow
         transfer rates in these processes and overload the primary instance.
         """
+        # Do not override the blocked PITR status: the reconfigure cannot succeed
+        # while Patroni is down and would mask the blocked status on every tick.
+        if (
+            self.is_cluster_restoring_to_time
+            and isinstance(self.unit.status, BlockedStatus)
+            and self.unit.status.message == CANNOT_RESTORE_PITR
+        ):
+            logger.debug("Early exit add_members: blocked after failed PITR restore")
+            return
+
         try:
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
@@ -2199,6 +2209,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
+        # Only a NEW fatal blocks: the journal also holds fatals from previous
+        # restore attempts that must not block a valid restore in progress.
         if self.is_cluster_restoring_to_time and all(self.restore_manager.is_pitr_failed()):
             logger.error(
                 "Restore failed: database service failed to reach point-in-time-recovery target. "
