@@ -12,6 +12,7 @@ output "provides" {
     cos_agent         = "cos-agent"
     replication_offer = "replication-offer"
     watcher_offer     = "watcher-offer"
+    logical_replication_offer = "logical-replication-offer"
   }
 }
 
@@ -24,6 +25,7 @@ output "requires" {
     s3_parameters       = "s3-parameters"
     ldap                = "ldap"
     tracing             = "tracing"
+    logical_replication = "logical-replication"
   }
 }
 
