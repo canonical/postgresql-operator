@@ -133,6 +133,7 @@ from single_kernel_postgresql.managers.database import DatabaseManager
 from single_kernel_postgresql.managers.logical_replication import LogicalReplicationManager
 from single_kernel_postgresql.managers.observer import ObserverManager
 from single_kernel_postgresql.managers.patroni import PatroniManager
+from single_kernel_postgresql.managers.raft import RaftManager
 from single_kernel_postgresql.managers.refresh import RefreshManager
 from single_kernel_postgresql.managers.restore import RestoreManager
 from single_kernel_postgresql.managers.tls import TLSManager
@@ -162,20 +163,18 @@ from single_kernel_postgresql.utils.s3 import S3Client
 from single_kernel_postgresql.workload.vm import VMWorkload
 from tenacity import RetryError, Retrying, stop_after_attempt, stop_after_delay, wait_fixed
 
-if TYPE_CHECKING:
-    from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
-
-from cluster import Patroni
-from cluster_topology_observer import start_raft_observer
 from constants import (
     MONITORING_SNAP_SERVICE,
     PGBACKREST_MONITORING_SNAP_SERVICE,
     POSTGRESQL_DATA_DIR,
-    RAFT_PARTNER_PREFIX,
     RAFT_PORT,
     TEMP_DATA_DIR,
     UPDATE_CERTS_BIN_PATH,
 )
+
+if TYPE_CHECKING:
+    from single_kernel_postgresql.charms.abstract_charm import AbstractPostgreSQLCharm
+
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -283,7 +282,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.cluster_manager = ClusterManager(state=self.state, workload=self.workload)
         self.observer_manager = ObserverManager(state=self.state, workload=self.workload)
 
-        self.framework.observe(self.on.raft_reconnect, self._on_raft_reconnect)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -417,6 +415,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
+        self.raft_manager = RaftManager(
+            state=self.state,
+            workload=self.workload,
+            patroni_manager=self.patroni_manager,
+            watcher_handler=self.watcher_handler,
+            update_config=self.update_config,
+            set_unit_status=self.set_unit_status,
+            peer_relation_changed=self.on[PEER_RELATION].relation_changed,
+            remove_from_members_ips=self._remove_from_members_ips,
+        )
         self.observer_handler = ObserverEventsHandler(
             self,  # type: ignore
             workload=self.workload,
@@ -424,6 +432,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             async_replication_manager=self.async_replication_manager,
             database_manager=self.database_manager,
             patroni_manager=self.patroni_manager,
+            raft_manager=self.raft_manager,
             tls_manager=self.tls_manager,
             watcher_handler=self.watcher_handler,
         )
@@ -809,12 +818,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if not primary_endpoint:
                 logger.warning(f"Missing primary IP for {primary}")
                 primary_endpoint = None
-            elif primary_endpoint not in self._units_ips:
+            elif primary_endpoint not in self.state.units_ips:
                 if len(self._peers.units) == 0:
                     logger.info(
                         f"The unit didn't join {PEER_RELATION} relation? Using {primary_endpoint}"
                     )
-                elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                elif len(self.state.units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
                 else:
                     logger.debug("Early exit primary_endpoint: Primary IP not in cached peer list")
@@ -866,7 +875,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return True
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_peer_relation_departed: Raft recovery in progress")
             return True
         return False
@@ -882,7 +891,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # checked for none in the early exit method
             departing_member = event.departing_unit.name.replace("/", "-")  # type: ignore
             if member_ip := self.patroni_manager.get_member_ip(departing_member):
-                self._patroni.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
+                self.raft_manager.remove_raft_member(f"{member_ip}:{RAFT_PORT}")
         except RemoveRaftMemberFailedError:
             logger.debug(
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
@@ -1023,7 +1032,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ) and "raft_stopped" not in self.unit_peer_data:
                 self.unit_peer_data.pop("raft_stuck", None)
                 self.unit_peer_data.pop("raft_candidate", None)
-                self._patroni.remove_raft_data()
+                self.raft_manager.remove_raft_data()
                 logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
                 self.watcher_handler.disable_watcher()
@@ -1041,7 +1050,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 self.set_unit_status(MaintenanceStatus("Reinitialising raft"))
                 logger.info(f"Reinitialising {self.unit.name} as primary")
-                self._patroni.reinitialise_raft_data()
+                self.raft_manager.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
 
             if self.unit.is_leader():
@@ -1058,14 +1067,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
 
-    def has_raft_keys(self):
-        """Checks for the presence of raft recovery keys in peer data."""
-        for key in self.app_peer_data:
-            if key.startswith("raft_"):
-                return True
-
-        return any(key.startswith("raft_") for key in self.unit_peer_data)
-
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
@@ -1074,7 +1075,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Check whether raft is stuck.
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             self._raft_reinitialisation()
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
@@ -1230,7 +1231,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             Whether it was possible to reconfigure the cluster.
         """
         # Remove departing units when the leader changes.
-        if self.is_cluster_initialised and not self._patroni.cleanup_raft_cluster():
+        if self.is_cluster_initialised and not self.raft_manager.cleanup_raft_cluster():
             logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
             return False
         try:
@@ -1295,7 +1296,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # to avoid the unnecessary reconfiguration.
             if (
                 self.patroni_manager.cluster_members == self._hosts
-                and self._units_ips <= self.members_ips
+                and self.state.units_ips <= self.members_ips
             ):
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
@@ -1306,7 +1307,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
 
-            if missing_ips := self._units_ips - self.members_ips:
+            if missing_ips := self.state.units_ips - self.members_ips:
                 for ip in missing_ips:
                     logger.info("Adding new IP %s to the members list", ip)
                     self._add_to_members_ips(ip)
@@ -1386,11 +1387,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             return len(self._hosts)
 
-    @cached_property
-    def _patroni(self) -> Patroni:
-        """Returns an instance of the Patroni object."""
-        return Patroni(self, self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY))
-
     @property
     def is_connectivity_enabled(self) -> bool:
         """Return whether this unit can be connected externally."""
@@ -1446,24 +1442,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return addresses
 
     @property
-    def _units_ips(self) -> set[str]:
-        """Fetch current list of peers IPs.
-
-        Returns:
-            A list of peers addresses (strings).
-        """
-        # Get all members IPs and remove the current unit IP from the list.
-        addresses = set()
-
-        if self.state.unit_ip:
-            addresses.add(self.state.unit_ip)
-        if self._peers:
-            for unit in self._peers.units:
-                if ip := self._get_unit_ip(unit):
-                    addresses.add(ip)
-        return addresses
-
-    @property
     def members_ips(self) -> set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
         if not self._peers:
@@ -1515,48 +1493,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 updates[key] = val
         self.unit_peer_data.update(updates)
         self.watcher_handler.update_endpoints()
-
-    def _on_raft_reconnect(self, _) -> None:
-        raft_status = self._patroni.get_raft_status()
-        logger.debug(f"Local raft status: {raft_status}")
-        if (
-            not raft_status
-            or not self.state.unit_ip
-            or not self.is_cluster_initialised
-            or self.state.unit_ip not in self.members_ips
-            or self.has_raft_keys()
-            or (not self.members_ips and not self.watcher_handler.watcher_raft_address)
-        ):
-            return
-
-        if all(
-            raft_status[partner] == 2
-            for partner in raft_status
-            if partner.startswith(RAFT_PARTNER_PREFIX)
-        ):
-            logger.debug("All raft members are active.")
-            return
-
-        logger.info("Potentially stuck Raft connection detected. Re-adding Raft member.")
-        local_addr = f"{self.state.unit_ip}:{RAFT_PORT}"
-        remote_addr = (
-            watcher_addr
-            if (watcher_addr := self.watcher_handler.watcher_raft_address)
-            and self.watcher_handler.is_active
-            else f"{next(member for member in self.members_ips if member != self.state.unit_ip)}:{RAFT_PORT}"
-        )
-        try:
-            self._patroni.remove_raft_member(
-                local_addr, remote_address=remote_addr, set_raft_flags=False
-            )
-        except Exception:
-            logger.exception("Unable to remove Raft member")
-            return
-        try:
-            self._patroni.add_raft_member(local_addr, remote_address=remote_addr)
-        except Exception:
-            logger.exception("Unable to add Raft member")
-            return
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -1613,7 +1549,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.set_secret(APP_SCOPE, key, new_password())
                     logger.info(f"Generated new password for {key}")
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             self._raft_reinitialisation()
             return
 
@@ -1772,7 +1708,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _get_ips_to_remove(self) -> set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
-        current = self._units_ips
+        current = self.state.units_ips
         return old - current
 
     def _can_start(self, event: StartEvent) -> bool:
@@ -1788,7 +1724,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_start: Raft recovery in process")
             return False
 
@@ -1829,7 +1765,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ModelError:
             logger.exception("failed to open port")
 
-        start_raft_observer()
+        self.observer_manager.start_raft_observer()
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -2141,14 +2077,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def promote_primary_unit(self, event: ActionEvent) -> None:
         """Handles promote to primary for unit scope."""
         if event.params.get("force"):
-            if self.has_raft_keys():
+            if self.state.has_raft_keys():
                 self.unit_peer_data.update({"raft_candidate": "True"})
                 if self.unit.is_leader():
                     self._raft_reinitialisation()
                 return
             event.fail("Raft is not stuck")
         else:
-            if self.has_raft_keys():
+            if self.state.has_raft_keys():
                 event.fail("Raft is stuck. Set force to reinitialise with new primary")
                 return
             try:
@@ -2279,7 +2215,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.is_cluster_initialised:
             return False
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_update_status: Raft recovery in progress")
             return False
 
@@ -2372,7 +2308,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 or self.is_standby_leader
             ):
                 danger_state = ""
-                if not self._patroni.has_raft_quorum():
+                if not self.raft_manager.has_raft_quorum():
                     danger_state = " (read-only)"
                 elif len(self.patroni_manager.get_running_cluster_members()) < self._planned_units:
                     danger_state = " (degraded)"
