@@ -220,7 +220,7 @@ jobs:
           # sudo needed since spread runs scripts as root
           # "testing" is default model created by concierge
           sudo juju switch testing
-          mkdir ~/logs/
+          mkdir -p ~/logs/
       - name: juju status
         timeout-minutes: 1
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
