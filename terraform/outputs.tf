@@ -8,10 +8,10 @@ output "application_name" {
 
 output "provides" {
   value = {
-    database          = "database"
-    cos_agent         = "cos-agent"
-    replication_offer = "replication-offer"
-    watcher_offer     = "watcher-offer"
+    database                  = "database"
+    cos_agent                 = "cos-agent"
+    replication_offer         = "replication-offer"
+    watcher_offer             = "watcher-offer"
     logical_replication_offer = "logical-replication-offer"
   }
 }
