@@ -801,12 +801,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if not primary_endpoint:
                 logger.warning(f"Missing primary IP for {primary}")
                 primary_endpoint = None
-            elif primary_endpoint not in self._units_ips:
+            elif primary_endpoint not in self.state.units_ips:
                 if len(self._peers.units) == 0:
                     logger.info(
                         f"The unit didn't join {PEER_RELATION} relation? Using {primary_endpoint}"
                     )
-                elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                elif len(self.state.units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
                 else:
                     logger.debug("Early exit primary_endpoint: Primary IP not in cached peer list")
@@ -858,7 +858,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return True
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_peer_relation_departed: Raft recovery in progress")
             return True
         return False
@@ -1050,14 +1050,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
 
-    def has_raft_keys(self):
-        """Checks for the presence of raft recovery keys in peer data."""
-        for key in self.app_peer_data:
-            if key.startswith("raft_"):
-                return True
-
-        return any(key.startswith("raft_") for key in self.unit_peer_data)
-
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
@@ -1066,7 +1058,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Check whether raft is stuck.
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             self._raft_reinitialisation()
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
@@ -1277,7 +1269,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # to avoid the unnecessary reconfiguration.
             if (
                 self.patroni_manager.cluster_members == self._hosts
-                and self._units_ips <= self.members_ips
+                and self.state.units_ips <= self.members_ips
             ):
                 logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
@@ -1288,7 +1280,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
 
-            if missing_ips := self._units_ips - self.members_ips:
+            if missing_ips := self.state.units_ips - self.members_ips:
                 for ip in missing_ips:
                     logger.info("Adding new IP %s to the members list", ip)
                     self._add_to_members_ips(ip)
@@ -1423,24 +1415,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return addresses
 
     @property
-    def _units_ips(self) -> set[str]:
-        """Fetch current list of peers IPs.
-
-        Returns:
-            A list of peers addresses (strings).
-        """
-        # Get all members IPs and remove the current unit IP from the list.
-        addresses = set()
-
-        if self.state.unit_ip:
-            addresses.add(self.state.unit_ip)
-        if self._peers:
-            for unit in self._peers.units:
-                if ip := self._get_unit_ip(unit):
-                    addresses.add(ip)
-        return addresses
-
-    @property
     def members_ips(self) -> set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
         if not self._peers:
@@ -1548,7 +1522,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.set_secret(APP_SCOPE, key, new_password())
                     logger.info(f"Generated new password for {key}")
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             self._raft_reinitialisation()
             return
 
@@ -1707,7 +1681,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _get_ips_to_remove(self) -> set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
-        current = self._units_ips
+        current = self.state.units_ips
         return old - current
 
     def _can_start(self, event: StartEvent) -> bool:
@@ -1723,7 +1697,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_start: Raft recovery in process")
             return False
 
@@ -2076,14 +2050,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def promote_primary_unit(self, event: ActionEvent) -> None:
         """Handles promote to primary for unit scope."""
         if event.params.get("force"):
-            if self.has_raft_keys():
+            if self.state.has_raft_keys():
                 self.unit_peer_data.update({"raft_candidate": "True"})
                 if self.unit.is_leader():
                     self._raft_reinitialisation()
                 return
             event.fail("Raft is not stuck")
         else:
-            if self.has_raft_keys():
+            if self.state.has_raft_keys():
                 event.fail("Raft is stuck. Set force to reinitialise with new primary")
                 return
             try:
@@ -2212,7 +2186,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.is_cluster_initialised:
             return False
 
-        if self.has_raft_keys():
+        if self.state.has_raft_keys():
             logger.debug("Early exit on_update_status: Raft recovery in progress")
             return False
 

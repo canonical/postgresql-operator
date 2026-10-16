@@ -197,7 +197,7 @@ def test_patroni_scrape_config(harness):
 def test_primary_endpoint(harness):
     with (
         patch(
-            "charm.PostgresqlOperatorCharm._units_ips",
+            "charm.CharmState.units_ips",
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
@@ -219,7 +219,7 @@ def test_primary_endpoint_no_peers(harness):
             "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None
         ),
         patch(
-            "charm.PostgresqlOperatorCharm._units_ips",
+            "charm.CharmState.units_ips",
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
