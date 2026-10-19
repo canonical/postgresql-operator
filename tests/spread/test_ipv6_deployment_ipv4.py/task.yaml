@@ -1,0 +1,10 @@
+summary: test_ipv6_deployment.py with IPv4-only networking
+environment:
+  TEST_MODULE: test_ipv6_deployment.py
+  PG_IP_FAMILY: ipv4
+execute: |
+  # Regression guard: no IPv6 on the bridge, the charm must work as before.
+  lxc network set lxdbr0 ipv6.address=none
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results
