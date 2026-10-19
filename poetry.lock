@@ -101,7 +101,7 @@ version = "26.1.0"
 description = "Classes Without Boilerplate"
 optional = false
 python-versions = ">=3.9"
-groups = ["charm-libs", "integration", "unit"]
+groups = ["main", "charm-libs", "integration", "unit"]
 files = [
     {file = "attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"},
     {file = "attrs-26.1.0.tar.gz", hash = "sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32"},
@@ -505,27 +505,6 @@ files = [
 ops = ">=2.19,<4"
 
 [[package]]
-name = "charmlibs-rollingops"
-version = "1.1.5"
-description = "The charmlibs.rollingops package."
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = [
-    {file = "charmlibs_rollingops-1.1.5-py3-none-any.whl", hash = "sha256:531979aa8b7fa847bedb2a41847aff9a37e5a92250373a0862da518ce13256a7"},
-    {file = "charmlibs_rollingops-1.1.5.tar.gz", hash = "sha256:3e278fb3628f4c08dcbcbcf4c029b650d6f07ce420c3902bbd31c6c873546d55"},
-]
-
-[package.dependencies]
-charmlibs-interfaces-tls-certificates = ">=1.8.1"
-charmlibs-pathops = ">=1.2.1"
-dpcharmlibs-interfaces = ">=1.1.0"
-ops = ">=2.23.1,<4"
-pydantic = ">=2.12.5"
-shortuuid = ">=1.0.13"
-tenacity = "*"
-
-[[package]]
 name = "charmlibs-snap"
 version = "1.0.1.post0"
 description = "The charmlibs.snap package."
@@ -769,7 +748,7 @@ version = "1.11.3"
 description = "Utils for COS Lite charms"
 optional = false
 python-versions = ">=3.8"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "cosl-1.11.3-py3-none-any.whl", hash = "sha256:5e808110ff0337cc0448bb3aa69e7656de7933a481651f84a2b8681ccd915eab"},
     {file = "cosl-1.11.3.tar.gz", hash = "sha256:4ff7df6fbec733318aacd064c230690aaa6a7a21f6fdcf9c8f180bfaeabffb83"},
@@ -1034,28 +1013,11 @@ version = "5.6.3"
 description = "Disk Cache -- Disk and file backed persistent cache."
 optional = false
 python-versions = ">=3"
-groups = ["charm-libs"]
+groups = ["main", "charm-libs"]
 files = [
     {file = "diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19"},
     {file = "diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc"},
 ]
-
-[[package]]
-name = "dpcharmlibs-interfaces"
-version = "1.2.2"
-description = "The dpcharmlibs.interfaces package."
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = [
-    {file = "dpcharmlibs_interfaces-1.2.2-py3-none-any.whl", hash = "sha256:8038c4616781bafb178c504a23b55c473af5a96fb9fbd25b7911addbbc5abd31"},
-    {file = "dpcharmlibs_interfaces-1.2.2.tar.gz", hash = "sha256:9600e4c61a523abc70676b14f26eb37913d9ea98c1d2ad643bf72b778ca41e3e"},
-]
-
-[package.dependencies]
-cryptography = ">=48.0.0"
-ops = ">=3,<4"
-pydantic = ">=2.11,<3"
 
 [[package]]
 name = "dunamai"
@@ -1459,7 +1421,7 @@ version = "4.26.0"
 description = "An implementation of JSON Schema validation for Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["charm-libs", "unit"]
+groups = ["main", "charm-libs", "unit"]
 files = [
     {file = "jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"},
     {file = "jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326"},
@@ -1481,7 +1443,7 @@ version = "2025.9.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
 optional = false
 python-versions = ">=3.9"
-groups = ["charm-libs", "unit"]
+groups = ["main", "charm-libs", "unit"]
 files = [
     {file = "jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"},
     {file = "jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d"},
@@ -2187,42 +2149,49 @@ testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "postgresql-charms-single-kernel"
-version = "16.3.19"
+version = "16.3.20"
 description = "Shared and reusable code for PostgreSQL-related charms"
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = ">=3.8,<4.0"
 groups = ["main", "integration"]
 files = [
-    {file = "postgresql_charms_single_kernel-16.3.19-py3-none-any.whl", hash = "sha256:b135baab5b8b827e83d0feecebb9d34e909ab4382adde88623eeeaf39ced53fa"},
-    {file = "postgresql_charms_single_kernel-16.3.19.tar.gz", hash = "sha256:dc1fe229488bda6650a29422b7a87a1db3a55131b1cf21ddaad6ad6d9087d83f"},
+    {file = "942e4c84.tar.gz", hash = "sha256:5ca34da81be2048ccf76fa040f4b3f9e7e4e28c48ac6b893dcd29de9370d7b56"},
 ]
 
 [package.dependencies]
-boto3 = {version = ">=1.43.85", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-botocore = {version = ">=1.43.85", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-charm-refresh = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-charmlibs-interfaces-tls-certificates = {version = ">=1.8.3", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-charmlibs-pathops = {version = ">=1.0.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-charmlibs-rollingops = {version = ">=1.1.1", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-charmlibs-snap = {version = ">=1.0.1,<2", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"vm\""}
-charmlibs-systemd = {version = ">=1.0.0.post0", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"vm\""}
+boto3 = {version = ">=1.43.85", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+botocore = {version = ">=1.43.85", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+charm-refresh = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+charmlibs-interfaces-tls-certificates = {version = ">=1.8.3", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+charmlibs-pathops = {version = ">=1.0.1", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+charmlibs-snap = {version = ">=1.0.1,<2", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
+charmlibs-systemd = {version = ">=1.0.0.post0", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
+cosl = {version = ">=0.0.53", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
 cryptography = ">=42.0.0"
-data-platform-helpers = {version = ">=0.1.7", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-httpx = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-jinja2 = {version = ">=3.1.6", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-ops = ">=2.0.0"
-psutil = {version = ">=7.2.2", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"vm\""}
-pydantic = {version = ">=2.0", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
-pysyncobj = {version = ">=0.3.15", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"vm\""}
-requests = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+data-platform-helpers = {version = ">=0.1.7", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+httpx = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+jinja2 = {version = ">=3.1.6", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+jsonschema = {version = ">=4.0.0", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+ops = [
+    {version = ">=2.0.0"},
+    {version = ">=2.0.0", extras = ["tracing"], optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""},
+]
+psutil = {version = ">=7.2.2", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
+pydantic = {version = ">=2.0", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
+pysyncobj = {version = ">=0.3.15", optional = true, markers = "python_version >= \"3.12\" and extra == \"vm\""}
+requests = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
 tenacity = ">=9.0.0"
-tomli = {version = "*", optional = true, markers = "python_full_version >= \"3.12.0\" and extra == \"postgresql\""}
+tomli = {version = "*", optional = true, markers = "python_version >= \"3.12\" and extra == \"postgresql\""}
 
 [package.extras]
 db-driver = ["psycopg2 (>=2.9.10)"]
-k8s = ["lightkube (>=0.21.0) ; python_full_version >= \"3.12.0\"", "lightkube-models (>=1.28.1.4) ; python_full_version >= \"3.12.0\""]
-postgresql = ["boto3 (>=1.43.85) ; python_full_version >= \"3.12.0\"", "botocore (>=1.43.85) ; python_full_version >= \"3.12.0\"", "charm-refresh ; python_full_version >= \"3.12.0\"", "charmlibs-interfaces-tls-certificates (>=1.8.3) ; python_full_version >= \"3.12.0\"", "charmlibs-pathops (>=1.0.1) ; python_full_version >= \"3.12.0\"", "charmlibs-rollingops (>=1.1.1) ; python_full_version >= \"3.12.0\"", "data-platform-helpers (>=0.1.7) ; python_full_version >= \"3.12.0\"", "httpx ; python_full_version >= \"3.12.0\"", "jinja2 (>=3.1.6) ; python_full_version >= \"3.12.0\"", "pydantic (>=2.0) ; python_full_version >= \"3.12.0\"", "requests ; python_full_version >= \"3.12.0\"", "tomli ; python_full_version >= \"3.12.0\""]
-vm = ["charmlibs-snap (>=1.0.1,<2) ; python_full_version >= \"3.12.0\"", "charmlibs-systemd (>=1.0.0.post0) ; python_full_version >= \"3.12.0\"", "psutil (>=7.2.2) ; python_full_version >= \"3.12.0\"", "pysyncobj (>=0.3.15) ; python_full_version >= \"3.12.0\""]
+k8s = ["cosl (>=0.0.53) ; python_version >= \"3.12\"", "lightkube (>=0.21.0) ; python_version >= \"3.12\"", "lightkube-models (>=1.28.1.4) ; python_version >= \"3.12\""]
+postgresql = ["boto3 (>=1.43.85) ; python_version >= \"3.12\"", "botocore (>=1.43.85) ; python_version >= \"3.12\"", "charm-refresh ; python_version >= \"3.12\"", "charmlibs-interfaces-tls-certificates (>=1.8.3) ; python_version >= \"3.12\"", "charmlibs-pathops (>=1.0.1) ; python_version >= \"3.12\"", "data-platform-helpers (>=0.1.7) ; python_version >= \"3.12\"", "httpx ; python_version >= \"3.12\"", "jinja2 (>=3.1.6) ; python_version >= \"3.12\"", "jsonschema (>=4.0.0) ; python_version >= \"3.12\"", "ops[tracing] (>=2.0.0) ; python_version >= \"3.12\"", "pydantic (>=2.0) ; python_version >= \"3.12\"", "requests ; python_version >= \"3.12\"", "tomli ; python_version >= \"3.12\""]
+vm = ["charmlibs-snap (>=1.0.1,<2) ; python_version >= \"3.12\"", "charmlibs-systemd (>=1.0.0.post0) ; python_version >= \"3.12\"", "cosl (>=0.0.53) ; python_version >= \"3.12\"", "psutil (>=7.2.2) ; python_version >= \"3.12\"", "pysyncobj (>=0.3.15) ; python_version >= \"3.12\""]
+
+[package.source]
+type = "url"
+url = "https://github.com/canonical/postgresql-single-kernel-library/archive/942e4c84.tar.gz"
 
 [[package]]
 name = "prompt-toolkit"
@@ -2903,7 +2872,7 @@ version = "0.37.0"
 description = "JSON Referencing + Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["charm-libs", "unit"]
+groups = ["main", "charm-libs", "unit"]
 files = [
     {file = "referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231"},
     {file = "referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8"},
@@ -2980,7 +2949,7 @@ version = "2026.9.1"
 description = "Python bindings to Rust's persistent data structures (rpds)"
 optional = false
 python-versions = ">=3.11"
-groups = ["charm-libs", "unit"]
+groups = ["main", "charm-libs", "unit"]
 files = [
     {file = "rpds_py-2026.9.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:2711d29b653b3bce48a63d18b9c6b53274669e6d6c4094dddeb4d9a0e45128b2"},
     {file = "rpds_py-2026.9.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3231c4c0e521dafa5be0c9f114ee2c2ad46650836f2d72caa86801950c3e7044"},
@@ -3157,18 +3126,6 @@ botocore = ">=1.37.4,<2.0a0"
 
 [package.extras]
 crt = ["botocore[crt] (>=1.37.4,<2.0a0)"]
-
-[[package]]
-name = "shortuuid"
-version = "1.0.13"
-description = "A generator library for concise, unambiguous and URL-safe UUIDs."
-optional = false
-python-versions = ">=3.6"
-groups = ["main"]
-files = [
-    {file = "shortuuid-1.0.13-py3-none-any.whl", hash = "sha256:a482a497300b49b4953e15108a7913244e1bb0d41f9d332f5e9925dba33a3c5a"},
-    {file = "shortuuid-1.0.13.tar.gz", hash = "sha256:3bb9cf07f606260584b1df46399c0b87dd84773e7b25912b7e391e30797c5e72"},
-]
 
 [[package]]
 name = "six"
@@ -3680,4 +3637,4 @@ h11 = ">=0.16.0,<1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "75b802c48c97b8f1f29706520d95cf0c62394f3362c4697aff06b694a849684e"
+content-hash = "3f7c747e8777a8e7e7bede12570cd9f0fe9956bfb6deb759939a4f55081b4982"
