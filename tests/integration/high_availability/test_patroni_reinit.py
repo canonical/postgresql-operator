@@ -5,8 +5,8 @@
 import logging
 import subprocess
 
-from charmlibs.pathops import LocalPath
 import jubilant
+from charmlibs.pathops import LocalPath
 from jubilant import Juju
 from single_kernel_postgresql.workload.paths.vm import VMPaths
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
