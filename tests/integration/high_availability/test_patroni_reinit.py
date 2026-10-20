@@ -5,11 +5,11 @@
 import logging
 import subprocess
 
+from charmlibs.pathops import LocalPath
 import jubilant
 from jubilant import Juju
+from single_kernel_postgresql.workload.paths.vm import VMPaths
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
-
-from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
@@ -26,6 +26,12 @@ DB_APP_NAME = "postgresql"
 DB_TEST_APP_NAME = "postgresql-test-app"
 
 MINUTE_SECS = 60
+
+# Same path composition the deployed VMWorkload uses.
+_paths = VMPaths(LocalPath("/"), "16")
+PATRONI_CONF_PATH = str(_paths.patroni_conf)
+PATRONI_LOGS_PATH = str(_paths.patroni_logs)
+POSTGRESQL_DATA_DIR = str(_paths.data)
 
 PG_CONTROL_PATH = f"{POSTGRESQL_DATA_DIR}/global/pg_control"
 

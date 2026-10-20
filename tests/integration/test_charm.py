@@ -7,14 +7,17 @@ import logging
 from time import sleep
 from typing import get_args
 
+from charmlibs.pathops import LocalPath
 import psycopg2
 import pytest
 import requests
 from psycopg2 import sql
 from single_kernel_postgresql.config.locales import SNAP_LOCALES
+from single_kernel_postgresql.workload.paths.vm import VMPaths
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
-from constants import POSTGRESQL_DATA_DIR
+# Same path composition the deployed VMWorkload uses.
+POSTGRESQL_DATA_DIR = str(VMPaths(LocalPath("/"), "16").data)
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (
