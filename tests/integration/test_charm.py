@@ -10,10 +10,13 @@ from typing import get_args
 import psycopg2
 import pytest
 import requests
-from charmlibs.pathops import LocalPath
 from psycopg2 import sql
+from single_kernel_postgresql.config.literals import (
+    BASE_SNAP_DIR,
+    SNAP_COMMON,
+    VM_DATA_PATH,
+)
 from single_kernel_postgresql.config.locales import SNAP_LOCALES
-from single_kernel_postgresql.workload.paths.vm import VMPaths
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from .adapters import JujuFixture
@@ -32,8 +35,8 @@ from .jubilant_helpers import (
     switchover,
 )
 
-# Same path composition the deployed VMWorkload uses.
-POSTGRESQL_DATA_DIR = str(VMPaths(LocalPath("/"), "16").data)
+# Same path layout the library's VMPaths composes.
+POSTGRESQL_DATA_DIR = f"{BASE_SNAP_DIR}/{SNAP_COMMON}/{VM_DATA_PATH}/16/main"
 
 logger = logging.getLogger(__name__)
 
