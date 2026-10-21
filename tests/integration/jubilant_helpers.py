@@ -1358,7 +1358,7 @@ def scale_application(
     count: int,
     model: ModelAdapter = None,
     timeout=2000,
-    idle_period: int = 30,
+    idle_period: int = 2,
 ) -> None:
     """Scale a given application to a specific unit count.
 
@@ -1369,6 +1369,13 @@ def scale_application(
         model: The model to scale the application in
         timeout: timeout period
         idle_period: idle period
+
+    The default idle_period is 2s: the model runs with
+    update-status-hook-interval=10s, so libjuju's continuous agent-idle
+    requirement (>= idle_period without an agent-status transition) can never
+    be met with the pre-fix 30s default — update-status hooks cost 8-19s on
+    the pre-repin lib and the units flapped executing/idle every cycle
+    (test_scale_down_and_up 2000s timeouts, round-5 3/3 + round-6 a1).
     """
     if model is None:
         model = juju.ext.model

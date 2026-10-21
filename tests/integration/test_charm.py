@@ -11,10 +11,13 @@ import psycopg2
 import pytest
 import requests
 from psycopg2 import sql
+from single_kernel_postgresql.config.literals import (
+    BASE_SNAP_DIR,
+    SNAP_COMMON,
+    VM_DATA_PATH,
+)
 from single_kernel_postgresql.config.locales import SNAP_LOCALES
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
-
-from constants import POSTGRESQL_DATA_DIR
 
 from .adapters import JujuFixture
 from .jubilant_helpers import (
@@ -31,6 +34,9 @@ from .jubilant_helpers import (
     scale_application,
     switchover,
 )
+
+# Same path layout the library's VMPaths composes.
+POSTGRESQL_DATA_DIR = f"{BASE_SNAP_DIR}/{SNAP_COMMON}/{VM_DATA_PATH}/16/main"
 
 logger = logging.getLogger(__name__)
 
