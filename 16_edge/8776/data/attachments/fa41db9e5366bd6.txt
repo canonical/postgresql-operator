@@ -1,0 +1,189 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator3/0 [idle] active: 
+  data-integrator/0 [idle] active: 
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: Primary
+  postgresql3/0 [executing] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: Primary
+  postgresql3/0 [idle] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  02:20:43Z
+
+App               Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator            active      1  data-integrator  latest/stable  418  no       
+data-integrator3           active      1  data-integrator  latest/stable  418  no       
+postgresql        16.15    active      3  postgresql                        0  no       
+postgresql3       16.15    active      1  postgresql                        2  no       
+
+Unit                 Workload  Agent  Machine  Public address  Ports     Message
+data-integrator3/0*  active    idle   0        10.182.10.228             
+data-integrator/0*   active    idle   1        10.182.10.84              
+postgresql3/0*       active    idle   9        10.182.10.137   5432/tcp  Primary
+postgresql/0         active    idle   6        10.182.10.158   5432/tcp  
+postgresql/1         active    idle   7        10.182.10.52    5432/tcp  
+postgresql/2*        active    idle   8        10.182.10.36    5432/tcp  Primary
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.182.10.228  juju-30e0e9-0  ubuntu@24.04  runnervmxehtw  Running
+1        started  10.182.10.84   juju-30e0e9-1  ubuntu@24.04  runnervmxehtw  Running
+6        started  10.182.10.158  juju-30e0e9-6  ubuntu@24.04  runnervmxehtw  Running
+7        started  10.182.10.52   juju-30e0e9-7  ubuntu@24.04  runnervmxehtw  Running
+8        started  10.182.10.36   juju-30e0e9-8  ubuntu@24.04  runnervmxehtw  Running
+9        started  10.182.10.137  juju-30e0e9-9  ubuntu@24.04  runnervmxehtw  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:49:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:49:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:49:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:49:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:50:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:50:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 01:51:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 01:51:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:51:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:51:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:52:24 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:52:24 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:53:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:53:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql3-0: 01:53:41 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4463c723c0 state=finished raised Exception>]
+machine-4: 01:53:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:53:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql3-0: 01:54:05 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd8dc6941d0 state=finished raised Exception>]
+unit-postgresql3-0: 01:54:12 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f8b9f059ac0 state=finished raised Exception>]
+unit-postgresql-2: 01:54:19 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f33db74fad0 state=finished raised Exception>]
+machine-5: 01:54:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:54:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:54:40 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f2d9d4d8680 state=finished raised Exception>]
+unit-postgresql-2: 01:54:48 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa8845c6330 state=finished raised Exception>]
+machine-3: 01:55:06 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:55:06 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql2-1: 01:56:37 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb2e4155ca0 state=finished raised Exception>]
+unit-postgresql2-1: 01:57:00 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1367758890 state=finished raised Exception>]
+unit-postgresql2-1: 01:57:07 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 486, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql2-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 226, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f998eacc8c0 state=finished raised Exception>]
+unit-postgresql-2: 02:07:28 ERROR unit.postgresql/2.juju-log logical-replication-offer:18: single_kernel_postgresql.managers.logical_replication:Cannot create new publication for logical-replication-offer #18: table public.test_table in database testdb doesn't exist
+unit-postgresql2-1: 02:07:36 ERROR unit.postgresql2/1.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 02:07:55 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: database bad_database doesn't exist
+unit-postgresql2-1: 02:09:00 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql2-1: 02:10:06 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 02:12:20 ERROR unit.postgresql3/0.juju-log logical-replication:19: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+unit-postgresql2-1: 02:15:22 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table in database testdb isn't empty
+unit-postgresql2-1: 02:15:58 ERROR unit.postgresql2/1.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+unit-postgresql-2: 02:18:48 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2 not found (not found)
+unit-postgresql-0: 02:18:48 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2 not found (not found)
+unit-postgresql-1: 02:18:48 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql2 not found (not found)
+unit-postgresql2-1: 02:18:50 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql not found (not found)
+unit-postgresql2-0: 02:18:51 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql not found (not found)
+unit-postgresql2-2: 02:19:00 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#18#postgresql not found (not found)
+machine-5: 02:19:04 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 02:19:04 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 02:19:04 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql2-1: 02:19:14 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#5#postgresql2": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#5#postgresql2 not found (not found)
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:19:18 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-3: 02:19:27 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-postgresql3-0: 02:20:07 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql not found (not found)
+unit-postgresql-0: 02:20:13 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql3": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql3 not found (not found)
+unit-postgresql-1: 02:20:13 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql3": settings d564a1ca-cdbc-4197-8182-d399fb30e0e9:r#19#postgresql3 not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
