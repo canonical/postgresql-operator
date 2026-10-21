@@ -217,6 +217,39 @@ def test_plugins(juju: JujuFixture, charm) -> None:
     connection.close()
 
 
+def test_orafce(juju: JujuFixture) -> None:
+    """Check the orafce lifecycle through the canonical option."""
+    application = juju.ext.model.applications[DATABASE_APP_NAME]
+    original_config = juju.config(DATABASE_APP_NAME).get("plugin-orafce-enable")
+    password = get_password()
+
+    try:
+        for enabled in (True, False, True):
+            application.set_config({"plugin-orafce-enable": str(enabled)})
+            juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+            primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+            address = get_unit_address(juju, primary)
+            with closing(db_connect(host=address, password=password)) as connection:
+                connection.autocommit = True
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'orafce')"
+                    )
+                    assert cursor.fetchone()[0] is enabled
+                    if enabled:
+                        cursor.execute(
+                            "SELECT oracle.add_months(DATE '2005-05-31', 1)::date = DATE '2005-06-30'"
+                        )
+                        assert cursor.fetchone()[0] is True
+    finally:
+        if original_config is None:
+            juju.config(DATABASE_APP_NAME, reset="plugin-orafce-enable")
+        else:
+            application.set_config({"plugin-orafce-enable": str(original_config)})
+        juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+
 def test_plugin_objects(juju: JujuFixture) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
     primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")

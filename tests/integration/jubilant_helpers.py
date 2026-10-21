@@ -1709,3 +1709,43 @@ def instance_ip(juju: JujuFixture, instance: str) -> str:
     for line in output.splitlines():
         if instance in line:
             return line.split()[2]
+
+
+def blocked_on_incompatible_refresh(status: jubilant.Status, app_name: str) -> bool:
+    """Whether the app, refreshed to a local charm, is blocked as "Refresh incompatible".
+
+    charm_refresh blocks when the packed charm's charm version is unreleased (`…postN.dev0+
+    gSHA`), which is the case for every PR CI build. Released-style builds—a nightly run when
+    the branch tip equals the last release tag—are accepted instead and never block.
+    """
+    app = status.apps[app_name]
+    return (
+        app.charm.startswith("local:")
+        and app.is_blocked
+        and "Refresh incompatible" in app.app_status.message
+    )
+
+
+def parse_juju_status_timestamp(timestamp: str) -> datetime:
+    """Parse a juju status timestamp, e.g. `12 Oct 2026 17:36:58-03:00`."""
+    return datetime.strptime(timestamp, "%d %b %Y %H:%M:%S%z")
+
+
+def units_status_reset_after(
+    status: jubilant.Status, app_name: str, stale_sinces: dict[str, str]
+) -> bool:
+    """Whether every unit's workload status was re-set after the statuses in `stale_sinces`.
+
+    Right after `juju refresh` flips the charm origin to `local:`, the app still shows the
+    pre-refresh statuses (the charm's hook starts later)—which are also active and idle—so
+    the statuses' `since` timestamps are what tells a completed refresh apart from the state
+    the old charm left behind.
+    """
+    for unit_name, unit in status.apps[app_name].units.items():
+        since = unit.workload_status.since
+        stale = stale_sinces.get(unit_name, "")
+        if not since or not stale:
+            return False
+        if parse_juju_status_timestamp(since) <= parse_juju_status_timestamp(stale):
+            return False
+    return True

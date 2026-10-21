@@ -45,7 +45,6 @@ from tenacity import RetryError, wait_fixed
 
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
-    PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
     StorageUnavailableError,
 )
@@ -126,8 +125,8 @@ def test_on_install(harness):
 def test_on_storage_detaching(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.ClusterTopologyObserver.stop_observer") as _stop_observer,
-        patch("charm.RotateLogs.stop_log_rotation") as _stop_log_rotation,
+        patch("charm.ObserverManager.stop_observer") as _stop_observer,
+        patch("charm.BackupManager.stop_log_rotation") as _stop_log_rotation,
         patch.object(harness.charm.app, "planned_units") as _planned_units,
     ):
         _selected_snap = _snap_cache.return_value.__getitem__.return_value
@@ -198,7 +197,7 @@ def test_patroni_scrape_config(harness):
 def test_primary_endpoint(harness):
     with (
         patch(
-            "charm.PostgresqlOperatorCharm._units_ips",
+            "charm.CharmState.units_ips",
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
@@ -220,7 +219,7 @@ def test_primary_endpoint_no_peers(harness):
             "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None
         ),
         patch(
-            "charm.PostgresqlOperatorCharm._units_ips",
+            "charm.CharmState.units_ips",
             new_callable=PropertyMock,
             return_value={"1.1.1.1", "1.1.1.2"},
         ),
@@ -469,7 +468,7 @@ def test_enable_disable_extensions_does_not_restore_unsettable_status(harness, u
     with (
         patch("charm.PatroniManager.get_primary") as _get_primary,
         patch("single_kernel_postgresql.core.state.CharmState.unit_ip"),
-        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("charm.RaftManager"),
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(harness.charm, "postgresql", Mock()) as postgresql_mock,
     ):
@@ -520,7 +519,7 @@ def test_on_start_bootstrap_failure(harness):
         patch("charm.TLSManager.generate_internal_peer_cert"),
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -566,7 +565,7 @@ def test_on_start_create_user_error(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -625,7 +624,7 @@ def test_on_start_success(harness):
         ),
         patch.object(harness.charm, "postgresql") as _postgresql,
         patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
@@ -741,7 +740,7 @@ def test_on_start_replica(harness):
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLSManager.generate_internal_peer_cert"),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -807,7 +806,7 @@ def test_on_start_no_patroni_member(harness):
             "single_kernel_postgresql.managers.database.DatabaseManager.get_databases_prefix_mapping",
             return_value={},
         ),
-        patch("charm.start_raft_observer"),
+        patch("charm.ObserverManager.start_raft_observer"),
     ):
         # Mock the passwords.
         _get_postgresql_version.return_value = "16.6"
@@ -825,24 +824,43 @@ def test_on_start_no_patroni_member(harness):
         assert harness.model.unit.status.message == "awaiting for member to start"
 
 
-def test_on_start_after_blocked_state(harness):
+@pytest.mark.parametrize(
+    "scope,raft_flag",
+    [
+        ("unit", "raft_stuck"),
+        ("unit", "raft_candidate"),
+        ("unit", "raft_stopped"),
+        ("unit", "raft_primary"),
+        ("app", "raft_selected_candidate"),
+        ("app", "raft_followers_stopped"),
+        ("app", "raft_reset_primary"),
+        ("app", "raft_rejoin"),
+    ],
+)
+def test_on_start_after_blocked_state(harness, scope, raft_flag):
     with (
         patch("charm.PatroniManager.bootstrap_cluster") as _bootstrap_cluster,
+        patch("charm.PatroniManager.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
     ):
-        # Set an initial blocked status (like after the install hook was triggered).
-        initial_status = BlockedStatus("fake message")
+        # Set an initial blocked status (like after losing the raft quorum before a reboot).
+        initial_status = BlockedStatus("Raft majority loss, run: promote-to-primary")
         harness.model.unit.status = initial_status
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        entity = harness.charm.unit.name if scope == "unit" else harness.charm.app.name
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, entity, {raft_flag: "True"})
 
-        # Test for a failed cluster bootstrapping.
+        # Patroni must not be started while the raft recovery is pending.
         harness.charm.on.start.emit()
         _get_password.assert_not_called()
         _replication_password.assert_not_called()
         _bootstrap_cluster.assert_not_called()
+        _start_patroni.assert_not_called()
         # Assert the status didn't change.
         assert harness.model.unit.status == initial_status
 
@@ -1095,7 +1113,7 @@ def test_ensure_storage_layout_recreates_temp_dir_on_reboot(harness, tmp_path):
 
 def test_on_update_status(harness):
     with (
-        patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
+        patch("charm.ObserverManager.start_observer") as _start_observer,
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
@@ -1193,7 +1211,7 @@ def test_on_update_status(harness):
 
 def test_on_update_status_after_restore_operation(harness):
     with (
-        patch("charm.ClusterTopologyObserver.start_observer"),
+        patch("charm.ObserverManager.start_observer"),
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
@@ -1453,71 +1471,6 @@ def test_update_config_clears_stale_standby_when_primary(harness):
         # standby_cluster must be explicitly cleared (patched to None) so the DCS converges;
         # merely omitting it would leave the stale standby from before the promotion in place.
         assert base_patch["standby_cluster"] is None
-
-
-def test_on_cluster_topology_change(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
-        ) as _primary_endpoint,
-    ):
-        # Mock the property value.
-        _primary_endpoint.side_effect = [None, "1.1.1.1"]
-
-        # Test without an elected primary.
-        harness.charm._on_cluster_topology_change(Mock())
-        _update_relation_endpoints.assert_not_called()
-
-        # Test with an elected primary.
-        harness.charm._on_cluster_topology_change(Mock())
-        _update_relation_endpoints.assert_called_once()
-
-
-def test_on_cluster_topology_change_keep_blocked(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-            return_value=None,
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-    ):
-        harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
-
-        harness.charm._on_cluster_topology_change(Mock())
-
-        _update_relation_endpoints.assert_not_called()
-        _primary_endpoint.assert_called_once_with()
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-        assert harness.model.unit.status.message == PRIMARY_NOT_REACHABLE_MESSAGE
-
-
-def test_on_cluster_topology_change_clear_blocked(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-            return_value="fake-unit",
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-        patch(
-            "charm.PostgresqlOperatorCharm._set_primary_status_message"
-        ) as _set_primary_status_message,
-    ):
-        harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
-
-        harness.charm._on_cluster_topology_change(Mock())
-
-        _update_relation_endpoints.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
-        _set_primary_status_message.assert_called_once_with()
 
 
 def test_validate_config_options(harness):
@@ -1785,7 +1738,9 @@ def test_reconfigure_cluster(harness):
             new_callable=PropertyMock,
             return_value=False,
         ) as _is_cluster_initialised,
-        patch("charm.Patroni.cleanup_raft_cluster", return_value=False) as _cleanup_raft_cluster,
+        patch(
+            "charm.RaftManager.cleanup_raft_cluster", return_value=False
+        ) as _cleanup_raft_cluster,
     ):
         # Cluster not initialised
         mock_event = MagicMock(spec=RelationEvent)
@@ -1911,16 +1866,6 @@ def test_clean_ca_file_from_workload(harness):
         assert harness.charm.clean_ca_file_from_workload("ca-app")
         _unlink.assert_called_once()
         _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
-
-
-def test_juju_run_exec(harness):
-    with (
-        patch("charm.ClusterTopologyObserver") as _topology_observer,
-    ):
-        # Juju 3
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
 
 
 def test_client_relations(harness):
@@ -2079,8 +2024,8 @@ def test_raft_reinitialisation(harness):
         patch(
             "charm.PostgresqlOperatorCharm._stuck_raft_cluster_cleanup"
         ) as _stuck_raft_cluster_cleanup,
-        patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
-        patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
+        patch("charm.RaftManager.remove_raft_data") as _remove_raft_data,
+        patch("charm.RaftManager.reinitialise_raft_data") as _reinitialise_raft_data,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
         patch("charm.PatroniManager.start_patroni"),
@@ -2281,7 +2226,7 @@ def test_on_peer_relation_departed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
-        patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
+        patch("charm.RaftManager.remove_raft_member") as _remove_raft_member,
         patch("single_kernel_postgresql.core.state.CharmState.unit_ip") as _unit_ip,
         patch("charm.PatroniManager.get_member_ip") as _get_member_ip,
     ):
@@ -2481,7 +2426,7 @@ def test_update_new_unit_status(harness):
 @pytest.mark.parametrize("is_leader", [True, False])
 def test_set_primary_status_message(harness, is_leader):
     with (
-        patch("charm.Patroni.has_raft_quorum", return_value=True),
+        patch("charm.RaftManager.has_raft_quorum", return_value=True),
         patch("charm.PatroniManager.get_running_cluster_members", return_value=["test"]),
         patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
         patch(
@@ -2758,16 +2703,6 @@ def test_handle_processes_failures(harness):
         _exists.return_value = True
 
 
-def test_on_databases_change(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-    ):
-        harness.charm._on_databases_change(Mock())
-
-        _update_config.assert_called_once_with()
-        assert "timestamp" in harness.charm.unit_peer_data
-
-
 def test_relations_user_databases_map(harness):
     with (
         patch.object(harness.charm, "postgresql") as _postgresql,
@@ -2866,3 +2801,115 @@ def test_planned_units_survives_goal_state_failure(harness):
         side_effect=ModelError('ERROR saas application "db1" not found'),
     ):
         assert charm._planned_units == len(charm._hosts)
+
+
+def test_on_update_status_pitr_no_reblock_on_stale_fail_id(harness):
+    """Test that a stale bootstrap FATAL does not block a valid PITR restore."""
+    with (
+        patch("charm.ObserverManager.start_observer"),
+        patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.RestoreManager.log_pitr_last_transaction_time"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # A Patroni bootstrap FATAL already observed by the charm (is_new == False).
+        _patroni_logs.return_value = (
+            "2026-10-11 01:58:00 UTC patroni.exceptions.PatroniFatalException:"
+            " Failed to bootstrap cluster"
+        )
+        _member_started.return_value = False
+        _get_member_status.return_value = ""
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.unit.name,
+                {"last_pitr_fail_id": "2026-10-11"},
+            )
+
+        harness.charm.unit.status = ActiveStatus()
+        harness.charm.on.update_status.emit()
+
+        assert harness.charm.unit.status.message != CANNOT_RESTORE_PITR
+
+
+def test_on_update_status_pitr_blocks_on_new_fail(harness):
+    """Test that a NEW bootstrap FATAL blocks with the PITR message."""
+    with (
+        patch("charm.ObserverManager.start_observer"),
+        patch("charm.PatroniManager.patroni_logs") as _patroni_logs,
+        patch("charm.PatroniManager.get_member_status") as _get_member_status,
+        patch("charm.PatroniManager.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.RestoreManager.log_pitr_last_transaction_time"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # A Patroni bootstrap FATAL that the charm has not observed yet.
+        _patroni_logs.return_value = (
+            "2026-10-11 01:58:00 UTC patroni.exceptions.PatroniFatalException:"
+            " Failed to bootstrap cluster"
+        )
+        _member_started.return_value = False
+        _get_member_status.return_value = ""
+
+        harness.charm.unit.status = ActiveStatus()
+        harness.charm.on.update_status.emit()
+
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
+
+
+def test_add_members_does_not_override_blocked_pitr_status(harness):
+    """Test that the reconfigure loop does not override the blocked PITR status."""
+    with (
+        patch("charm.snap.SnapCache"),
+        patch(
+            "charm.PatroniManager.cluster_members", new_callable=PropertyMock
+        ) as _cluster_members,
+        patch("charm.PatroniManager.are_all_members_ready", return_value=False),
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+    ):
+        rel_id = harness.model.get_relation(PEER_RELATION).id
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "restore-to-time": "2023-01-01 09:30:00+00",
+                },
+            )
+        # Patroni API is unreachable: cluster_status returns nothing, so the
+        # reconfigure path is exercised.
+        _cluster_members.return_value = set()
+        peers = harness.model.get_relation(PEER_RELATION)
+        peers.data[harness.charm.unit]["database-peers-address"] = "192.0.2.1"
+
+        harness.charm.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+        mock_event = Mock()
+
+        harness.charm._add_members(mock_event)
+
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
