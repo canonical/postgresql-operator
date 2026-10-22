@@ -1,0 +1,8 @@
+summary: test_versioned_storage_idempotency.py (1 unit)
+environment:
+  TEST_MODULE: high_availability/test_versioned_storage_idempotency.py
+  NUM_UNITS: "1"
+execute: |
+  NUM_UNITS=$NUM_UNITS tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results
