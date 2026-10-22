@@ -1397,9 +1397,7 @@ def test_validate_config_options(harness):
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
         message = (
-            "1 validation error for CharmConfig\n"
-            "response_lc_monetary\n"
-            "  unexpected value; permitted:"
+            "1 validation error for CharmConfig\nresponse_lc_monetary\n  Input should be 'C',"
         )
         assert str(e.value).startswith(message)
 

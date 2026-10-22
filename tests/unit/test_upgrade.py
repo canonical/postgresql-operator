@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 import tenacity
-from charms.data_platform_libs.v0.upgrade import ClusterNotReadyError
+from charms.data_platform_libs.v1.upgrade import ClusterNotReadyError, UpgradeState
 from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
@@ -57,21 +57,21 @@ def test_log_rollback(harness):
 @pytest.mark.parametrize(
     "unit_states,is_cluster_initialised,call",
     [
-        (["ready"], False, False),
-        (["ready", "ready"], True, False),
-        (["idle"], False, False),
-        (["idle"], True, False),
-        (["ready"], True, True),
+        ([UpgradeState.READY], False, False),
+        ([UpgradeState.READY, UpgradeState.READY], True, False),
+        ([UpgradeState.IDLE], False, False),
+        ([UpgradeState.IDLE], True, False),
+        ([UpgradeState.READY], True, True),
     ],
 )
 def test_on_upgrade_charm_check_legacy(harness, unit_states, is_cluster_initialised, call):
     with (
         patch(
-            "charms.data_platform_libs.v0.upgrade.DataUpgrade.state",
+            "charms.data_platform_libs.v1.upgrade.DataUpgrade.state",
             new_callable=PropertyMock(return_value=None),
         ) as _state,
         patch(
-            "charms.data_platform_libs.v0.upgrade.DataUpgrade.unit_states",
+            "charms.data_platform_libs.v1.upgrade.DataUpgrade.unit_states",
             new_callable=PropertyMock(return_value=unit_states),
         ) as _unit_states,
         patch(

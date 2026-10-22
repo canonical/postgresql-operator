@@ -7,11 +7,12 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from charms.data_platform_libs.v0.upgrade import (
+from charms.data_platform_libs.v1.upgrade import (
     ClusterNotReadyError,
     DataUpgrade,
     DependencyModel,
     UpgradeGrantedEvent,
+    UpgradeState,
 )
 from charms.postgresql_k8s.v0.postgresql import ACCESS_GROUPS
 from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
@@ -135,11 +136,11 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.unit_upgrade_data.update({"state": "ready"})
             return
 
-        peers_state = list(filter(lambda state: state != "", self.unit_states))
+        peers_state = list(filter(lambda state: state is not None, self.unit_states))
 
         if (
             len(peers_state) == len(self.peer_relation.units)
-            and (set(peers_state) == {"ready"} or len(peers_state) == 0)
+            and (set(peers_state) == {UpgradeState.READY} or len(peers_state) == 0)
             and self.charm.is_cluster_initialised
         ):
             if self.charm._patroni.member_started:
@@ -263,7 +264,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         if self.peer_relation is None:
             return
         self.peer_relation.data[self.charm.app].update({
-            "dependencies": json.dumps(self.dependency_model.dict())
+            "dependencies": json.dumps(self.dependency_model.model_dump())
         })
         if self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
             self.charm.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
