@@ -7,9 +7,8 @@ import subprocess
 
 import jubilant
 from jubilant import Juju
+from single_kernel_postgresql.config import literals
 from tenacity import Retrying, retry_if_exception, stop_after_delay, wait_fixed
-
-from constants import PATRONI_CONF_PATH, PATRONI_LOGS_PATH, POSTGRESQL_DATA_DIR
 
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
@@ -26,6 +25,13 @@ DB_APP_NAME = "postgresql"
 DB_TEST_APP_NAME = "postgresql-test-app"
 
 MINUTE_SECS = 60
+
+# Same path layout the library's VMPaths composes.
+PATRONI_CONF_PATH = f"{literals.BASE_SNAP_DIR}/{literals.SNAP_DATA}/{literals.PATRONI_CONF_PATH}"
+PATRONI_LOGS_PATH = f"{literals.BASE_SNAP_DIR}/{literals.SNAP_COMMON}/{literals.PATRONI_LOGS_PATH}"
+POSTGRESQL_DATA_DIR = (
+    f"{literals.BASE_SNAP_DIR}/{literals.SNAP_COMMON}/{literals.VM_DATA_PATH}/16/main"
+)
 
 PG_CONTROL_PATH = f"{POSTGRESQL_DATA_DIR}/global/pg_control"
 

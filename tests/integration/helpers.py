@@ -29,6 +29,7 @@ from tenacity import (
     RetryError,
     Retrying,
     retry,
+    retry_if_exception,
     retry_if_result,
     stop_after_attempt,
     stop_after_delay,
@@ -1211,6 +1212,23 @@ def wait_for_relation_removed_between(
 ### Ported Mysql jubilant helpers
 
 
+SWEEP_CONNECT_RETRY_BUDGET = 600
+"""Seconds the sweep connect may keep retrying a refused connection.
+
+Sized for the observed pending-restart window: a member carrying a
+pending-restart max_replication_slots change stayed unreachable for >=6
+minutes (round-5 async_replication RCA; round-6 attempt-1 exhausted the
+original 60s budget at the same surface).
+"""
+
+
+def _is_connection_refused(error: BaseException) -> bool:
+    """Whether the error is a transient connection refusal (e.g. unit still starting)."""
+    return (
+        isinstance(error, psycopg2.OperationalError) and "connection refused" in str(error).lower()
+    )
+
+
 def execute_queries_on_unit(
     unit_address: str, username: str, password: str, queries: list[str], database: str
 ) -> list:
@@ -1226,10 +1244,18 @@ def execute_queries_on_unit(
     Returns:
         A list of rows that were potentially queried
     """
+    for attempt in Retrying(
+        stop=stop_after_delay(SWEEP_CONNECT_RETRY_BUDGET),
+        wait=wait_fixed(5),
+        retry=retry_if_exception(_is_connection_refused),
+        reraise=True,
+    ):
+        with attempt:
+            connection = psycopg2.connect(
+                f"dbname='{database}' user='{username}' host='{unit_address}' password='{password}' connect_timeout=10"
+            )
     with (
-        psycopg2.connect(
-            f"dbname='{database}' user='{username}' host='{unit_address}' password='{password}' connect_timeout=10"
-        ) as connection,
+        connection,
         connection.cursor() as cursor,
     ):
         for query in queries:
