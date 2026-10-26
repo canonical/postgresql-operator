@@ -6,6 +6,7 @@ from asyncio import gather
 
 import pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     APPLICATION_NAME,
@@ -24,6 +25,10 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 charm = None
+
+
+class ClusterNotReadyError(Exception):
+    """The Patroni cluster view is not coherent enough to sample roles."""
 
 
 @pytest.mark.abort_on_fail
@@ -56,9 +61,18 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
 async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
-    original_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
+    # wait_for_idle can pass while a standby is still creating its replica.
+    original_roles = None
+    try:
+        for attempt in Retrying(stop=stop_after_delay(60 * 10), wait=wait_fixed(10)):
+            with attempt:
+                original_roles = await get_cluster_roles(
+                    ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+                )
+                if not original_roles["sync_standbys"]:
+                    raise ClusterNotReadyError()
+    except RetryError:
+        pytest.fail("no sync_standby member appeared within 10 minutes of deployment")
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting primary")
     primary = await get_primary(ops_test, app)

@@ -2,9 +2,10 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_fixed
+from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
 
 from ..helpers import (
     APPLICATION_NAME,
@@ -141,17 +142,26 @@ async def test_no_data_replicated_between_clusters(
     # Verify that the data from the first cluster wasn't replicated to the second cluster.
     password = await get_password(ops_test, database_app_name=new_cluster_app)
     for unit in ops_test.model.applications[new_cluster_app].units:
-        try:
-            with (
-                db_connect(host=unit.public_address, password=password) as connection,
-                connection.cursor() as cursor,
-            ):
-                cursor.execute(
-                    "SELECT EXISTS (SELECT FROM information_schema.tables"
-                    " WHERE table_schema = 'public' AND table_name = 'continuous_writes');"
-                )
-                assert not cursor.fetchone()[0], (
-                    "table 'continuous_writes' was replicated to the second cluster"
-                )
-        finally:
-            connection.close()
+        for attempt in Retrying(
+            stop=stop_after_delay(120),
+            wait=wait_fixed(3),
+            retry=retry_if_exception_type((psycopg2.InterfaceError, psycopg2.OperationalError)),
+            reraise=True,
+        ):
+            with attempt:
+                connection = None
+                try:
+                    with (
+                        db_connect(host=unit.public_address, password=password) as connection,
+                        connection.cursor() as cursor,
+                    ):
+                        cursor.execute(
+                            "SELECT EXISTS (SELECT FROM information_schema.tables"
+                            " WHERE table_schema = 'public' AND table_name = 'continuous_writes');"
+                        )
+                        assert not cursor.fetchone()[0], (
+                            "table 'continuous_writes' was replicated to the second cluster"
+                        )
+                finally:
+                    if connection is not None:
+                        connection.close()

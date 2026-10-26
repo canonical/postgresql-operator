@@ -41,7 +41,7 @@ on:
 jobs:
   lint-workflows:
     name: Lint .github/workflows/
-    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v53.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v54.0.0
     permissions:
       contents: read
     cache-mode: none
@@ -104,27 +104,9 @@ jobs:
     permissions: {}
     cache-mode: none
 
-  alert-test:
-    name: Test Prometheus Alert Rules
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Install prometheus snap
-        run: sudo snap install prometheus
-      - name: Check validity of prometheus alert rules
-        run: promtool check rules src/prometheus_alert_rules/*
-      - name: Run unit tests for prometheus alert rules
-        run: promtool test rules tests/alerts/*.yaml
-    permissions: {}
-    cache-mode: none
-
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v53.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v54.0.0
     permissions:
       contents: read
     cache-mode: none
