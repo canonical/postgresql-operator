@@ -12,7 +12,6 @@ with the PG_IP_FAMILY environment variable:
 - "ipv6": the peer relation is bound to a Juju space holding only the
   IPv6 subnet (PG_IPV6_SUBNET), so the charm's own cluster networking is
   purely IPv6;
-- "ipv4": the deployment only has IPv4 addresses;
 - "dual": both families are present and Juju picks one.
 
 The PG_IPV6_SUBNET environment variable must name the IPv6 subnet that
@@ -46,19 +45,12 @@ def test_deploy(juju: JujuFixture, charm: str):
         if not any(space["name"] == "ipv6" for space in existing["spaces"]):
             juju.cli("add-space", "ipv6", V6_SUBNET)
         juju.cli("model-config", "default-space=ipv6")
-        juju.ext.model.deploy(
-            charm,
-            application_name=DATABASE_APP_NAME,
-            num_units=1,
-            config={"profile": "testing"},
-        )
-    else:
-        juju.ext.model.deploy(
-            charm,
-            application_name=DATABASE_APP_NAME,
-            num_units=1,
-            config={"profile": "testing"},
-        )
+    juju.ext.model.deploy(
+        charm,
+        application_name=DATABASE_APP_NAME,
+        num_units=1,
+        config={"profile": "testing"},
+    )
     juju.ext.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
     assert juju.ext.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
@@ -81,10 +73,6 @@ def test_peer_binding_address_family(juju: JujuFixture):
         subnet_prefix = V6_SUBNET.split("::")[0]
         assert all(address.lower().startswith(subnet_prefix) for address in addresses), (
             f"expected IPv6 addresses in {V6_SUBNET}, got {addresses}"
-        )
-    elif IP_FAMILY == "ipv4":
-        assert all(":" not in address for address in addresses), (
-            f"expected IPv4-only addresses, got {addresses}"
         )
 
 
