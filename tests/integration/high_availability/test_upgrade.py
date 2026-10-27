@@ -11,6 +11,7 @@ import jubilant
 import tomli
 import tomli_w
 from jubilant import Juju
+from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
 
 from ..helpers import execute_queries_on_unit
 from .high_availability_helpers_new import (
@@ -69,7 +70,16 @@ def test_pre_refresh_check(juju: Juju) -> None:
     db_leader = get_app_leader(juju, DB_APP_NAME)
 
     logging.info("Run pre-refresh-check action")
-    juju.run(unit=db_leader, action="pre-refresh-check")
+    # Units can report active before all replicas have joined the Patroni cluster,
+    # so retry until the check passes.
+    for attempt in Retrying(
+        retry=retry_if_exception_type(jubilant.TaskError),
+        stop=stop_after_delay(10 * MINUTE_SECS),
+        wait=wait_fixed(30),
+        reraise=True,
+    ):
+        with attempt:
+            juju.run(unit=db_leader, action="pre-refresh-check")
 
     juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
