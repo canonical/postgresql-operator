@@ -1,0 +1,11 @@
+summary: test_ipv6_deployment.py with an IPv6-only peer binding
+environment:
+  TEST_MODULE: test_ipv6_deployment.py
+  PG_IP_FAMILY: ipv6
+  PG_IPV6_SUBNET: fd42:1928:642::/64
+execute: |
+  # Deterministic IPv6 prefix on the LXD bridge so units get IPv6 addresses.
+  lxc network set lxdbr0 ipv6.address=fd42:1928:642::1/64
+  tox run -e integration -- "tests/integration/$TEST_MODULE" --model testing --alluredir="$SPREAD_TASK/allure-results"
+artifacts:
+  - allure-results
