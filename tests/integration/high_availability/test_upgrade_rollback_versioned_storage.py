@@ -283,7 +283,20 @@ def test_rollback_to_stable(juju: Juju) -> None:
     )
 
     logger.info("Rolling back to 16/stable")
-    juju.cli("refresh", DB_APP_NAME, "--switch", f"ch:{DB_APP_NAME}", "--channel", "16/stable")
+    # Roll back to the pinned pre-refactoring revisions: the current 16/stable
+    # tip already ships the versioned storage layout, so only a pre-refactoring
+    # revision exercises the reverse migration (root layout) on rollback.
+    revision = _get_stable_revision()
+    juju.cli(
+        "refresh",
+        DB_APP_NAME,
+        "--switch",
+        f"ch:{DB_APP_NAME}",
+        "--channel",
+        "16/stable",
+        "--revision",
+        str(revision),
+    )
 
     logger.info("Waiting for rollback to complete or block")
     try:
