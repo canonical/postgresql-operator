@@ -143,18 +143,24 @@ def _do_rollback(juju: Juju) -> None:
     """Roll back to the pinned pre-refactoring stable revision."""
     # The current 16/stable tip already ships the versioned storage layout, so
     # only a pre-refactoring revision exercises the reverse migration (root
-    # layout) on rollback.
+    # layout) on rollback. `juju refresh` cannot combine --switch with
+    # --revision, so download the pinned revision's charm file and refresh to
+    # it by path.
     revision = _get_stable_revision()
+    # Write into the working directory: the juju strict snap places downloaded
+    # files into its own private /tmp when given a /tmp path, where the test
+    # process cannot see them.
+    charm_file = os.path.join(os.getcwd(), f"{DB_APP_NAME}-{revision}.charm")
     juju.cli(
-        "refresh",
+        "download",
         DB_APP_NAME,
-        "--switch",
-        f"ch:{DB_APP_NAME}",
-        "--channel",
-        "16/stable",
         "--revision",
         str(revision),
+        "--filepath",
+        charm_file,
+        include_model=False,
     )
+    juju.refresh(app=DB_APP_NAME, path=charm_file)
 
     try:
         juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
