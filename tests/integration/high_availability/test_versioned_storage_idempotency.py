@@ -140,8 +140,21 @@ def _do_upgrade(juju: Juju, charm: str) -> None:
 
 
 def _do_rollback(juju: Juju) -> None:
-    """Roll back to the stable channel."""
-    juju.cli("refresh", DB_APP_NAME, "--switch", f"ch:{DB_APP_NAME}", "--channel", "16/stable")
+    """Roll back to the pinned pre-refactoring stable revision."""
+    # The current 16/stable tip already ships the versioned storage layout, so
+    # only a pre-refactoring revision exercises the reverse migration (root
+    # layout) on rollback.
+    revision = _get_stable_revision()
+    juju.cli(
+        "refresh",
+        DB_APP_NAME,
+        "--switch",
+        f"ch:{DB_APP_NAME}",
+        "--channel",
+        "16/stable",
+        "--revision",
+        str(revision),
+    )
 
     try:
         juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=10 * MINUTE_SECS)
