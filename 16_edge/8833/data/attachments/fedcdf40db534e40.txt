@@ -1,0 +1,76 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/data-integrator-418
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-0
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [allocating] waiting: waiting for machine
+  data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] waiting: agent initialising
+  data-integrator/0 [idle] blocked: Please relate the data-integrator with the desired product
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] maintenance: installing PostgreSQL
+  data-integrator/0 [idle] blocked: Please relate the data-integrator with the desired product
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: 
+  data-integrator/0 [idle] blocked: Please relate the data-integrator with the desired product
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+  data-integrator/0 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [idle] active: 
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  data-integrator/0 [idle] blocked: Please relate the data-integrator with the desired product
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+[32mINFO    [0m integration.new_relations.test_relations_coherence:test_relations_coherence.py:98 connecting to the following database: data_integrator
+[32mINFO    [0m integration.new_relations.test_relations_coherence:test_relations_coherence.py:98 connecting to the following database: postgres
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  01:29:32Z
+
+App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator           active      1  data-integrator  latest/stable  418  no       
+postgresql       16.15    active      1  postgresql                        0  no       
+
+Unit                Workload  Agent  Machine  Public address  Ports     Message
+data-integrator/0*  active    idle   0        10.213.91.56              
+postgresql/0*       active    idle   1        10.213.91.18    5432/tcp  Primary
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.213.91.56  juju-8a8268-0  ubuntu@24.04  runnervm48cm3  Running
+1        started  10.213.91.18  juju-8a8268-1  ubuntu@24.04  runnervm48cm3  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:26:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:26:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:26:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:26:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:26:52 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f3e56aa6030 state=finished raised Exception>]
+unit-postgresql-0: 01:26:52 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3e5647ff80 state=finished raised Exception>]
+unit-postgresql-0: 01:26:54 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fb451929df0 state=finished raised Exception>]
+unit-postgresql-0: 01:26:54 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb451627bf0 state=finished raised Exception>]
+unit-postgresql-0: 01:26:55 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fc92feeb920 state=finished raised Exception>]
+unit-postgresql-0: 01:26:55 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc92f91b920 state=finished raised Exception>]
+unit-postgresql-0: 01:26:57 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f099c62c770 state=finished raised Exception>]
+unit-postgresql-0: 01:26:57 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f099dce6b40 state=finished raised Exception>]
+unit-postgresql-0: 01:26:58 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7efdfbb3b8f0 state=finished raised Exception>]
+unit-postgresql-0: 01:27:23 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efdfa7474d0 state=finished raised Exception>]
+unit-postgresql-0: 01:27:50 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f060895f950 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
