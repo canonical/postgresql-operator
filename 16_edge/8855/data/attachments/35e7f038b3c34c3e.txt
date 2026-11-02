@@ -1,0 +1,563 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing s3-integrator --bind ''
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing self-signed-certificates --bind '' --channel 1/stable
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju deploy --model testing /root/snap/juju/common/tmpss7f0ivi/_temp.charm postgresql-aws --bind '' --config profile=testing --num-units 2
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-aws:client-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-aws:peer-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=60s
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: waiting (agent initialising) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates] status changed: maintenance (installing charm software) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [self-signed-certificates/0] status changed: maintenance (installing charm software) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: waiting (agent initialising) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (agent initialising) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: waiting (waiting for machine) -> waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: waiting (waiting for machine) -> waiting (installing agent)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: waiting (installing agent) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: waiting (installing agent) -> maintenance (installing charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator] status changed: maintenance (installing charm software) -> blocked (Missing parameters: ['access-key', 'secret-key'])
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [s3-integrator/0] status changed: maintenance (installing charm software) -> blocked (Missing parameters: ['access-key', 'secret-key'])
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (agent initialising) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: maintenance (installing PostgreSQL) -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (installing PostgreSQL) -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: waiting (awaiting passwords generation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: maintenance (installing PostgreSQL) -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (awaiting passwords generation) -> waiting (waiting for peer IP)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (waiting for peer IP) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (awaiting passwords generation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: active () -> waiting (awaiting for cluster to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (awaiting for cluster to start) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: active () -> waiting (awaiting for cluster to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (awaiting for cluster to start) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (awaiting for member to start) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: active () -> waiting (awaiting for cluster to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (awaiting for cluster to start) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (Executing restart operation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: active () -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/1] status changed: waiting (awaiting for member to start) -> active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:60 configuring S3 integrator for AWS
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing s3-integrator endpoint=https://s3.amazonaws.com bucket=data-charms-testing path=/postgresql-k8s/6635be75-d65b-11f1-aafe-6045bda977eb region=us-east-1
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json s3-integrator/0 sync-s3-credentials --params /root/snap/juju/common/tmp4ps3cqo3
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju integrate --model testing postgresql-aws s3-integrator
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=60s
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary) -> maintenance (initialising stanza)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (initialising stanza) -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary) -> maintenance (initialising stanza)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (initialising stanza) -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/0 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:107 creating a table in the database
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:116 creating a backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/1 create-backup --params /root/snap/juju/common/tmphvrosjjg
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:128 listing the available backups
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/1 list-backups --params /root/snap/juju/common/tmpjhilecyv
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:137 creating a second table in the database
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:144 creating a backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/1 create-backup --params /root/snap/juju/common/tmpexg2yb01
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:155 listing the available backups
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/1 list-backups --params /root/snap/juju/common/tmpajsq6c2e
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:164 creating a second table in the database
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-unit --model testing --no-prompt postgresql-aws/1
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/1] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:185 restoring the backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/0 restore --params /root/snap/juju/common/tmpn1o2cwip
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (Executing restart operation) -> maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:198 checking that the backup was correctly restored
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/0 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:230 restoring the backup
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/0 restore --params /root/snap/juju/common/tmpbsj0ua25
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (Executing restart operation) -> maintenance (restoring backup)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (restoring backup) -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/0 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.backup_helpers:backup_helpers.py:245 checking that the backup was correctly restored
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing postgresql-aws:client-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-relation --model testing postgresql-aws:peer-certificates self-signed-certificates:certificates
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=10s
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju add-unit --model testing postgresql-aws
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/2] status: waiting (waiting for machine)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: active () -> maintenance (Beginning rolling restart)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary) -> maintenance (Executing restart operation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (Executing restart operation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: maintenance (Beginning rolling restart) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: waiting (waiting for machine) -> waiting (agent initialising)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: waiting (agent initialising) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: maintenance (installing PostgreSQL) -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: waiting (awaiting passwords generation) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> waiting (waiting for peer IP)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (waiting for peer IP) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> waiting (waiting for peer IP)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (waiting for peer IP) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> maintenance (reconfiguring cluster)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (reconfiguring cluster) -> active (Primary (degraded))
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: active () -> waiting (awaiting for member to start)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: waiting (awaiting for member to start) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary (degraded)) -> active (Primary)
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju model-config --model testing update-status-hook-interval=5m
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/2 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/2 get-primary
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m integration.test_backups_aws:test_backups_aws.py:99 listing the available backups
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju run --model testing --format json postgresql-aws/2 list-backups --params /root/snap/juju/common/tmpl_07y2i8
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/2] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-application --model testing --no-prompt postgresql-aws
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/0] status: active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [postgresql-aws/2] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active (Primary) -> active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: active () -> active (Primary)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: active (Primary) -> maintenance (stopping charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: maintenance (stopping charm software) -> maintenance (cleaning up prior to charm deletion)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: active () -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: active () -> waiting (awaiting passwords generation)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: waiting (awaiting passwords generation) -> maintenance (stopping charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/2] status changed: maintenance (cleaning up prior to charm deletion) -> terminated ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (stopping charm software) -> maintenance (cleaning up prior to charm deletion)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws] status changed: waiting (awaiting passwords generation) -> maintenance (installing PostgreSQL)
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [postgresql-aws/0] status changed: maintenance (cleaning up prior to charm deletion) -> terminated ()
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju remove-application --model testing --no-prompt self-signed-certificates
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates] status: maintenance (stopping charm software)
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [self-signed-certificates/0] status: maintenance (stopping charm software)
+[32mINFO    [0m integration.conftest:conftest.py:71 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  01:41:22Z
+
+App            Version  Status  Scale  Charm          Channel   Rev  Exposed  Message
+s3-integrator           active      1  s3-integrator  1/stable  562  no       
+
+Unit              Workload  Agent  Machine  Public address  Ports  Message
+s3-integrator/0*  active    idle   0        10.236.245.69          
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.236.245.69  juju-5ae8f0-0  ubuntu@22.04  runnervm48cm3  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 01:20:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:20:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:21:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:21:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:21:24 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f5ebd2b4380 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:25 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5ebc4819d0 state=finished raised Exception>]
+machine-0: 01:21:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:21:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:21:27 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f6ab99be090 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:28 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6ab96ebec0 state=finished raised Exception>]
+machine-3: 01:21:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:21:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:21:30 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f5c01cda090 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:30 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5c019ffaa0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:32 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f28130ea210 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:32 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f2812e0fce0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:34 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f67d01883b0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:36 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f802d955550 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:37 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f802c998e30 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:38 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f27d42ffa70 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:38 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f27d3e3dbb0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:39 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f155e9f14f0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:39 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f155e131f70 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:41 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f73d8d094f0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:41 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f73d8a337a0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:21:42 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f74980f1640 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:21:59 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f67cf998470 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:02 ERROR unit.postgresql-aws/0.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7f93490d3a10 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:02 ERROR unit.postgresql-aws/0.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9347f37980 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:04 ERROR unit.postgresql-aws/0.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f3ac82d9a60 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:04 ERROR unit.postgresql-aws/0.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3ac56c0b60 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:06 ERROR unit.postgresql-aws/0.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7fdfeb119c40 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:06 ERROR unit.postgresql-aws/0.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdfe9f82ed0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:09 ERROR unit.postgresql-aws/0.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f3dfa630770 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:09 ERROR unit.postgresql-aws/0.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3df94bcaa0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:10 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f7497833710 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:10 ERROR unit.postgresql-aws/0.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7fbfff439f40 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:12 ERROR unit.postgresql-aws/0.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fbffe2ddbb0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:12 ERROR unit.postgresql-aws/1.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7f3fe2525b50 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:12 ERROR unit.postgresql-aws/1.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3fe13847a0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:13 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7fa095943860 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:14 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa092d360f0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:14 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7fb040ea9b20 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:15 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb040ec5730 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:16 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f438f6a60c0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:17 ERROR unit.postgresql-aws/1.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f61628c4e90 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:17 ERROR unit.postgresql-aws/1.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f61617406b0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:18 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f31e6b393a0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:19 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f31e6b56690 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:20 ERROR unit.postgresql-aws/1.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7f2302d5bbf0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:20 ERROR unit.postgresql-aws/1.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f2302d740b0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:22 ERROR unit.postgresql-aws/1.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7fd03a2b8e90 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:22 ERROR unit.postgresql-aws/1.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd0388bcb90 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:23 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f04e348d520 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:23 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f04e1e67ce0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:24 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7ff87c3b9430 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:25 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff87a76baa0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:26 ERROR unit.postgresql-aws/1.juju-log failed to get primary with error RetryError[<Future at 0x7f6f4f1a8800 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:26 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6f4dcbeae0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:28 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7fe711811dc0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:28 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe7106b0ad0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:30 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f5f6b71c7a0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:30 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5f6a227a10 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:31 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f8d13ad2ea0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:31 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8d12948f50 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:32 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 240, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f43918f88f0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:33 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f438f6e5490 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:33 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7ff9d45c9850 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:33 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff9d2c4af60 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:35 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7fc58d528860 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:35 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7fbf6c169880 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:36 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc590c4a240 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:36 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fc58c3ab9b0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:36 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc58c3aadb0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:38 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7ff6d56b5a60 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:38 ERROR unit.postgresql-aws/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fbf6c1d44d0 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:40 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7f027a08bf50 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:22:42 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff6d571dd00 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:22:42 ERROR unit.postgresql-aws/1.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f027a111c70 state=finished raised Exception>]
+unit-postgresql-aws-1: 01:33:16 ERROR unit.postgresql-aws/1.juju-log single_kernel_postgresql.events.postgresql:Skipping charmed-postgresql snap removal: failed to unmount data storage: umount: /var/snap/charmed-postgresql/common/var/lib/postgresql: target is busy.
+
+machine-3: 01:33:16 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 01:37:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:37:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-2: 01:37:26 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7fb42f8e7e60 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:26 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb42f480ce0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:28 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7ff1bd1b97f0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:28 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff1bc7160f0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:29 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f91bba51520 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:29 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f91ba2e2120 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:31 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f4ce451b1a0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:31 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4ce3ee2ed0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:32 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f1b3da315e0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:53 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f1b3c8a35c0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:56 ERROR unit.postgresql-aws/2.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7fe35b181cd0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:56 ERROR unit.postgresql-aws/2.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe35b181700 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:58 ERROR unit.postgresql-aws/2.juju-log s3-parameters:7: failed to get primary with error RetryError[<Future at 0x7fc090883d10 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:37:58 ERROR unit.postgresql-aws/2.juju-log s3-parameters:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc090893920 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:00 ERROR unit.postgresql-aws/2.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7fa1df9f4620 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:01 ERROR unit.postgresql-aws/2.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa1dfa07f20 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:02 ERROR unit.postgresql-aws/2.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f63aa3fbd70 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:03 ERROR unit.postgresql-aws/2.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f63aa3db410 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:05 ERROR unit.postgresql-aws/2.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7fdfc52d9f10 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:05 ERROR unit.postgresql-aws/2.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdfc53123f0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:07 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f0d7e6e6c00 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:07 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0d7e703fe0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:09 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f3cce198fb0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:10 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3cce1bf7d0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:38:12 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f2e4afa30b0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:23 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb923e07260 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:24 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f31d93ebce0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:24 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f9b3f2234a0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:25 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f040e4d14f0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:25 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9b3ed37d40 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:26 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f040e036cf0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:27 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f394e3f27e0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:27 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f394d067ce0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:27 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7f0d1a481cd0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:28 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0d1a076f60 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:29 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f9bf4dd7da0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:30 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9bf47fa150 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:30 ERROR unit.postgresql-aws/0.juju-log failed to get primary with error RetryError[<Future at 0x7fce5cec15e0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:30 ERROR unit.postgresql-aws/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fce5c41c4d0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:31 ERROR unit.postgresql-aws/2.juju-log s3-parameters:7: failed to get primary with error RetryError[<Future at 0x7f492b1a8a40 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:31 ERROR unit.postgresql-aws/2.juju-log s3-parameters:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f492b8d5e80 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:32 ERROR unit.postgresql-aws/0.juju-log s3-parameters:7: failed to get primary with error RetryError[<Future at 0x7f0ad5eb7020 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:32 ERROR unit.postgresql-aws/0.juju-log s3-parameters:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0ad478e2d0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:33 ERROR unit.postgresql-aws/2.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7fa85b3e3f20 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:33 ERROR unit.postgresql-aws/2.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa85a234b30 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:34 ERROR unit.postgresql-aws/0.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f523f9e3470 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:34 ERROR unit.postgresql-aws/0.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f523dfc8b90 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:34 ERROR unit.postgresql-aws/2.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7eff8c4d5e50 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:35 ERROR unit.postgresql-aws/2.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7eff898ffb60 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:35 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "cdbff943-ae99-483f-8684-305a225ae8f0:r#7#s3-integrator": settings cdbff943-ae99-483f-8684-305a225ae8f0:r#7#s3-integrator not found (not found)
+unit-postgresql-aws-2: 01:40:36 ERROR unit.postgresql-aws/2.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7f8da65b0b90 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:36 ERROR unit.postgresql-aws/2.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8da65b07a0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:37 ERROR unit.postgresql-aws/2.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f149da6eba0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:37 ERROR unit.postgresql-aws/2.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f149c9037a0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:39 ERROR unit.postgresql-aws/0.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7f6bcc6e9430 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:39 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7f72db85e2a0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:39 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f72dc9b83b0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:39 ERROR unit.postgresql-aws/0.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6bc9e77ad0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:40 ERROR unit.postgresql-aws/2.juju-log failed to get primary with error RetryError[<Future at 0x7fc08dec5310 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:40 ERROR unit.postgresql-aws/0.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f82a0788140 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:41 ERROR unit.postgresql-aws/0.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f82a2218530 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:42 ERROR unit.postgresql-aws/0.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7f83aea1a330 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:42 ERROR unit.postgresql-aws/0.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f83ae31aff0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:43 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7fa65ab9c1d0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:43 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa65ab9f2f0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:44 ERROR unit.postgresql-aws/0.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f77ca8c3260 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:45 ERROR unit.postgresql-aws/0.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f77ca3af860 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:46 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7f650d9d8c50 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:46 ERROR unit.postgresql-aws/0.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f650d60f9b0 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:47 ERROR unit.postgresql-aws/0.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f88d7735250 state=finished raised Exception>]
+unit-postgresql-aws-0: 01:40:47 ERROR unit.postgresql-aws/0.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f88d6cc73b0 state=finished raised Exception>]
+unit-postgresql-aws-2: 01:40:47 ERROR unit.postgresql-aws/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc08df779e0 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
