@@ -1,0 +1,68 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  00:07:04Z
+
+App                  Version  Status   Scale  Charm                Channel       Rev  Exposed  Message
+postgresql           14.24    active     2/3  postgresql           14/stable    1217  no       
+postgresql-test-app           waiting    0/1  postgresql-test-app  latest/edge   616  no       waiting for machine
+
+Unit                   Workload  Agent       Machine  Public address  Ports     Message
+postgresql-test-app/0  waiting   allocating  3        10.229.16.254             waiting for machine
+postgresql/0*          active    idle        0        10.229.16.21    5432/tcp  Primary (degraded)
+postgresql/1           waiting   allocating  1        10.229.16.9               agent initialising
+postgresql/2           error     idle        2        10.229.16.228             hook failed: "install"
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.229.16.21   juju-278881-0  ubuntu@22.04  runnervmcwoy2  Running
+1        started  10.229.16.9    juju-278881-1  ubuntu@22.04  runnervmcwoy2  Running
+2        started  10.229.16.228  juju-278881-2  ubuntu@22.04  runnervmcwoy2  Running
+3        down     10.229.16.254  juju-278881-3  ubuntu@22.04  runnervmcwoy2  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:05:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:05:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:06:15 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fa1e290ef20 state=finished raised Exception>]
+unit-postgresql-0: 00:06:18 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f4625769ba0 state=finished raised Exception>]
+unit-postgresql-0: 00:06:19 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1bad240a00 state=finished raised Exception>]
+unit-postgresql-0: 00:06:20 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1b45aa8040 state=finished raised Exception>]
+unit-postgresql-0: 00:06:22 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1c5486ca30 state=finished raised Exception>]
+unit-postgresql-0: 00:06:30 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-2: 00:06:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:06:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
