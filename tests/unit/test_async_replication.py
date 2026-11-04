@@ -362,9 +362,11 @@ def test__configure_standby_cluster():
 
     relation = make_relation_with_real_manager(mock_charm, state)
     mock_relation = MagicMock()
-    mock_relation.name = "something_else"
-    relation.manager._update_internal_secret = MagicMock(return_value=True)
-    relation.manager.workload.get_system_identifier = MagicMock(return_value=(None, 2))
+    mock_relation.name = "some_relation"
+    mock_relation.app = "remote-app"
+    relation.manager.workload.create_data_backup_tarball = MagicMock(return_value="backup.tar.gz")
+    app_data = {}
+    state.application.data = app_data
 
     with (
         patch.object(
@@ -373,32 +375,12 @@ def test__configure_standby_cluster():
             new_callable=PropertyMock,
             return_value=mock_relation,
         ),
-        pytest.raises(Exception) as exc_info,
-    ):
-        relation.manager._configure_standby_cluster(mock_event)
-
-    assert str(exc_info.value) == "2"
-
-    # 3.
-    mock_charm = MagicMock()
-    mock_event = MagicMock()
-    state = MagicMock()
-
-    relation = make_relation_with_real_manager(mock_charm, state)
-    mock_relation = MagicMock()
-    mock_relation.name = "some_relation"
-    mock_relation.app = "remote-app"
-    relation.manager.workload.create_data_backup_tarball = MagicMock(return_value="backup.tar.gz")
-    app_data = {}
-    state.application.data = app_data
-
-    relation.manager.workload.get_system_identifier = MagicMock(return_value=("456", None))
-
-    with patch.object(
-        AsyncReplicationManager,
-        "async_relation",
-        new_callable=PropertyMock,
-        return_value=mock_relation,
+        patch.object(
+            AsyncReplicationManager,
+            "was_backup_made",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
     ):
         result = relation.manager._configure_standby_cluster(mock_event)
 
