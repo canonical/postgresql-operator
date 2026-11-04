@@ -1,0 +1,273 @@
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:268 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:273 Cutting network for postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:281 checking for no connectivity between postgresql/2 and postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:281 checking for no connectivity between postgresql/2 and postgresql/0
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:288 checking for no connectivity between postgresql/2 and the controller
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:295 checking whether the connectivity to the database is not working
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:301 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:104 Initial writes {'testing.postgresql-0': 121, 'testing.postgresql-1': 121}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:114 Retry writes {'testing.postgresql-0': 123, 'testing.postgresql-1': 123}
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:304 checking whether a new primary was elected
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:311 Restoring network for postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:315 waiting for cluster to become idle
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:320 waiting for the database service to be ready on postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing_3:test_self_healing_3.py:324 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:223 checking that the former primary is now a replica
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:229 checking that all units are part of the same cluster
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:243 checking that no writes to the database were missed after stopping the writes
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-0, count: 256, max_number_written: 256, total_expected_writes: 256
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-1, count: 256, max_number_written: 256, total_expected_writes: 256
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:268 member: testing.postgresql-2, count: 256, max_number_written: 256, total_expected_writes: 256
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:249 checking that the former primary is up to date with the cluster after restarting
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  01:44:47Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           16.15    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  625  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.250.87.59              received database credentials of the first database
+postgresql/0            active    idle   0        10.250.87.194   5432/tcp  
+postgresql/1*           active    idle   1        10.250.87.101   5432/tcp  Primary
+postgresql/2            active    idle   2        10.250.87.235   5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.250.87.194  juju-bcacf1-0  ubuntu@24.04  runnervm48cm3  Running
+1        started  10.250.87.101  juju-bcacf1-1  ubuntu@24.04  runnervm48cm3  Running
+2        started  10.250.87.235  juju-bcacf1-2  ubuntu@24.04  runnervm48cm3  Running
+3        started  10.250.87.59   juju-bcacf1-3  ubuntu@24.04  runnervm48cm3  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:30:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:30:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:31:09 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f619c1e94f0 state=finished raised Exception>]
+unit-postgresql-0: 01:31:09 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f619bd73380 state=finished raised Exception>]
+unit-postgresql-0: 01:31:13 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fbd2522c4d0 state=finished raised Exception>]
+unit-postgresql-0: 01:31:13 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fbd2522f260 state=finished raised Exception>]
+unit-postgresql-0: 01:31:17 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f41797f02f0 state=finished raised Exception>]
+unit-postgresql-0: 01:31:18 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4178db3680 state=finished raised Exception>]
+machine-1: 01:31:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:31:21 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f156a85fd70 state=finished raised Exception>]
+unit-postgresql-0: 01:31:22 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f156a22fb30 state=finished raised Exception>]
+unit-postgresql-0: 01:31:25 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fecb1f3b290 state=finished raised Exception>]
+unit-postgresql-1: 01:31:33 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f089da9b260 state=finished raised Exception>]
+unit-postgresql-1: 01:31:33 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f089da9ccb0 state=finished raised Exception>]
+unit-postgresql-1: 01:31:36 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7fa9ee88c680 state=finished raised Exception>]
+unit-postgresql-1: 01:31:36 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa9ee50f020 state=finished raised Exception>]
+unit-postgresql-1: 01:31:40 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f78e45f0200 state=finished raised Exception>]
+unit-postgresql-1: 01:31:40 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f78e3fb6060 state=finished raised Exception>]
+machine-2: 01:31:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:31:43 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f6cb7bc1ca0 state=finished raised Exception>]
+unit-postgresql-1: 01:31:43 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6cb7bc3440 state=finished raised Exception>]
+unit-postgresql-1: 01:31:46 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f49c26974a0 state=finished raised Exception>]
+machine-3: 01:31:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:32:00 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f5b28be5490 state=finished raised Exception>]
+unit-postgresql-2: 01:32:00 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5b2876c8f0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:02 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f26c402eea0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:02 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f26c3c2ef30 state=finished raised Exception>]
+unit-postgresql-0: 01:32:03 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fecb1a3cd10 state=finished raised Exception>]
+unit-postgresql-2: 01:32:05 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f1486dd2c60 state=finished raised Exception>]
+unit-postgresql-2: 01:32:05 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f148682b2f0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:07 ERROR unit.postgresql/0.juju-log database:5: failed to get primary with error RetryError[<Future at 0x7fcafbf260c0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:07 ERROR unit.postgresql/0.juju-log database:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fcafada35c0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:08 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7fd46d6a2f60 state=finished raised Exception>]
+unit-postgresql-2: 01:32:08 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd46cf33110 state=finished raised Exception>]
+unit-postgresql-0: 01:32:10 ERROR unit.postgresql/0.juju-log restart:2: failed to get primary with error RetryError[<Future at 0x7f689b17ecf0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:10 ERROR unit.postgresql/0.juju-log restart:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f689b1adc70 state=finished raised Exception>]
+unit-postgresql-2: 01:32:10 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f8f2d702ed0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:13 ERROR unit.postgresql/0.juju-log refresh-v-three:3: failed to get primary with error RetryError[<Future at 0x7f4df43f9220 state=finished raised Exception>]
+unit-postgresql-0: 01:32:13 ERROR unit.postgresql/0.juju-log refresh-v-three:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4df3248c20 state=finished raised Exception>]
+unit-postgresql-0: 01:32:17 ERROR unit.postgresql/0.juju-log status-peers:0: failed to get primary with error RetryError[<Future at 0x7efed1793f50 state=finished raised Exception>]
+unit-postgresql-0: 01:32:17 ERROR unit.postgresql/0.juju-log status-peers:0: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efecf1a0b90 state=finished raised Exception>]
+unit-postgresql-0: 01:32:20 ERROR unit.postgresql/0.juju-log database-peers:1: failed to get primary with error RetryError[<Future at 0x7f15bdecdca0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:20 ERROR unit.postgresql/0.juju-log database-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f15bcd51e50 state=finished raised Exception>]
+unit-postgresql-1: 01:32:21 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f49c0d8f350 state=finished raised Exception>]
+unit-postgresql-0: 01:32:23 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fe92052bfe0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:25 ERROR unit.postgresql/1.juju-log status-peers:0: failed to get primary with error RetryError[<Future at 0x7f10fa3adac0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:25 ERROR unit.postgresql/1.juju-log status-peers:0: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f10f81ec290 state=finished raised Exception>]
+unit-postgresql-1: 01:32:27 ERROR unit.postgresql/1.juju-log restart:2: failed to get primary with error RetryError[<Future at 0x7f67e380c8f0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:27 ERROR unit.postgresql/1.juju-log restart:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f67e2695850 state=finished raised Exception>]
+unit-postgresql-1: 01:32:29 ERROR unit.postgresql/1.juju-log refresh-v-three:3: failed to get primary with error RetryError[<Future at 0x7efebf38dd00 state=finished raised Exception>]
+unit-postgresql-1: 01:32:29 ERROR unit.postgresql/1.juju-log refresh-v-three:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efebf3ae1e0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:31 ERROR unit.postgresql/1.juju-log database:5: failed to get primary with error RetryError[<Future at 0x7faf010bafc0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:31 ERROR unit.postgresql/1.juju-log database:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faeff4b4140 state=finished raised Exception>]
+unit-postgresql-1: 01:32:33 ERROR unit.postgresql/1.juju-log database-peers:1: failed to get primary with error RetryError[<Future at 0x7fce3cca87a0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:33 ERROR unit.postgresql/1.juju-log database-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fce3b7a4140 state=finished raised Exception>]
+unit-postgresql-1: 01:32:35 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7fdabcf52e10 state=finished raised Exception>]
+unit-postgresql-1: 01:32:35 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdabadb0800 state=finished raised Exception>]
+unit-postgresql-1: 01:32:37 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f6a18abcce0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:38 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6a19514590 state=finished raised Exception>]
+unit-postgresql-0: 01:32:40 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 240, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe921fa0200 state=finished raised Exception>]
+unit-postgresql-1: 01:32:40 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f6d23760ad0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:40 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe92054be90 state=finished raised Exception>]
+unit-postgresql-1: 01:32:41 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6d225b3ce0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:43 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8f2c0abf20 state=finished raised Exception>]
+unit-postgresql-0: 01:32:43 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f48f748aff0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:44 ERROR unit.postgresql/1.juju-log database:5: failed to get primary with error RetryError[<Future at 0x7fdddc485be0 state=finished raised Exception>]
+unit-postgresql-0: 01:32:44 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f48f74d4140 state=finished raised Exception>]
+unit-postgresql-1: 01:32:46 ERROR unit.postgresql/1.juju-log database:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdddc4e1760 state=finished raised Exception>]
+unit-postgresql-0: 01:32:47 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fd35ccdd070 state=finished raised Exception>]
+unit-postgresql-2: 01:32:47 ERROR unit.postgresql/2.juju-log restart:2: failed to get primary with error RetryError[<Future at 0x7f76f9172840 state=finished raised Exception>]
+unit-postgresql-2: 01:32:47 ERROR unit.postgresql/2.juju-log restart:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f76f7fe02f0 state=finished raised Exception>]
+unit-postgresql-1: 01:32:50 ERROR unit.postgresql/1.juju-log database:5: failed to get primary with error RetryError[<Future at 0x7f153aa90a10 state=finished raised Exception>]
+unit-postgresql-2: 01:32:50 ERROR unit.postgresql/2.juju-log status-peers:0: failed to get primary with error RetryError[<Future at 0x7fa680ef2c60 state=finished raised Exception>]
+unit-postgresql-2: 01:32:51 ERROR unit.postgresql/2.juju-log status-peers:0: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa67fd77b00 state=finished raised Exception>]
+unit-postgresql-1: 01:32:51 ERROR unit.postgresql/1.juju-log database:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f153aae1670 state=finished raised Exception>]
+unit-postgresql-0: 01:32:52 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd35cd07440 state=finished raised Exception>]
+unit-postgresql-2: 01:32:54 ERROR unit.postgresql/2.juju-log database:5: failed to get primary with error RetryError[<Future at 0x7faa458fbda0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:55 ERROR unit.postgresql/2.juju-log database:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faa4590b710 state=finished raised Exception>]
+unit-postgresql-2: 01:32:58 ERROR unit.postgresql/2.juju-log database-peers:1: failed to get primary with error RetryError[<Future at 0x7f485a6d16d0 state=finished raised Exception>]
+unit-postgresql-2: 01:32:58 ERROR unit.postgresql/2.juju-log database-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f485a6a60c0 state=finished raised Exception>]
+unit-postgresql-2: 01:33:02 ERROR unit.postgresql/2.juju-log refresh-v-three:3: failed to get primary with error RetryError[<Future at 0x7f1ec933e5d0 state=finished raised Exception>]
+unit-postgresql-2: 01:33:02 ERROR unit.postgresql/2.juju-log refresh-v-three:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f1ec9330e00 state=finished raised Exception>]
+unit-postgresql-2: 01:33:05 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f021bbd9be0 state=finished raised Exception>]
+unit-postgresql-2: 01:33:05 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f021bbd98e0 state=finished raised Exception>]
+unit-postgresql-2: 01:33:08 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f4cd2909430 state=finished raised Exception>]
+unit-postgresql-2: 01:33:08 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4cd2999130 state=finished raised Exception>]
+unit-postgresql-2: 01:33:11 ERROR unit.postgresql/2.juju-log failed to get primary with error RetryError[<Future at 0x7f34588ca120 state=finished raised Exception>]
+unit-postgresql-2: 01:36:25 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:33 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-0: 01:38:36 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [72f7fb] "machine-0" cannot open api: unable to connect to API: dial tcp 10.250.87.249:17070: connect: network is unreachable
+machine-0: 01:38:40 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [72f7fb] "machine-0" cannot open api: unable to connect to API: dial tcp 10.250.87.249:17070: connect: network is unreachable
+machine-0: 01:38:45 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [72f7fb] "machine-0" cannot open api: unable to connect to API: dial tcp 10.250.87.249:17070: connect: network is unreachable
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.worker.dependency "migration-minion" manifold worker returned unexpected error: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.worker.dependency "reboot-executor" manifold worker returned unexpected error: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.worker.dependency "upgrader" manifold worker returned unexpected error: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-2: 01:43:35 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
