@@ -1,0 +1,130 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  00:11:37Z
+
+App                       Version  Status       Scale  Charm                     Channel   Rev  Exposed  Message
+postgresql                14.24    maintenance      3  postgresql                            0  no       Beginning rolling restart
+self-signed-certificates           active           1  self-signed-certificates  1/stable  710  no       
+
+Unit                         Workload  Agent      Machine  Public address  Ports     Message
+postgresql/0*                active    executing  0        10.69.64.233    5432/tcp  
+postgresql/1                 active    executing  1        10.69.64.243    5432/tcp  Primary (degraded)
+postgresql/2                 error     idle       2        10.69.64.213    5432/tcp  hook failed: "database-peers-relation-changed"
+self-signed-certificates/0*  active    idle       3        10.69.64.241              
+
+Machine  State    Address       Inst id        Base          AZ             Message
+0        started  10.69.64.233  juju-329e6d-0  ubuntu@22.04  runnervmlby3q  Running
+1        started  10.69.64.243  juju-329e6d-1  ubuntu@22.04  runnervmlby3q  Running
+2        started  10.69.64.213  juju-329e6d-2  ubuntu@22.04  runnervmlby3q  Running
+3        started  10.69.64.241  juju-329e6d-3  ubuntu@24.04  runnervmlby3q  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 00:06:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 00:06:52 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f078c648550 state=finished raised Exception>]
+unit-postgresql-0: 00:06:55 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f1464a2e740 state=finished raised Exception>]
+unit-postgresql-0: 00:06:59 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb7f4372740 state=finished raised Exception>]
+unit-postgresql-0: 00:07:02 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fe00df3b130 state=finished raised Exception>]
+unit-postgresql-0: 00:07:03 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 588, in are_replicas_up
+    members = self.cluster_status()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 377, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f5f003fa680 state=finished raised Exception>]
+unit-postgresql-0: 00:07:11 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-2: 00:07:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 00:07:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:07:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 00:11:36 ERROR unit.postgresql/2.juju-log database-peers:0: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3591, in _wrap_hookcmd
+    yield
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3948, in planned_units
+    app_state = hookcmds.goal_state()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/hookcmds/_other.py", line 95, in goal_state
+    stdout = run('goal-state', '--format=json')
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/hookcmds/_utils.py", line 53, in run
+    raise Error(returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr) from None
+ops.hookcmds._utils.Error: command ('goal-state', '--format=json') exited with status 1
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2730, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/__init__.py", line 360, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 522, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 506, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 439, in _emit
+    self._emit_charm_event(self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/_main.py", line 483, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 336, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 914, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/framework.py", line 1034, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 752, in _on_peer_relation_changed
+    self.update_config()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2323, in update_config
+    pg_parameters = self._build_postgresql_parameters()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 2297, in _build_postgresql_parameters
+    pg_parameters = self.postgresql.build_postgresql_parameters(
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 425, in postgresql
+    primary_host=self.primary_endpoint,  # type: ignore
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 441, in primary_endpoint
+    primary = self._patroni.get_primary() or self._patroni.get_standby_leader()
+  File "/usr/lib/python3.10/functools.py", line 981, in __get__
+    val = self.func(instance)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/charm.py", line 996, in _patroni
+    self.app.planned_units(),
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 479, in planned_units
+    return self._backend.planned_units()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3947, in planned_units
+    with self._wrap_hookcmd('goal-state'):
+  File "/usr/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/lib/python3.10/site-packages/ops/model.py", line 3601, in _wrap_hookcmd
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR getting relation status: cannot get status: relation not found
+
+unit-postgresql-2: 00:11:36 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
