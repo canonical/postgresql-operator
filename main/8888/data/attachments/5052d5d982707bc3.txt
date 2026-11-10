@@ -1,0 +1,53 @@
+[32mINFO    [0m integration.conftest:conftest.py:142 Setting up TLS certificates
+[32mINFO    [0m integration.conftest:conftest.py:207 Setting up microceph
+[32mINFO    [0m integration.conftest:conftest.py:236 Set up microceph
+[32mINFO    [0m pytest_operator.plugin:plugin.py:806 Connecting to existing model concierge-lxd:testing on unspecified cloud
+[33mWARNING [0m juju.client.connection:connection.py:858 unexpected facade SecretsRevoker received from the controller
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/jammy/s3-integrator-145
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying ch:amd64/noble/self-signed-certificates-710
+[32mINFO    [0m juju.model:__init__.py:2301 Deploying local:postgresql-0
+[33mWARNING [0m juju.model:__init__.py:1683 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-ceph/0 [allocating] waiting: waiting for machine
+  postgresql-ceph/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-ceph/0 [allocating] waiting: waiting for machine
+  postgresql-ceph/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-ceph/0 [allocating] waiting: waiting for machine
+  postgresql-ceph/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-ceph/0 [allocating] waiting: waiting for machine
+  postgresql-ceph/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  00:06:38Z
+
+App                       Version  Status   Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql-ceph                    error      1/2  postgresql                                 0  no       hook failed: "install"
+s3-integrator                      blocked      1  s3-integrator             latest/stable  145  no       Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates           active       1  self-signed-certificates  1/stable       710  no       
+
+Unit                         Workload  Agent       Machine  Public address  Ports  Message
+postgresql-ceph/0            waiting   allocating  2        10.68.102.109          waiting for machine
+postgresql-ceph/1*           error     idle        3        10.68.102.179          hook failed: "install"
+s3-integrator/0*             blocked   idle        0        10.68.102.182          Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates/0*  active    idle        1        10.68.102.126          
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.68.102.182  juju-7c7b38-0  ubuntu@22.04  runnervmlby3q  Running
+1        started  10.68.102.126  juju-7c7b38-1  ubuntu@24.04  runnervmlby3q  Running
+2        pending  10.68.102.109  juju-7c7b38-2  ubuntu@22.04  runnervmlby3q  Running
+3        started  10.68.102.179  juju-7c7b38-3  ubuntu@22.04  runnervmlby3q  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-1: 00:05:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 00:05:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:24 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 00:06:24 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:06:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 00:06:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
