@@ -1932,6 +1932,13 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
 
         # Check the template is opened read-only in the call to open.
         assert mock.call_args_list[0][0] == ("templates/pgbackrest.conf.j2",)
+        rendered_pgbackrest_conf = next(
+            call_args[0][1]
+            for call_args in _render_file.call_args_list
+            if call_args[0][0]
+            == "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf"
+        )
+        assert "log-level-stderr=warn" in rendered_pgbackrest_conf
 
         # Get the expected content from a file.
         with open("templates/pgbackrest.conf.j2") as file:
