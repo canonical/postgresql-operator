@@ -54,6 +54,62 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
+@pytest.mark.abort_on_fail
+async def test_promote_to_primary(ops_test: OpsTest) -> None:
+    """Switch the primary over to a sync standby and check the Primary label follows it."""
+    database_app = ops_test.model.applications[DATABASE_APP_NAME]
+    any_unit_name = database_app.units[0].name
+    original_roles = await get_cluster_roles(ops_test, any_unit_name)
+    old_primary = original_roles["primaries"][0]
+    new_primary = original_roles["sync_standbys"][0]
+
+    def primary_labels() -> dict[str, str]:
+        return {unit.name: unit.workload_status_message for unit in database_app.units}
+
+    expected_labels = {
+        unit.name: "Primary" if unit.name == new_primary else "" for unit in database_app.units
+    }
+
+    # The update-status hook recomputes the label on its own. Keep it from firing,
+    # so the label has to be moved by the switchover handling itself.
+    await ops_test.model.set_config({"update-status-hook-interval": "60m"})
+    try:
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, idle_period=30
+        )
+        assert primary_labels()[old_primary] == "Primary"
+
+        logger.info(f"Promoting {new_primary} (current primary: {old_primary})")
+        run_action = await ops_test.model.units[new_primary].run_action(
+            "promote-to-primary", scope="unit"
+        )
+        await run_action.wait()
+        assert run_action.status == "completed"
+
+        try:
+            await ops_test.model.block_until(
+                lambda: primary_labels() == expected_labels, timeout=180
+            )
+        except exceptions.TimeoutError:
+            pytest.fail(
+                f"Primary label did not move from {old_primary} to {new_primary}: "
+                f"{primary_labels()}"
+            )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, idle_period=30
+        )
+        # The label must also stay put once the units settle.
+        assert primary_labels() == expected_labels
+    finally:
+        await ops_test.model.set_config({"update-status-hook-interval": "5m"})
+
+    new_roles = await get_cluster_roles(ops_test, any_unit_name)
+    assert new_roles["primaries"] == [new_primary]
+    assert old_primary in new_roles["sync_standbys"]
+    assert len(new_roles["sync_standbys"]) == 2
+    assert len(new_roles["replicas"]) == 0
+
+
 @pytest.mark.parametrize(
     "roles",
     [
