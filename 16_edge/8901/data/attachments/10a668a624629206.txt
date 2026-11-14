@@ -1,0 +1,112 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-a/0 [executing] blocked: Circular replication detected
+  postgresql-c/0 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-a/0 [idle] blocked: table public.orders in database testdb isn't empty
+  postgresql-c/0 [executing] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  02:11:30Z
+
+App                Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator-a           active      1  data-integrator  latest/stable  418  no       
+data-integrator-b           active      1  data-integrator  latest/stable  418  no       
+data-integrator-c           active      1  data-integrator  latest/stable  418  no       
+postgresql-a       16.15    active      1  postgresql                        1  no       
+postgresql-b       16.15    active      1  postgresql                        0  no       
+postgresql-c       16.15    active      1  postgresql                        2  no       
+
+Unit                  Workload  Agent  Machine  Public address  Ports     Message
+data-integrator-a/0*  active    idle   1        10.142.215.166            
+data-integrator-b/0*  active    idle   2        10.142.215.67             
+data-integrator-c/0*  active    idle   0        10.142.215.30             
+postgresql-a/0*       active    idle   5        10.142.215.132  5432/tcp  Primary
+postgresql-b/0*       active    idle   3        10.142.215.192  5432/tcp  Primary
+postgresql-c/0*       active    idle   4        10.142.215.74   5432/tcp  Primary
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.142.215.30   juju-84667c-0  ubuntu@24.04  runnervm8axu0  Running
+1        started  10.142.215.166  juju-84667c-1  ubuntu@24.04  runnervm8axu0  Running
+2        started  10.142.215.67   juju-84667c-2  ubuntu@24.04  runnervm8axu0  Running
+3        started  10.142.215.192  juju-84667c-3  ubuntu@24.04  runnervm8axu0  Running
+4        started  10.142.215.74   juju-84667c-4  ubuntu@24.04  runnervm8axu0  Running
+5        started  10.142.215.132  juju-84667c-5  ubuntu@24.04  runnervm8axu0  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:57:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:57:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:57:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:57:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:57:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:57:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:58:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:58:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:58:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:58:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-c-0: 01:58:47 ERROR unit.postgresql-c/0.juju-log failed to get primary with error RetryError[<Future at 0x7f368136ecf0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:48 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f36813733b0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:49 ERROR unit.postgresql-c/0.juju-log failed to get primary with error RetryError[<Future at 0x7fce5b444f80 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:50 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fce5b213dd0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:52 ERROR unit.postgresql-c/0.juju-log failed to get primary with error RetryError[<Future at 0x7f216ea35a00 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:52 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f216ea37e30 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:52 ERROR unit.postgresql-a/0.juju-log failed to get primary with error RetryError[<Future at 0x7f4b3939ae10 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:52 ERROR unit.postgresql-b/0.juju-log failed to get primary with error RetryError[<Future at 0x7f04ee442030 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:53 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4b39113740 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:53 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f04ede3b4a0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:53 ERROR unit.postgresql-c/0.juju-log failed to get primary with error RetryError[<Future at 0x7f52689e7fe0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:54 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5267f3b260 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:55 ERROR unit.postgresql-b/0.juju-log failed to get primary with error RetryError[<Future at 0x7f80a7402e40 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:55 ERROR unit.postgresql-a/0.juju-log failed to get primary with error RetryError[<Future at 0x7f19c0528620 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:55 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f80a71d3e60 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:55 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f19bee937a0 state=finished raised Exception>]
+unit-postgresql-c-0: 01:58:55 ERROR unit.postgresql-c/0.juju-log failed to get primary with error RetryError[<Future at 0x7fca23323290 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:56 ERROR unit.postgresql-a/0.juju-log failed to get primary with error RetryError[<Future at 0x7faf535af3e0 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:57 ERROR unit.postgresql-b/0.juju-log failed to get primary with error RetryError[<Future at 0x7fb746dbf020 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:57 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faf51b97650 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:57 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb7469afe90 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:59 ERROR unit.postgresql-a/0.juju-log failed to get primary with error RetryError[<Future at 0x7fc7c1b184a0 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:59 ERROR unit.postgresql-b/0.juju-log failed to get primary with error RetryError[<Future at 0x7f2476f002f0 state=finished raised Exception>]
+unit-postgresql-a-0: 01:58:59 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc7c0987620 state=finished raised Exception>]
+unit-postgresql-b-0: 01:58:59 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f2476f02db0 state=finished raised Exception>]
+unit-postgresql-a-0: 01:59:00 ERROR unit.postgresql-a/0.juju-log failed to get primary with error RetryError[<Future at 0x7f347b6356a0 state=finished raised Exception>]
+unit-postgresql-b-0: 01:59:01 ERROR unit.postgresql-b/0.juju-log failed to get primary with error RetryError[<Future at 0x7f436b0fe930 state=finished raised Exception>]
+unit-postgresql-c-0: 01:59:31 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fca230ca480 state=finished raised Exception>]
+unit-postgresql-a-0: 01:59:35 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f347be0a240 state=finished raised Exception>]
+unit-postgresql-b-0: 01:59:35 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f436ac2ef30 state=finished raised Exception>]
+unit-postgresql-c-0: 02:00:00 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-c-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-c-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fae907a64b0 state=finished raised Exception>]
+unit-postgresql-b-0: 02:00:03 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-b-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-b-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb8f9a59670 state=finished raised Exception>]
+unit-postgresql-a-0: 02:00:04 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-a-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-a-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fbf9f61ff20 state=finished raised Exception>]
+unit-postgresql-a-0: 02:04:32 ERROR unit.postgresql-a/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: circular replication detected for table public.users in database testdb
+unit-postgresql-b-0: 02:04:36 ERROR unit.postgresql-b/0.juju-log logical-replication-offer:19: single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #19: circular replication detected for tables public.users in database testdb
+unit-postgresql-b-0: 02:04:46 ERROR unit.postgresql-b/0.juju-log single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #19: circular replication detected for tables public.users in database testdb
+unit-postgresql-c-0: 02:10:30 ERROR unit.postgresql-c/0.juju-log logical-replication-offer:22: single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #22: circular replication detected for tables public.users in database testdb
+unit-postgresql-a-0: 02:10:33 ERROR unit.postgresql-a/0.juju-log logical-replication:22: single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher rejected subscription: circular replication detected for tables public.users in database testdb
+unit-postgresql-c-0: 02:10:45 ERROR unit.postgresql-c/0.juju-log single_kernel_postgresql.managers.logical_replication:Cannot create/update publication for logical-replication-offer #22: circular replication detected for tables public.users in database testdb
+unit-postgresql-a-0: 02:10:58 ERROR unit.postgresql-a/0.juju-log logical-replication:22: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.orders in database testdb isn't empty
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
