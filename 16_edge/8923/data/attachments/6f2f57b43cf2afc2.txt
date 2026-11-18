@@ -1,0 +1,60 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  01:29:13Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  16.15    active      1  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/1*  active    idle   1        10.185.144.241  5432/tcp  Primary
+
+Machine  State    Address         Inst id        Base          AZ             Message
+1        started  10.185.144.241  juju-e85535-1  ubuntu@24.04  runnervm8axu0  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:24:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:24:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:24:53 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f47c7427080 state=finished raised Exception>]
+unit-postgresql-0: 01:24:54 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f47c6d23680 state=finished raised Exception>]
+unit-postgresql-0: 01:24:55 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7ff9478caab0 state=finished raised Exception>]
+unit-postgresql-0: 01:24:55 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff94615f830 state=finished raised Exception>]
+unit-postgresql-0: 01:24:56 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f46d6ad99d0 state=finished raised Exception>]
+unit-postgresql-0: 01:24:57 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f46d759ca70 state=finished raised Exception>]
+unit-postgresql-0: 01:24:58 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f7d674048f0 state=finished raised Exception>]
+unit-postgresql-0: 01:24:58 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f7d65a13620 state=finished raised Exception>]
+unit-postgresql-0: 01:24:59 ERROR unit.postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fda7e837b60 state=finished raised Exception>]
+unit-postgresql-0: 01:25:19 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fda7e841ca0 state=finished raised Exception>]
+unit-postgresql-0: 01:25:41 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f372eb33c50 state=finished raised Exception>]
+machine-0: 01:26:32 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+controller-0: 01:26:42 ERROR juju.worker.provisioner failed to remove dead machine "0"
+machine-1: 01:27:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:27:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:27:16 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7fce61055490 state=finished raised Exception>]
+unit-postgresql-1: 01:27:16 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fce60e189b0 state=finished raised Exception>]
+unit-postgresql-1: 01:27:18 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f87ada67dd0 state=finished raised Exception>]
+unit-postgresql-1: 01:27:18 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f87ad1a58e0 state=finished raised Exception>]
+unit-postgresql-1: 01:27:19 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f3459011730 state=finished raised Exception>]
+unit-postgresql-1: 01:27:19 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3459013020 state=finished raised Exception>]
+unit-postgresql-1: 01:27:20 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f98213314f0 state=finished raised Exception>]
+unit-postgresql-1: 01:27:20 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f98209b74d0 state=finished raised Exception>]
+unit-postgresql-1: 01:27:22 ERROR unit.postgresql/1.juju-log failed to get primary with error RetryError[<Future at 0x7f3143305850 state=finished raised Exception>]
+unit-postgresql-1: 01:27:44 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3143310f50 state=finished raised Exception>]
+unit-postgresql-1: 01:28:12 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7964dc0680 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
