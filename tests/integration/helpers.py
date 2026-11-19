@@ -793,7 +793,7 @@ async def check_roles_and_their_permissions(
                 cursor.execute(f"CREATE DATABASE {database_name}_2;")
 
             logger.info("Checking that the relation user can't create a table")
-            cursor.execute("RESET ROLE;")
+            cursor.execute("SET ROLE NONE;")
             check_connected_user(cursor, username, username)
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                 cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
