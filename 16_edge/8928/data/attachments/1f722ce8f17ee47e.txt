@@ -1,0 +1,209 @@
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju config --model testing s3-integrator endpoint=https://storage.googleapis.com bucket=data-charms-testing path=/postgresql-k8s/d0aea7ed-e3bb-11f1-82ab-7ced8dc0fc02 region=
+[32mINFO    [0m integration.test_backups_gcp:test_backups_gcp.py:234 waiting for the database charm to become blocked
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant:_juju.py:551 cli: juju status --model testing --format json
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [new-postgresql] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [new-postgresql/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1875 [s3-integrator/0] status: active ()
+[32mINFO    [0m jubilant.wait:_juju.py:1880 [new-postgresql/0] status changed: active () -> blocked (failed to initialize stanza, check your S3 settings)
+[32mINFO    [0m integration.conftest:conftest.py:71 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  02:19:54Z
+
+App             Version  Status  Scale  Charm          Channel   Rev  Exposed  Message
+new-postgresql  16.15    active      1  postgresql                 2  no       
+s3-integrator            active      1  s3-integrator  1/stable  562  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  blocked   idle   5        10.91.252.31    5432/tcp  failed to initialize stanza, check your S3 settings
+s3-integrator/0*   active    idle   0        10.91.252.127             
+
+Machine  State    Address        Inst id        Base          AZ             Message
+0        started  10.91.252.127  juju-d3fded-0  ubuntu@22.04  runnervm8axu0  Running
+5        started  10.91.252.31   juju-d3fded-5  ubuntu@24.04  runnervm8axu0  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:53:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:53:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:53:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:53:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:54:06 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:54:06 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 01:54:14 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f8403ad0680 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:14 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f840365d8e0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:17 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f833ebe17f0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:17 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f833e1bbd70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:19 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f576dd4af30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:19 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f576d513c50 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:20 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f7e0c51ef00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:21 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f7e0bb0f380 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:22 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7fb9bf010cb0 state=finished raised Exception>]
+machine-3: 01:54:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:54:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-1: 01:54:47 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f50d279a990 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:47 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f50d37b61b0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:48 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f439aa8e990 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:49 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f439a712390 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:50 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb9bf011460 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:50 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f85522e9640 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:50 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8551caf260 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:52 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f9c27de3260 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:52 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9c27b0b260 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:52 ERROR unit.postgresql-gcp/0.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7f5c22a61880 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:52 ERROR unit.postgresql-gcp/0.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5c218973e0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:54:54 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f75cbbd0da0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:54 ERROR unit.postgresql-gcp/0.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7fe27894d850 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:54 ERROR unit.postgresql-gcp/0.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe27779da60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:56 ERROR unit.postgresql-gcp/0.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f10395118b0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:56 ERROR unit.postgresql-gcp/0.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f10383a1f40 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:58 ERROR unit.postgresql-gcp/0.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7fc38b5b9f10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:58 ERROR unit.postgresql-gcp/0.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc38a442180 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:54:59 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f985f70a480 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:00 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f985f73cc20 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:01 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7fcc2be86de0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:02 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fcc2beb8cb0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:03 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f0981f7d760 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:15 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f75cbbd2a20 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:17 ERROR unit.postgresql-gcp/1.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7fb4fb9e0290 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:17 ERROR unit.postgresql-gcp/1.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb4fbbd6330 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:19 ERROR unit.postgresql-gcp/1.juju-log refresh-v-three:4: failed to get primary with error RetryError[<Future at 0x7f65cbada930 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:19 ERROR unit.postgresql-gcp/1.juju-log refresh-v-three:4: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f65ca5a4a70 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:19 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 240, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f0981f7d280 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:19 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0981f99550 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:21 ERROR unit.postgresql-gcp/1.juju-log restart:3: failed to get primary with error RetryError[<Future at 0x7f9f1e354cb0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:21 ERROR unit.postgresql-gcp/1.juju-log restart:3: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9f1e380b60 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:21 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f072b85c230 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:22 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f072b89fc50 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:22 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f072b88ade0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:23 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f072b89e4e0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:23 ERROR unit.postgresql-gcp/1.juju-log status-peers:1: failed to get primary with error RetryError[<Future at 0x7fac3e9fa810 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:23 ERROR unit.postgresql-gcp/1.juju-log status-peers:1: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fac3d0954c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:24 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7fc05863ee40 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:25 ERROR unit.postgresql-gcp/1.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f975d6e0830 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:26 ERROR unit.postgresql-gcp/1.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f975c37ffb0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:28 ERROR unit.postgresql-gcp/1.juju-log database-peers:2: failed to get primary with error RetryError[<Future at 0x7fd4ca6285c0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 01:55:28 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc0586aa630 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:28 ERROR unit.postgresql-gcp/1.juju-log database-peers:2: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd4c8eebcb0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:30 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7fd4ee8d8f20 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:30 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd4ee8f8980 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:32 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f999b1b0380 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:32 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f999c3109b0 state=finished raised Exception>]
+unit-postgresql-gcp-1: 01:55:35 ERROR unit.postgresql-gcp/1.juju-log failed to get primary with error RetryError[<Future at 0x7f59832c8440 state=finished raised Exception>]
+unit-postgresql-gcp-1: 02:07:13 ERROR unit.postgresql-gcp/1.juju-log single_kernel_postgresql.events.postgresql:Skipping charmed-postgresql snap removal: failed to unmount data storage: umount: /var/snap/charmed-postgresql/common/var/lib/postgresql: target is busy.
+
+unit-postgresql-gcp-0: 02:11:52 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7fb2430cb2f0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:52 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb2430f9ca0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:53 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f20021c3290 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:54 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f20021fe720 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:55 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7fd26b8bc800 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:56 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd26b8bc710 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:57 ERROR unit.postgresql-gcp/0.juju-log s3-parameters:7: failed to get primary with error RetryError[<Future at 0x7fce5b1d0950 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:57 ERROR unit.postgresql-gcp/0.juju-log s3-parameters:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fce5a0a3b00 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:58 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7fc58b868ce0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:58 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc58b845640 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:11:59 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: failed to get primary with error RetryError[<Future at 0x7f31a3692570 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:00 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f31a3725430 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:00 ERROR unit.postgresql-gcp/0.juju-log client-certificates:5: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f31a36fbb30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:01 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7f55ec5211f0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:01 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f55eb3a0a10 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:02 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: failed to get primary with error RetryError[<Future at 0x7f52bb709160 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:03 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f52ba5edca0 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:03 ERROR unit.postgresql-gcp/0.juju-log peer-certificates:6: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f52ba5ef530 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:04 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7f6737a0e630 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:04 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f67368ebf80 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:05 ERROR unit.postgresql-gcp/0.juju-log failed to get primary with error RetryError[<Future at 0x7ff669b62c30 state=finished raised Exception>]
+unit-postgresql-gcp-0: 02:12:10 ERROR unit.postgresql-gcp/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff6687d7c50 state=finished raised Exception>]
+machine-4: 02:13:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 02:13:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:13:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:13:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-2: 02:13:51 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7f2990520200 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:52 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f298e51b1d0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:53 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7fe975c10770 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:54 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe975c13350 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:55 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7f89696efd70 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:55 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8969112e70 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:56 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7f931d708770 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:57 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f931d70b170 state=finished raised Exception>]
+unit-new-postgresql-0: 02:13:58 ERROR unit.new-postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f3d8ed4f4d0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:13:58 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7f734c879370 state=finished raised Exception>]
+unit-new-postgresql-0: 02:13:58 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3d8e97fb30 state=finished raised Exception>]
+unit-new-postgresql-0: 02:13:59 ERROR unit.new-postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f189ebe17f0 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:00 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f189e1c7530 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:01 ERROR unit.new-postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fe0dfe198b0 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:01 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe0dfe1bb60 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:03 ERROR unit.new-postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7fea24853410 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:03 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fea22103e90 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:04 ERROR unit.new-postgresql/0.juju-log failed to get primary with error RetryError[<Future at 0x7f4b8ceef0e0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:14:23 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f734a6f54c0 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:29 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4b8cae6a80 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:14:50 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-gcp-2/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f29e4083980 state=finished raised Exception>]
+unit-new-postgresql-0: 02:14:55 ERROR unit.new-postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 532, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 272, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7f7e72ea6450 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:16:02 ERROR unit.postgresql-gcp/2.juju-log s3-parameters:16: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3e8c556c30 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:16:03 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7fefa360a360 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:16:03 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fefa24e7c50 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:16:04 ERROR unit.postgresql-gcp/2.juju-log failed to get primary with error RetryError[<Future at 0x7fb08bac56a0 state=finished raised Exception>]
+unit-postgresql-gcp-2: 02:16:09 ERROR unit.postgresql-gcp/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb08bab79e0 state=finished raised Exception>]
+machine-4: 02:16:10 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:16:10 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:16:10 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:16:10 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:16:10 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+unit-new-postgresql-0: 02:19:46 ERROR unit.new-postgresql/0.juju-log s3-parameters:17: single_kernel_postgresql.managers.backup:Invalid stanza name from s3
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
