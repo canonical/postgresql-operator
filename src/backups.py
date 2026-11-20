@@ -28,7 +28,7 @@ from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.jujuversion import JujuVersion
-from ops.model import ActiveStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
@@ -985,24 +985,40 @@ Juju Version: {juju_version!s}
             event.fail(error_message)
             return
 
-        if not self.charm.is_primary:
-            # Create a rule to mark the cluster as in a creating backup state and update
-            # the Patroni configuration.
-            self._change_connectivity_to_database(connectivity=False)
+        # Decide before any side effect whether this unit disables connectivity, so the
+        # reset in the finally below runs even if disabling or the re-render raises partway
+        # — a stale "off" leaves pg_hba rejecting peer/replica connections across restarts.
+        disabled_connectivity = not self.charm.is_primary
+        try:
+            if disabled_connectivity:
+                # Create a rule to mark the cluster as in a creating backup state and update
+                # the Patroni configuration.
+                self._change_connectivity_to_database(connectivity=False)
 
-        self.charm.unit.status = MaintenanceStatus("creating backup")
-        # Set flag due to missing in progress backups on JSON output
-        # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
-        self.charm.update_config(is_creating_backup=True)
+            self.charm.unit.status = MaintenanceStatus("creating backup")
+            # Set flag due to missing in progress backups on JSON output
+            # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
+            self.charm.update_config(is_creating_backup=True)
 
-        self._run_backup(event, s3_parameters, datetime_backup_requested, backup_type)
+            self._run_backup(event, s3_parameters, datetime_backup_requested, backup_type)
+        finally:
+            if disabled_connectivity:
+                # Remove the rule that marks the cluster as in a creating backup state
+                # and update the Patroni configuration.
+                try:
+                    self._change_connectivity_to_database(connectivity=True)
+                except Exception:
+                    # Suppressed so a cleanup failure can't replace the backup error that is
+                    # already propagating; surfaced through the log and a blocked status
+                    # instead, and reset_stale_connectivity_flag() retries on later hooks.
+                    logger.exception("Failed to restore connectivity after the backup")
+                    self.charm.unit.status = BlockedStatus(
+                        "failed to restore connectivity after backup"
+                    )
+            # Clear the in-progress tag inside the finally so an unexpected failure can't
+            # leave it set, which would block refreshes and the stale-flag recovery.
+            self.charm.update_config(is_creating_backup=False)
 
-        if not self.charm.is_primary:
-            # Remove the rule that marks the cluster as in a creating backup state
-            # and update the Patroni configuration.
-            self._change_connectivity_to_database(connectivity=True)
-
-        self.charm.update_config(is_creating_backup=False)
         self.charm.unit.status = ActiveStatus()
 
     def _run_backup(
