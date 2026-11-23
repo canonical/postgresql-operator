@@ -1,0 +1,681 @@
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  data-integrator/0 [idle] active: 
+  data-integrator3/0 [idle] active: 
+  postgresql3/0 [executing] active: Primary
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql3/0 [idle] active: Primary
+  postgresql/0 [idle] active: Primary
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.29   unsupported  02:09:53Z
+
+App               Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
+data-integrator            active      1  data-integrator  latest/stable  418  no       
+data-integrator3           active      1  data-integrator  latest/stable  418  no       
+postgresql        16.15    active      3  postgresql                        1  no       
+postgresql3       16.15    active      1  postgresql                        0  no       
+
+Unit                 Workload  Agent  Machine  Public address  Ports     Message
+data-integrator3/0*  active    idle   2        10.138.103.197            
+data-integrator/0*   active    idle   0        10.138.103.202            
+postgresql3/0*       active    idle   3        10.138.103.155  5432/tcp  Primary
+postgresql/0*        active    idle   7        10.138.103.133  5432/tcp  Primary
+postgresql/1         active    idle   8        10.138.103.174  5432/tcp  
+postgresql/2         active    idle   9        10.138.103.96   5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ             Message
+0        started  10.138.103.202  juju-000efa-0  ubuntu@24.04  runnervmeozm8  Running
+2        started  10.138.103.197  juju-000efa-2  ubuntu@24.04  runnervmeozm8  Running
+3        started  10.138.103.155  juju-000efa-3  ubuntu@24.04  runnervmeozm8  Running
+7        started  10.138.103.133  juju-000efa-7  ubuntu@24.04  runnervmeozm8  Running
+8        started  10.138.103.174  juju-000efa-8  ubuntu@24.04  runnervmeozm8  Running
+9        started  10.138.103.96   juju-000efa-9  ubuntu@24.04  runnervmeozm8  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-0: 01:39:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:39:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:41:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:41:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:41:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:41:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:41:37 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:41:37 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql3-0: 01:41:45 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4e8b8b9490 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:45 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4e8b8badb0 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:48 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0184919b80 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:49 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0184030740 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:52 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f37ebfd1e20 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:52 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f37eb538a40 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:55 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f65a38e7410 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:55 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f65a2e26ff0 state=finished raised Exception>]
+unit-postgresql3-0: 01:41:59 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe85379b1d0 state=finished raised Exception>]
+unit-postgresql-0: 01:42:03 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f280b1b20c0 state=finished raised Exception>]
+unit-postgresql-0: 01:42:03 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f280a6c7620 state=finished raised Exception>]
+machine-4: 01:42:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:42:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:42:08 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f014df31550 state=finished raised Exception>]
+unit-postgresql-0: 01:42:08 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f014df33140 state=finished raised Exception>]
+unit-postgresql-0: 01:42:12 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8e24a6f020 state=finished raised Exception>]
+unit-postgresql-0: 01:42:12 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8e24728530 state=finished raised Exception>]
+machine-8: 01:42:14 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:42:14 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:42:16 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb1c60c3bc0 state=finished raised Exception>]
+unit-postgresql-0: 01:42:16 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb1c5ddb230 state=finished raised Exception>]
+unit-postgresql-0: 01:42:19 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f371e711490 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:37 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f902cb71d90 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:38 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f902c3cb620 state=finished raised Exception>]
+unit-postgresql-1: 01:42:41 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f49d1b48e30 state=finished raised Exception>]
+unit-postgresql-1: 01:42:41 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f49d23f0830 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:41 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efd2d6594f0 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:41 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efd2c3df1a0 state=finished raised Exception>]
+unit-postgresql-1: 01:42:45 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f12a3deb680 state=finished raised Exception>]
+unit-postgresql-1: 01:42:45 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f12a331c1a0 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:45 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f23e4419700 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:45 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f23e31e4830 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:49 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdc43919b80 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:49 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fdc43638470 state=finished raised Exception>]
+unit-postgresql-1: 01:42:49 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f73827502f0 state=finished raised Exception>]
+unit-postgresql-1: 01:42:50 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f738203ac00 state=finished raised Exception>]
+unit-postgresql2-0: 01:42:53 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f39c6ef1490 state=finished raised Exception>]
+unit-postgresql-1: 01:42:54 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efcf701b470 state=finished raised Exception>]
+unit-postgresql-1: 01:42:54 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efcf682ed50 state=finished raised Exception>]
+unit-postgresql3-0: 01:42:57 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe852409520 state=finished raised Exception>]
+unit-postgresql-1: 01:42:58 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f825f8467e0 state=finished raised Exception>]
+machine-5: 01:42:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:42:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 01:43:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 01:43:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:43:15 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f371e721310 state=finished raised Exception>]
+unit-postgresql-0: 01:43:20 ERROR unit.postgresql/0.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc870235400 state=finished raised Exception>]
+unit-postgresql-0: 01:43:20 ERROR unit.postgresql/0.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc871920770 state=finished raised Exception>]
+unit-postgresql-0: 01:43:25 ERROR unit.postgresql/0.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f524c235550 state=finished raised Exception>]
+unit-postgresql-0: 01:43:25 ERROR unit.postgresql/0.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f524a0bd2e0 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:27 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff1fd559a00 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:27 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff1fd55afc0 state=finished raised Exception>]
+unit-postgresql-0: 01:43:30 ERROR unit.postgresql/0.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd4d5c2d6a0 state=finished raised Exception>]
+unit-postgresql-0: 01:43:30 ERROR unit.postgresql/0.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd4d4ab89e0 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:30 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f12d7b20cb0 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:31 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f12d7312b10 state=finished raised Exception>]
+unit-postgresql-2: 01:43:31 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4c8ddc5a60 state=finished raised Exception>]
+unit-postgresql-2: 01:43:31 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f4c8ddc7350 state=finished raised Exception>]
+unit-postgresql-0: 01:43:34 ERROR unit.postgresql/0.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f60efdcdaf0 state=finished raised Exception>]
+unit-postgresql-0: 01:43:34 ERROR unit.postgresql/0.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f60edfbd460 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:34 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f1731d0fc80 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:34 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f17322e3770 state=finished raised Exception>]
+unit-postgresql-2: 01:43:34 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f24aed83bc0 state=finished raised Exception>]
+unit-postgresql-2: 01:43:34 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f24ae532750 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:38 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f44193f1730 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:38 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f44189ea990 state=finished raised Exception>]
+unit-postgresql-2: 01:43:38 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6f496a8890 state=finished raised Exception>]
+unit-postgresql-2: 01:43:38 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6f48f1ebd0 state=finished raised Exception>]
+unit-postgresql-0: 01:43:38 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd1bbb55cd0 state=finished raised Exception>]
+machine-6: 01:43:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:43:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql3-0: 01:43:41 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 535, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql3-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 275, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fde258fda90 state=finished raised Exception>]
+unit-postgresql2-1: 01:43:41 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f86a805b320 state=finished raised Exception>]
+unit-postgresql-2: 01:43:42 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f39fa1e7920 state=finished raised Exception>]
+unit-postgresql-2: 01:43:42 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f39f97ce930 state=finished raised Exception>]
+unit-postgresql-2: 01:43:45 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f16d45127e0 state=finished raised Exception>]
+unit-postgresql-1: 01:43:47 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f825f4413a0 state=finished raised Exception>]
+unit-postgresql2-0: 01:43:51 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f39c6c1df70 state=finished raised Exception>]
+unit-postgresql-1: 01:43:53 ERROR unit.postgresql/1.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faaaa84c5c0 state=finished raised Exception>]
+unit-postgresql-1: 01:43:53 ERROR unit.postgresql/1.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faaa8689b80 state=finished raised Exception>]
+unit-postgresql-0: 01:43:55 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 535, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 243, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fd1bbb62b70 state=finished raised Exception>]
+unit-postgresql2-0: 01:43:55 ERROR unit.postgresql2/0.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fee3bfdf050 state=finished raised Exception>]
+unit-postgresql-0: 01:43:56 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd1bbb9ee40 state=finished raised Exception>]
+unit-postgresql2-0: 01:43:56 ERROR unit.postgresql2/0.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fee3bfdfb00 state=finished raised Exception>]
+unit-postgresql-1: 01:43:58 ERROR unit.postgresql/1.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff9b28bce90 state=finished raised Exception>]
+unit-postgresql-1: 01:43:58 ERROR unit.postgresql/1.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff9b28e2f60 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:00 ERROR unit.postgresql2/0.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fed8a852780 state=finished raised Exception>]
+unit-postgresql-0: 01:44:00 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ffb3026bb60 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:00 ERROR unit.postgresql2/0.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fed8849e9f0 state=finished raised Exception>]
+unit-postgresql-0: 01:44:01 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ffb302a7200 state=finished raised Exception>]
+unit-postgresql-1: 01:44:03 ERROR unit.postgresql/1.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efff6b9d2e0 state=finished raised Exception>]
+unit-postgresql-1: 01:44:03 ERROR unit.postgresql/1.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7efff5145010 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:05 ERROR unit.postgresql2/0.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3610551910 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:05 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5651d59d30 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:05 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5651d5b920 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:05 ERROR unit.postgresql2/0.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f360f3ab710 state=finished raised Exception>]
+unit-postgresql-0: 01:44:05 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc38c8bf4a0 state=finished raised Exception>]
+unit-postgresql-1: 01:44:09 ERROR unit.postgresql/1.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd06d58f560 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:09 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa20f8f16a0 state=finished raised Exception>]
+unit-postgresql-1: 01:44:09 ERROR unit.postgresql/1.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd06aca9bb0 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:09 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa20f612d50 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:09 ERROR unit.postgresql2/0.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f55e7e06240 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:10 ERROR unit.postgresql2/0.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f55e69a9310 state=finished raised Exception>]
+unit-postgresql-0: 01:44:11 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fc38e028bc0 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:14 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb232731af0 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:14 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0073b526f0 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:15 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0073842b70 state=finished raised Exception>]
+unit-postgresql-1: 01:44:15 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f7532e2a360 state=finished raised Exception>]
+unit-postgresql-1: 01:44:15 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f7532ea1e50 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:18 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5ffb62ec60 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:18 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f5ffb63c350 state=finished raised Exception>]
+unit-postgresql-1: 01:44:20 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd491396900 state=finished raised Exception>]
+unit-postgresql-0: 01:44:20 ERROR unit.postgresql/0.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6628b9fd70 state=finished raised Exception>]
+unit-postgresql-1: 01:44:20 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd48f9c50a0 state=finished raised Exception>]
+unit-postgresql2-2: 01:44:22 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe32a5494f0 state=finished raised Exception>]
+unit-postgresql-1: 01:44:25 ERROR unit.postgresql/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7ff9d5cb4d10 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:31 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.managers.patroni:Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql2-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 535, in online_cluster_members
+    cluster_status = self.cluster_status()
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/lib/juju/agents/unit-postgresql2-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/patroni.py", line 243, in cluster_status
+    raise RetryError(
+tenacity.RetryError: RetryError[<Future at 0x7fb2305b7ce0 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:32 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fb2305c6a50 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:39 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faca9d91e20 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:39 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faca9dcb050 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:43 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f86a7b366f0 state=finished raised Exception>]
+unit-postgresql-2: 01:44:43 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f16d43126f0 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:44 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f977fa73e30 state=finished raised Exception>]
+unit-postgresql-2: 01:44:49 ERROR unit.postgresql/2.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fefec558cb0 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:49 ERROR unit.postgresql2/1.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa821ecccb0 state=finished raised Exception>]
+unit-postgresql-2: 01:44:49 ERROR unit.postgresql/2.juju-log database-peers:11: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fefec5762a0 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:49 ERROR unit.postgresql2/1.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa821eb1cd0 state=finished raised Exception>]
+unit-postgresql2-0: 01:44:50 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f97811d4260 state=finished raised Exception>]
+unit-postgresql-2: 01:44:53 ERROR unit.postgresql/2.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9da8bab9e0 state=finished raised Exception>]
+unit-postgresql-2: 01:44:53 ERROR unit.postgresql/2.juju-log refresh-v-three:13: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9da9ce2900 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:55 ERROR unit.postgresql2/1.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6da830aea0 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:55 ERROR unit.postgresql2/1.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6da8317a10 state=finished raised Exception>]
+unit-postgresql-2: 01:44:58 ERROR unit.postgresql/2.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa3f54655e0 state=finished raised Exception>]
+unit-postgresql-2: 01:44:59 ERROR unit.postgresql/2.juju-log restart:12: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fa3f54bc590 state=finished raised Exception>]
+unit-postgresql2-1: 01:44:59 ERROR unit.postgresql2/1.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9748ad86e0 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:00 ERROR unit.postgresql2/1.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9748b00cb0 state=finished raised Exception>]
+unit-postgresql-2: 01:45:05 ERROR unit.postgresql/2.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f58b0161610 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:06 ERROR unit.postgresql2/1.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f420a2e5b20 state=finished raised Exception>]
+unit-postgresql-2: 01:45:06 ERROR unit.postgresql/2.juju-log status-peers:14: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f58b156cd70 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:06 ERROR unit.postgresql2/1.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f420a303c20 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:12 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9667f7bce0 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:12 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9667f7b4d0 state=finished raised Exception>]
+unit-postgresql-2: 01:45:12 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6a1f5373e0 state=finished raised Exception>]
+unit-postgresql-2: 01:45:13 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f6a1e3c5c10 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:16 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8a4efcfcb0 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:17 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f8a4efdd460 state=finished raised Exception>]
+unit-postgresql-2: 01:45:19 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fcffbf83b60 state=finished raised Exception>]
+unit-postgresql-2: 01:45:21 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fcffbf92570 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:21 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fe32a2d3980 state=finished raised Exception>]
+unit-postgresql2-1: 01:45:22 ERROR unit.postgresql2/1.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3e4caf3920 state=finished raised Exception>]
+unit-postgresql-2: 01:45:27 ERROR unit.postgresql/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7feeecc758e0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:28 ERROR unit.postgresql2/2.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f39968b5bb0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:28 ERROR unit.postgresql2/2.juju-log restart:7: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f3995761610 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:32 ERROR unit.postgresql2/2.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9e786ff740 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:32 ERROR unit.postgresql2/2.juju-log status-peers:9: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f9e786ff1a0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:36 ERROR unit.postgresql2/2.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f404a6b9d00 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:36 ERROR unit.postgresql2/2.juju-log refresh-v-three:8: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f404a6f31d0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:41 ERROR unit.postgresql2/2.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faf37160560 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:42 ERROR unit.postgresql2/2.juju-log database-peers:10: single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7faf345e76b0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:47 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0aa9f80d70 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:48 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7f0aa9f81ca0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:54 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fedc73beab0 state=finished raised Exception>]
+unit-postgresql2-2: 01:45:56 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fedc59b32c0 state=finished raised Exception>]
+unit-postgresql2-2: 01:46:02 ERROR unit.postgresql2/2.juju-log single_kernel_postgresql.charms.vm_charm:failed to get primary with error RetryError[<Future at 0x7fd98cbe37d0 state=finished raised Exception>]
+unit-postgresql-0: 01:48:01 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:06 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:11 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:16 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:21 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql2-2: 01:48:24 ERROR unit.postgresql2/2.juju-log database-peers:10: single_kernel_postgresql.utils.postgresql:Failed to list PostgreSQL database users: connection to server on socket "/tmp/snap-private-tmp/snap.charmed-postgresql/tmp//.s.PGSQL.5432" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?
+
+unit-postgresql-0: 01:48:26 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:32 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:37 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:42 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:47 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:52 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:48:57 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:02 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:07 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:12 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:18 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:23 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:28 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:33 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:38 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:43 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:48 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:53 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:49:58 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:03 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:08 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:13 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:18 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:23 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:28 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:33 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:38 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:43 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:49 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:54 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:50:59 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:04 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:09 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:14 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:19 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:24 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:29 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:34 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:39 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:44 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:49 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:54 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:51:59 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:04 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:09 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:14 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:19 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:24 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:30 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:35 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:40 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:45 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:50 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:52:55 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:53:00 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:53:05 ERROR unit.postgresql/0.juju-log single_kernel_postgresql.managers.cluster_membership:Unable to remove Raft member
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/cluster_membership.py", line 611, in raft_reconnect
+    self.raft_manager.remove_raft_member(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.12/site-packages/single_kernel_postgresql/managers/raft.py", line 284, in remove_raft_member
+    raise RemoveRaftMemberFailedError() from None
+single_kernel_postgresql.config.exceptions.RemoveRaftMemberFailedError
+unit-postgresql-0: 01:57:41 ERROR unit.postgresql/0.juju-log logical-replication-offer:18: single_kernel_postgresql.managers.logical_replication:Cannot create new publication for logical-replication-offer #18: table public.test_table in database testdb doesn't exist
+unit-postgresql2-0: 01:57:49 ERROR unit.postgresql2/0.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 01:58:02 ERROR unit.postgresql3/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: database bad_database doesn't exist
+unit-postgresql2-0: 01:59:14 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: Publisher errors: table public.test_table in database testdb doesn't exist
+unit-postgresql3-0: 02:01:35 ERROR unit.postgresql3/0.juju-log logical-replication:19: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+unit-postgresql2-0: 02:04:08 ERROR unit.postgresql2/0.juju-log single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table in database testdb isn't empty
+unit-postgresql2-0: 02:04:41 ERROR unit.postgresql2/0.juju-log logical-replication:18: single_kernel_postgresql.managers.logical_replication:Logical replication validation: table public.test_table2 in database testdb isn't empty
+machine-5: 02:08:45 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 02:08:45 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 02:08:45 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-5: 02:08:45 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:08:47 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+machine-4: 02:08:47 ERROR juju.api.watcher error trying to stop watcher: connection is shutdown before send: connection is shut down
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
