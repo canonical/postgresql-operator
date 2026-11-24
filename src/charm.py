@@ -2454,7 +2454,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("PostgreSQL restart required")
             if self._peers is not None:
                 self._peers.data[self.unit].pop("postgresql_restarted", None)
-            self.on[self.restart_manager.name].acquire_lock.emit()
+            self.on[str(self.restart_manager.name)].acquire_lock.emit()
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
